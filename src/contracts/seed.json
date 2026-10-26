@@ -1,0 +1,1154 @@
+{
+ "$schema": "./demo-provisioning-1.2.schema.json",
+ "dataset": "nerdpos-demo-restaurant",
+ "version": "1.2.0",
+ "task": "NP-D-L2-18",
+ "label": "DEMO",
+ "notice": "Disclosed demonstration data for the L1 integration environment (NP-R-13). Not a real business, tax registration, price list or person. Legal/fiscal values are not certified. Version 1.2.0 adds the L2 administration demo (W10).",
+ "references": {
+  "previous": "demo-provisioning.json 1.1.0 (unchanged)",
+  "domain_line": "agent/claude/domain-line @ f4b90711 (manifest 3.7.0)",
+  "canonical_sha256": "33e3096c201a22c42df07cdcf58d1203efbef5d53aab32f08d0551be06682c2a",
+  "operations": "Catalog.SetPrice (W1), TaxPolicy.Create/Configure (W2), ReasonCode.Create (W4), Settings.UpdatePolicy (W4), Report.Run (W8)"
+ },
+ "credentials": {
+  "label": "IMPLEMENTATION_DEFAULT",
+  "rule": "No password, PIN or hash appears in this file. Every demo user's password and PIN come from environment variables at provisioning time and are hashed by the existing access owner. Values are never logged.",
+  "password_env": "NERDPOS_DEMO_PASSWORD",
+  "pin_env": "NERDPOS_DEMO_PIN",
+  "per_user_override_env_pattern": "NERDPOS_DEMO_PASSWORD_<USERNAME_UPPER_SNAKE>"
+ },
+ "business": {
+  "key": "biz",
+  "label": "DEMO",
+  "name": "NerdPOS Demo Restaurant",
+  "currency": "EGP",
+  "legalName": null,
+  "taxRegistrationNumber": null
+ },
+ "branches": [
+  {
+   "key": "branch_main",
+   "label": "DEMO",
+   "code": "DEMO-MAIN",
+   "name": "Demo Main Branch",
+   "timezone": "Africa/Cairo",
+   "businessDayCutoff": "04:00",
+   "active": true
+  },
+  {
+   "key": "branch_second",
+   "label": "DEMO",
+   "code": "DEMO-SECOND",
+   "name": "Demo Second Branch",
+   "timezone": "Africa/Cairo",
+   "businessDayCutoff": "04:00",
+   "active": true,
+   "why": "N9 cross-branch negative control (NP-W-02): a minimal second branch with one table named like a main-branch table"
+  }
+ ],
+ "terminals": [
+  {
+   "key": "t_floor",
+   "label": "DEMO",
+   "branch": "branch_main",
+   "code": "DEMO-FLOOR-1",
+   "name": "Floor tablet 1 (no drawer)",
+   "lifecycle": "ACTIVE",
+   "drawer": false,
+   "purpose": "waiter: visits, orders, fire, line void requests"
+  },
+  {
+   "key": "t_cash",
+   "label": "DEMO",
+   "branch": "branch_main",
+   "code": "DEMO-CASH-1",
+   "name": "Cashier station 1 (drawer)",
+   "lifecycle": "ACTIVE",
+   "drawer": true,
+   "purpose": "cashier A then cashier B (shift handover), confirm, collect, X/Z"
+  },
+  {
+   "key": "t_kds",
+   "label": "DEMO",
+   "branch": "branch_main",
+   "code": "DEMO-KDS-1",
+   "name": "Kitchen display 1",
+   "lifecycle": "ACTIVE",
+   "drawer": false,
+   "purpose": "chef: station board, advance tickets"
+  },
+  {
+   "key": "t_admin",
+   "label": "DEMO",
+   "branch": "branch_main",
+   "code": "DEMO-ADMIN-1",
+   "name": "Manager back office",
+   "lifecycle": "ACTIVE",
+   "drawer": false,
+   "purpose": "manager: setup, approvals, refunds, Z"
+  },
+  {
+   "key": "t_second_floor",
+   "label": "DEMO",
+   "branch": "branch_second",
+   "code": "DEMO-SECOND-FLOOR-1",
+   "name": "Second branch floor tablet (no drawer)",
+   "lifecycle": "ACTIVE",
+   "drawer": false,
+   "purpose": "N9 only"
+  }
+ ],
+ "roles": [
+  {
+   "key": "role_waiter",
+   "label": "DEMO",
+   "name": "Demo Waiter",
+   "permissionIds": [
+    "table:read",
+    "table:assign",
+    "table:release",
+    "table:transfer",
+    "order:create",
+    "order:read",
+    "order:addlines",
+    "order:updateline",
+    "order:removeline",
+    "order:fire",
+    "order:voidline",
+    "approval:grant",
+    "catalog:read",
+    "product:read",
+    "kitchen:read"
+   ]
+  },
+  {
+   "key": "role_cashier",
+   "label": "DEMO",
+   "name": "Demo Cashier",
+   "permissionIds": [
+    "table:read",
+    "order:read",
+    "order:confirm",
+    "order:complete",
+    "payment:capture",
+    "payment:read",
+    "session:open",
+    "session:read",
+    "session:close",
+    "session:xreport",
+    "cash:read",
+    "catalog:read",
+    "refund:read",
+    "refund:request",
+    "approval:grant"
+   ]
+  },
+  {
+   "key": "role_manager",
+   "label": "DEMO",
+   "name": "Demo Manager",
+   "permissionIds": [
+    "table:read",
+    "table:upsert",
+    "table:assign",
+    "table:release",
+    "table:transfer",
+    "kitchen:read",
+    "kitchen:configure",
+    "order:read",
+    "order:void",
+    "order:voidline",
+    "order:confirm",
+    "order:complete",
+    "payment:read",
+    "session:read",
+    "session:zreport",
+    "session:xreport",
+    "cash:read",
+    "cash:move",
+    "refund:read",
+    "refund:request",
+    "refund:approve",
+    "refund:reject",
+    "approval:grant",
+    "approve:line_void",
+    "approve:order_void",
+    "approve:refund_approve",
+    "approve:session_variance",
+    "approve:cash_move",
+    "catalog:read",
+    "product:read",
+    "report:run",
+    "catalog:manage",
+    "catalog:upsertitem",
+    "product:setavailability",
+    "catalog:setprice",
+    "tax:manage",
+    "tax:read",
+    "settings:read",
+    "settings:updatepolicy",
+    "reasoncode:upsert",
+    "approve:sensitive_policy_change"
+   ],
+   "why_1_2": "L2 admin demo: prices, taxes, catalog, settings, reason codes and reports; approve:sensitive_policy_change lets demo-manager-2 approve demo-manager-1's tax change (SelfApprovalPolicy DENY)"
+  },
+  {
+   "key": "role_chef",
+   "label": "DEMO",
+   "name": "Demo Chef",
+   "permissionIds": [
+    "kitchen:read",
+    "kitchen:advanceticket"
+   ]
+  }
+ ],
+ "users": [
+  {
+   "key": "u_manager_1",
+   "label": "DEMO",
+   "username": "demo-manager-1",
+   "displayName": "Demo Manager 1",
+   "role": "role_manager",
+   "branch": "branch_main"
+  },
+  {
+   "key": "u_manager_2",
+   "label": "DEMO",
+   "username": "demo-manager-2",
+   "displayName": "Demo Manager 2",
+   "role": "role_manager",
+   "branch": "branch_main",
+   "why": "J-R4: a refund is approved by another manager (SelfApprovalPolicy)"
+  },
+  {
+   "key": "u_waiter_1",
+   "label": "DEMO",
+   "username": "demo-waiter-1",
+   "displayName": "Demo Waiter 1",
+   "role": "role_waiter",
+   "branch": "branch_main"
+  },
+  {
+   "key": "u_waiter_2",
+   "label": "DEMO",
+   "username": "demo-waiter-2",
+   "displayName": "Demo Waiter 2",
+   "role": "role_waiter",
+   "branch": "branch_main"
+  },
+  {
+   "key": "u_cashier_a",
+   "label": "DEMO",
+   "username": "demo-cashier-a",
+   "displayName": "Demo Cashier A",
+   "role": "role_cashier",
+   "branch": "branch_main"
+  },
+  {
+   "key": "u_cashier_b",
+   "label": "DEMO",
+   "username": "demo-cashier-b",
+   "displayName": "Demo Cashier B",
+   "role": "role_cashier",
+   "branch": "branch_main",
+   "why": "J-R1 steps 18-23: second shift after counted close"
+  },
+  {
+   "key": "u_chef_1",
+   "label": "DEMO",
+   "username": "demo-chef-1",
+   "displayName": "Demo Chef 1",
+   "role": "role_chef",
+   "branch": "branch_main"
+  },
+  {
+   "key": "u_waiter_second",
+   "label": "DEMO",
+   "username": "demo-waiter-second",
+   "displayName": "Demo Waiter Second Branch",
+   "role": "role_waiter",
+   "branch": "branch_second",
+   "why": "N9: a waiter scoped to the second branch only"
+  }
+ ],
+ "user_defaults": {
+  "label": "IMPLEMENTATION_DEFAULT",
+  "active": true,
+  "mustChangeCredentials": false,
+  "credentialKinds": [
+   "PASSWORD",
+   "PIN"
+  ]
+ },
+ "units": [
+  {
+   "key": "unit_ea",
+   "label": "DEMO",
+   "code": "DEMO_EA",
+   "precision": 0
+  }
+ ],
+ "tax_policies": [
+  {
+   "key": "tax_demo",
+   "label": "DEMO",
+   "jurisdiction": "DEMO_NOT_CERTIFIED",
+   "rate": "14",
+   "calculationMode": "EXCLUSIVE",
+   "roundingMode": "HALF_UP",
+   "roundingScale": 2,
+   "note": "Illustrative rate only (reported Egyptian standard VAT, docs/19 R10). NOT a legal determination; the pilot's real tax mapping is L2 (NP-D-L2-03, accountant confirmation).",
+   "name": {
+    "en": "Demo VAT (not certified)",
+    "ar": "ضريبة تجريبية (غير معتمدة)"
+   }
+  }
+ ],
+ "categories": [
+  {
+   "key": "cat_hot",
+   "label": "DEMO",
+   "name": {
+    "ar": "مشروبات ساخنة",
+    "en": "Hot drinks"
+   },
+   "active": true
+  },
+  {
+   "key": "cat_cold",
+   "label": "DEMO",
+   "name": {
+    "ar": "مشروبات باردة",
+    "en": "Cold drinks"
+   },
+   "active": true
+  },
+  {
+   "key": "cat_starters",
+   "label": "DEMO",
+   "name": {
+    "ar": "مقبلات وسلطات",
+    "en": "Starters and salads"
+   },
+   "active": true
+  },
+  {
+   "key": "cat_mains",
+   "label": "DEMO",
+   "name": {
+    "ar": "أطباق رئيسية",
+    "en": "Main dishes"
+   },
+   "active": true
+  },
+  {
+   "key": "cat_desserts",
+   "label": "DEMO",
+   "name": {
+    "ar": "حلويات",
+    "en": "Desserts"
+   },
+   "active": true
+  }
+ ],
+ "modifier_groups": [
+  {
+   "key": "mod_size",
+   "label": "DEMO",
+   "name": {
+    "ar": "الحجم",
+    "en": "Size"
+   },
+   "selectionRule": "SINGLE",
+   "min": 1,
+   "max": 1,
+   "active": true,
+   "options": [
+    {
+     "key": "opt_size_regular",
+     "name": "Regular",
+     "priceDelta": "0.0000"
+    },
+    {
+     "key": "opt_size_large",
+     "name": "Large",
+     "priceDelta": "10.0000"
+    }
+   ]
+  },
+  {
+   "key": "mod_doneness",
+   "label": "DEMO",
+   "name": {
+    "ar": "درجة الاستواء",
+    "en": "Doneness"
+   },
+   "selectionRule": "SINGLE",
+   "min": 1,
+   "max": 1,
+   "active": true,
+   "options": [
+    {
+     "key": "opt_medium",
+     "name": "Medium",
+     "priceDelta": "0.0000"
+    },
+    {
+     "key": "opt_well",
+     "name": "Well done",
+     "priceDelta": "0.0000"
+    }
+   ]
+  },
+  {
+   "key": "mod_extras",
+   "label": "DEMO",
+   "name": {
+    "ar": "إضافات",
+    "en": "Extras"
+   },
+   "selectionRule": "MULTIPLE",
+   "min": 0,
+   "max": 3,
+   "active": true,
+   "options": [
+    {
+     "key": "opt_cheese",
+     "name": "Extra cheese",
+     "priceDelta": "15.0000"
+    },
+    {
+     "key": "opt_egg",
+     "name": "Egg",
+     "priceDelta": "10.0000"
+    },
+    {
+     "key": "opt_hot_sauce",
+     "name": "Hot sauce",
+     "priceDelta": "0.0000"
+    }
+   ]
+  }
+ ],
+ "modifier_option_defaults": {
+  "label": "IMPLEMENTATION_DEFAULT",
+  "currency": "EGP",
+  "active": true
+ },
+ "products": [
+  {
+   "key": "p_tea",
+   "label": "DEMO",
+   "sku": "DEMO-TEA",
+   "category": "cat_hot",
+   "name": {
+    "ar": "شاي",
+    "en": "Tea"
+   },
+   "modifier_groups": [
+    "mod_size"
+   ]
+  },
+  {
+   "key": "p_turkish_coffee",
+   "label": "DEMO",
+   "sku": "DEMO-TCOFFEE",
+   "category": "cat_hot",
+   "name": {
+    "ar": "قهوة تركي",
+    "en": "Turkish coffee"
+   },
+   "modifier_groups": [
+    "mod_size"
+   ]
+  },
+  {
+   "key": "p_espresso",
+   "label": "DEMO",
+   "sku": "DEMO-ESPRESSO",
+   "category": "cat_hot",
+   "name": {
+    "ar": "إسبريسو",
+    "en": "Espresso"
+   },
+   "modifier_groups": []
+  },
+  {
+   "key": "p_orange_juice",
+   "label": "DEMO",
+   "sku": "DEMO-ORANGE",
+   "category": "cat_cold",
+   "name": {
+    "ar": "عصير برتقال",
+    "en": "Orange juice"
+   },
+   "modifier_groups": [
+    "mod_size"
+   ]
+  },
+  {
+   "key": "p_lemon_mint",
+   "label": "DEMO",
+   "sku": "DEMO-LEMINT",
+   "category": "cat_cold",
+   "name": {
+    "ar": "ليمون نعناع",
+    "en": "Lemon mint"
+   },
+   "modifier_groups": [
+    "mod_size"
+   ]
+  },
+  {
+   "key": "p_hummus",
+   "label": "DEMO",
+   "sku": "DEMO-HUMMUS",
+   "category": "cat_starters",
+   "name": {
+    "ar": "حمص",
+    "en": "Hummus"
+   },
+   "modifier_groups": []
+  },
+  {
+   "key": "p_baba_ghanoush",
+   "label": "DEMO",
+   "sku": "DEMO-BABA",
+   "category": "cat_starters",
+   "name": {
+    "ar": "بابا غنوج",
+    "en": "Baba ghanoush"
+   },
+   "modifier_groups": []
+  },
+  {
+   "key": "p_green_salad",
+   "label": "DEMO",
+   "sku": "DEMO-SALAD",
+   "category": "cat_starters",
+   "name": {
+    "ar": "سلطة خضراء",
+    "en": "Green salad"
+   },
+   "modifier_groups": []
+  },
+  {
+   "key": "p_chicken_shawarma",
+   "label": "DEMO",
+   "sku": "DEMO-SHAWARMA",
+   "category": "cat_mains",
+   "name": {
+    "ar": "شاورما فراخ",
+    "en": "Chicken shawarma"
+   },
+   "modifier_groups": [
+    "mod_extras"
+   ]
+  },
+  {
+   "key": "p_kofta",
+   "label": "DEMO",
+   "sku": "DEMO-KOFTA",
+   "category": "cat_mains",
+   "name": {
+    "ar": "كفتة مشوية",
+    "en": "Grilled kofta"
+   },
+   "modifier_groups": [
+    "mod_doneness"
+   ]
+  },
+  {
+   "key": "p_mixed_grill",
+   "label": "DEMO",
+   "sku": "DEMO-MIXGRILL",
+   "category": "cat_mains",
+   "name": {
+    "ar": "مشويات مشكلة",
+    "en": "Mixed grill"
+   },
+   "modifier_groups": [
+    "mod_doneness"
+   ]
+  },
+  {
+   "key": "p_beef_burger",
+   "label": "DEMO",
+   "sku": "DEMO-BURGER",
+   "category": "cat_mains",
+   "name": {
+    "ar": "برجر لحم",
+    "en": "Beef burger"
+   },
+   "modifier_groups": [
+    "mod_doneness",
+    "mod_extras"
+   ]
+  },
+  {
+   "key": "p_om_ali",
+   "label": "DEMO",
+   "sku": "DEMO-OMALI",
+   "category": "cat_desserts",
+   "name": {
+    "ar": "أم علي",
+    "en": "Om Ali"
+   },
+   "modifier_groups": []
+  },
+  {
+   "key": "p_kunafa",
+   "label": "DEMO",
+   "sku": "DEMO-KUNAFA",
+   "category": "cat_desserts",
+   "name": {
+    "ar": "كنافة",
+    "en": "Kunafa"
+   },
+   "modifier_groups": [],
+   "availability": "SOLD_OUT",
+   "why": "shows the unavailable tile state (docs/18)"
+  }
+ ],
+ "product_defaults": {
+  "label": "IMPLEMENTATION_DEFAULT",
+  "unit": "unit_ea",
+  "tax_policy": "tax_demo",
+  "active": true,
+  "availability": "AVAILABLE"
+ },
+ "tables": {
+  "label": "DEMO",
+  "items": [
+   {
+    "key": "tbl_1",
+    "name": "1",
+    "area": "Hall",
+    "capacity": 4
+   },
+   {
+    "key": "tbl_2",
+    "name": "2",
+    "area": "Hall",
+    "capacity": 4
+   },
+   {
+    "key": "tbl_3",
+    "name": "3",
+    "area": "Hall",
+    "capacity": 4
+   },
+   {
+    "key": "tbl_4",
+    "name": "4",
+    "area": "Hall",
+    "capacity": 4
+   },
+   {
+    "key": "tbl_5",
+    "name": "5",
+    "area": "Hall",
+    "capacity": 6
+   },
+   {
+    "key": "tbl_6",
+    "name": "6",
+    "area": "Hall",
+    "capacity": 6
+   },
+   {
+    "key": "tbl_7",
+    "name": "7",
+    "area": "Hall",
+    "capacity": 4,
+    "why": "J-R1 uses table 7"
+   },
+   {
+    "key": "tbl_8",
+    "name": "8",
+    "area": "Hall",
+    "capacity": 2
+   },
+   {
+    "key": "tbl_9",
+    "name": "9",
+    "area": "Terrace",
+    "capacity": 2
+   },
+   {
+    "key": "tbl_10",
+    "name": "10",
+    "area": "Terrace",
+    "capacity": 2
+   },
+   {
+    "key": "tbl_11",
+    "name": "11",
+    "area": "Terrace",
+    "capacity": 4
+   },
+   {
+    "key": "tbl_12",
+    "name": "12",
+    "area": "Terrace",
+    "capacity": 8
+   },
+   {
+    "key": "tbl_second_7",
+    "branch": "branch_second",
+    "name": "7",
+    "area": "Hall",
+    "capacity": 4,
+    "why": "N9: same name as main-branch table 7, other branch"
+   }
+  ],
+  "defaults": {
+   "label": "IMPLEMENTATION_DEFAULT",
+   "branch": "branch_main",
+   "active": true
+  }
+ },
+ "kitchen_stations": [
+  {
+   "key": "st_grill",
+   "label": "DEMO",
+   "name": "GRILL",
+   "branch": "branch_main",
+   "active": true
+  },
+  {
+   "key": "st_cold",
+   "label": "DEMO",
+   "name": "COLD",
+   "branch": "branch_main",
+   "active": true
+  },
+  {
+   "key": "st_bar",
+   "label": "DEMO",
+   "name": "BAR",
+   "branch": "branch_main",
+   "active": true
+  }
+ ],
+ "routing_rules": {
+  "label": "DEMO",
+  "rule_order": "ascending priority, first eligible match wins (kitchen.fire-round@3, E-23)",
+  "items": [
+   {
+    "key": "rr_hot",
+    "priority": 10,
+    "match": {
+     "categoryId": "cat_hot"
+    },
+    "station": "st_bar"
+   },
+   {
+    "key": "rr_cold",
+    "priority": 20,
+    "match": {
+     "categoryId": "cat_cold"
+    },
+    "station": "st_bar"
+   },
+   {
+    "key": "rr_starters",
+    "priority": 30,
+    "match": {
+     "categoryId": "cat_starters"
+    },
+    "station": "st_cold"
+   },
+   {
+    "key": "rr_desserts",
+    "priority": 40,
+    "match": {
+     "categoryId": "cat_desserts"
+    },
+    "station": "st_cold"
+   },
+   {
+    "key": "rr_mains",
+    "priority": 50,
+    "match": {
+     "categoryId": "cat_mains"
+    },
+    "station": "st_grill"
+   },
+   {
+    "key": "rr_catch_all",
+    "priority": 1000,
+    "match": {},
+    "station": "st_grill",
+    "why": "E-14: default station is a catch-all rule"
+   }
+  ]
+ },
+ "policy_values": {
+  "label": "DEMO",
+  "items": [
+   {
+    "policyId": "PricingOrderPolicy",
+    "scopeType": "TENANT",
+    "value": "DISCOUNT_BEFORE_TAX",
+    "source": "existing catalog-seed.ts"
+   },
+   {
+    "policyId": "OrderConfirmationPricingPolicy",
+    "scopeType": "TENANT",
+    "value": {
+     "mode": "CAPTURED_BASE_SINGLE_TAX_POLICY",
+     "channels": [
+      "DINE_IN"
+     ]
+    },
+    "source": "existing catalog-seed.ts"
+   },
+   {
+    "policyId": "FloorIntakePolicy",
+    "scopeType": "BRANCH",
+    "scope": "branch_main",
+    "value": {
+     "DINE_IN": "FLOOR_WITHOUT_DRAWER"
+    },
+    "source": "orders/policy/FloorIntakePolicy@2 demo_values"
+   },
+   {
+    "policyId": "FireTimingPolicy",
+    "scopeType": "BRANCH",
+    "scope": "branch_main",
+    "value": {
+     "DINE_IN": "EXPLICIT_ROUNDS"
+    },
+    "source": "orders/policy/FireTimingPolicy@2 demo_values"
+   },
+   {
+    "policyId": "CheckCompositionPolicy",
+    "scopeType": "BRANCH",
+    "scope": "branch_main",
+    "value": {
+     "DINE_IN": "VISIT_MULTI_CHECK"
+    },
+    "source": "orders/policy/CheckCompositionPolicy@2 demo_values"
+   },
+   {
+    "policyId": "CollectionScopePolicy",
+    "scopeType": "BRANCH",
+    "scope": "branch_main",
+    "value": {
+     "DINE_IN": "BRANCH_COLLECTING_DRAWER"
+    },
+    "source": "payments/policy/CollectionScopePolicy@2 demo_values"
+   },
+   {
+    "policyId": "ReasonCodePolicy",
+    "scopeType": "TENANT",
+    "value": {
+     "CASH_MOVE": "MANAGED",
+     "COMP": "MANAGED",
+     "DISCOUNT": "MANAGED",
+     "LINE_VOID": "MANAGED",
+     "NO_SALE": "MANAGED",
+     "ORDER_CANCEL": "MANAGED",
+     "ORDER_VOID": "MANAGED",
+     "REFUND": "MANAGED"
+    },
+    "source": "settings/policy/ReasonCodePolicy@1; every MANAGED kind has at least one active code"
+   }
+  ],
+  "server_defaults": "Every other accepted policy (ApprovalTtlPolicy, SelfApprovalPolicy, SplitTenderPolicy, TenderMethodPolicy, RoundingPolicy, BlindClosePolicy, VarianceApprovalPolicy, BusinessDatePolicy, ...) keeps its canonical default; provisioning does not set it."
+ },
+ "reason_codes": {
+  "label": "DEMO",
+  "writer": "ReasonCode.Create (settings/operation/ReasonCode.Create@1)",
+  "note": "Managed rows (W4). The codes of 1.1.0 are kept, so every J-R and N script stays valid; labels are bilingual.",
+  "items": [
+   {
+    "kind": "LINE_VOID",
+    "code": "WRONG_ITEM",
+    "label": {
+     "en": "Wrong item entered",
+     "ar": "صنف خاطئ"
+    },
+    "requiresNote": false,
+    "sortOrder": 10,
+    "active": true
+   },
+   {
+    "kind": "LINE_VOID",
+    "code": "CUSTOMER_CHANGED_MIND",
+    "label": {
+     "en": "Customer changed mind",
+     "ar": "العميل غيّر رأيه"
+    },
+    "requiresNote": false,
+    "sortOrder": 20,
+    "active": true
+   },
+   {
+    "kind": "ORDER_VOID",
+    "code": "CUSTOMER_LEFT",
+    "label": {
+     "en": "Customer left before payment",
+     "ar": "العميل مشي قبل الدفع"
+    },
+    "requiresNote": true,
+    "sortOrder": 10,
+    "active": true
+   },
+   {
+    "kind": "ORDER_CANCEL",
+    "code": "OPENED_BY_MISTAKE",
+    "label": {
+     "en": "Opened by mistake",
+     "ar": "اتفتح بالغلط"
+    },
+    "requiresNote": false,
+    "sortOrder": 10,
+    "active": true
+   },
+   {
+    "kind": "REFUND",
+    "code": "QUALITY_ISSUE",
+    "label": {
+     "en": "Food quality complaint",
+     "ar": "شكوى من جودة الأكل"
+    },
+    "requiresNote": true,
+    "sortOrder": 10,
+    "active": true
+   },
+   {
+    "kind": "CASH_MOVE",
+    "code": "FLOAT_TOP_UP",
+    "label": {
+     "en": "Float top-up",
+     "ar": "تعزيز الفكة"
+    },
+    "requiresNote": false,
+    "sortOrder": 10,
+    "active": true
+   },
+   {
+    "kind": "DISCOUNT",
+    "code": "REGULAR_GUEST",
+    "label": {
+     "en": "Regular guest",
+     "ar": "عميل دائم"
+    },
+    "requiresNote": false,
+    "sortOrder": 10,
+    "active": true
+   },
+   {
+    "kind": "COMP",
+    "code": "STAFF_MEAL",
+    "label": {
+     "en": "Staff meal",
+     "ar": "وجبة موظف"
+    },
+    "requiresNote": false,
+    "sortOrder": 10,
+    "active": true
+   },
+   {
+    "kind": "NO_SALE",
+    "code": "GIVE_CHANGE",
+    "label": {
+     "en": "Give change",
+     "ar": "فكّ عملة"
+    },
+    "requiresNote": false,
+    "sortOrder": 10,
+    "active": true
+   }
+  ]
+ },
+ "sessions": {
+  "label": "DEMO",
+  "note": "Not provisioned: drawers are opened by the journey itself (J-R1 step 3 Session.Open by demo-cashier-a). Suggested opening float for scripts:",
+  "suggested_opening_float": "500.0000"
+ },
+ "price_rules": {
+  "label": "DEMO",
+  "writer": "Catalog.SetPrice (pricing/operation/Catalog.SetPrice, FIRST_PRICE) or Catalog.Import prices",
+  "defaults": {
+   "currency": "branch currency (EGP)",
+   "effectiveFrom": "provisioning time (omitted = now)",
+   "effectiveTo": null
+  },
+  "items": [
+   {
+    "product": "p_tea",
+    "branch": "branch_main",
+    "channel": "DINE_IN",
+    "amount": "25.0000"
+   },
+   {
+    "product": "p_tea",
+    "branch": "branch_main",
+    "channel": "TAKEAWAY",
+    "amount": "25.0000"
+   },
+   {
+    "product": "p_turkish_coffee",
+    "branch": "branch_main",
+    "channel": "DINE_IN",
+    "amount": "40.0000"
+   },
+   {
+    "product": "p_turkish_coffee",
+    "branch": "branch_main",
+    "channel": "TAKEAWAY",
+    "amount": "40.0000"
+   },
+   {
+    "product": "p_espresso",
+    "branch": "branch_main",
+    "channel": "DINE_IN",
+    "amount": "45.0000"
+   },
+   {
+    "product": "p_espresso",
+    "branch": "branch_main",
+    "channel": "TAKEAWAY",
+    "amount": "45.0000"
+   },
+   {
+    "product": "p_orange_juice",
+    "branch": "branch_main",
+    "channel": "DINE_IN",
+    "amount": "50.0000"
+   },
+   {
+    "product": "p_orange_juice",
+    "branch": "branch_main",
+    "channel": "TAKEAWAY",
+    "amount": "45.0000",
+    "why": "one channel-specific price so the demo proves (product, branch, channel) resolution"
+   },
+   {
+    "product": "p_lemon_mint",
+    "branch": "branch_main",
+    "channel": "DINE_IN",
+    "amount": "45.0000"
+   },
+   {
+    "product": "p_lemon_mint",
+    "branch": "branch_main",
+    "channel": "TAKEAWAY",
+    "amount": "45.0000"
+   },
+   {
+    "product": "p_hummus",
+    "branch": "branch_main",
+    "channel": "DINE_IN",
+    "amount": "60.0000"
+   },
+   {
+    "product": "p_hummus",
+    "branch": "branch_main",
+    "channel": "TAKEAWAY",
+    "amount": "60.0000"
+   },
+   {
+    "product": "p_baba_ghanoush",
+    "branch": "branch_main",
+    "channel": "DINE_IN",
+    "amount": "60.0000"
+   },
+   {
+    "product": "p_baba_ghanoush",
+    "branch": "branch_main",
+    "channel": "TAKEAWAY",
+    "amount": "60.0000"
+   },
+   {
+    "product": "p_green_salad",
+    "branch": "branch_main",
+    "channel": "DINE_IN",
+    "amount": "55.0000"
+   },
+   {
+    "product": "p_green_salad",
+    "branch": "branch_main",
+    "channel": "TAKEAWAY",
+    "amount": "55.0000"
+   },
+   {
+    "product": "p_chicken_shawarma",
+    "branch": "branch_main",
+    "channel": "DINE_IN",
+    "amount": "150.0000"
+   },
+   {
+    "product": "p_chicken_shawarma",
+    "branch": "branch_main",
+    "channel": "TAKEAWAY",
+    "amount": "150.0000"
+   },
+   {
+    "product": "p_kofta",
+    "branch": "branch_main",
+    "channel": "DINE_IN",
+    "amount": "220.0000"
+   },
+   {
+    "product": "p_kofta",
+    "branch": "branch_main",
+    "channel": "TAKEAWAY",
+    "amount": "220.0000"
+   },
+   {
+    "product": "p_mixed_grill",
+    "branch": "branch_main",
+    "channel": "DINE_IN",
+    "amount": "320.0000"
+   },
+   {
+    "product": "p_mixed_grill",
+    "branch": "branch_main",
+    "channel": "TAKEAWAY",
+    "amount": "320.0000"
+   },
+   {
+    "product": "p_beef_burger",
+    "branch": "branch_main",
+    "channel": "DINE_IN",
+    "amount": "180.0000"
+   },
+   {
+    "product": "p_beef_burger",
+    "branch": "branch_main",
+    "channel": "TAKEAWAY",
+    "amount": "180.0000"
+   },
+   {
+    "product": "p_om_ali",
+    "branch": "branch_main",
+    "channel": "DINE_IN",
+    "amount": "70.0000"
+   },
+   {
+    "product": "p_om_ali",
+    "branch": "branch_main",
+    "channel": "TAKEAWAY",
+    "amount": "70.0000"
+   },
+   {
+    "product": "p_kunafa",
+    "branch": "branch_main",
+    "channel": "DINE_IN",
+    "amount": "80.0000"
+   },
+   {
+    "product": "p_kunafa",
+    "branch": "branch_main",
+    "channel": "TAKEAWAY",
+    "amount": "80.0000"
+   }
+  ],
+  "note": "branch_second sells nothing (N9 control only): it has no price, so every quote there is PRICE_NOT_FOUND"
+ }
+}

@@ -1,0 +1,8653 @@
+[
+ {
+  "id": "Access.Me",
+  "module": "access",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/auth/me",
+  "route_class": "PUBLIC_POS",
+  "permission": "AUTHENTICATED",
+  "input": {},
+  "output": "Me{user:UserSummary,authSession:{id,expiresAt,credentialKind},branchId?,terminalId?,effectivePermissions:List<PermissionId>,mustChangeCredentials}",
+  "errors": [
+   "UNAUTHENTICATED"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "authenticated-only; returns effective permissions for context branch"
+ },
+ {
+  "id": "AuthSession.Revoke",
+  "module": "access",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/auth-sessions/{authSessionId}/revoke",
+  "route_class": "ADMIN",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "deactivation and credential reset already revoke all sessions of a user"
+ },
+ {
+  "id": "AuthenticationAttempt.Find",
+  "module": "access",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/security/authentication-attempts",
+  "route_class": "ADMIN",
+  "permission": "security:read",
+  "input": {
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "from": {
+    "type": "Timestamp",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   },
+   "outcome": {
+    "type": "Enum<SUCCESS|FAILURE|LOCKED>",
+    "required": false
+   },
+   "terminalId": {
+    "type": "Ref<organization.Terminal>",
+    "required": false
+   },
+   "to": {
+    "type": "Timestamp",
+    "required": false
+   },
+   "userId": {
+    "type": "Ref<access.User>",
+    "required": false
+   }
+  },
+  "output": "Page<AuthenticationAttemptView>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "security investigation; never returns secrets or raw unknown usernames"
+ },
+ {
+  "id": "Credential.Reset",
+  "module": "access",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/users/{userId}/credentials/reset",
+  "route_class": "ADMIN",
+  "permission": "credential:reset",
+  "input": {
+   "approvalGrantId": {
+    "type": "Ref<approvals.ApprovalGrant>",
+    "required": false
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "kind": {
+    "type": "CredentialKind",
+    "required": true
+   },
+   "newSecret": {
+    "type": "SecretText",
+    "required": true
+   },
+   "userId": {
+    "type": "Ref<access.User>",
+    "required": true
+   }
+  },
+  "output": "void",
+  "errors": [
+   "APPROVAL_GRANT_ALREADY_CONSUMED",
+   "APPROVAL_GRANT_EXPIRED",
+   "APPROVAL_GRANT_INVALID",
+   "APPROVAL_REQUIRED",
+   "APPROVER_NOT_AUTHORIZED",
+   "CONCURRENCY_CONFLICT",
+   "CREDENTIAL_POLICY_VIOLATION",
+   "PERMISSION_DENIED",
+   "USER_NOT_FOUND"
+  ],
+  "approval": {
+   "mode": "BY_POLICY",
+   "action": "CREDENTIAL_RESET"
+  },
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "admin reset; sets mustChangeCredentials; bumps credentialVersion"
+ },
+ {
+  "id": "Credential.Rotate",
+  "module": "access",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/me/credentials/rotate",
+  "route_class": "PUBLIC_POS",
+  "permission": "AUTHENTICATED",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "currentSecret": {
+    "type": "SecretText",
+    "required": true
+   },
+   "kind": {
+    "type": "CredentialKind",
+    "required": true
+   },
+   "newSecret": {
+    "type": "SecretText",
+    "required": true
+   }
+  },
+  "output": "void",
+  "errors": [
+   "CONCURRENCY_CONFLICT",
+   "CREDENTIAL_LOCKED",
+   "CREDENTIAL_POLICY_VIOLATION",
+   "CURRENT_CREDENTIAL_MISMATCH"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "self rotation; requires current secret; bumps credentialVersion"
+ },
+ {
+  "id": "Permission.List",
+  "module": "access",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/permissions",
+  "route_class": "ADMIN",
+  "permission": "role:read",
+  "input": {
+   "module": {
+    "type": "Text",
+    "required": false
+   }
+  },
+  "output": "List<PermissionView{id,module,operations,description}>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "generated registry; grouped by module"
+ },
+ {
+  "id": "Role.Create",
+  "module": "access",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/roles",
+  "route_class": "ADMIN",
+  "permission": "role:create",
+  "input": {
+   "approvalGrantId": {
+    "type": "Ref<approvals.ApprovalGrant>",
+    "required": false
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "name": {
+    "type": "Text",
+    "required": true
+   },
+   "permissionIds": {
+    "type": "List<PermissionId>",
+    "required": true
+   }
+  },
+  "output": "RoleView",
+  "errors": [
+   "APPROVAL_REQUIRED",
+   "CAPABILITY_NOT_AVAILABLE",
+   "PERMISSION_DENIED",
+   "ROLE_NAME_TAKEN",
+   "UNKNOWN_PERMISSION_ID",
+   "VALIDATION_FAILED"
+  ],
+  "approval": {
+   "mode": "BY_POLICY",
+   "action": "USER_ACCESS_CHANGE"
+  },
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "permissionIds must be registered"
+ },
+ {
+  "id": "Role.List",
+  "module": "access",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/roles",
+  "route_class": "ADMIN",
+  "permission": "role:read",
+  "input": {
+   "active": {
+    "type": "Boolean",
+    "required": false
+   }
+  },
+  "output": "List<RoleView>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": ""
+ },
+ {
+  "id": "Role.Update",
+  "module": "access",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/roles/{roleId}",
+  "route_class": "ADMIN",
+  "permission": "role:update",
+  "input": {
+   "active": {
+    "type": "Boolean",
+    "required": true
+   },
+   "approvalGrantId": {
+    "type": "Ref<approvals.ApprovalGrant>",
+    "required": false
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "name": {
+    "type": "Text",
+    "required": true
+   },
+   "permissionIds": {
+    "type": "List<PermissionId>",
+    "required": true
+   },
+   "roleId": {
+    "type": "Ref<access.Role>",
+    "required": true
+   }
+  },
+  "output": "RoleView",
+  "errors": [
+   "APPROVAL_REQUIRED",
+   "CAPABILITY_NOT_AVAILABLE",
+   "CONCURRENCY_CONFLICT",
+   "LAST_OWNER_PROTECTED",
+   "PERMISSION_DENIED",
+   "ROLE_NAME_TAKEN",
+   "ROLE_NOT_FOUND",
+   "UNKNOWN_PERMISSION_ID"
+  ],
+  "approval": {
+   "mode": "BY_POLICY",
+   "action": "USER_ACCESS_CHANGE"
+  },
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "name, permissionIds, active"
+ },
+ {
+  "id": "User.Create",
+  "module": "access",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/users",
+  "route_class": "ADMIN",
+  "permission": "user:create",
+  "input": {
+   "approvalGrantId": {
+    "type": "Ref<approvals.ApprovalGrant>",
+    "required": false
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "displayName": {
+    "type": "Text",
+    "required": true
+   },
+   "password": {
+    "type": "SecretText",
+    "required": true
+   },
+   "pin": {
+    "type": "SecretText",
+    "required": false
+   },
+   "roleAssignments": {
+    "type": "List<RoleAssignmentInput>",
+    "required": true
+   },
+   "username": {
+    "type": "Text",
+    "required": true
+   }
+  },
+  "output": "UserView",
+  "errors": [
+   "APPROVAL_REQUIRED",
+   "BRANCH_NOT_FOUND",
+   "CAPABILITY_NOT_AVAILABLE",
+   "CREDENTIAL_POLICY_VIOLATION",
+   "PERMISSION_DENIED",
+   "ROLE_INACTIVE",
+   "ROLE_NOT_FOUND",
+   "USERNAME_TAKEN"
+  ],
+  "approval": {
+   "mode": "BY_POLICY",
+   "action": "USER_ACCESS_CHANGE"
+  },
+  "backend_state": "BUILT_ON_MAIN",
+  "note": ""
+ },
+ {
+  "id": "User.Find",
+  "module": "access",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/users",
+  "route_class": "ADMIN",
+  "permission": "user:read",
+  "input": {
+   "active": {
+    "type": "Boolean",
+    "required": false
+   },
+   "branchId": {
+    "type": "Ref<organization.Branch>",
+    "required": false
+   },
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   },
+   "q": {
+    "type": "Text",
+    "required": false
+   },
+   "roleId": {
+    "type": "Ref<access.Role>",
+    "required": false
+   }
+  },
+  "output": "Page<UserSummary>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": ""
+ },
+ {
+  "id": "User.Get",
+  "module": "access",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/users/{userId}",
+  "route_class": "ADMIN",
+  "permission": "user:read",
+  "input": {
+   "userId": {
+    "type": "Ref<access.User>",
+    "required": true
+   }
+  },
+  "output": "UserView{assignments,effectivePermissionsByBranch}",
+  "errors": [
+   "USER_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "includes assignments and effective permissions per branch"
+ },
+ {
+  "id": "User.ManageAccess",
+  "module": "access",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/users/{userId}/access",
+  "route_class": "ADMIN",
+  "permission": "user:manageaccess",
+  "input": {
+   "active": {
+    "type": "Boolean",
+    "required": true
+   },
+   "approvalGrantId": {
+    "type": "Ref<approvals.ApprovalGrant>",
+    "required": false
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "roleAssignments": {
+    "type": "List<RoleAssignmentInput>",
+    "required": true
+   },
+   "userId": {
+    "type": "Ref<access.User>",
+    "required": true
+   }
+  },
+  "output": "UserView",
+  "errors": [
+   "APPROVAL_GRANT_ALREADY_CONSUMED",
+   "APPROVAL_GRANT_EXPIRED",
+   "APPROVAL_GRANT_INVALID",
+   "APPROVAL_REQUIRED",
+   "APPROVER_NOT_AUTHORIZED",
+   "BRANCH_NOT_FOUND",
+   "CONCURRENCY_CONFLICT",
+   "LAST_OWNER_PROTECTED",
+   "ROLE_INACTIVE",
+   "ROLE_NOT_FOUND",
+   "USER_NOT_FOUND"
+  ],
+  "approval": {
+   "mode": "BY_POLICY",
+   "action": "USER_ACCESS_CHANGE"
+  },
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "active flag + role assignments (replaces branchIds)"
+ },
+ {
+  "id": "User.Update",
+  "module": "access",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/users/{userId}",
+  "route_class": "ADMIN",
+  "permission": "user:update",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "displayName": {
+    "type": "Text",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "userId": {
+    "type": "Ref<access.User>",
+    "required": true
+   },
+   "username": {
+    "type": "Text",
+    "required": true
+   }
+  },
+  "output": "UserView",
+  "errors": [
+   "USER_NOT_FOUND",
+   "USERNAME_TAKEN",
+   "CONCURRENCY_CONFLICT"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "profile fields only"
+ },
+ {
+  "id": "Approval.Find",
+  "module": "approvals",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/approvals",
+  "route_class": "BACK_OFFICE",
+  "permission": "approval:read",
+  "input": {
+   "action": {
+    "type": "Enum<ORDER_DISCOUNT|ORDER_VOID|LINE_VOID|REFUND_APPROVE|SESSION_VARIANCE|CASH_MOVE|DRAWER_NO_SALE|TENDER_CORRECTION|INVENTORY_ADJUST|STOCK_COUNT_POST|STOCK_WASTE|SENSITIVE_POLICY_CHANGE|OUTBOX_REDRIVE|USER_ACCESS_CHANGE|CREDENTIAL_RESET|PRICE_OVERRIDE>",
+    "required": false
+   },
+   "approverId": {
+    "type": "Ref<access.User>",
+    "required": false
+   },
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "from": {
+    "type": "Timestamp",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   },
+   "requesterId": {
+    "type": "Ref<access.User>",
+    "required": false
+   },
+   "status": {
+    "type": "GrantStatus",
+    "required": false
+   },
+   "targetId": {
+    "type": "Id",
+    "required": false
+   },
+   "to": {
+    "type": "Timestamp",
+    "required": false
+   }
+  },
+  "output": "Page<GrantView>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": ""
+ },
+ {
+  "id": "Approval.Get",
+  "module": "approvals",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/approvals/{grantId}",
+  "route_class": "BACK_OFFICE",
+  "permission": "approval:read",
+  "input": {
+   "grantId": {
+    "type": "Ref<approvals.ApprovalGrant>",
+    "required": true
+   }
+  },
+  "output": "GrantView{contextValues}",
+  "errors": [
+   "APPROVAL_GRANT_NOT_FOUND",
+   "APPROVAL_CONTEXT_INVALID"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": ""
+ },
+ {
+  "id": "Approval.Grant",
+  "module": "approvals",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/approvals",
+  "route_class": "PUBLIC_POS",
+  "permission": "approval:grant",
+  "input": {
+   "action": {
+    "type": "Enum<CREDENTIAL_RESET|USER_ACCESS_CHANGE|CASH_MOVE|REFUND_APPROVE|SESSION_VARIANCE|ORDER_VOID|LINE_VOID>",
+    "required": true
+   },
+   "approverCredentialKind": {
+    "type": "CredentialKind",
+    "required": true
+   },
+   "approverSecret": {
+    "type": "SecretText",
+    "required": true
+   },
+   "approverUserId": {
+    "type": "Ref<access.User>",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "context": {
+    "type": "ApprovalIssueContext",
+    "required": true
+   },
+   "reason": {
+    "type": "Text",
+    "required": false
+   },
+   "targetId": {
+    "type": "Id",
+    "required": true
+   }
+  },
+  "output": "GrantView{grantId,action,targetType,targetId,expiresAt,approverId}",
+  "errors": [
+   "APPROVER_NOT_AUTHORIZED",
+   "CREDENTIAL_LOCKED",
+   "SELF_APPROVAL_DENIED",
+   "APPROVAL_CONTEXT_INVALID",
+   "CONTEXT_REQUIRED",
+   "REFUNDS_REFUNDCASE_NOT_FOUND",
+   "REFUND_CASE_NOT_PENDING",
+   "SESSION_NOT_FOUND",
+   "SESSION_NOT_OPEN",
+   "ORDERS_ORDER_NOT_FOUND",
+   "ORDER_NOT_EDITABLE",
+   "ORDER_HAS_PAYMENTS",
+   "LINE_ALREADY_VOIDED",
+   "LINE_NOT_FIRED",
+   "ORDER_NOT_FIRED",
+   "REASON_CODE_INVALID",
+   "BRANCH_INACTIVE",
+   "BRANCH_NOT_FOUND",
+   "TERMINAL_NOT_ACTIVE",
+   "TERMINAL_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "approver step-up credential; bound to action+target+contextHash+requester; single use; TTL by policy"
+ },
+ {
+  "id": "ApprovalRequest.Create",
+  "module": "approvals",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/approval-requests",
+  "route_class": "PUBLIC_POS",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "PD_HELD",
+  "note": "remote approval queue waits for PD-V4-03"
+ },
+ {
+  "id": "Audit.Find",
+  "module": "audit",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/audit",
+  "route_class": "BACK_OFFICE",
+  "permission": "audit:read",
+  "input": {
+   "actorId": {
+    "type": "Ref<access.User>",
+    "required": false
+   },
+   "branchId": {
+    "type": "Ref<organization.Branch>",
+    "required": false
+   },
+   "category": {
+    "type": "AuditCategory",
+    "required": false
+   },
+   "commandType": {
+    "type": "Text",
+    "required": false
+   },
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "entityId": {
+    "type": "Id",
+    "required": false
+   },
+   "entityType": {
+    "type": "Text",
+    "required": false
+   },
+   "from": {
+    "type": "Timestamp",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   },
+   "outcome": {
+    "type": "AuditOutcome",
+    "required": false
+   },
+   "to": {
+    "type": "Timestamp",
+    "required": false
+   }
+  },
+  "output": "Page<AuditEntryView>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": ""
+ },
+ {
+  "id": "Audit.Get",
+  "module": "audit",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/audit/{auditEntryId}",
+  "route_class": "BACK_OFFICE",
+  "permission": "audit:read",
+  "input": {
+   "auditEntryId": {
+    "type": "Ref<audit.AuditEntry>",
+    "required": true
+   }
+  },
+  "output": "AuditEntryView",
+  "errors": [
+   "AUDIT_ENTRY_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": ""
+ },
+ {
+  "id": "Cash.Find",
+  "module": "cash",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/sessions/{sessionId}/cash-movements",
+  "route_class": "PUBLIC_POS",
+  "permission": "cash:read",
+  "input": {
+   "kind": {
+    "type": "CashMovementKind",
+    "required": false
+   },
+   "sessionId": {
+    "type": "Ref<sessions.Session>",
+    "required": true
+   }
+  },
+  "output": "List<CashEntryView>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "Cash.Move",
+  "module": "cash",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/sessions/{sessionId}/cash-movements",
+  "route_class": "PUBLIC_POS",
+  "permission": "cash:move",
+  "input": {
+   "amount": {
+    "type": "Money",
+    "required": true
+   },
+   "approvalGrantId": {
+    "type": "Ref<approvals.ApprovalGrant>",
+    "required": false
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "kind": {
+    "type": "CashMovementKind",
+    "required": true
+   },
+   "reason": {
+    "type": "Text",
+    "required": false
+   },
+   "reasonCode": {
+    "type": "Text",
+    "required": true
+   },
+   "reference": {
+    "type": "Text",
+    "required": false
+   },
+   "sessionId": {
+    "type": "Ref<sessions.Session>",
+    "required": true
+   },
+   "sourceId": {
+    "type": "Id",
+    "required": true
+   },
+   "sourceType": {
+    "type": "Code",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [
+   "CASH_MOVE_KIND_NOT_ALLOWED",
+   "SESSION_NOT_OPEN",
+   "SESSION_NOT_FOUND",
+   "APPROVAL_REQUIRED",
+   "APPROVAL_GRANT_INVALID",
+   "APPROVAL_GRANT_EXPIRED",
+   "APPROVAL_GRANT_ALREADY_CONSUMED",
+   "APPROVER_NOT_AUTHORIZED",
+   "TERMINAL_NOT_ACTIVE",
+   "TERMINAL_NOT_FOUND",
+   "BRANCH_INACTIVE",
+   "BRANCH_NOT_FOUND"
+  ],
+  "approval": {
+   "mode": "BY_POLICY",
+   "action": "CASH_MOVE"
+  },
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "kinds PAY_IN, DROP, PAYOUT, PETTY_CASH only; reasonCode/reason/reference"
+ },
+ {
+  "id": "Drawer.OpenNoSale",
+  "module": "cash",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/sessions/{sessionId}/no-sale",
+  "route_class": "PUBLIC_POS",
+  "permission": "drawer:opennosale",
+  "input": {
+   "approvalGrantId": {
+    "type": "Ref<approvals.ApprovalGrant>",
+    "required": false
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "reason": {
+    "type": "Text",
+    "required": false
+   },
+   "reasonCode": {
+    "type": "Text",
+    "required": true
+   },
+   "sessionId": {
+    "type": "Ref<sessions.Session>",
+    "required": true
+   }
+  },
+  "output": "DrawerEventView",
+  "errors": [],
+  "approval": {
+   "mode": "BY_POLICY",
+   "action": "DRAWER_NO_SALE"
+  },
+  "backend_state": "SPECIFIED",
+  "note": "DrawerEvent fact; hardware open is an outbox side effect"
+ },
+ {
+  "id": "Catalog.Import",
+  "module": "catalog",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/catalog/import",
+  "route_class": "ADMIN",
+  "permission": "catalog:manage",
+  "input": {
+   "availability": {
+    "type": "List<CatalogImportAvailability>",
+    "required": false
+   },
+   "categories": {
+    "type": "List<CatalogImportCategory>",
+    "required": false
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "dryRun": {
+    "type": "Boolean",
+    "required": true
+   },
+   "modifierGroups": {
+    "type": "List<CatalogImportModifierGroup>",
+    "required": false
+   },
+   "modifierOptions": {
+    "type": "List<CatalogImportModifierOption>",
+    "required": false
+   },
+   "prices": {
+    "type": "List<CatalogImportPrice>",
+    "required": false
+   },
+   "products": {
+    "type": "List<CatalogImportProduct>",
+    "required": false
+   },
+   "units": {
+    "type": "List<CatalogImportUnit>",
+    "required": false
+   }
+  },
+  "output": "CatalogImportReport",
+  "errors": [
+   "VALIDATION_FAILED",
+   "PERMISSION_DENIED",
+   "CONCURRENCY_CONFLICT"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Installation import of a client menu from the menu sheet: validate (dryRun) or apply all-or-nothing."
+ },
+ {
+  "id": "Catalog.Search",
+  "module": "catalog",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/catalog/search",
+  "route_class": "PUBLIC_POS",
+  "permission": "catalog:read",
+  "input": {
+   "active": {
+    "type": "Boolean",
+    "required": false
+   },
+   "categoryId": {
+    "type": "Ref<catalog.Category>",
+    "required": false
+   },
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   }
+  },
+  "output": "Page<CatalogProductView>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Menu product list by category. No prices, stock or availability here: price is server-quoted (Pricing.QuoteItem, accepted) and captured by Order.AddLines."
+ },
+ {
+  "id": "Category.Configure",
+  "module": "catalog",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/categories/{categoryId}",
+  "route_class": "ADMIN",
+  "permission": "catalog:manage",
+  "input": {
+   "active": {
+    "type": "Boolean",
+    "required": true
+   },
+   "categoryId": {
+    "type": "Ref<catalog.Category>",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "name": {
+    "type": "LocalizedText",
+    "required": true
+   }
+  },
+  "output": "CategoryView",
+  "errors": [
+   "CATALOG_CATEGORY_NOT_FOUND",
+   "CONCURRENCY_CONFLICT"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Rename or (de)activate a category. Deactivating takes every product of the category off the menu at once."
+ },
+ {
+  "id": "Category.Create",
+  "module": "catalog",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/categories",
+  "route_class": "ADMIN",
+  "permission": "catalog:manage",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "name": {
+    "type": "LocalizedText",
+    "required": true
+   }
+  },
+  "output": "CategoryView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Create a menu category with a bilingual name."
+ },
+ {
+  "id": "Category.List",
+  "module": "catalog",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/categories",
+  "route_class": "PUBLIC_POS",
+  "permission": "catalog:read",
+  "input": {
+   "active": {
+    "type": "Boolean",
+    "required": false
+   },
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   }
+  },
+  "output": "Page<CategoryView>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "Tenant catalog categories for the menu."
+ },
+ {
+  "id": "ModifierGroup.Configure",
+  "module": "catalog",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/modifier-groups/{groupId}",
+  "route_class": "ADMIN",
+  "permission": "catalog:manage",
+  "input": {
+   "active": {
+    "type": "Boolean",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "groupId": {
+    "type": "Ref<catalog.ModifierDefinition>",
+    "required": true
+   },
+   "max": {
+    "type": "Integer",
+    "required": true
+   },
+   "min": {
+    "type": "Integer",
+    "required": true
+   },
+   "name": {
+    "type": "LocalizedText",
+    "required": true
+   },
+   "selectionRule": {
+    "type": "Enum<SINGLE|MULTIPLE>",
+    "required": true
+   }
+  },
+  "output": "ModifierGroupHeaderView",
+  "errors": [
+   "MODIFIER_DEFINITION_NOT_FOUND",
+   "CONCURRENCY_CONFLICT"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Change or (de)activate a group. A deactivated group's options are refused at quote; captured lines keep their modifiers."
+ },
+ {
+  "id": "ModifierGroup.Create",
+  "module": "catalog",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/modifier-groups",
+  "route_class": "ADMIN",
+  "permission": "catalog:manage",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "max": {
+    "type": "Integer",
+    "required": true
+   },
+   "min": {
+    "type": "Integer",
+    "required": true
+   },
+   "name": {
+    "type": "LocalizedText",
+    "required": true
+   },
+   "selectionRule": {
+    "type": "Enum<SINGLE|MULTIPLE>",
+    "required": true
+   }
+  },
+  "output": "ModifierGroupHeaderView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Create a modifier group (e.g. Size: single choice, required)."
+ },
+ {
+  "id": "ModifierGroup.List",
+  "module": "catalog",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/modifier-groups",
+  "route_class": "PUBLIC_POS",
+  "permission": "catalog:read",
+  "input": {
+   "active": {
+    "type": "Boolean",
+    "required": false
+   },
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   }
+  },
+  "output": "Page<ModifierGroupView>",
+  "errors": [
+   "VALIDATION_FAILED"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Menu read: modifier groups with their options for order entry (S15 modifier dialog). Display data only: no price quote (Pricing.QuoteItem re-quotes the selection, docs/18) and no availability claim."
+ },
+ {
+  "id": "ModifierOption.Configure",
+  "module": "catalog",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/modifier-groups/{groupId}/options/{optionId}",
+  "route_class": "ADMIN",
+  "permission": "catalog:manage",
+  "input": {
+   "active": {
+    "type": "Boolean",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "groupId": {
+    "type": "Ref<catalog.ModifierDefinition>",
+    "required": true
+   },
+   "name": {
+    "type": "Text",
+    "required": true
+   },
+   "optionId": {
+    "type": "Ref<catalog.ModifierOption>",
+    "required": true
+   },
+   "priceDelta": {
+    "type": "Money",
+    "required": true
+   }
+  },
+  "output": "ModifierOptionRecordView",
+  "errors": [
+   "MODIFIER_OPTION_NOT_FOUND",
+   "CONCURRENCY_CONFLICT"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Rename, re-price or (de)activate an option. Its group is fixed. A new delta applies to new quotes only."
+ },
+ {
+  "id": "ModifierOption.Create",
+  "module": "catalog",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/modifier-groups/{groupId}/options",
+  "route_class": "ADMIN",
+  "permission": "catalog:manage",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "groupId": {
+    "type": "Ref<catalog.ModifierDefinition>",
+    "required": true
+   },
+   "name": {
+    "type": "Text",
+    "required": true
+   },
+   "priceDelta": {
+    "type": "Money",
+    "required": true
+   }
+  },
+  "output": "ModifierOptionRecordView",
+  "errors": [
+   "MODIFIER_DEFINITION_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Add an option to a group. priceDelta is signed (a negative delta is allowed)."
+ },
+ {
+  "id": "Product.Configure",
+  "module": "catalog",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/catalog/products/{productId}",
+  "route_class": "ADMIN",
+  "permission": "catalog:upsertitem",
+  "input": {
+   "active": {
+    "type": "Boolean",
+    "required": true
+   },
+   "categoryId": {
+    "type": "Ref<catalog.Category>",
+    "required": true
+   },
+   "colorCode": {
+    "type": "Text",
+    "required": false
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "description": {
+    "type": "LocalizedText",
+    "required": false
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "imageUrl": {
+    "type": "Text",
+    "required": false
+   },
+   "name": {
+    "type": "LocalizedText",
+    "required": true
+   },
+   "productId": {
+    "type": "Ref<catalog.Product>",
+    "required": true
+   },
+   "sku": {
+    "type": "Code",
+    "required": true
+   }
+  },
+  "output": "CatalogProductView",
+  "errors": [
+   "CATALOG_PRODUCT_NOT_FOUND",
+   "CATALOG_CATEGORY_NOT_FOUND",
+   "CATALOG_SKU_TAKEN",
+   "CONCURRENCY_CONFLICT",
+   "CATALOG_PRODUCT_NAME_TAKEN"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Change sku, name, category or active (archive). The unit is fixed at creation; the tax mapping changes only via Product.SetTaxPolicy."
+ },
+ {
+  "id": "Product.Create",
+  "module": "catalog",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/catalog/products",
+  "route_class": "ADMIN",
+  "permission": "catalog:upsertitem",
+  "input": {
+   "categoryId": {
+    "type": "Ref<catalog.Category>",
+    "required": true
+   },
+   "colorCode": {
+    "type": "Text",
+    "required": false
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "description": {
+    "type": "LocalizedText",
+    "required": false
+   },
+   "imageUrl": {
+    "type": "Text",
+    "required": false
+   },
+   "name": {
+    "type": "LocalizedText",
+    "required": true
+   },
+   "sku": {
+    "type": "Code",
+    "required": false
+   },
+   "taxPolicyId": {
+    "type": "Ref<taxes.TaxPolicy>",
+    "required": false
+   },
+   "unitId": {
+    "type": "Ref<catalog.Unit>",
+    "required": true
+   }
+  },
+  "output": "CatalogProductView",
+  "errors": [
+   "CATALOG_UNIT_NOT_FOUND",
+   "CATALOG_CATEGORY_NOT_FOUND",
+   "TAX_POLICY_NOT_FOUND",
+   "CATALOG_SKU_TAKEN",
+   "PERMISSION_DENIED",
+   "TAX_POLICY_ARCHIVED",
+   "CATALOG_PRODUCT_NAME_TAKEN",
+   "CATALOG_SKU_SEQUENCE_EXHAUSTED"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Create a product. It is sellable in a branch only once it has a price (NP-D-L2-02) and an AVAILABLE row there (Product.SetAvailability). sku may be omitted when SkuGenerationPolicy is AUTO_IF_EMPTY."
+ },
+ {
+  "id": "Product.Get",
+  "module": "catalog",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/catalog/products/{productId}",
+  "route_class": "PUBLIC_POS",
+  "permission": "catalog:read",
+  "input": {
+   "productId": {
+    "type": "Ref<catalog.Product>",
+    "required": true
+   }
+  },
+  "output": "ProductDetailView",
+  "errors": [
+   "CATALOG_PRODUCT_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "One product with its availability in the caller's branch (null = not yet on this branch's menu). No price (docs/18)."
+ },
+ {
+  "id": "Product.NameCheck",
+  "module": "catalog",
+  "kind": "QRY",
+  "method": "POST",
+  "path": "/catalog/products/name-check",
+  "route_class": "ADMIN",
+  "permission": "catalog:read",
+  "input": {
+   "excludeProductId": {
+    "type": "Ref<catalog.Product>",
+    "required": false
+   },
+   "name": {
+    "type": "LocalizedText",
+    "required": true
+   }
+  },
+  "output": "ProductNameDuplicate",
+  "errors": [
+   "VALIDATION_FAILED"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Editor helper: which active products already use this name, per locale, and what the policy would do. Read-only; the write operations enforce the policy themselves."
+ },
+ {
+  "id": "Product.SetAvailability",
+  "module": "catalog",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/catalog/products/{productId}/availability",
+  "route_class": "PUBLIC_POS",
+  "permission": "product:setavailability",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "productId": {
+    "type": "Ref<catalog.Product>",
+    "required": true
+   },
+   "reason": {
+    "type": "Text",
+    "required": false
+   },
+   "state": {
+    "type": "AvailabilityState",
+    "required": true
+   }
+  },
+  "output": "ProductAvailabilityView",
+  "errors": [
+   "CATALOG_PRODUCT_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Put a product on (AVAILABLE) or off (SOLD_OUT, BLOCKED) the menu of the caller's branch. The first call creates the branch row."
+ },
+ {
+  "id": "Product.SetModifierGroups",
+  "module": "catalog",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/catalog/products/{productId}/modifier-groups",
+  "route_class": "ADMIN",
+  "permission": "catalog:manage",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "groupIds": {
+    "type": "List<Ref<catalog.ModifierDefinition>>",
+    "required": true
+   },
+   "productId": {
+    "type": "Ref<catalog.Product>",
+    "required": true
+   }
+  },
+  "output": "CatalogProductView",
+  "errors": [
+   "CATALOG_PRODUCT_NOT_FOUND",
+   "MODIFIER_DEFINITION_NOT_FOUND",
+   "CONCURRENCY_CONFLICT"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Replace the ordered list of modifier groups offered with a product. The list order is the display order."
+ },
+ {
+  "id": "Product.SetTaxPolicy",
+  "module": "catalog",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/catalog/products/{productId}/tax-policy",
+  "route_class": "ADMIN",
+  "permission": "tax:manage",
+  "input": {
+   "approvalGrantId": {
+    "type": "Ref<approvals.ApprovalGrant>",
+    "required": false
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "productId": {
+    "type": "Ref<catalog.Product>",
+    "required": true
+   },
+   "taxPolicyId": {
+    "type": "Ref<taxes.TaxPolicy>",
+    "required": true
+   }
+  },
+  "output": "CatalogProductView",
+  "errors": [
+   "CATALOG_PRODUCT_NOT_FOUND",
+   "TAX_POLICY_NOT_FOUND",
+   "CONCURRENCY_CONFLICT",
+   "TAX_POLICY_ARCHIVED",
+   "APPROVAL_REQUIRED",
+   "APPROVAL_GRANT_INVALID",
+   "APPROVAL_GRANT_EXPIRED",
+   "APPROVAL_GRANT_ALREADY_CONSUMED",
+   "APPROVER_NOT_AUTHORIZED"
+  ],
+  "approval": {
+   "mode": "BY_POLICY",
+   "action": "PRODUCT_TAX_CHANGE"
+  },
+  "backend_state": "SPECIFIED",
+  "note": "Change which tax policy applies to a product. Separate from Product.Configure so the owner decides by role who may change a tax mapping; its manager approval becomes ApprovalRequirementPolicy[PRODUCT_TAX_CHANGE] once that action is registered (CORE section 5)."
+ },
+ {
+  "id": "Unit.Configure",
+  "module": "catalog",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/units/{unitId}",
+  "route_class": "ADMIN",
+  "permission": "catalog:manage",
+  "input": {
+   "code": {
+    "type": "Code",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "precision": {
+    "type": "Integer",
+    "required": true
+   },
+   "unitId": {
+    "type": "Ref<catalog.Unit>",
+    "required": true
+   }
+  },
+  "output": "UnitView",
+  "errors": [
+   "CATALOG_UNIT_NOT_FOUND",
+   "UNIT_CODE_TAKEN",
+   "UNIT_PRECISION_IMMUTABLE",
+   "CONCURRENCY_CONFLICT"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Rename a unit, or change its precision while no product uses it."
+ },
+ {
+  "id": "Unit.Create",
+  "module": "catalog",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/units",
+  "route_class": "ADMIN",
+  "permission": "catalog:manage",
+  "input": {
+   "code": {
+    "type": "Code",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "precision": {
+    "type": "Integer",
+    "required": true
+   }
+  },
+  "output": "UnitView",
+  "errors": [
+   "UNIT_CODE_TAKEN"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Create a sale unit (e.g. piece). precision = number of quantity decimals."
+ },
+ {
+  "id": "Unit.List",
+  "module": "catalog",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/units",
+  "route_class": "ADMIN",
+  "permission": "catalog:read",
+  "input": {
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   }
+  },
+  "output": "Page<UnitView>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Units for the admin product form."
+ },
+ {
+  "id": "Variant.Upsert",
+  "module": "catalog",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/catalog/products/{productId}/variants/{variantId}",
+  "route_class": "BACK_OFFICE",
+  "permission": "catalog:manage",
+  "input": {
+   "active": {
+    "type": "Boolean",
+    "required": true
+   },
+   "attributes": {
+    "type": "List<VariantAttribute{name,value}>",
+    "required": true
+   },
+   "barcode": {
+    "type": "Text",
+    "required": false
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": false
+   },
+   "productId": {
+    "type": "Ref<catalog.Product>",
+    "required": true
+   },
+   "variantId": {
+    "type": "Id",
+    "required": true
+   }
+  },
+  "output": "VariantView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "holds barcode; barcode unique per tenant among active variants"
+ },
+ {
+  "id": "Compliance.Find",
+  "module": "compliance",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/compliance/documents",
+  "route_class": "BACK_OFFICE",
+  "permission": "compliance:read",
+  "input": {
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "documentType": {
+    "type": "FiscalDocumentType",
+    "required": false
+   },
+   "from": {
+    "type": "Timestamp",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   },
+   "orderId": {
+    "type": "Ref<orders.Order>",
+    "required": false
+   },
+   "submission": {
+    "type": "Text",
+    "required": false
+   },
+   "to": {
+    "type": "Timestamp",
+    "required": false
+   }
+  },
+  "output": "Page<FiscalDocumentView>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "Compliance.Get",
+  "module": "compliance",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/compliance/documents/{documentId}",
+  "route_class": "BACK_OFFICE",
+  "permission": "compliance:read",
+  "input": {
+   "documentId": {
+    "type": "Ref<compliance.FiscalDocument>",
+    "required": true
+   }
+  },
+  "output": "FiscalDocumentView{attempts}",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "includes submission attempts"
+ },
+ {
+  "id": "Compliance.IssueDocument",
+  "module": "compliance",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/compliance/documents",
+  "route_class": "BACK_OFFICE",
+  "permission": "compliance:issuedocument",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "documentType": {
+    "type": "FiscalDocumentType",
+    "required": true
+   },
+   "orderId": {
+    "type": "Ref<orders.Order>",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "manual invoice request; automatic issue is the consumer"
+ },
+ {
+  "id": "Compliance.ReissueDocument",
+  "module": "compliance",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/compliance/documents/{documentId}/reissue",
+  "route_class": "ADMIN",
+  "permission": "compliance:issuedocument",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "documentId": {
+    "type": "Ref<compliance.FiscalDocument>",
+    "required": true
+   },
+   "reason": {
+    "type": "Text",
+    "required": true
+   }
+  },
+  "output": "FiscalSetupResult",
+  "errors": [
+   "VALIDATION_FAILED",
+   "PERMISSION_DENIED",
+   "CONCURRENCY_CONFLICT"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Manager queue action: build a pending document or correct a rejected one."
+ },
+ {
+  "id": "Compliance.VerifyChain",
+  "module": "compliance",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/compliance/hash-chain/verify",
+  "route_class": "BACK_OFFICE",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "needs legal validation of chain requirements"
+ },
+ {
+  "id": "FiscalDevice.Register",
+  "module": "compliance",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/compliance/fiscal-devices",
+  "route_class": "ADMIN",
+  "permission": "compliance:issuedocument",
+  "input": {
+   "adapter": {
+    "type": "Code",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "credentialRef": {
+    "type": "Code",
+    "required": true
+   },
+   "deviceSerial": {
+    "type": "Code",
+    "required": true
+   },
+   "terminalId": {
+    "type": "Ref<organization.Terminal>",
+    "required": true
+   }
+  },
+  "output": "FiscalSetupResult",
+  "errors": [
+   "VALIDATION_FAILED",
+   "PERMISSION_DENIED",
+   "CONCURRENCY_CONFLICT",
+   "ORGANIZATION_TERMINAL_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Installation: register the ETA POS identity of a terminal."
+ },
+ {
+  "id": "FiscalDevice.SetState",
+  "module": "compliance",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/compliance/fiscal-devices/{deviceId}/state",
+  "route_class": "ADMIN",
+  "permission": "compliance:issuedocument",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "deviceId": {
+    "type": "Ref<compliance.FiscalDevice>",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "reason": {
+    "type": "Text",
+    "required": true
+   },
+   "state": {
+    "type": "Enum<ACTIVE|SUSPENDED|RETIRED>",
+    "required": true
+   }
+  },
+  "output": "FiscalSetupResult",
+  "errors": [
+   "VALIDATION_FAILED",
+   "PERMISSION_DENIED",
+   "CONCURRENCY_CONFLICT"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Installation and operations: activate, suspend or retire a fiscal device."
+ },
+ {
+  "id": "FiscalItemMapping.SetMany",
+  "module": "compliance",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/compliance/item-mappings",
+  "route_class": "ADMIN",
+  "permission": "compliance:issuedocument",
+  "input": {
+   "adapter": {
+    "type": "Code",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "rows": {
+    "type": "List<FiscalItemMappingRow>",
+    "required": true
+   }
+  },
+  "output": "FiscalSetupResult",
+  "errors": [
+   "VALIDATION_FAILED",
+   "PERMISSION_DENIED",
+   "CATALOG_PRODUCT_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Installation: map menu products to ETA item codes."
+ },
+ {
+  "id": "FiscalProfile.Configure",
+  "module": "compliance",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/compliance/fiscal-profiles/{branchId}",
+  "route_class": "ADMIN",
+  "permission": "compliance:issuedocument",
+  "input": {
+   "activityCode": {
+    "type": "Code",
+    "required": true
+   },
+   "adapter": {
+    "type": "Code",
+    "required": true
+   },
+   "address": {
+    "type": "FiscalAddress",
+    "required": true
+   },
+   "branchId": {
+    "type": "Ref<organization.Branch>",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": false
+   },
+   "issuerBranchCode": {
+    "type": "Code",
+    "required": true
+   },
+   "issuerId": {
+    "type": "Code",
+    "required": true
+   },
+   "issuerName": {
+    "type": "Text",
+    "required": true
+   },
+   "receiptType": {
+    "type": "Code",
+    "required": true
+   }
+  },
+  "output": "FiscalSetupResult",
+  "errors": [
+   "VALIDATION_FAILED",
+   "PERMISSION_DENIED",
+   "CONCURRENCY_CONFLICT",
+   "ORGANIZATION_BRANCH_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Installation: the fiscal registration of a branch for one adapter."
+ },
+ {
+  "id": "Stock.Count",
+  "module": "counts_adjustments",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/stock-counts/{countId}/post",
+  "route_class": "BACK_OFFICE",
+  "permission": "stock:count",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "countId": {
+    "type": "Ref<counts_adjustments.StockCount>",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [],
+  "approval": {
+   "mode": "BY_POLICY",
+   "action": "STOCK_COUNT_POST"
+  },
+  "backend_state": "SPECIFIED",
+  "note": "SUBMITTED -> POSTED; variance vs baseline + movements since baseline"
+ },
+ {
+  "id": "StockCount.Cancel",
+  "module": "counts_adjustments",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/stock-counts/{countId}/cancel",
+  "route_class": "BACK_OFFICE",
+  "permission": "stockcount:cancel",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "countId": {
+    "type": "Ref<counts_adjustments.StockCount>",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "reason": {
+    "type": "Text",
+    "required": true
+   }
+  },
+  "output": "StockCountView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "DRAFT/SUBMITTED -> CANCELLED; recount = new count"
+ },
+ {
+  "id": "StockCount.Find",
+  "module": "counts_adjustments",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/stock-counts",
+  "route_class": "BACK_OFFICE",
+  "permission": "inventory:read",
+  "input": {
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "lifecycle": {
+    "type": "StockCountState",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   },
+   "warehouseId": {
+    "type": "Ref<warehouses.Warehouse>",
+    "required": false
+   }
+  },
+  "output": "Page<StockCountView>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "StockCount.Get",
+  "module": "counts_adjustments",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/stock-counts/{countId}",
+  "route_class": "BACK_OFFICE",
+  "permission": "inventory:read",
+  "input": {
+   "countId": {
+    "type": "Ref<counts_adjustments.StockCount>",
+    "required": true
+   }
+  },
+  "output": "StockCountView{lines}",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "StockCount.RecordObservations",
+  "module": "counts_adjustments",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/stock-counts/{countId}/observations",
+  "route_class": "BACK_OFFICE",
+  "permission": "stockcount:recordobservations",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "countId": {
+    "type": "Ref<counts_adjustments.StockCount>",
+    "required": true
+   },
+   "observations": {
+    "type": "List<Observation{itemId,countedQuantity}>",
+    "required": true
+   }
+  },
+  "output": "StockCountView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "DRAFT only; later observation for the same item replaces the earlier one"
+ },
+ {
+  "id": "StockCount.Start",
+  "module": "counts_adjustments",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/stock-counts",
+  "route_class": "BACK_OFFICE",
+  "permission": "stockcount:start",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "itemIds": {
+    "type": "List<Ref<inventory.InventoryItem>>",
+    "required": false
+   },
+   "warehouseId": {
+    "type": "Ref<warehouses.Warehouse>",
+    "required": true
+   }
+  },
+  "output": "StockCountView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "baseline cursor per item"
+ },
+ {
+  "id": "StockCount.Submit",
+  "module": "counts_adjustments",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/stock-counts/{countId}/submit",
+  "route_class": "BACK_OFFICE",
+  "permission": "stockcount:submit",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "countId": {
+    "type": "Ref<counts_adjustments.StockCount>",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "zeroUncounted": {
+    "type": "Boolean",
+    "required": true
+   }
+  },
+  "output": "StockCountView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "DRAFT -> SUBMITTED"
+ },
+ {
+  "id": "Customer.Create",
+  "module": "customers",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/customers",
+  "route_class": "PUBLIC_POS",
+  "permission": "customer:create",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "email": {
+    "type": "Email",
+    "required": false
+   },
+   "name": {
+    "type": "Text",
+    "required": true
+   },
+   "phone": {
+    "type": "Phone",
+    "required": false
+   }
+  },
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "Customer.Get",
+  "module": "customers",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/customers/{customerId}",
+  "route_class": "PUBLIC_POS",
+  "permission": "customer:pii:read",
+  "input": {
+   "customerId": {
+    "type": "Ref<customers.Customer>",
+    "required": true
+   }
+  },
+  "output": "CustomerView{addresses}",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "PII permission"
+ },
+ {
+  "id": "Customer.Merge",
+  "module": "customers",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/customers/{customerId}/merge",
+  "route_class": "BACK_OFFICE",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "rewrites loyalty and history references"
+ },
+ {
+  "id": "Customer.Search",
+  "module": "customers",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/customers",
+  "route_class": "PUBLIC_POS",
+  "permission": "customer:pii:read",
+  "input": {
+   "email": {
+    "type": "Email",
+    "required": false
+   },
+   "page": {
+    "type": "PaginationInput",
+    "required": false
+   },
+   "phone": {
+    "type": "Phone",
+    "required": false
+   },
+   "sort": {
+    "type": "CustomerSort",
+    "required": false
+   },
+   "text": {
+    "type": "Text",
+    "required": false
+   }
+  },
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "PII permission"
+ },
+ {
+  "id": "Customer.Update",
+  "module": "customers",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/customers/{customerId}",
+  "route_class": "PUBLIC_POS",
+  "permission": "customer:update",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "customerId": {
+    "type": "Ref<customers.Customer>",
+    "required": true
+   },
+   "email": {
+    "type": "Text",
+    "required": false
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "name": {
+    "type": "Text",
+    "required": true
+   },
+   "phone": {
+    "type": "Text",
+    "required": false
+   }
+  },
+  "output": "CustomerView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "CustomerAddress.Upsert",
+  "module": "customers",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/customers/{customerId}/addresses/{addressId}",
+  "route_class": "PUBLIC_POS",
+  "permission": "customeraddress:upsert",
+  "input": {
+   "active": {
+    "type": "Boolean",
+    "required": true
+   },
+   "address": {
+    "type": "Address",
+    "required": true
+   },
+   "addressId": {
+    "type": "Id",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "customerId": {
+    "type": "Ref<customers.Customer>",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": false
+   },
+   "label": {
+    "type": "Text",
+    "required": false
+   }
+  },
+  "output": "CustomerAddressView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "remove via active=false"
+ },
+ {
+  "id": "Delivery.Assign",
+  "module": "delivery",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/deliveries/{deliveryId}/assign",
+  "route_class": "PUBLIC_POS",
+  "permission": "delivery:assign",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "deliveryId": {
+    "type": "Ref<delivery.Delivery>",
+    "required": true
+   },
+   "driverId": {
+    "type": "Ref<access.User>",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   }
+  },
+  "output": "DeliveryView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "PENDING/FAILED -> ASSIGNED; driver = access.User until PD-V4-13"
+ },
+ {
+  "id": "Delivery.Board",
+  "module": "delivery",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/deliveries",
+  "route_class": "PUBLIC_POS",
+  "permission": "delivery:read",
+  "input": {
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "driverId": {
+    "type": "Ref<access.User>",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   },
+   "state": {
+    "type": "DeliveryState",
+    "required": false
+   }
+  },
+  "output": "Page<DeliveryView>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "Delivery.Cancel",
+  "module": "delivery",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/deliveries/{deliveryId}/cancel",
+  "route_class": "PUBLIC_POS",
+  "permission": "delivery:cancel",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "deliveryId": {
+    "type": "Ref<delivery.Delivery>",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "reason": {
+    "type": "Text",
+    "required": true
+   }
+  },
+  "output": "DeliveryView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "non-terminal -> CANCELLED; reason"
+ },
+ {
+  "id": "Delivery.Complete",
+  "module": "delivery",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/deliveries/{deliveryId}/complete",
+  "route_class": "PUBLIC_POS",
+  "permission": "delivery:complete",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "deliveryId": {
+    "type": "Ref<delivery.Delivery>",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   }
+  },
+  "output": "DeliveryView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "PICKED_UP -> DELIVERED"
+ },
+ {
+  "id": "Delivery.Create",
+  "module": "delivery",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/deliveries",
+  "route_class": "PUBLIC_POS",
+  "permission": "delivery:create",
+  "input": {
+   "address": {
+    "type": "Address",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "orderId": {
+    "type": "Ref<orders.Order>",
+    "required": true
+   }
+  },
+  "output": "DeliveryView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "DELIVERY channel order; address snapshot"
+ },
+ {
+  "id": "Delivery.Dispatch",
+  "module": "delivery",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/deliveries/{deliveryId}/dispatch",
+  "route_class": "PUBLIC_POS",
+  "permission": "delivery:dispatch",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "deliveryId": {
+    "type": "Ref<delivery.Delivery>",
+    "required": true
+   },
+   "driverId": {
+    "type": "Id",
+    "required": false
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "toState": {
+    "type": "DeliveryState",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "ASSIGNED -> PICKED_UP (transition was undeclared)"
+ },
+ {
+  "id": "Delivery.FailAttempt",
+  "module": "delivery",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/deliveries/{deliveryId}/fail",
+  "route_class": "PUBLIC_POS",
+  "permission": "delivery:failattempt",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "deliveryId": {
+    "type": "Ref<delivery.Delivery>",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "reason": {
+    "type": "Text",
+    "required": false
+   },
+   "reasonCode": {
+    "type": "Text",
+    "required": true
+   }
+  },
+  "output": "DeliveryView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "ASSIGNED/PICKED_UP -> FAILED; reasonCode; future-feature test subject"
+ },
+ {
+  "id": "Delivery.Get",
+  "module": "delivery",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/deliveries/{deliveryId}",
+  "route_class": "PUBLIC_POS",
+  "permission": "delivery:read",
+  "input": {
+   "deliveryId": {
+    "type": "Ref<delivery.Delivery>",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "read permission registered"
+ },
+ {
+  "id": "DeliveryZone.Upsert",
+  "module": "delivery",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/delivery-zones/{zoneId}",
+  "route_class": "ADMIN",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "PD_HELD",
+  "note": ""
+ },
+ {
+  "id": "Driver.SettleCash",
+  "module": "delivery",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/drivers/{driverId}/settlements",
+  "route_class": "PUBLIC_POS",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "PD_HELD",
+  "note": ""
+ },
+ {
+  "id": "Driver.UpdateLocation",
+  "module": "delivery",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/drivers/{driverId}/location",
+  "route_class": "PUBLIC_POS",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "live tracking"
+ },
+ {
+  "id": "Driver.Upsert",
+  "module": "delivery",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/drivers/{driverId}",
+  "route_class": "ADMIN",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "PD_HELD",
+  "note": ""
+ },
+ {
+  "id": "Outbox.Redrive",
+  "module": "events",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/outbox/deliveries/{deliveryId}/redrive",
+  "route_class": "OPERATIONAL",
+  "permission": "outbox:redrive",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "deliveryId": {
+    "type": "Ref<events.ConsumerDelivery>",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [],
+  "approval": {
+   "mode": "BY_POLICY",
+   "action": "OUTBOX_REDRIVE"
+  },
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "OutboxDelivery.Find",
+  "module": "events",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/outbox/deliveries",
+  "route_class": "OPERATIONAL",
+  "permission": "outbox:read",
+  "input": {
+   "consumerId": {
+    "type": "Text",
+    "required": false
+   },
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   },
+   "olderThan": {
+    "type": "Timestamp",
+    "required": false
+   },
+   "state": {
+    "type": "ConsumerDeliveryState",
+    "required": false
+   }
+  },
+  "output": "Page<ConsumerDeliveryView>{countsByState}",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "includes counts by state"
+ },
+ {
+  "id": "OutboxDelivery.Get",
+  "module": "events",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/outbox/deliveries/{deliveryId}",
+  "route_class": "OPERATIONAL",
+  "permission": "outbox:read",
+  "input": {
+   "deliveryId": {
+    "type": "Ref<events.ConsumerDelivery>",
+    "required": true
+   }
+  },
+  "output": "ConsumerDeliveryView{event}",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "Inventory.Adjust",
+  "module": "inventory",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/inventory/adjustments",
+  "route_class": "BACK_OFFICE",
+  "permission": "inventory:adjust",
+  "input": {
+   "approvalGrantId": {
+    "type": "Ref<approvals.ApprovalGrant>",
+    "required": false
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedItemVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Integer",
+    "required": true
+   },
+   "inventoryItemId": {
+    "type": "Ref<inventory.InventoryItem>",
+    "required": true
+   },
+   "note": {
+    "type": "Text",
+    "required": false
+   },
+   "quantityDelta": {
+    "type": "Quantity",
+    "required": true
+   },
+   "reason": {
+    "type": "InventoryAdjustmentReason",
+    "required": true
+   },
+   "stockUnitId": {
+    "type": "Ref<catalog.Unit>",
+    "required": true
+   },
+   "unitCost": {
+    "type": "Money",
+    "required": false
+   },
+   "warehouseId": {
+    "type": "Ref<warehouses.Warehouse>",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [
+   "INVENTORY_ITEM_NOT_FOUND",
+   "WAREHOUSE_NOT_FOUND",
+   "UNIT_NOT_FOUND",
+   "PRODUCT_NOT_FOUND",
+   "INVENTORY_ITEM_INACTIVE",
+   "WAREHOUSE_INACTIVE",
+   "STOCK_UNIT_MISMATCH",
+   "QUANTITY_PRECISION_UNSUPPORTED",
+   "NEGATIVE_STOCK_BLOCKED",
+   "STOCK_MOVEMENT_REJECTED",
+   "APPROVAL_REQUIRED",
+   "BRANCH_NOT_FOUND",
+   "BRANCH_INACTIVE",
+   "TERMINAL_NOT_FOUND",
+   "TERMINAL_NOT_ACTIVE"
+  ],
+  "approval": {
+   "mode": "BY_POLICY",
+   "action": "INVENTORY_ADJUST"
+  },
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "reason + note persisted on the movement"
+ },
+ {
+  "id": "Inventory.Expiring",
+  "module": "inventory",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/inventory/batches",
+  "route_class": "BACK_OFFICE",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "batch/expiry tracking"
+ },
+ {
+  "id": "Inventory.LowStock",
+  "module": "inventory",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/inventory/low-stock",
+  "route_class": "BACK_OFFICE",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "depends on reorder levels"
+ },
+ {
+  "id": "Inventory.OnHand",
+  "module": "inventory",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/inventory/on-hand",
+  "route_class": "BACK_OFFICE",
+  "permission": "inventory:read",
+  "input": {
+   "inventoryItemId": {
+    "type": "Ref<inventory.InventoryItem>",
+    "required": true
+   },
+   "warehouseId": {
+    "type": "Ref<warehouses.Warehouse>",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [
+   "INVENTORY_ITEM_NOT_FOUND",
+   "WAREHOUSE_NOT_FOUND",
+   "UNIT_NOT_FOUND",
+   "PRODUCT_NOT_FOUND",
+   "INVENTORY_ITEM_INACTIVE",
+   "WAREHOUSE_INACTIVE",
+   "STOCK_UNIT_MISMATCH",
+   "QUANTITY_PRECISION_UNSUPPORTED",
+   "NEGATIVE_STOCK_BLOCKED",
+   "STOCK_MOVEMENT_REJECTED",
+   "APPROVAL_REQUIRED",
+   "BRANCH_NOT_FOUND",
+   "BRANCH_INACTIVE",
+   "TERMINAL_NOT_FOUND",
+   "TERMINAL_NOT_ACTIVE"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "read permission registered"
+ },
+ {
+  "id": "InventoryItem.Configure",
+  "module": "inventory",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/inventory/items/{inventoryItemId}",
+  "route_class": "BACK_OFFICE",
+  "permission": "inventoryitem:configure",
+  "input": {
+   "active": {
+    "type": "Boolean",
+    "required": true
+   },
+   "allowNegative": {
+    "type": "Boolean",
+    "required": false
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": false
+   },
+   "inventoryItemId": {
+    "type": "Id",
+    "required": true
+   },
+   "productId": {
+    "type": "Ref<catalog.Product>",
+    "required": true
+   },
+   "stockUnitId": {
+    "type": "Ref<catalog.Unit>",
+    "required": true
+   }
+  },
+  "output": "InventoryItemView",
+  "errors": [
+   "INVENTORY_ITEM_NOT_FOUND",
+   "PRODUCT_NOT_FOUND",
+   "UNIT_NOT_FOUND",
+   "BRANCH_NOT_FOUND",
+   "BRANCH_INACTIVE",
+   "TERMINAL_NOT_FOUND",
+   "TERMINAL_NOT_ACTIVE"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "tracking, stock unit, allowNegative override"
+ },
+ {
+  "id": "InventoryItem.Get",
+  "module": "inventory",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/inventory/items/{inventoryItemId}",
+  "route_class": "BACK_OFFICE",
+  "permission": "inventory:read",
+  "input": {
+   "inventoryItemId": {
+    "type": "Ref<inventory.InventoryItem>",
+    "required": true
+   }
+  },
+  "output": "WarehouseView",
+  "errors": [
+   "INVENTORY_ITEM_NOT_FOUND",
+   "PRODUCT_NOT_FOUND",
+   "UNIT_NOT_FOUND",
+   "BRANCH_NOT_FOUND",
+   "BRANCH_INACTIVE",
+   "TERMINAL_NOT_FOUND",
+   "TERMINAL_NOT_ACTIVE"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": ""
+ },
+ {
+  "id": "InventoryItem.SetLevels",
+  "module": "inventory",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/inventory/items/{inventoryItemId}/levels",
+  "route_class": "BACK_OFFICE",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "reorder levels"
+ },
+ {
+  "id": "Kitchen.AdvanceTicket",
+  "module": "kitchen",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/kitchen/tickets/{ticketId}/advance",
+  "route_class": "OPERATIONAL",
+  "permission": "kitchen:advanceticket",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "ticketId": {
+    "type": "Ref<kitchen.KitchenTicket>",
+    "required": true
+   },
+   "toState": {
+    "type": "KitchenState",
+    "required": true
+   }
+  },
+  "output": "KitchenAdvanceTicketResult",
+  "errors": [
+   "KITCHEN_TICKET_NOT_FOUND",
+   "KITCHEN_TRANSITION_INVALID",
+   "CONCURRENCY_CONFLICT"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Advance one station ticket."
+ },
+ {
+  "id": "Kitchen.Board",
+  "module": "kitchen",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/kitchen/board",
+  "route_class": "OPERATIONAL",
+  "permission": "kitchen:read",
+  "input": {
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "lifecycle": {
+    "type": "KitchenState",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   },
+   "stationId": {
+    "type": "Ref<kitchen_routing.KitchenStation>",
+    "required": false
+   }
+  },
+  "output": "Page<KitchenTicketView>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Station board over kitchen-owned tickets. Lifecycle filter is a single value (UI requests QUEUED/STARTED/READY)."
+ },
+ {
+  "id": "Kitchen.OrderFulfillment",
+  "module": "kitchen",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/orders/{orderId}/fulfillment",
+  "route_class": "PUBLIC_POS",
+  "permission": "order:read",
+  "input": {
+   "orderId": {
+    "type": "Ref<orders.Order>",
+    "required": true
+   }
+  },
+  "output": "KitchenFulfillmentView",
+  "errors": [
+   "ORDER_NOT_FOUND",
+   "PERMISSION_DENIED"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Per-round kitchen status of one check, for the floor and the cashier."
+ },
+ {
+  "id": "KitchenTicket.Get",
+  "module": "kitchen",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/kitchen/tickets/{ticketId}",
+  "route_class": "PUBLIC_POS",
+  "permission": "kitchen:read",
+  "input": {
+   "ticketId": {
+    "type": "Ref<kitchen.KitchenTicket>",
+    "required": true
+   }
+  },
+  "output": "KitchenTicketView{items}",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "Ticket.Recall",
+  "module": "kitchen",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/kitchen/tickets/{ticketId}/recall",
+  "route_class": "PUBLIC_POS",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "PD_HELD",
+  "note": ""
+ },
+ {
+  "id": "Ticket.Refire",
+  "module": "kitchen",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/kitchen/tickets/{ticketId}/refire",
+  "route_class": "PUBLIC_POS",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "PD_HELD",
+  "note": ""
+ },
+ {
+  "id": "Ticket.SetPriority",
+  "module": "kitchen",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/kitchen/tickets/{ticketId}/priority",
+  "route_class": "PUBLIC_POS",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "PD_HELD",
+  "note": ""
+ },
+ {
+  "id": "Ticket.TransferStation",
+  "module": "kitchen",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/kitchen/tickets/{ticketId}/station",
+  "route_class": "PUBLIC_POS",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "PD_HELD",
+  "note": ""
+ },
+ {
+  "id": "TicketItem.Bump",
+  "module": "kitchen",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/kitchen/tickets/{ticketId}/items/{itemId}/bump",
+  "route_class": "PUBLIC_POS",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "PD_HELD",
+  "note": ""
+ },
+ {
+  "id": "KitchenStation.Configure",
+  "module": "kitchen_routing",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/kitchen/stations/{stationId}",
+  "route_class": "ADMIN",
+  "permission": "kitchen:configure",
+  "input": {
+   "active": {
+    "type": "Boolean",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "name": {
+    "type": "Text",
+    "required": true
+   },
+   "stationId": {
+    "type": "Ref<kitchen_routing.KitchenStation>",
+    "required": true
+   }
+  },
+  "output": "KitchenStationView",
+  "errors": [
+   "KITCHEN_STATION_NOT_FOUND",
+   "KITCHEN_STATION_NAME_TAKEN",
+   "CONCURRENCY_CONFLICT"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "Rename or (de)activate a station with CAS."
+ },
+ {
+  "id": "KitchenStation.Create",
+  "module": "kitchen_routing",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/kitchen/stations",
+  "route_class": "ADMIN",
+  "permission": "kitchen:configure",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "name": {
+    "type": "Text",
+    "required": true
+   }
+  },
+  "output": "KitchenStationView",
+  "errors": [
+   "KITCHEN_STATION_NAME_TAKEN"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "Create a preparation station in the current branch."
+ },
+ {
+  "id": "KitchenStation.List",
+  "module": "kitchen_routing",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/kitchen/stations",
+  "route_class": "PUBLIC_POS",
+  "permission": "kitchen:read",
+  "input": {
+   "active": {
+    "type": "Boolean",
+    "required": false
+   },
+   "branchId": {
+    "type": "Ref<organization.Branch>",
+    "required": false
+   },
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   }
+  },
+  "output": "Page<KitchenStationView>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "Stations visible to the caller."
+ },
+ {
+  "id": "RoutingRule.Configure",
+  "module": "kitchen_routing",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/kitchen/routing-rules/{ruleId}",
+  "route_class": "ADMIN",
+  "permission": "kitchen:configure",
+  "input": {
+   "active": {
+    "type": "Boolean",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "match": {
+    "type": "RoutingPredicate",
+    "required": true
+   },
+   "priority": {
+    "type": "Integer",
+    "required": true
+   },
+   "ruleId": {
+    "type": "Ref<kitchen_routing.RoutingRule>",
+    "required": true
+   }
+  },
+  "output": "RoutingRuleView",
+  "errors": [
+   "ROUTING_RULE_NOT_FOUND",
+   "CONCURRENCY_CONFLICT"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Edit a routing rule (priority, match, active) with CAS. No destination-station activity guard: a rule may be disabled, edited or enabled whatever its station state, because station deactivation never cascades to rules. Dispatch (kitchen.fire-round) only uses a rule whose own active flag AND whose st"
+ },
+ {
+  "id": "RoutingRule.Create",
+  "module": "kitchen_routing",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/kitchen/routing-rules",
+  "route_class": "ADMIN",
+  "permission": "kitchen:configure",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "match": {
+    "type": "RoutingPredicate",
+    "required": true
+   },
+   "priority": {
+    "type": "Integer",
+    "required": true
+   },
+   "stationId": {
+    "type": "Ref<kitchen_routing.KitchenStation>",
+    "required": true
+   }
+  },
+  "output": "RoutingRuleView",
+  "errors": [
+   "KITCHEN_STATION_NOT_FOUND",
+   "KITCHEN_STATION_INACTIVE"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Route a product/category/channel (or everything, as the catch-all) to a station."
+ },
+ {
+  "id": "RoutingRule.List",
+  "module": "kitchen_routing",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/kitchen/routing-rules",
+  "route_class": "ADMIN",
+  "permission": "kitchen:read",
+  "input": {
+   "active": {
+    "type": "Boolean",
+    "required": false
+   },
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   },
+   "stationId": {
+    "type": "Ref<kitchen_routing.KitchenStation>",
+    "required": false
+   }
+  },
+  "output": "Page<RoutingRuleView>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Rules in resolution order (priority ascending)."
+ },
+ {
+  "id": "Loyalty.Adjust",
+  "module": "loyalty",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/customers/{customerId}/loyalty/adjustments",
+  "route_class": "BACK_OFFICE",
+  "permission": "loyalty:adjust",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "customerId": {
+    "type": "Ref<customers.Customer>",
+    "required": true
+   },
+   "points": {
+    "type": "Integer",
+    "required": true
+   },
+   "reason": {
+    "type": "Text",
+    "required": true
+   }
+  },
+  "output": "LoyaltyBalanceView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "reason required"
+ },
+ {
+  "id": "Loyalty.Balance",
+  "module": "loyalty",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/customers/{customerId}/loyalty",
+  "route_class": "PUBLIC_POS",
+  "permission": "loyalty:read",
+  "input": {
+   "customerId": {
+    "type": "Ref<customers.Customer>",
+    "required": true
+   }
+  },
+  "output": "LoyaltyBalanceView{entries}",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "Loyalty.Redeem",
+  "module": "loyalty",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/loyalty/redemptions",
+  "route_class": "PUBLIC_POS",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "PD_HELD",
+  "note": "no LOYALTY tender and no redemption settlement contract"
+ },
+ {
+  "id": "LoyaltyTier.Upsert",
+  "module": "loyalty",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/loyalty/tiers/{tierId}",
+  "route_class": "BACK_OFFICE",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "PD_HELD",
+  "note": ""
+ },
+ {
+  "id": "Sync.Bootstrap",
+  "module": "offline",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/sync/bootstrap",
+  "route_class": "SYNC",
+  "permission": "sync:read",
+  "input": {},
+  "output": "SyncSnapshot{catalog,prices,policies,reasonCodes,tables,cursor}",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "catalog/price/policy snapshot + cursor for the terminal's branch"
+ },
+ {
+  "id": "Sync.Changes",
+  "module": "offline",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/sync/changes",
+  "route_class": "SYNC",
+  "permission": "sync:read",
+  "input": {
+   "cursor": {
+    "type": "Cursor",
+    "required": true
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   }
+  },
+  "output": "SyncDelta{changes,nextCursor,resetRequired}",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "cursor-based delta"
+ },
+ {
+  "id": "Sync.Replay",
+  "module": "offline",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/sync/commands",
+  "route_class": "SYNC",
+  "permission": "sync:replay",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "commands": {
+    "type": "List<OfflineReplayCommandInput>",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "typed allowlist union, per-item idempotency key; no raw JSON"
+ },
+ {
+  "id": "Sync.ResolveConflict",
+  "module": "offline",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/sync/conflicts/{offlineCommandId}/resolve",
+  "route_class": "SYNC",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "manager conflict workflow follows offline business-date decision"
+ },
+ {
+  "id": "Sync.Status",
+  "module": "offline",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/sync/status",
+  "route_class": "SYNC",
+  "permission": "sync:read",
+  "input": {
+   "terminalId": {
+    "type": "Ref<organization.Terminal>",
+    "required": false
+   }
+  },
+  "output": "SyncStatus{pending,failed,conflicts,lastReplayAt}",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "Channel.IngestExternalOrder",
+  "module": "order_channels",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/channels/{channel}/orders",
+  "route_class": "ADAPTER_CALLBACK",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "aggregator adapter + Order.Create; needs adapter identity and signature model"
+ },
+ {
+  "id": "Order.AddLines",
+  "module": "orders",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/orders/{orderId}/lines",
+  "route_class": "PUBLIC_POS",
+  "permission": "order:addlines",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "lines": {
+    "type": "List<OrderLineInput>",
+    "required": true
+   },
+   "orderId": {
+    "type": "Ref<orders.Order>",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [
+   "ORDERS_ORDER_NOT_FOUND",
+   "ORDER_NOT_EDITABLE",
+   "SESSION_NOT_OPEN",
+   "TERMINAL_NOT_ACTIVE",
+   "TERMINAL_NOT_FOUND",
+   "BRANCH_INACTIVE",
+   "BRANCH_NOT_FOUND",
+   "CATALOG_PRODUCT_NOT_FOUND",
+   "CATALOG_UNIT_NOT_FOUND",
+   "PRODUCT_UNAVAILABLE",
+   "MODIFIER_UNAVAILABLE",
+   "MODIFIER_SELECTION_INVALID",
+   "PRICE_NOT_FOUND",
+   "PRICING_POLICY_REJECTED",
+   "TAX_POLICY_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "DRAFT or CONFIRMED; new lines unfired"
+ },
+ {
+  "id": "Order.ApplyDiscount",
+  "module": "orders",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/orders/{orderId}/discounts",
+  "route_class": "PUBLIC_POS",
+  "permission": "order:applydiscount",
+  "input": {
+   "approvalGrantId": {
+    "type": "Ref<approvals.ApprovalGrant>",
+    "required": false
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "discount": {
+    "type": "OrderWideDiscountRequest",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "orderId": {
+    "type": "Ref<orders.Order>",
+    "required": true
+   },
+   "reason": {
+    "type": "Text",
+    "required": false
+   },
+   "reasonCode": {
+    "type": "Text",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [
+   "ORDERS_ORDER_NOT_FOUND",
+   "ORDER_NOT_EDITABLE",
+   "ORDER_EMPTY",
+   "LINE_ALREADY_FIRED",
+   "SESSION_NOT_OPEN",
+   "APPROVAL_REQUIRED",
+   "ORDER_DISCOUNT_NOT_FOUND",
+   "DISCOUNT_EXCEEDS_ELIGIBLE_BASE",
+   "DISCOUNT_ALLOCATION_UNAVAILABLE",
+   "TERMINAL_NOT_ACTIVE",
+   "TERMINAL_NOT_FOUND",
+   "BRANCH_INACTIVE",
+   "BRANCH_NOT_FOUND",
+   "INCLUSIVE_DISCOUNT_QUANTUM_UNAVAILABLE",
+   "INCLUSIVE_DISCOUNT_COMPONENT_UNAVAILABLE"
+  ],
+  "approval": {
+   "mode": "BY_POLICY",
+   "action": "ORDER_DISCOUNT"
+  },
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "PD-N7-MIXED-TAX-DISCOUNT-ALLOCATION Option A and PD-N7-MIXED-TAX-PERCENTAGE-DISCOUNT-BASIS Option A: FIXED_AMOUNT or explicit PERCENTAGE ORDER_WIDE BEFORE_TAX, DRAFT_UNFIRED mixed EXCLUSIVE only. Pricing derives percentage from total eligible raw base before invoice rounding, rounds total once at Mo"
+ },
+ {
+  "id": "Order.Cancel",
+  "module": "orders",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/orders/{orderId}/cancel",
+  "route_class": "PUBLIC_POS",
+  "permission": "order:cancel",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "orderId": {
+    "type": "Ref<orders.Order>",
+    "required": true
+   },
+   "reason": {
+    "type": "Text",
+    "required": false
+   },
+   "reasonCode": {
+    "type": "Text",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [
+   "ORDERS_ORDER_NOT_FOUND",
+   "ORDER_NOT_EDITABLE",
+   "ORDER_ALREADY_FIRED",
+   "SESSION_NOT_OPEN",
+   "TERMINAL_NOT_ACTIVE",
+   "TERMINAL_NOT_FOUND",
+   "BRANCH_INACTIVE",
+   "BRANCH_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "Enabled DRAFT_UNFIRED only; no financial/stock/fulfillment result fabricated. Reason code persisted; optional free text. Recovered confirmed-cancel branch remains unavailable."
+ },
+ {
+  "id": "Order.ChangeChannel",
+  "module": "orders",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/orders/{orderId}/channel",
+  "route_class": "PUBLIC_POS",
+  "permission": "order:changechannel",
+  "input": {
+   "channel": {
+    "type": "OrderChannel",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "orderId": {
+    "type": "Ref<orders.Order>",
+    "required": true
+   }
+  },
+  "output": "OrderView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "DRAFT only; reprices"
+ },
+ {
+  "id": "Order.Comp",
+  "module": "orders",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/orders/{orderId}/comp",
+  "route_class": "PUBLIC_POS",
+  "permission": "order:comp",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "orderId": {
+    "type": "Ref<orders.Order>",
+    "required": true
+   },
+   "reason": {
+    "type": "Text",
+    "required": false
+   },
+   "reasonCode": {
+    "type": "Text",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [
+   "ORDERS_ORDER_NOT_FOUND",
+   "ORDER_NOT_EDITABLE",
+   "ORDER_EMPTY",
+   "SESSION_NOT_OPEN",
+   "TERMINAL_NOT_ACTIVE",
+   "TERMINAL_NOT_FOUND",
+   "BRANCH_INACTIVE",
+   "BRANCH_NOT_FOUND",
+   "PRICING_POLICY_REJECTED"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": " PD-N7-COMP-AUTHORITY provisional owner B, EXPERT_VALIDATION_PENDING: explicit Orders FULL_ORDER_COMP intent/reason/source-version/lineage and live independent order:comp, never ordinary discount policy/permission or user grant. Initial fee-free homogeneous EXCLUSIVE common captured-policy cart in e"
+ },
+ {
+  "id": "Order.Complete",
+  "module": "orders",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/orders/{orderId}/complete",
+  "route_class": "PUBLIC_POS",
+  "permission": "order:complete",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "orderId": {
+    "type": "Ref<orders.Order>",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [
+   "ORDERS_ORDER_NOT_FOUND",
+   "ORDER_NOT_CONFIRMED",
+   "ORDER_NOT_EDITABLE",
+   "ORDER_NOT_SETTLED",
+   "SESSION_NOT_OPEN",
+   "TERMINAL_NOT_ACTIVE",
+   "TERMINAL_NOT_FOUND",
+   "BRANCH_INACTIVE",
+   "BRANCH_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "Original financial coverage plus independently required Order guards; completed Refund is not new debt. PD-N3-PRECOMPLETE-REFUND."
+ },
+ {
+  "id": "Order.Confirm",
+  "module": "orders",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/orders/{orderId}/confirm",
+  "route_class": "PUBLIC_POS",
+  "permission": "order:confirm",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "orderId": {
+    "type": "Ref<orders.Order>",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [
+   "ORDERS_ORDER_NOT_FOUND",
+   "ORDER_EMPTY",
+   "ORDER_NOT_DRAFT",
+   "ORDER_NOT_EDITABLE",
+   "LINE_ALREADY_FIRED",
+   "SESSION_NOT_OPEN",
+   "PRICING_POLICY_REJECTED",
+   "TERMINAL_NOT_ACTIVE",
+   "TERMINAL_NOT_FOUND",
+   "BRANCH_INACTIVE",
+   "BRANCH_NOT_FOUND",
+   "DISCOUNT_EXCEEDS_ELIGIBLE_BASE",
+   "DISCOUNT_ALLOCATION_UNAVAILABLE",
+   "APPROVAL_REQUIRED",
+   "INCLUSIVE_DISCOUNT_QUANTUM_UNAVAILABLE",
+   "INCLUSIVE_DISCOUNT_COMPONENT_UNAVAILABLE"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": ">=1 active line; finalizes pricing; fires round 1 PD-N7-INCLUSIVE-FIXED-DISCOUNT-BASIS Option A: explicit INCLUSIVE_GROSS_PRICE_REDUCTION FIXED_AMOUNT ORDER_WIDE BEFORE_TAX only, homogeneous common-policy INCLUSIVE DRAFT_UNFIRED. Aggregate raw ACTIVE captures, establish captured-policy rounded gross"
+ },
+ {
+  "id": "Order.Create",
+  "module": "orders",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/orders",
+  "route_class": "PUBLIC_POS",
+  "permission": "order:create",
+  "input": {
+   "channel": {
+    "type": "OrderChannel",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "customerId": {
+    "type": "Ref<customers.Customer>",
+    "required": false
+   },
+   "label": {
+    "type": "Text",
+    "required": false
+   },
+   "note": {
+    "type": "Text",
+    "required": false
+   },
+   "tableId": {
+    "type": "Ref<tables.Table>",
+    "required": false
+   }
+  },
+  "output": null,
+  "errors": [
+   "SESSION_NOT_OPEN",
+   "SESSION_NOT_FOUND",
+   "TERMINAL_NOT_ACTIVE",
+   "TERMINAL_NOT_FOUND",
+   "BRANCH_INACTIVE",
+   "BRANCH_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "server assigns number, sessionId, terminalId, createdBy"
+ },
+ {
+  "id": "Order.Find",
+  "module": "orders",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/orders",
+  "route_class": "PUBLIC_POS",
+  "permission": "order:read",
+  "input": {
+   "businessDate": {
+    "type": "BusinessDate",
+    "required": false
+   },
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "customerId": {
+    "type": "Ref<customers.Customer>",
+    "required": false
+   },
+   "lifecycle": {
+    "type": "OrderLifecycle",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   },
+   "number": {
+    "type": "Text",
+    "required": false
+   },
+   "sessionId": {
+    "type": "Ref<sessions.Session>",
+    "required": false
+   },
+   "sort": {
+    "type": "OrderSort",
+    "required": false
+   }
+  },
+  "output": null,
+  "errors": [
+   "ORDERS_ORDER_NOT_FOUND",
+   "CONCURRENCY_CONFLICT"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "Current scoped summaries; flat bounded seek pagination; CREATED_DESC/CREATED_ASC/NUMBER_ASC. Not a financial report, cursor journal, frozen snapshot, Customer/Table owner or settlement query."
+ },
+ {
+  "id": "Order.Fire",
+  "module": "orders",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/orders/{orderId}/fire",
+  "route_class": "PUBLIC_POS",
+  "permission": "order:fire",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "orderId": {
+    "type": "Ref<orders.Order>",
+    "required": true
+   }
+  },
+  "output": "OrderFireResult",
+  "errors": [
+   "ORDER_NOT_FOUND",
+   "ORDER_NOT_EDITABLE",
+   "NOTHING_TO_FIRE",
+   "CONCURRENCY_CONFLICT",
+   "CAPABILITY_NOT_AVAILABLE",
+   "TABLE_VISIT_CLOSED",
+   "TABLE_VISIT_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Send every ACTIVE line with firedAt null of a DRAFT check to preparation as the next fire round. Fire is a preparation request, never a stock, price or invoice effect."
+ },
+ {
+  "id": "Order.Get",
+  "module": "orders",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/orders/{orderId}",
+  "route_class": "PUBLIC_POS",
+  "permission": "order:read",
+  "input": {
+   "orderId": {
+    "type": "Ref<orders.Order>",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [
+   "ORDERS_ORDER_NOT_FOUND",
+   "CONCURRENCY_CONFLICT"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "adds allowedActions, live quote for DRAFT PD-N7-INCLUSIVE-FIXED-DISCOUNT-BASIS Option A: explicit INCLUSIVE_GROSS_PRICE_REDUCTION FIXED_AMOUNT ORDER_WIDE BEFORE_TAX only, homogeneous common-policy INCLUSIVE DRAFT_UNFIRED. Aggregate raw ACTIVE captures, establish captured-policy rounded gross, subtra"
+ },
+ {
+  "id": "Order.Merge",
+  "module": "orders",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/orders/{orderId}/merge",
+  "route_class": "PUBLIC_POS",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "PD_HELD",
+  "note": ""
+ },
+ {
+  "id": "Order.MoveLines",
+  "module": "orders",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/orders/{orderId}/lines/move",
+  "route_class": "PUBLIC_POS",
+  "permission": "order:updateline",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "lineIds": {
+    "type": "List<Ref<orders.OrderLine>>",
+    "required": true
+   },
+   "orderId": {
+    "type": "Ref<orders.Order>",
+    "required": true
+   },
+   "targetExpectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "targetOrderId": {
+    "type": "Ref<orders.Order>",
+    "required": true
+   }
+  },
+  "output": "OrderMoveLinesResult",
+  "errors": [
+   "ORDER_NOT_FOUND",
+   "ORDER_NOT_EDITABLE",
+   "LINE_ALREADY_VOIDED",
+   "VALIDATION_FAILED",
+   "CONCURRENCY_CONFLICT"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Split by item: move ACTIVE lines from one DRAFT check to another DRAFT check of the same table visit."
+ },
+ {
+  "id": "Order.OverrideLinePrice",
+  "module": "orders",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/orders/{orderId}/lines/{lineId}/price-override",
+  "route_class": "PUBLIC_POS",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": {
+   "mode": "REQUIRED",
+   "action": "PRICE_OVERRIDE"
+  },
+  "backend_state": "PD_HELD",
+  "note": ""
+ },
+ {
+  "id": "Order.RemoveDiscount",
+  "module": "orders",
+  "kind": "CMD",
+  "method": "DELETE",
+  "path": "/orders/{orderId}/discounts/{discountId}",
+  "route_class": "PUBLIC_POS",
+  "permission": "order:removediscount",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "discountId": {
+    "type": "Id",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "orderId": {
+    "type": "Ref<orders.Order>",
+    "required": true
+   },
+   "reason": {
+    "type": "Text",
+    "required": false
+   }
+  },
+  "output": "OrderView",
+  "errors": [
+   "ORDERS_ORDER_NOT_FOUND",
+   "ORDER_NOT_EDITABLE",
+   "ORDER_EMPTY",
+   "LINE_ALREADY_FIRED",
+   "SESSION_NOT_OPEN",
+   "APPROVAL_REQUIRED",
+   "ORDER_DISCOUNT_NOT_FOUND",
+   "DISCOUNT_EXCEEDS_ELIGIBLE_BASE",
+   "DISCOUNT_ALLOCATION_UNAVAILABLE",
+   "TERMINAL_NOT_ACTIVE",
+   "TERMINAL_NOT_FOUND",
+   "BRANCH_INACTIVE",
+   "BRANCH_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "PD-N7-MIXED-TAX-DISCOUNT-ALLOCATION Option A and PD-N7-MIXED-TAX-PERCENTAGE-DISCOUNT-BASIS Option A: FIXED_AMOUNT or explicit PERCENTAGE ORDER_WIDE BEFORE_TAX, DRAFT_UNFIRED mixed EXCLUSIVE only. Pricing derives percentage from total eligible raw base before invoice rounding, rounds total once at Mo"
+ },
+ {
+  "id": "Order.RemoveLine",
+  "module": "orders",
+  "kind": "CMD",
+  "method": "DELETE",
+  "path": "/orders/{orderId}/lines/{lineId}",
+  "route_class": "PUBLIC_POS",
+  "permission": "order:removeline",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedLineVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "lineId": {
+    "type": "Ref<orders.OrderLine>",
+    "required": true
+   },
+   "orderId": {
+    "type": "Ref<orders.Order>",
+    "required": true
+   },
+   "reason": {
+    "type": "Text",
+    "required": false
+   },
+   "reasonCode": {
+    "type": "Text",
+    "required": false
+   }
+  },
+  "output": null,
+  "errors": [
+   "ORDERS_ORDER_NOT_FOUND",
+   "ORDERS_ORDERLINE_NOT_FOUND",
+   "ORDER_NOT_EDITABLE",
+   "LINE_ALREADY_FIRED",
+   "LINE_ALREADY_VOIDED",
+   "LINE_ALREADY_REMOVED",
+   "SESSION_NOT_OPEN",
+   "TERMINAL_NOT_ACTIVE",
+   "TERMINAL_NOT_FOUND",
+   "BRANCH_INACTIVE",
+   "BRANCH_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "DRAFT_UNFIRED only. Retain source quantity/captures; state REMOVED, not VOIDED; immutable negative REMOVE fact. Parent expectedVersion/version plus expectedLineVersion/lineVersion. Reasons optional per recovered V4 patch. Confirmed/fired/financial/stock paths unavailable."
+ },
+ {
+  "id": "Order.SetCustomer",
+  "module": "orders",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/orders/{orderId}/customer",
+  "route_class": "PUBLIC_POS",
+  "permission": "order:setcustomer",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "customerId": {
+    "type": "Ref<customers.Customer>",
+    "required": false
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "orderId": {
+    "type": "Ref<orders.Order>",
+    "required": true
+   }
+  },
+  "output": "OrderView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "non-terminal orders; customer snapshot"
+ },
+ {
+  "id": "Order.Split",
+  "module": "orders",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/orders/{orderId}/split",
+  "route_class": "PUBLIC_POS",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "PD_HELD",
+  "note": "split/merge checks need settlement reallocation semantics"
+ },
+ {
+  "id": "Order.Timeline",
+  "module": "orders",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/orders/{orderId}/timeline",
+  "route_class": "PUBLIC_POS",
+  "permission": "order:read",
+  "input": {
+   "orderId": {
+    "type": "Ref<orders.Order>",
+    "required": true
+   }
+  },
+  "output": "List<TimelineEntry>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "line changes, transitions, fires, payments refs"
+ },
+ {
+  "id": "Order.TransferSession",
+  "module": "orders",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/orders/{orderId}/transfer",
+  "route_class": "PUBLIC_POS",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "PD_HELD",
+  "note": "order handover between sessions"
+ },
+ {
+  "id": "Order.UpdateDetails",
+  "module": "orders",
+  "kind": "CMD",
+  "method": "PATCH",
+  "path": "/orders/{orderId}",
+  "route_class": "PUBLIC_POS",
+  "permission": "order:updatedetails",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "guestCount": {
+    "type": "Integer",
+    "required": false
+   },
+   "label": {
+    "type": "Text",
+    "required": false
+   },
+   "note": {
+    "type": "Text",
+    "required": false
+   },
+   "orderId": {
+    "type": "Ref<orders.Order>",
+    "required": true
+   }
+  },
+  "output": "OrderView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "label, note, guestCount; non-terminal orders"
+ },
+ {
+  "id": "Order.UpdateLine",
+  "module": "orders",
+  "kind": "CMD",
+  "method": "PATCH",
+  "path": "/orders/{orderId}/lines/{lineId}",
+  "route_class": "PUBLIC_POS",
+  "permission": "order:updateline",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedLineVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "lineId": {
+    "type": "Ref<orders.OrderLine>",
+    "required": true
+   },
+   "modifiers": {
+    "type": "List<ModifierSelectionInput>",
+    "required": false
+   },
+   "note": {
+    "type": "Text",
+    "required": false
+   },
+   "orderId": {
+    "type": "Ref<orders.Order>",
+    "required": true
+   },
+   "quantity": {
+    "type": "Quantity",
+    "required": true
+   },
+   "reason": {
+    "type": "Text",
+    "required": false
+   },
+   "reasonCode": {
+    "type": "Text",
+    "required": false
+   }
+  },
+  "output": null,
+  "errors": [
+   "ORDERS_ORDER_NOT_FOUND",
+   "ORDERS_ORDERLINE_NOT_FOUND",
+   "ORDER_NOT_EDITABLE",
+   "LINE_ALREADY_FIRED",
+   "LINE_ALREADY_VOIDED",
+   "SESSION_NOT_OPEN",
+   "CATALOG_UNIT_NOT_FOUND",
+   "TERMINAL_NOT_ACTIVE",
+   "TERMINAL_NOT_FOUND",
+   "BRANCH_INACTIVE",
+   "BRANCH_NOT_FOUND",
+   "LINE_ALREADY_REMOVED"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "unfired lines only; note/modifiers/quantity"
+ },
+ {
+  "id": "Order.Void",
+  "module": "orders",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/orders/{orderId}/void",
+  "route_class": "PUBLIC_POS",
+  "permission": "order:void",
+  "input": {
+   "approvalGrantId": {
+    "type": "Ref<approvals.ApprovalGrant>",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "orderId": {
+    "type": "Ref<orders.Order>",
+    "required": true
+   },
+   "reason": {
+    "type": "Text",
+    "required": true
+   },
+   "reasonCode": {
+    "type": "Text",
+    "required": true
+   }
+  },
+  "output": "OrderView",
+  "errors": [
+   "ORDER_NOT_FOUND",
+   "ORDER_NOT_EDITABLE",
+   "ORDER_HAS_PAYMENTS",
+   "REASON_CODE_INVALID",
+   "APPROVAL_REQUIRED",
+   "APPROVAL_GRANT_INVALID",
+   "APPROVAL_GRANT_EXPIRED",
+   "APPROVAL_GRANT_ALREADY_CONSUMED",
+   "APPROVER_NOT_AUTHORIZED",
+   "CONCURRENCY_CONFLICT",
+   "ORDER_NOT_FIRED",
+   "CAPABILITY_NOT_AVAILABLE"
+  ],
+  "approval": {
+   "mode": "REQUIRED",
+   "action": "ORDER_VOID"
+  },
+  "backend_state": "SPECIFIED",
+  "note": "Void a whole check that has no original captured payment: DRAFT that was fired (payable = captured preview), or CONFIRMED and unpaid (payable = immutable snapshot), with an approval bound to that exact order version."
+ },
+ {
+  "id": "Order.VoidLine",
+  "module": "orders",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/orders/{orderId}/lines/{lineId}/void",
+  "route_class": "PUBLIC_POS",
+  "permission": "order:voidline",
+  "input": {
+   "approvalGrantId": {
+    "type": "Ref<approvals.ApprovalGrant>",
+    "required": false
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "lineId": {
+    "type": "Ref<orders.OrderLine>",
+    "required": true
+   },
+   "orderId": {
+    "type": "Ref<orders.Order>",
+    "required": true
+   },
+   "reason": {
+    "type": "Text",
+    "required": false
+   },
+   "reasonCode": {
+    "type": "Text",
+    "required": true
+   }
+  },
+  "output": "OrderView",
+  "errors": [
+   "ORDER_NOT_FOUND",
+   "ORDER_NOT_EDITABLE",
+   "LINE_ALREADY_VOIDED",
+   "LINE_NOT_FIRED",
+   "REASON_CODE_INVALID",
+   "APPROVAL_REQUIRED",
+   "APPROVAL_GRANT_INVALID",
+   "APPROVAL_GRANT_EXPIRED",
+   "APPROVAL_GRANT_ALREADY_CONSUMED",
+   "APPROVER_NOT_AUTHORIZED",
+   "CONCURRENCY_CONFLICT",
+   "CAPABILITY_NOT_AVAILABLE"
+  ],
+  "approval": {
+   "mode": "REQUIRED",
+   "action": "LINE_VOID"
+  },
+  "backend_state": "SPECIFIED",
+  "note": "Void a fired line of a DRAFT check with an approved reason. Unfired lines use the accepted Order.RemoveLine."
+ },
+ {
+  "id": "Branch.Configure",
+  "module": "organization",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/branches/{branchId}",
+  "route_class": "ADMIN",
+  "permission": "branch:configure",
+  "input": {
+   "branchId": {
+    "type": "Ref<organization.Branch>",
+    "required": true
+   },
+   "businessDayCutoff": {
+    "type": "LocalTime",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "name": {
+    "type": "Text",
+    "required": true
+   },
+   "timezone": {
+    "type": "IanaTimezone",
+    "required": true
+   }
+  },
+  "output": "BranchView",
+  "errors": [
+   "BRANCH_NOT_FOUND",
+   "TIMEZONE_INVALID",
+   "CONCURRENCY_CONFLICT"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "update-only; timezone/cutoff change applies to commands resolved after commit"
+ },
+ {
+  "id": "Branch.Create",
+  "module": "organization",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/branches",
+  "route_class": "ADMIN",
+  "permission": "branch:create",
+  "input": {
+   "businessDayCutoff": {
+    "type": "LocalTime",
+    "required": true
+   },
+   "code": {
+    "type": "Text",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "name": {
+    "type": "Text",
+    "required": true
+   },
+   "timezone": {
+    "type": "IanaTimezone",
+    "required": true
+   }
+  },
+  "output": "BranchView",
+  "errors": [
+   "BRANCH_CODE_TAKEN",
+   "TIMEZONE_INVALID"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "branch lifecycle start; legacy evidence BRN.Create"
+ },
+ {
+  "id": "Branch.Get",
+  "module": "organization",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/branches/{branchId}",
+  "route_class": "ADMIN",
+  "permission": "branch:read",
+  "input": {
+   "branchId": {
+    "type": "Ref<organization.Branch>",
+    "required": true
+   }
+  },
+  "output": "BranchView",
+  "errors": [
+   "BRANCH_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "read permission registered (was overlay)"
+ },
+ {
+  "id": "Branch.List",
+  "module": "organization",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/branches",
+  "route_class": "ADMIN",
+  "permission": "branch:read",
+  "input": {
+   "active": {
+    "type": "Boolean",
+    "required": false
+   },
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   }
+  },
+  "output": "Page<BranchView>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "scoped to actor's accessible branches"
+ },
+ {
+  "id": "Branch.SetActive",
+  "module": "organization",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/branches/{branchId}/active",
+  "route_class": "ADMIN",
+  "permission": "branch:setactive",
+  "input": {
+   "active": {
+    "type": "Boolean",
+    "required": true
+   },
+   "branchId": {
+    "type": "Ref<organization.Branch>",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "reason": {
+    "type": "Text",
+    "required": true
+   }
+  },
+  "output": "BranchView",
+  "errors": [
+   "BRANCH_NOT_FOUND",
+   "CONCURRENCY_CONFLICT"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "inactive branch rejects new sessions/logins/orders; existing sessions may close"
+ },
+ {
+  "id": "Business.Configure",
+  "module": "organization",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/business",
+  "route_class": "ADMIN",
+  "permission": "business:configure",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "legalName": {
+    "type": "Text",
+    "required": false
+   },
+   "name": {
+    "type": "Text",
+    "required": true
+   },
+   "taxRegistrationNumber": {
+    "type": "Text",
+    "required": false
+   }
+  },
+  "output": "BusinessView",
+  "errors": [
+   "CONCURRENCY_CONFLICT"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "currency immutable after provisioning"
+ },
+ {
+  "id": "Business.Get",
+  "module": "organization",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/business",
+  "route_class": "ADMIN",
+  "permission": "business:read",
+  "input": {},
+  "output": "BusinessView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "store identity"
+ },
+ {
+  "id": "Terminal.Decommission",
+  "module": "organization",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/terminals/{terminalId}/decommission",
+  "route_class": "ADMIN",
+  "permission": "terminal:decommission",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "reason": {
+    "type": "Text",
+    "required": true
+   },
+   "terminalId": {
+    "type": "Ref<organization.Terminal>",
+    "required": true
+   }
+  },
+  "output": "TerminalView",
+  "errors": [
+   "TERMINAL_NOT_FOUND",
+   "TERMINAL_NOT_ACTIVE",
+   "CONCURRENCY_CONFLICT"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "terminal checks are per request, so no cross-module write is needed"
+ },
+ {
+  "id": "Terminal.Get",
+  "module": "organization",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/terminals/{terminalId}",
+  "route_class": "ADMIN",
+  "permission": "terminal:read",
+  "input": {
+   "terminalId": {
+    "type": "Ref<organization.Terminal>",
+    "required": true
+   }
+  },
+  "output": "TerminalView",
+  "errors": [
+   "TERMINAL_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": ""
+ },
+ {
+  "id": "Terminal.Heartbeat",
+  "module": "organization",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/terminals/{terminalId}/heartbeat",
+  "route_class": "OPERATIONAL",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "device telemetry is not business truth; revisit with fleet monitoring"
+ },
+ {
+  "id": "Terminal.List",
+  "module": "organization",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/terminals",
+  "route_class": "ADMIN",
+  "permission": "terminal:read",
+  "input": {
+   "branchId": {
+    "type": "Ref<organization.Branch>",
+    "required": false
+   },
+   "code": {
+    "type": "Text",
+    "required": false
+   },
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "lifecycle": {
+    "type": "TerminalLifecycle",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   }
+  },
+  "output": "Page<TerminalView>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "filter code, branchId, lifecycle"
+ },
+ {
+  "id": "Terminal.Register",
+  "module": "organization",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/terminals",
+  "route_class": "ADMIN",
+  "permission": "terminal:register",
+  "input": {
+   "branchId": {
+    "type": "Ref<organization.Branch>",
+    "required": true
+   },
+   "code": {
+    "type": "Text",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "name": {
+    "type": "Text",
+    "required": true
+   }
+  },
+  "output": "TerminalView",
+  "errors": [
+   "BRANCH_NOT_FOUND",
+   "BRANCH_INACTIVE",
+   "TERMINAL_CODE_TAKEN"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": ""
+ },
+ {
+  "id": "Terminal.Update",
+  "module": "organization",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/terminals/{terminalId}",
+  "route_class": "ADMIN",
+  "permission": "terminal:update",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "name": {
+    "type": "Text",
+    "required": true
+   },
+   "terminalId": {
+    "type": "Ref<organization.Terminal>",
+    "required": true
+   }
+  },
+  "output": "TerminalView",
+  "errors": [
+   "TERMINAL_NOT_FOUND",
+   "TERMINAL_NOT_ACTIVE",
+   "CONCURRENCY_CONFLICT"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": ""
+ },
+ {
+  "id": "Payment.AuthorizeExternal",
+  "module": "payments",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/payments/authorizations",
+  "route_class": "ADAPTER_CALLBACK",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "integrated card terminal adapter"
+ },
+ {
+  "id": "Payment.Capture",
+  "module": "payments",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/orders/{orderId}/payments",
+  "route_class": "PUBLIC_POS",
+  "permission": "payment:capture",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "orderId": {
+    "type": "Ref<orders.Order>",
+    "required": true
+   },
+   "tenderReference": {
+    "type": "Text",
+    "required": false
+   },
+   "tenders": {
+    "type": "List<TenderInput>",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [
+   "ORDERS_ORDER_NOT_FOUND",
+   "ORDER_NOT_CONFIRMED",
+   "ORDER_NOT_EDITABLE",
+   "SESSION_NOT_OPEN",
+   "OVERPAYMENT",
+   "CHANGE_NOT_ALLOWED",
+   "TENDER_METHOD_DISABLED",
+   "SPLIT_TENDER_DISABLED",
+   "TERMINAL_NOT_ACTIVE",
+   "TERMINAL_NOT_FOUND",
+   "BRANCH_INACTIVE",
+   "BRANCH_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "ON_ACCOUNT -> CAPABILITY_NOT_AVAILABLE until credit; SplitTenderPolicy; tenderReference"
+ },
+ {
+  "id": "Payment.CorrectTender",
+  "module": "payments",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/payments/{paymentId}/corrections",
+  "route_class": "PUBLIC_POS",
+  "permission": "payment:correcttender",
+  "input": {
+   "approvalGrantId": {
+    "type": "Ref<approvals.ApprovalGrant>",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "correctedTender": {
+    "type": "TenderInput",
+    "required": true
+   },
+   "paymentId": {
+    "type": "Ref<payments.PaymentCapture>",
+    "required": true
+   },
+   "reason": {
+    "type": "Text",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [],
+  "approval": {
+   "mode": "REQUIRED",
+   "action": "TENDER_CORRECTION"
+  },
+  "backend_state": "SPECIFIED",
+  "note": "amount-preserving method reclassification; cash effect via cash.RecordCorrectionEffect"
+ },
+ {
+  "id": "Payment.Find",
+  "module": "payments",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/payments",
+  "route_class": "BACK_OFFICE",
+  "permission": "payment:read",
+  "input": {
+   "businessDate": {
+    "type": "BusinessDate",
+    "required": false
+   },
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   },
+   "method": {
+    "type": "TenderMethod",
+    "required": false
+   },
+   "orderId": {
+    "type": "Ref<orders.Order>",
+    "required": false
+   },
+   "sessionId": {
+    "type": "Ref<sessions.Session>",
+    "required": false
+   }
+  },
+  "output": "Page<PaymentCaptureView>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "Payment.Get",
+  "module": "payments",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/payments/{paymentId}",
+  "route_class": "PUBLIC_POS",
+  "permission": "payment:read",
+  "input": {
+   "paymentId": {
+    "type": "Ref<payments.PaymentCapture>",
+    "required": true
+   }
+  },
+  "output": "PaymentCaptureView{corrections,refundAllocations}",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "Payment.GetSettlement",
+  "module": "payments",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/orders/{orderId}/settlement",
+  "route_class": "PUBLIC_POS",
+  "permission": "payment:read",
+  "input": {
+   "asOf": {
+    "type": "Timestamp",
+    "required": false
+   },
+   "orderId": {
+    "type": "Ref<orders.Order>",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [
+   "ORDERS_ORDER_NOT_FOUND",
+   "ORDER_NOT_CONFIRMED",
+   "CONCURRENCY_CONFLICT"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": ""
+ },
+ {
+  "id": "Health.Live",
+  "module": "platform",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/health/live",
+  "route_class": "OPERATIONAL",
+  "permission": "PUBLIC",
+  "input": {},
+  "output": "Health{status}",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "unauthenticated liveness; no tenant data"
+ },
+ {
+  "id": "Health.Ready",
+  "module": "platform",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/health/ready",
+  "route_class": "OPERATIONAL",
+  "permission": "PUBLIC",
+  "input": {},
+  "output": "Health{status,checks}",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "database + outbox reachability; no tenant data"
+ },
+ {
+  "id": "Platform.BuildInfo",
+  "module": "platform",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/meta/build",
+  "route_class": "OPERATIONAL",
+  "permission": "platform:read",
+  "input": {},
+  "output": "BuildInfo{compilerVersion,irHash,targetHash,builtAt}",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "compiler version, IR hash, target hash"
+ },
+ {
+  "id": "Catalog.SetPrice",
+  "module": "pricing",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/catalog/products/{productId}/price",
+  "route_class": "BACK_OFFICE",
+  "permission": "catalog:setprice",
+  "input": {
+   "amount": {
+    "type": "Money",
+    "required": true
+   },
+   "approvalGrantId": {
+    "type": "Ref<approvals.ApprovalGrant>",
+    "required": false
+   },
+   "branchId": {
+    "type": "Ref<organization.Branch>",
+    "required": true
+   },
+   "channel": {
+    "type": "OrderChannel",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "currency": {
+    "type": "CurrencyCode",
+    "required": true
+   },
+   "effectiveFrom": {
+    "type": "Timestamp",
+    "required": false
+   },
+   "effectiveTo": {
+    "type": "Timestamp",
+    "required": false
+   },
+   "productId": {
+    "type": "Ref<catalog.Product>",
+    "required": true
+   }
+  },
+  "output": "CatalogSetPriceResult",
+  "errors": [
+   "CATALOG_PRODUCT_NOT_FOUND",
+   "ORGANIZATION_BRANCH_NOT_FOUND",
+   "PRICE_SCHEDULE_CONFLICT",
+   "PRICE_ZERO_NOT_ALLOWED",
+   "PRICE_SCHEDULING_NOT_ALLOWED",
+   "VALIDATION_FAILED",
+   "PERMISSION_DENIED",
+   "CONCURRENCY_CONFLICT",
+   "APPROVAL_REQUIRED",
+   "APPROVAL_GRANT_INVALID",
+   "APPROVAL_GRANT_EXPIRED",
+   "APPROVAL_GRANT_ALREADY_CONSUMED",
+   "APPROVER_NOT_AUTHORIZED"
+  ],
+  "approval": {
+   "mode": "BY_POLICY",
+   "action": "PRICE_CHANGE"
+  },
+  "backend_state": "SPECIFIED",
+  "note": "Set the price of a product for one branch and one sale channel, now or from a later start, with an optional end. Every change is a new window; earlier windows are closed, never re-priced. Captured order lines keep the price they captured."
+ },
+ {
+  "id": "Pricing.QuoteItem",
+  "module": "pricing",
+  "kind": "QRY",
+  "method": "POST",
+  "path": "/pricing/items/{productId}/quote",
+  "route_class": "PUBLIC_POS",
+  "permission": "catalog:read",
+  "input": {
+   "branchId": {
+    "type": "Ref<organization.Branch>",
+    "required": true
+   },
+   "channel": {
+    "type": "OrderChannel",
+    "required": true
+   },
+   "modifierOptionIds": {
+    "type": "List<Ref<catalog.ModifierOption>>",
+    "required": true
+   },
+   "productId": {
+    "type": "Ref<catalog.Product>",
+    "required": true
+   },
+   "quantity": {
+    "type": "Quantity",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [
+   "CATALOG_PRODUCT_NOT_FOUND",
+   "CATALOG_UNIT_NOT_FOUND",
+   "PRODUCT_UNAVAILABLE",
+   "MODIFIER_UNAVAILABLE",
+   "MODIFIER_SELECTION_INVALID",
+   "PRICE_NOT_FOUND",
+   "PRICING_POLICY_REJECTED",
+   "TAX_POLICY_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": ""
+ },
+ {
+  "id": "Product.PriceHistory",
+  "module": "pricing",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/catalog/products/{productId}/price-history",
+  "route_class": "BACK_OFFICE",
+  "permission": "product:read",
+  "input": {
+   "branchId": {
+    "type": "Ref<organization.Branch>",
+    "required": false
+   },
+   "channel": {
+    "type": "OrderChannel",
+    "required": false
+   },
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "from": {
+    "type": "Timestamp",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   },
+   "productId": {
+    "type": "Ref<catalog.Product>",
+    "required": true
+   },
+   "to": {
+    "type": "Timestamp",
+    "required": false
+   }
+  },
+  "output": "Page<PriceRuleView>",
+  "errors": [
+   "VALIDATION_FAILED",
+   "PERMISSION_DENIED"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Every price window of a product: scheduled, current and ended, per branch and channel. A window that has started never changes amount, so this list is the complete history of the prices that were in force."
+ },
+ {
+  "id": "Promotion.Configure",
+  "module": "pricing",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/promotions/{promotionId}/configuration",
+  "route_class": "ADMIN",
+  "permission": "catalog:setprice",
+  "input": {
+   "active": {
+    "type": "Boolean",
+    "required": true
+   },
+   "benefitType": {
+    "type": "DiscountKind",
+    "required": true
+   },
+   "benefitValue": {
+    "type": "Decimal",
+    "required": true
+   },
+   "branchIds": {
+    "type": "List<Ref<organization.Branch>>",
+    "required": true
+   },
+   "channels": {
+    "type": "List<OrderChannel>",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "minSubtotal": {
+    "type": "Money",
+    "required": false
+   },
+   "name": {
+    "type": "LocalizedText",
+    "required": true
+   },
+   "promotionId": {
+    "type": "Ref<pricing.Promotion>",
+    "required": true
+   },
+   "schedule": {
+    "type": "PromotionSchedule",
+    "required": false
+   },
+   "validFrom": {
+    "type": "Timestamp",
+    "required": false
+   },
+   "validTo": {
+    "type": "Timestamp",
+    "required": false
+   }
+  },
+  "output": "PromotionView",
+  "errors": [
+   "PROMOTION_NOT_FOUND",
+   "CONCURRENCY_CONFLICT",
+   "CAPABILITY_NOT_AVAILABLE",
+   "VALIDATION_FAILED",
+   "PERMISSION_DENIED"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Change or (de)activate a promotion. Kind and code are fixed. Discounts already applied keep the promotion version they captured."
+ },
+ {
+  "id": "Promotion.Create",
+  "module": "pricing",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/promotions",
+  "route_class": "ADMIN",
+  "permission": "catalog:setprice",
+  "input": {
+   "benefitType": {
+    "type": "DiscountKind",
+    "required": true
+   },
+   "benefitValue": {
+    "type": "Decimal",
+    "required": true
+   },
+   "branchIds": {
+    "type": "List<Ref<organization.Branch>>",
+    "required": true
+   },
+   "channels": {
+    "type": "List<OrderChannel>",
+    "required": true
+   },
+   "code": {
+    "type": "Code",
+    "required": false
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "kind": {
+    "type": "Enum<CODED|AUTOMATIC>",
+    "required": true
+   },
+   "minSubtotal": {
+    "type": "Money",
+    "required": false
+   },
+   "name": {
+    "type": "LocalizedText",
+    "required": true
+   },
+   "schedule": {
+    "type": "PromotionSchedule",
+    "required": false
+   },
+   "validFrom": {
+    "type": "Timestamp",
+    "required": false
+   },
+   "validTo": {
+    "type": "Timestamp",
+    "required": false
+   }
+  },
+  "output": "PromotionView",
+  "errors": [
+   "PROMOTION_CODE_TAKEN",
+   "CAPABILITY_NOT_AVAILABLE",
+   "VALIDATION_FAILED",
+   "PERMISSION_DENIED"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Define a promotion: a coded or automatic order-wide discount instruction, optionally limited by branch, channel, dates, a weekly schedule and a minimum subtotal. Gated by PD-V4-11."
+ },
+ {
+  "id": "Promotion.Find",
+  "module": "pricing",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/promotions",
+  "route_class": "PUBLIC_POS",
+  "permission": "order:applydiscount",
+  "input": {
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "includeInactive": {
+    "type": "Boolean",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   },
+   "validFor": {
+    "type": "OrderChannel",
+    "required": false
+   }
+  },
+  "output": "Page<PromotionView>",
+  "errors": [
+   "CAPABILITY_NOT_AVAILABLE",
+   "VALIDATION_FAILED"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Promotions for the admin list, or the AUTOMATIC promotions valid now for the caller branch and a channel (offered to the cashier)."
+ },
+ {
+  "id": "Promotion.Upsert",
+  "module": "pricing",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/promotions/{promotionId}",
+  "route_class": "BACK_OFFICE",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "PD_HELD",
+  "note": "promotions scope"
+ },
+ {
+  "id": "Promotion.ValidateCode",
+  "module": "pricing",
+  "kind": "QRY",
+  "method": "POST",
+  "path": "/promotions/validate",
+  "route_class": "PUBLIC_POS",
+  "permission": "order:applydiscount",
+  "input": {
+   "channel": {
+    "type": "OrderChannel",
+    "required": true
+   },
+   "code": {
+    "type": "Code",
+    "required": true
+   },
+   "subtotal": {
+    "type": "Money",
+    "required": false
+   }
+  },
+  "output": "PromotionDiscountInstruction",
+  "errors": [
+   "PROMOTION_CODE_INVALID",
+   "PROMOTION_NOT_APPLICABLE",
+   "CAPABILITY_NOT_AVAILABLE",
+   "VALIDATION_FAILED"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Check a code a guest gives, for the caller branch and a channel, and return the discount instruction to pass to Order.ApplyDiscount."
+ },
+ {
+  "id": "Print.Reprint",
+  "module": "printing",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/print-jobs",
+  "route_class": "PUBLIC_POS",
+  "permission": "print:reprint",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "documentId": {
+    "type": "Id",
+    "required": true
+   },
+   "documentType": {
+    "type": "Code",
+    "required": true
+   },
+   "terminalId": {
+    "type": "Ref<organization.Terminal>",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "new PrintJob copyKind REPRINT; audited"
+ },
+ {
+  "id": "PrintJob.Find",
+  "module": "printing",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/print-jobs",
+  "route_class": "OPERATIONAL",
+  "permission": "print:read",
+  "input": {
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "documentType": {
+    "type": "PrintDocumentType",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   },
+   "state": {
+    "type": "PrintJobState",
+    "required": false
+   },
+   "terminalId": {
+    "type": "Ref<organization.Terminal>",
+    "required": false
+   }
+  },
+  "output": "Page<PrintJobView>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "PrintJob.Get",
+  "module": "printing",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/print-jobs/{printJobId}",
+  "route_class": "OPERATIONAL",
+  "permission": "print:read",
+  "input": {
+   "printJobId": {
+    "type": "Ref<printing.PrintJob>",
+    "required": true
+   }
+  },
+  "output": "PrintJobView{attempts}",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "includes attempts"
+ },
+ {
+  "id": "PrintJob.Retry",
+  "module": "printing",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/print-jobs/{printJobId}/retry",
+  "route_class": "OPERATIONAL",
+  "permission": "print:retry",
+  "input": {
+   "printJobId": {
+    "type": "Ref<printing.PrintJob>",
+    "required": true
+   }
+  },
+  "output": "PrintJobView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "same job, same copy; never a new copy"
+ },
+ {
+  "id": "Receipt.Get",
+  "module": "printing",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/orders/{orderId}/receipt",
+  "route_class": "PUBLIC_POS",
+  "permission": "order:read",
+  "input": {
+   "orderId": {
+    "type": "Ref<orders.Order>",
+    "required": true
+   }
+  },
+  "output": "ReceiptView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "from persisted snapshots only"
+ },
+ {
+  "id": "Production.Find",
+  "module": "production",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/production-runs",
+  "route_class": "BACK_OFFICE",
+  "permission": "inventory:read",
+  "input": {
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "from": {
+    "type": "Timestamp",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   },
+   "to": {
+    "type": "Timestamp",
+    "required": false
+   },
+   "warehouseId": {
+    "type": "Ref<warehouses.Warehouse>",
+    "required": false
+   }
+  },
+  "output": "Page<ProductionRunView>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "Production.Post",
+  "module": "production",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/production-runs",
+  "route_class": "BACK_OFFICE",
+  "permission": "production:post",
+  "input": {
+   "actualInputs": {
+    "type": "List<ActualInput>",
+    "required": true
+   },
+   "actualOutput": {
+    "type": "Quantity",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "recipeVersionId": {
+    "type": "Ref<recipes.RecipeVersion>",
+    "required": true
+   },
+   "warehouseId": {
+    "type": "Ref<warehouses.Warehouse>",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "Production.Preview",
+  "module": "production",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/production-runs/preview",
+  "route_class": "BACK_OFFICE",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "planning aid"
+ },
+ {
+  "id": "PurchaseOrder.Cancel",
+  "module": "purchasing",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/purchase-orders/{purchaseOrderId}/cancel",
+  "route_class": "BACK_OFFICE",
+  "permission": "purchaseorder:cancel",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "purchaseOrderId": {
+    "type": "Ref<purchasing.PurchaseOrder>",
+    "required": true
+   },
+   "reason": {
+    "type": "Text",
+    "required": true
+   }
+  },
+  "output": "PurchaseOrderView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "DRAFT/ISSUED with no receipts; reason"
+ },
+ {
+  "id": "PurchaseOrder.Close",
+  "module": "purchasing",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/purchase-orders/{purchaseOrderId}/close",
+  "route_class": "BACK_OFFICE",
+  "permission": "purchaseorder:close",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "purchaseOrderId": {
+    "type": "Ref<purchasing.PurchaseOrder>",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "cancels the outstanding remainder; reason"
+ },
+ {
+  "id": "PurchaseOrder.Create",
+  "module": "purchasing",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/purchase-orders",
+  "route_class": "BACK_OFFICE",
+  "permission": "purchaseorder:create",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "lines": {
+    "type": "List<PurchaseOrderLineInput>",
+    "required": true
+   },
+   "supplierId": {
+    "type": "Ref<suppliers.Supplier>",
+    "required": true
+   },
+   "warehouseId": {
+    "type": "Ref<warehouses.Warehouse>",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "DRAFT"
+ },
+ {
+  "id": "PurchaseOrder.Find",
+  "module": "purchasing",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/purchase-orders",
+  "route_class": "BACK_OFFICE",
+  "permission": "purchasing:read",
+  "input": {
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "lifecycle": {
+    "type": "PurchaseOrderState",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   },
+   "supplierId": {
+    "type": "Ref<suppliers.Supplier>",
+    "required": false
+   }
+  },
+  "output": "Page<PurchaseOrderView{received,outstanding}>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "derived received/outstanding"
+ },
+ {
+  "id": "PurchaseOrder.Get",
+  "module": "purchasing",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/purchase-orders/{purchaseOrderId}",
+  "route_class": "BACK_OFFICE",
+  "permission": "purchasing:read",
+  "input": {
+   "purchaseOrderId": {
+    "type": "Ref<purchasing.PurchaseOrder>",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "PurchaseOrder.Issue",
+  "module": "purchasing",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/purchase-orders/{purchaseOrderId}/issue",
+  "route_class": "BACK_OFFICE",
+  "permission": "purchaseorder:issue",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "purchaseOrderId": {
+    "type": "Ref<purchasing.PurchaseOrder>",
+    "required": true
+   }
+  },
+  "output": "PurchaseOrderView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "DRAFT -> ISSUED"
+ },
+ {
+  "id": "PurchaseOrder.Update",
+  "module": "purchasing",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/purchase-orders/{purchaseOrderId}",
+  "route_class": "BACK_OFFICE",
+  "permission": "purchaseorder:update",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "lines": {
+    "type": "List<PurchaseOrderLineInput{itemId,orderedQuantity,orderedUnitCost}>",
+    "required": true
+   },
+   "purchaseOrderId": {
+    "type": "Ref<purchasing.PurchaseOrder>",
+    "required": true
+   }
+  },
+  "output": "PurchaseOrderView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "DRAFT only"
+ },
+ {
+  "id": "GoodsReceipt.Find",
+  "module": "receiving",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/goods-receipts",
+  "route_class": "BACK_OFFICE",
+  "permission": "purchasing:read",
+  "input": {
+   "businessDateFrom": {
+    "type": "BusinessDate",
+    "required": false
+   },
+   "businessDateTo": {
+    "type": "BusinessDate",
+    "required": false
+   },
+   "itemId": {
+    "type": "Ref<catalog.Product>",
+    "required": false
+   },
+   "page": {
+    "type": "PaginationInput",
+    "required": false
+   },
+   "purchaseOrderId": {
+    "type": "Ref<purchasing.PurchaseOrder>",
+    "required": false
+   },
+   "sort": {
+    "type": "GoodsReceiptSort",
+    "required": false
+   },
+   "supplierId": {
+    "type": "Ref<suppliers.Supplier>",
+    "required": false
+   }
+  },
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "read permission registered"
+ },
+ {
+  "id": "GoodsReceipt.Get",
+  "module": "receiving",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/goods-receipts/{receiptId}",
+  "route_class": "BACK_OFFICE",
+  "permission": "purchasing:read",
+  "input": {
+   "receiptId": {
+    "type": "Ref<receiving.GoodsReceipt>",
+    "required": true
+   }
+  },
+  "output": "GoodsReceiptView{lines}",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "GoodsReceipt.Post",
+  "module": "receiving",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/goods-receipts",
+  "route_class": "BACK_OFFICE",
+  "permission": "goodsreceipt:post",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "lines": {
+    "type": "List<GoodsReceiptPostLineInput>",
+    "required": true
+   },
+   "purchaseOrderId": {
+    "type": "Ref<purchasing.PurchaseOrder>",
+    "required": false
+   },
+   "supplierId": {
+    "type": "Ref<suppliers.Supplier>",
+    "required": true
+   },
+   "warehouseId": {
+    "type": "Ref<warehouses.Warehouse>",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "OverReceiptPolicy invoked"
+ },
+ {
+  "id": "GoodsReceipt.Reverse",
+  "module": "receiving",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/goods-receipts/{receiptId}/reverse",
+  "route_class": "BACK_OFFICE",
+  "permission": "goodsreceipt:reverse",
+  "input": {
+   "approvalGrantId": {
+    "type": "Ref<approvals.ApprovalGrant>",
+    "required": false
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "reason": {
+    "type": "Text",
+    "required": true
+   },
+   "receiptId": {
+    "type": "Ref<receiving.GoodsReceipt>",
+    "required": true
+   }
+  },
+  "output": "GoodsReceiptView",
+  "errors": [],
+  "approval": {
+   "mode": "BY_POLICY",
+   "action": "INVENTORY_ADJUST"
+  },
+  "backend_state": "SPECIFIED",
+  "note": "compensating receipt; reopens PO outstanding"
+ },
+ {
+  "id": "SupplierReturn.Find",
+  "module": "receiving",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/supplier-returns",
+  "route_class": "BACK_OFFICE",
+  "permission": "purchasing:read",
+  "input": {
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "from": {
+    "type": "Timestamp",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   },
+   "supplierId": {
+    "type": "Ref<suppliers.Supplier>",
+    "required": false
+   },
+   "to": {
+    "type": "Timestamp",
+    "required": false
+   }
+  },
+  "output": "Page<SupplierReturnView>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "SupplierReturn.Post",
+  "module": "receiving",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/supplier-returns",
+  "route_class": "BACK_OFFICE",
+  "permission": "supplierreturn:post",
+  "input": {
+   "approvalGrantId": {
+    "type": "Ref<approvals.ApprovalGrant>",
+    "required": false
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "lines": {
+    "type": "List<SupplierReturnLineInput{itemId,quantity,unitCost}>",
+    "required": true
+   },
+   "reason": {
+    "type": "Text",
+    "required": true
+   },
+   "receiptId": {
+    "type": "Ref<receiving.GoodsReceipt>",
+    "required": false
+   },
+   "supplierId": {
+    "type": "Ref<suppliers.Supplier>",
+    "required": true
+   },
+   "warehouseId": {
+    "type": "Ref<warehouses.Warehouse>",
+    "required": true
+   }
+  },
+  "output": "SupplierReturnView",
+  "errors": [],
+  "approval": {
+   "mode": "BY_POLICY",
+   "action": "INVENTORY_ADJUST"
+  },
+  "backend_state": "SPECIFIED",
+  "note": "SUPPLIER_RETURN movement"
+ },
+ {
+  "id": "Recipe.Cost",
+  "module": "recipes",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/recipes/{recipeId}/cost",
+  "route_class": "BACK_OFFICE",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "costing method not ratified"
+ },
+ {
+  "id": "Recipe.Define",
+  "module": "recipes",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/recipes/{recipeId}/versions",
+  "route_class": "BACK_OFFICE",
+  "permission": "recipe:define",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "effectiveFrom": {
+    "type": "Timestamp",
+    "required": false
+   },
+   "inputsPerBatch": {
+    "type": "List<RecipeInput>",
+    "required": true
+   },
+   "outputProductId": {
+    "type": "Ref<catalog.Product>",
+    "required": true
+   },
+   "outputQuantityPerBatch": {
+    "type": "Quantity",
+    "required": true
+   },
+   "recipeId": {
+    "type": "Ref<recipes.Recipe>",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "Recipe.Find",
+  "module": "recipes",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/recipes",
+  "route_class": "BACK_OFFICE",
+  "permission": "recipe:read",
+  "input": {
+   "outputProductId": {
+    "type": "Ref<catalog.Product>",
+    "required": false
+   }
+  },
+  "output": "List<RecipeView>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "Recipe.Get",
+  "module": "recipes",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/recipes/{recipeId}",
+  "route_class": "BACK_OFFICE",
+  "permission": "recipe:read",
+  "input": {
+   "recipeId": {
+    "type": "Ref<recipes.Recipe>",
+    "required": true
+   }
+  },
+  "output": "RecipeView{activeVersion,versions}",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "Reconciliation.Acknowledge",
+  "module": "reconciliation",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/reconciliations/results/{resultId}/acknowledge",
+  "route_class": "RECONCILIATION",
+  "permission": "reconciliation:acknowledge",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "reason": {
+    "type": "Text",
+    "required": true
+   },
+   "resultId": {
+    "type": "Ref<reconciliation.ReconciliationResult>",
+    "required": true
+   }
+  },
+  "output": "ReconciliationResultView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "EXPLAINED difference sign-off with reason; never edits facts"
+ },
+ {
+  "id": "Reconciliation.Board",
+  "module": "reconciliation",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/reconciliations",
+  "route_class": "RECONCILIATION",
+  "permission": "reconciliation:read",
+  "input": {
+   "branchId": {
+    "type": "Ref<organization.Branch>",
+    "required": false
+   },
+   "from": {
+    "type": "Timestamp",
+    "required": false
+   },
+   "ruleId": {
+    "type": "Text",
+    "required": false
+   },
+   "status": {
+    "type": "ReconciliationStatus",
+    "required": false
+   },
+   "to": {
+    "type": "Timestamp",
+    "required": false
+   }
+  },
+  "output": "List<ReconciliationBoardRow>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "Reconciliation.Evaluate",
+  "module": "reconciliation",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/reconciliations/{ruleId}/evaluate",
+  "route_class": "RECONCILIATION",
+  "permission": "reconciliation:evaluate",
+  "input": {
+   "branchId": {
+    "type": "Ref<organization.Branch>",
+    "required": false
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "period": {
+    "type": "Period",
+    "required": true
+   },
+   "ruleId": {
+    "type": "Text",
+    "required": true
+   }
+  },
+  "output": "ReconciliationRunView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "writes ReconciliationRun + results"
+ },
+ {
+  "id": "Reconciliation.GetResult",
+  "module": "reconciliation",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/reconciliations/results/{resultId}",
+  "route_class": "RECONCILIATION",
+  "permission": "reconciliation:read",
+  "input": {
+   "resultId": {
+    "type": "Ref<reconciliation.ReconciliationResult>",
+    "required": true
+   }
+  },
+  "output": "ReconciliationResultView{drilldown}",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "drilldown ids"
+ },
+ {
+  "id": "Refund.Approve",
+  "module": "refunds",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/refund-requests/{refundCaseId}/approve",
+  "route_class": "BACK_OFFICE",
+  "permission": "refund:approve",
+  "input": {
+   "approvalGrantId": {
+    "type": "Ref<approvals.ApprovalGrant>",
+    "required": false
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "payoutMethod": {
+    "type": "TenderMethod",
+    "required": true
+   },
+   "refundCaseId": {
+    "type": "Ref<refunds.RefundCase>",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [
+   "REFUNDS_REFUNDCASE_NOT_FOUND",
+   "REFUND_CASE_NOT_PENDING",
+   "ORDERS_ORDER_NOT_FOUND",
+   "ORDER_NOT_CONFIRMED",
+   "PAYMENTS_PAYMENTCAPTURE_NOT_FOUND",
+   "REFUND_EXCEEDS_CAPTURE",
+   "REFUND_EXCEEDS_PAID",
+   "CROSS_TENDER_REFUND_DENIED",
+   "SESSION_NOT_OPEN",
+   "CONCURRENCY_CONFLICT",
+   "APPROVAL_REQUIRED",
+   "APPROVAL_CONTEXT_INVALID",
+   "APPROVAL_GRANT_INVALID",
+   "APPROVAL_GRANT_EXPIRED",
+   "APPROVAL_GRANT_ALREADY_CONSUMED",
+   "APPROVER_NOT_AUTHORIZED",
+   "TERMINAL_NOT_ACTIVE",
+   "TERMINAL_NOT_FOUND",
+   "BRANCH_INACTIVE",
+   "BRANCH_NOT_FOUND"
+  ],
+  "approval": {
+   "mode": "BY_POLICY",
+   "action": "REFUND_APPROVE"
+  },
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "re-checks bound under lock; writes RefundFinancialEntry + cash effect"
+ },
+ {
+  "id": "Refund.Cancel",
+  "module": "refunds",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/refund-requests/{refundCaseId}/cancel",
+  "route_class": "PUBLIC_POS",
+  "permission": "AUTHENTICATED",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "reason": {
+    "type": "Text",
+    "required": true
+   },
+   "refundCaseId": {
+    "type": "Ref<refunds.RefundCase>",
+    "required": true
+   }
+  },
+  "output": "RefundCaseView",
+  "errors": [
+   "REFUNDS_REFUNDCASE_NOT_FOUND",
+   "REFUND_CASE_NOT_PENDING",
+   "CONCURRENCY_CONFLICT",
+   "BRANCH_INACTIVE",
+   "BRANCH_NOT_FOUND",
+   "TERMINAL_NOT_ACTIVE",
+   "TERMINAL_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "requester withdraws a PENDING_APPROVAL case"
+ },
+ {
+  "id": "Refund.Find",
+  "module": "refunds",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/refund-requests",
+  "route_class": "BACK_OFFICE",
+  "permission": "refund:read",
+  "input": {
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "from": {
+    "type": "Timestamp",
+    "required": false
+   },
+   "lifecycle": {
+    "type": "RefundCaseState",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   },
+   "orderId": {
+    "type": "Ref<orders.Order>",
+    "required": false
+   },
+   "requestedBy": {
+    "type": "Ref<access.User>",
+    "required": false
+   },
+   "to": {
+    "type": "Timestamp",
+    "required": false
+   }
+  },
+  "output": "Page<RefundCaseView>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": ""
+ },
+ {
+  "id": "Refund.Get",
+  "module": "refunds",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/refund-requests/{refundCaseId}",
+  "route_class": "PUBLIC_POS",
+  "permission": "refund:read",
+  "input": {
+   "refundCaseId": {
+    "type": "Ref<refunds.RefundCase>",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [
+   "REFUNDS_REFUNDCASE_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": ""
+ },
+ {
+  "id": "Refund.Refundable",
+  "module": "refunds",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/orders/{orderId}/refundable",
+  "route_class": "PUBLIC_POS",
+  "permission": "refund:read",
+  "input": {
+   "orderId": {
+    "type": "Ref<orders.Order>",
+    "required": true
+   }
+  },
+  "output": "Refundable{captures:List<CaptureRemaining>,lines:List<RefundableLine>,effectivePaid}",
+  "errors": [
+   "ORDERS_ORDER_NOT_FOUND",
+   "ORDER_NOT_CONFIRMED",
+   "CONCURRENCY_CONFLICT",
+   "CAPABILITY_NOT_AVAILABLE"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "per capture and per line remaining amounts"
+ },
+ {
+  "id": "Refund.Reject",
+  "module": "refunds",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/refund-requests/{refundCaseId}/reject",
+  "route_class": "BACK_OFFICE",
+  "permission": "refund:reject",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "decisionReason": {
+    "type": "Text",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "refundCaseId": {
+    "type": "Ref<refunds.RefundCase>",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [
+   "REFUNDS_REFUNDCASE_NOT_FOUND",
+   "REFUND_CASE_NOT_PENDING",
+   "CONCURRENCY_CONFLICT",
+   "BRANCH_INACTIVE",
+   "BRANCH_NOT_FOUND",
+   "TERMINAL_NOT_ACTIVE",
+   "TERMINAL_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "reason persisted; approval removed (permission suffices)"
+ },
+ {
+  "id": "Refund.Request",
+  "module": "refunds",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/orders/{orderId}/refund-requests",
+  "route_class": "PUBLIC_POS",
+  "permission": "refund:request",
+  "input": {
+   "allocations": {
+    "type": "List<RefundRequestAllocation>",
+    "required": true
+   },
+   "amount": {
+    "type": "Money",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "lines": {
+    "type": "List<RefundLineInput>",
+    "required": false
+   },
+   "method": {
+    "type": "TenderMethod",
+    "required": true
+   },
+   "orderId": {
+    "type": "Ref<orders.Order>",
+    "required": true
+   },
+   "reason": {
+    "type": "Text",
+    "required": true
+   },
+   "reasonCode": {
+    "type": "Text",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [
+   "ORDERS_ORDER_NOT_FOUND",
+   "ORDER_NOT_CONFIRMED",
+   "PAYMENTS_PAYMENTCAPTURE_NOT_FOUND",
+   "REFUND_EXCEEDS_CAPTURE",
+   "REFUND_EXCEEDS_PAID",
+   "CROSS_TENDER_REFUND_DENIED",
+   "TERMINAL_NOT_ACTIVE",
+   "TERMINAL_NOT_FOUND",
+   "BRANCH_INACTIVE",
+   "BRANCH_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "per-capture allocations + optional lines; reasonCode"
+ },
+ {
+  "id": "BusinessDay.Close",
+  "module": "reporting",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/business-days/{date}/close",
+  "route_class": "REPORTING",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "PD_HELD",
+  "note": ""
+ },
+ {
+  "id": "Report.Export",
+  "module": "reporting",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/reports/exports",
+  "route_class": "REPORTING",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "export job model not sized"
+ },
+ {
+  "id": "Report.List",
+  "module": "reporting",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/reports",
+  "route_class": "REPORTING",
+  "permission": "report:run",
+  "input": {},
+  "output": "List<ReportTemplateView>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "The operator reports the caller may run, with their titles and sections."
+ },
+ {
+  "id": "Report.Run",
+  "module": "reporting",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/reports/{reportId}",
+  "route_class": "REPORTING",
+  "permission": "report:run",
+  "input": {
+   "branchIds": {
+    "type": "List<Ref<organization.Branch>>",
+    "required": false
+   },
+   "channel": {
+    "type": "OrderChannel",
+    "required": false
+   },
+   "fromBusinessDate": {
+    "type": "BusinessDate",
+    "required": true
+   },
+   "reportId": {
+    "type": "ReportId",
+    "required": true
+   },
+   "toBusinessDate": {
+    "type": "BusinessDate",
+    "required": false
+   }
+  },
+  "output": "ReportRunResult",
+  "errors": [
+   "REPORT_NOT_FOUND",
+   "CAPABILITY_NOT_AVAILABLE",
+   "VALIDATION_FAILED",
+   "PERMISSION_DENIED"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Run one named operator report (daily sales, tenders, products, staff, exceptions, shifts, peak hours, branch comparison) for a business-date period and the caller's branches. A read model: never transaction truth."
+ },
+ {
+  "id": "Report.Schedule",
+  "module": "reporting",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/reports/schedules",
+  "route_class": "REPORTING",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "export/schedule job model not sized"
+ },
+ {
+  "id": "Stock.RecordReturn",
+  "module": "returns",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/returns",
+  "route_class": "PUBLIC_POS",
+  "permission": "stock:recordreturn",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "disposition": {
+    "type": "ReturnDisposition",
+    "required": true
+   },
+   "orderId": {
+    "type": "Ref<orders.Order>",
+    "required": true
+   },
+   "orderLineId": {
+    "type": "Ref<orders.OrderLine>",
+    "required": true
+   },
+   "quantity": {
+    "type": "Quantity",
+    "required": true
+   },
+   "refundEntryId": {
+    "type": "Ref<refunds.RefundFinancialEntry>",
+    "required": false
+   },
+   "warehouseId": {
+    "type": "Ref<warehouses.Warehouse>",
+    "required": false
+   }
+  },
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "accounting mapping is an accountant policy gate"
+ },
+ {
+  "id": "Session.Close",
+  "module": "sessions",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/sessions/{sessionId}/close",
+  "route_class": "PUBLIC_POS",
+  "permission": "session:close",
+  "input": {
+   "approvalGrantId": {
+    "type": "Ref<approvals.ApprovalGrant>",
+    "required": false
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "countedCash": {
+    "type": "Money",
+    "required": false
+   },
+   "denominations": {
+    "type": "List<CashDenominationCount>",
+    "required": false
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "reason": {
+    "type": "Text",
+    "required": false
+   },
+   "sessionId": {
+    "type": "Ref<sessions.Session>",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [
+   "SESSION_NOT_FOUND",
+   "SESSION_NOT_OPEN",
+   "SESSION_HAS_OPEN_ORDERS",
+   "APPROVAL_REQUIRED",
+   "APPROVAL_CONTEXT_INVALID",
+   "APPROVAL_GRANT_INVALID",
+   "APPROVAL_GRANT_EXPIRED",
+   "APPROVAL_GRANT_ALREADY_CONSUMED",
+   "APPROVER_NOT_AUTHORIZED",
+   "TERMINAL_NOT_ACTIVE",
+   "TERMINAL_NOT_FOUND",
+   "BRANCH_INACTIVE",
+   "BRANCH_NOT_FOUND"
+  ],
+  "approval": {
+   "mode": "BY_POLICY",
+   "action": "SESSION_VARIANCE"
+  },
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "Required actual count: countedCash or nonempty denominations; if both supplied totals must agree. Owner PD-N5-COUNT-SOURCE option A. Expected Cash is never an actual-count substitute. Frozen supported CASH close, not live XReport or provider/correction-complete settlement."
+ },
+ {
+  "id": "Session.Current",
+  "module": "sessions",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/sessions/current",
+  "route_class": "PUBLIC_POS",
+  "permission": "session:read",
+  "input": {
+   "terminalId": {
+    "type": "Ref<organization.Terminal>",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [
+   "SESSION_NOT_FOUND",
+   "TERMINAL_NOT_FOUND",
+   "TERMINAL_NOT_ACTIVE",
+   "BRANCH_NOT_FOUND",
+   "BRANCH_INACTIVE"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": ""
+ },
+ {
+  "id": "Session.Find",
+  "module": "sessions",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/sessions",
+  "route_class": "BACK_OFFICE",
+  "permission": "session:read",
+  "input": {
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "from": {
+    "type": "Timestamp",
+    "required": false
+   },
+   "lifecycle": {
+    "type": "SessionState",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   },
+   "openedBy": {
+    "type": "Ref<access.User>",
+    "required": false
+   },
+   "terminalId": {
+    "type": "Ref<organization.Terminal>",
+    "required": false
+   },
+   "to": {
+    "type": "Timestamp",
+    "required": false
+   }
+  },
+  "output": "Page<SessionView>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "Session.Get",
+  "module": "sessions",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/sessions/{sessionId}",
+  "route_class": "PUBLIC_POS",
+  "permission": "session:read",
+  "input": {
+   "sessionId": {
+    "type": "Ref<sessions.Session>",
+    "required": true
+   }
+  },
+  "output": "SessionView{snapshot?}",
+  "errors": [
+   "SESSION_NOT_FOUND",
+   "TERMINAL_NOT_FOUND",
+   "TERMINAL_NOT_ACTIVE",
+   "BRANCH_NOT_FOUND",
+   "BRANCH_INACTIVE"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": ""
+ },
+ {
+  "id": "Session.Handover",
+  "module": "sessions",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/sessions/{sessionId}/handover",
+  "route_class": "PUBLIC_POS",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "PD_HELD",
+  "note": ""
+ },
+ {
+  "id": "Session.Open",
+  "module": "sessions",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/sessions",
+  "route_class": "PUBLIC_POS",
+  "permission": "session:open",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "openingFloat": {
+    "type": "Money",
+    "required": true
+   },
+   "terminalId": {
+    "type": "Ref<organization.Terminal>",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [
+   "SESSION_ALREADY_OPEN",
+   "TERMINAL_NOT_ACTIVE",
+   "TERMINAL_NOT_FOUND",
+   "BRANCH_INACTIVE",
+   "BRANCH_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "one OPEN session per terminal; opening float -> cash.RecordOpeningFloat"
+ },
+ {
+  "id": "Session.XReport",
+  "module": "sessions",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/sessions/{sessionId}/x-report",
+  "route_class": "PUBLIC_POS",
+  "permission": "session:xreport",
+  "input": {
+   "sessionId": {
+    "type": "Ref<sessions.Session>",
+    "required": true
+   }
+  },
+  "output": "XReport{tenderBreakdown,refundBreakdown,cashByKind,expectedCash?,orderCounts}",
+  "errors": [
+   "SESSION_NOT_FOUND",
+   "SESSION_NOT_OPEN"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "live; expected cash hidden when BlindClosePolicy applies to the caller"
+ },
+ {
+  "id": "Session.ZReport",
+  "module": "sessions",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/sessions/{sessionId}/z-report",
+  "route_class": "PUBLIC_POS",
+  "permission": "session:zreport",
+  "input": {
+   "sessionId": {
+    "type": "Ref<sessions.Session>",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [
+   "SESSION_NOT_FOUND",
+   "SESSION_CLOSE_SNAPSHOT_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "reads the immutable close snapshot only"
+ },
+ {
+  "id": "Capability.List",
+  "module": "settings",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/capabilities",
+  "route_class": "PUBLIC_POS",
+  "permission": "AUTHENTICATED",
+  "input": {},
+  "output": "List<CapabilityView{id,present,edges}>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "compiled composition for this tenant; UI hides absent capabilities"
+ },
+ {
+  "id": "Policy.History",
+  "module": "settings",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/policies/{policyId}/history",
+  "route_class": "ADMIN",
+  "permission": "settings:read",
+  "input": {
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   },
+   "policyId": {
+    "type": "PolicyId",
+    "required": true
+   },
+   "scopeId": {
+    "type": "Id",
+    "required": false
+   },
+   "scopeType": {
+    "type": "PolicyScope",
+    "required": false
+   }
+  },
+  "output": "Page<PolicyValueView>",
+  "errors": [
+   "SETTINGS_POLICY_UNKNOWN",
+   "VALIDATION_FAILED",
+   "PERMISSION_DENIED"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Every stored value of one policy, newest first: scheduled, in force and superseded, per scope."
+ },
+ {
+  "id": "Profile.SetCapability",
+  "module": "settings",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/capabilities/{capability}",
+  "route_class": "ADMIN",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "owner deferred runtime composition switches"
+ },
+ {
+  "id": "ReasonCode.Configure",
+  "module": "settings",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/reason-codes/{reasonCodeId}/configuration",
+  "route_class": "ADMIN",
+  "permission": "reasoncode:upsert",
+  "input": {
+   "active": {
+    "type": "Boolean",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "label": {
+    "type": "LocalizedText",
+    "required": true
+   },
+   "reasonCodeId": {
+    "type": "Ref<settings.ReasonCode>",
+    "required": true
+   },
+   "requiresNote": {
+    "type": "Boolean",
+    "required": true
+   },
+   "sortOrder": {
+    "type": "Integer",
+    "required": false
+   }
+  },
+  "output": "ReasonCodeView",
+  "errors": [
+   "REASON_CODE_NOT_FOUND",
+   "CONCURRENCY_CONFLICT",
+   "VALIDATION_FAILED",
+   "PERMISSION_DENIED"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Relabel, reorder, change requiresNote, or (de)activate a reason code. Kind and code are fixed: facts already reference them."
+ },
+ {
+  "id": "ReasonCode.Create",
+  "module": "settings",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/reason-codes",
+  "route_class": "ADMIN",
+  "permission": "reasoncode:upsert",
+  "input": {
+   "code": {
+    "type": "Code",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "kind": {
+    "type": "ReasonKind",
+    "required": true
+   },
+   "label": {
+    "type": "LocalizedText",
+    "required": true
+   },
+   "requiresNote": {
+    "type": "Boolean",
+    "required": true
+   },
+   "sortOrder": {
+    "type": "Integer",
+    "required": false
+   }
+  },
+  "output": "ReasonCodeView",
+  "errors": [
+   "REASON_CODE_TAKEN",
+   "VALIDATION_FAILED",
+   "PERMISSION_DENIED"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Add a managed reason (for example \"Customer changed mind\" for ORDER_CANCEL) with a bilingual label."
+ },
+ {
+  "id": "ReasonCode.List",
+  "module": "settings",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/reason-codes",
+  "route_class": "PUBLIC_POS",
+  "permission": "settings:read",
+  "input": {
+   "active": {
+    "type": "Boolean",
+    "required": false
+   },
+   "kind": {
+    "type": "ReasonKind",
+    "required": false
+   }
+  },
+  "output": "List<ReasonCodeView>",
+  "errors": [
+   "VALIDATION_FAILED"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Reason codes for the POS exception dialogs and the admin screen, in display order, with the mode of each kind."
+ },
+ {
+  "id": "Settings.Effective",
+  "module": "settings",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/settings/effective",
+  "route_class": "ADMIN",
+  "permission": "settings:read",
+  "input": {
+   "asOf": {
+    "type": "Timestamp",
+    "required": false
+   },
+   "policyId": {
+    "type": "PolicyId",
+    "required": true
+   },
+   "scopeId": {
+    "type": "Id",
+    "required": true
+   },
+   "scopeType": {
+    "type": "PolicyScope",
+    "required": true
+   }
+  },
+  "output": "EffectivePolicyView",
+  "errors": [
+   "SETTINGS_POLICY_UNKNOWN",
+   "ORGANIZATION_TERMINAL_NOT_FOUND",
+   "VALIDATION_FAILED",
+   "PERMISSION_DENIED"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "The value a command would resolve for one policy at one scope, now or at a given time, and where it comes from. EXPERIENCE shows this value; it never keeps a local copy (CORE 7.4 #7)."
+ },
+ {
+  "id": "Settings.UpdatePolicy",
+  "module": "settings",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/policies/{policyId}",
+  "route_class": "ADMIN",
+  "permission": "settings:updatepolicy",
+  "input": {
+   "approvalGrantId": {
+    "type": "Ref<approvals.ApprovalGrant>",
+    "required": false
+   },
+   "changeNote": {
+    "type": "Text",
+    "required": false
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "effectiveFrom": {
+    "type": "Timestamp",
+    "required": false
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": false
+   },
+   "policyId": {
+    "type": "PolicyId",
+    "required": true
+   },
+   "scopeId": {
+    "type": "Id",
+    "required": true
+   },
+   "scopeType": {
+    "type": "PolicyScope",
+    "required": true
+   },
+   "state": {
+    "type": "Enum<SET|INHERIT>",
+    "required": false
+   },
+   "value": {
+    "type": "PolicyTypedValue",
+    "required": false
+   }
+  },
+  "output": "SettingsUpdatePolicyResult",
+  "errors": [
+   "SETTINGS_POLICY_UNKNOWN",
+   "SETTINGS_POLICY_SCOPE_NOT_ALLOWED",
+   "ORGANIZATION_BRANCH_NOT_FOUND",
+   "ORGANIZATION_TERMINAL_NOT_FOUND",
+   "APPROVAL_REQUIRED",
+   "APPROVAL_GRANT_INVALID",
+   "APPROVAL_GRANT_EXPIRED",
+   "APPROVAL_GRANT_ALREADY_CONSUMED",
+   "APPROVER_NOT_AUTHORIZED",
+   "CONCURRENCY_CONFLICT",
+   "VALIDATION_FAILED",
+   "PERMISSION_DENIED"
+  ],
+  "approval": {
+   "mode": "BY_POLICY",
+   "action": "SENSITIVE_POLICY_CHANGE"
+  },
+  "backend_state": "SPECIFIED",
+  "note": "Set (or clear back to the inherited value) one registered policy at one scope, now or from a later start. Every change is a new immutable row; nothing is overwritten."
+ },
+ {
+  "id": "Movement.Find",
+  "module": "stock_movements",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/inventory/movements",
+  "route_class": "BACK_OFFICE",
+  "permission": "inventory:read",
+  "input": {
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "from": {
+    "type": "Timestamp",
+    "required": false
+   },
+   "itemId": {
+    "type": "Ref<inventory.InventoryItem>",
+    "required": false
+   },
+   "kind": {
+    "type": "MovementKind",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   },
+   "to": {
+    "type": "Timestamp",
+    "required": false
+   },
+   "warehouseId": {
+    "type": "Ref<warehouses.Warehouse>",
+    "required": false
+   }
+  },
+  "output": "Page<StockMovementView>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "Movement.Get",
+  "module": "stock_movements",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/inventory/movements/{movementId}",
+  "route_class": "BACK_OFFICE",
+  "permission": "inventory:read",
+  "input": {
+   "movementId": {
+    "type": "Ref<stock_movements.StockMovement>",
+    "required": true
+   }
+  },
+  "output": "StockMovementView{source:{module,command,id}}",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "includes source trace"
+ },
+ {
+  "id": "StockMovement.Get",
+  "module": "stock_movements",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/inventory/movements/{movementId}",
+  "route_class": "BACK_OFFICE",
+  "permission": "inventory:read",
+  "input": {
+   "movementId": {
+    "type": "Ref<stock_movements.StockMovement>",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [
+   "INVENTORY_ITEM_NOT_FOUND",
+   "WAREHOUSE_NOT_FOUND",
+   "UNIT_NOT_FOUND",
+   "PRODUCT_NOT_FOUND",
+   "INVENTORY_ITEM_INACTIVE",
+   "WAREHOUSE_INACTIVE",
+   "STOCK_UNIT_MISMATCH",
+   "QUANTITY_PRECISION_UNSUPPORTED",
+   "NEGATIVE_STOCK_BLOCKED",
+   "STOCK_MOVEMENT_REJECTED",
+   "APPROVAL_REQUIRED",
+   "BRANCH_NOT_FOUND",
+   "BRANCH_INACTIVE",
+   "TERMINAL_NOT_FOUND",
+   "TERMINAL_NOT_ACTIVE",
+   "STOCK_MOVEMENT_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "read permission registered"
+ },
+ {
+  "id": "Supplier.Get",
+  "module": "suppliers",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/suppliers/{supplierId}",
+  "route_class": "BACK_OFFICE",
+  "permission": "purchasing:read",
+  "input": {
+   "supplierId": {
+    "type": "Ref<suppliers.Supplier>",
+    "required": true
+   }
+  },
+  "output": "SupplierView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "Supplier.List",
+  "module": "suppliers",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/suppliers",
+  "route_class": "BACK_OFFICE",
+  "permission": "purchasing:read",
+  "input": {
+   "active": {
+    "type": "Boolean",
+    "required": false
+   },
+   "page": {
+    "type": "PaginationInput",
+    "required": false
+   },
+   "sort": {
+    "type": "SupplierSort",
+    "required": false
+   },
+   "text": {
+    "type": "Text",
+    "required": false
+   }
+  },
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "read permission registered"
+ },
+ {
+  "id": "Supplier.Upsert",
+  "module": "suppliers",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/suppliers/{supplierId}",
+  "route_class": "BACK_OFFICE",
+  "permission": "supplier:upsert",
+  "input": {
+   "active": {
+    "type": "Boolean",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": false
+   },
+   "name": {
+    "type": "Text",
+    "required": true
+   },
+   "supplierId": {
+    "type": "Ref<suppliers.Supplier>",
+    "required": true
+   },
+   "taxId": {
+    "type": "Text",
+    "required": false
+   }
+  },
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "Floor.Upsert",
+  "module": "tables",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/floors/{floorId}",
+  "route_class": "ADMIN",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "PD_HELD",
+  "note": ""
+ },
+ {
+  "id": "Reservation.Create",
+  "module": "tables",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/reservations",
+  "route_class": "PUBLIC_POS",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "PD_HELD",
+  "note": ""
+ },
+ {
+  "id": "Reservation.Find",
+  "module": "tables",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/reservations",
+  "route_class": "PUBLIC_POS",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "PD_HELD",
+  "note": ""
+ },
+ {
+  "id": "Table.AssignWaiter",
+  "module": "tables",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/tables/{tableId}/waiter",
+  "route_class": "PUBLIC_POS",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "PD_HELD",
+  "note": ""
+ },
+ {
+  "id": "Table.Configure",
+  "module": "tables",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/tables/{tableId}",
+  "route_class": "ADMIN",
+  "permission": "table:upsert",
+  "input": {
+   "area": {
+    "type": "Text",
+    "required": false
+   },
+   "capacity": {
+    "type": "Integer",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "name": {
+    "type": "Text",
+    "required": true
+   },
+   "tableId": {
+    "type": "Ref<tables.Table>",
+    "required": true
+   }
+  },
+  "output": "TableView",
+  "errors": [
+   "TABLE_NOT_FOUND",
+   "TABLE_NAME_TAKEN",
+   "CONCURRENCY_CONFLICT",
+   "BRANCH_INACTIVE",
+   "BRANCH_NOT_FOUND",
+   "TERMINAL_NOT_ACTIVE",
+   "TERMINAL_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "Rename/resize/re-area a table with CAS. Omitted area is preserved (OMIT_UNSUPPLIED_OPTIONAL_FIELDS); clearing area and (de)activation are not in E1 (activation needs an open-visit guard, see TableVisit)."
+ },
+ {
+  "id": "Table.Create",
+  "module": "tables",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/tables",
+  "route_class": "ADMIN",
+  "permission": "table:upsert",
+  "input": {
+   "area": {
+    "type": "Text",
+    "required": false
+   },
+   "capacity": {
+    "type": "Integer",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "name": {
+    "type": "Text",
+    "required": true
+   }
+  },
+  "output": "TableView",
+  "errors": [
+   "TABLE_NAME_TAKEN",
+   "TABLE_NOT_FOUND",
+   "BRANCH_INACTIVE",
+   "BRANCH_NOT_FOUND",
+   "TERMINAL_NOT_ACTIVE",
+   "TERMINAL_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "Create a branch table. Branch comes from the authenticated branch context, never from the client."
+ },
+ {
+  "id": "Table.List",
+  "module": "tables",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/tables",
+  "route_class": "PUBLIC_POS",
+  "permission": "table:read",
+  "input": {
+   "active": {
+    "type": "Boolean",
+    "required": false
+   },
+   "branchId": {
+    "type": "Ref<organization.Branch>",
+    "required": false
+   },
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   }
+  },
+  "output": "Page<TableView>",
+  "errors": [
+   "TABLE_NOT_FOUND",
+   "BRANCH_INACTIVE",
+   "BRANCH_NOT_FOUND",
+   "TERMINAL_NOT_ACTIVE",
+   "TERMINAL_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "Branch-scoped table configuration list for floor screens."
+ },
+ {
+  "id": "Table.MarkClean",
+  "module": "tables",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/tables/{tableId}/clean",
+  "route_class": "PUBLIC_POS",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "PD_HELD",
+  "note": ""
+ },
+ {
+  "id": "Table.Merge",
+  "module": "tables",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/tables/merge",
+  "route_class": "PUBLIC_POS",
+  "permission": "INTERNAL",
+  "input": {},
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "PD_HELD",
+  "note": ""
+ },
+ {
+  "id": "Table.SetActive",
+  "module": "tables",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/tables/{tableId}/active",
+  "route_class": "ADMIN",
+  "permission": "table:upsert",
+  "input": {
+   "active": {
+    "type": "Boolean",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "tableId": {
+    "type": "Ref<tables.Table>",
+    "required": true
+   }
+  },
+  "output": "TableView",
+  "errors": [
+   "TABLE_NOT_FOUND",
+   "TABLE_OCCUPIED",
+   "CONCURRENCY_CONFLICT",
+   "BRANCH_INACTIVE",
+   "BRANCH_NOT_FOUND",
+   "TERMINAL_NOT_ACTIVE",
+   "TERMINAL_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Activate or deactivate a table. Deactivation is refused while a visit is OPEN on it."
+ },
+ {
+  "id": "TableVisit.Close",
+  "module": "tables",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/table-visits/{visitId}/close",
+  "route_class": "PUBLIC_POS",
+  "permission": "table:release",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "visitId": {
+    "type": "Ref<tables.TableVisit>",
+    "required": true
+   }
+  },
+  "output": "TableVisitView",
+  "errors": [
+   "TABLE_VISIT_NOT_FOUND",
+   "TABLE_NOT_OCCUPIED",
+   "CONCURRENCY_CONFLICT",
+   "BRANCH_INACTIVE",
+   "BRANCH_NOT_FOUND",
+   "TERMINAL_NOT_ACTIVE",
+   "TERMINAL_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "Release the table. DEMO default: does not verify that every check is settled (that requires an Orders read port); unsettled checks stay visible in Order.Find and keep their own lifecycle."
+ },
+ {
+  "id": "TableVisit.List",
+  "module": "tables",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/table-visits",
+  "route_class": "PUBLIC_POS",
+  "permission": "table:read",
+  "input": {
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   },
+   "state": {
+    "type": "Enum<OPEN|CLOSED>",
+    "required": false
+   },
+   "tableId": {
+    "type": "Ref<tables.Table>",
+    "required": false
+   }
+  },
+  "output": "Page<TableVisitView>",
+  "errors": [
+   "BRANCH_INACTIVE",
+   "BRANCH_NOT_FOUND",
+   "TERMINAL_NOT_ACTIVE",
+   "TERMINAL_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "Open/closed visits for floor status."
+ },
+ {
+  "id": "TableVisit.Open",
+  "module": "tables",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/tables/{tableId}/visits",
+  "route_class": "PUBLIC_POS",
+  "permission": "table:assign",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "guestCount": {
+    "type": "Integer",
+    "required": true
+   },
+   "tableId": {
+    "type": "Ref<tables.Table>",
+    "required": true
+   }
+  },
+  "output": "TableVisitView",
+  "errors": [
+   "TABLE_NOT_FOUND",
+   "TABLE_INACTIVE",
+   "TABLE_OCCUPIED",
+   "BRANCH_INACTIVE",
+   "BRANCH_NOT_FOUND",
+   "TERMINAL_NOT_ACTIVE",
+   "TERMINAL_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "Seat guests at a table. The opener is the responsible server. No order, drawer or session is required."
+ },
+ {
+  "id": "TableVisit.Transfer",
+  "module": "tables",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/table-visits/{visitId}/transfer",
+  "route_class": "PUBLIC_POS",
+  "permission": "table:transfer",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "toTableId": {
+    "type": "Ref<tables.Table>",
+    "required": true
+   },
+   "visitId": {
+    "type": "Ref<tables.TableVisit>",
+    "required": true
+   }
+  },
+  "output": "TableVisitView",
+  "errors": [
+   "TABLE_NOT_FOUND",
+   "TABLE_VISIT_NOT_FOUND",
+   "TABLE_INACTIVE",
+   "TABLE_OCCUPIED",
+   "TABLE_NOT_OCCUPIED",
+   "CONCURRENCY_CONFLICT",
+   "BRANCH_INACTIVE",
+   "BRANCH_NOT_FOUND",
+   "TERMINAL_NOT_ACTIVE",
+   "TERMINAL_NOT_FOUND"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Move a seated party (the whole visit and therefore all its checks) to another free table in the same branch."
+ },
+ {
+  "id": "TaxPolicy.Configure",
+  "module": "taxes",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/tax-policies/{taxPolicyId}/configuration",
+  "route_class": "ADMIN",
+  "permission": "tax:manage",
+  "input": {
+   "approvalGrantId": {
+    "type": "Ref<approvals.ApprovalGrant>",
+    "required": false
+   },
+   "calculationMode": {
+    "type": "Enum<INCLUSIVE|EXCLUSIVE>",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "fiscalSubtype": {
+    "type": "Code",
+    "required": false
+   },
+   "fiscalTaxType": {
+    "type": "Code",
+    "required": false
+   },
+   "jurisdiction": {
+    "type": "Code",
+    "required": true
+   },
+   "name": {
+    "type": "LocalizedText",
+    "required": true
+   },
+   "rate": {
+    "type": "Percentage",
+    "required": true
+   },
+   "roundingMode": {
+    "type": "RoundingMode",
+    "required": true
+   },
+   "roundingScale": {
+    "type": "Integer",
+    "required": true
+   },
+   "taxPolicyId": {
+    "type": "Ref<taxes.TaxPolicy>",
+    "required": true
+   }
+  },
+  "output": "TaxPolicyView",
+  "errors": [
+   "TAX_POLICY_NOT_FOUND",
+   "TAX_POLICY_ARCHIVED",
+   "CONCURRENCY_CONFLICT",
+   "APPROVAL_REQUIRED",
+   "VALIDATION_FAILED",
+   "PERMISSION_DENIED",
+   "APPROVAL_GRANT_INVALID",
+   "APPROVAL_GRANT_EXPIRED",
+   "APPROVAL_GRANT_ALREADY_CONSUMED",
+   "APPROVER_NOT_AUTHORIZED"
+  ],
+  "approval": {
+   "mode": "BY_POLICY",
+   "action": "SENSITIVE_POLICY_CHANGE"
+  },
+  "backend_state": "SPECIFIED",
+  "note": "Change a tax policy. The new values apply to quotes made after commit; captured lines keep the tax and policy version they captured. A change of a tax-relevant value needs approval under ApprovalRequirementPolicy[SENSITIVE_POLICY_CHANGE]."
+ },
+ {
+  "id": "TaxPolicy.Create",
+  "module": "taxes",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/tax-policies",
+  "route_class": "ADMIN",
+  "permission": "tax:manage",
+  "input": {
+   "calculationMode": {
+    "type": "Enum<INCLUSIVE|EXCLUSIVE>",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "fiscalSubtype": {
+    "type": "Code",
+    "required": false
+   },
+   "fiscalTaxType": {
+    "type": "Code",
+    "required": false
+   },
+   "jurisdiction": {
+    "type": "Code",
+    "required": true
+   },
+   "name": {
+    "type": "LocalizedText",
+    "required": true
+   },
+   "rate": {
+    "type": "Percentage",
+    "required": true
+   },
+   "roundingMode": {
+    "type": "RoundingMode",
+    "required": true
+   },
+   "roundingScale": {
+    "type": "Integer",
+    "required": true
+   }
+  },
+  "output": "TaxPolicyView",
+  "errors": [
+   "VALIDATION_FAILED",
+   "PERMISSION_DENIED"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Define a tax policy (for example the VAT a product is sold under). Nothing changes price until a product is mapped to it."
+ },
+ {
+  "id": "TaxPolicy.List",
+  "module": "taxes",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/tax-policies",
+  "route_class": "ADMIN",
+  "permission": "tax:read",
+  "input": {
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "includeArchived": {
+    "type": "Boolean",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   }
+  },
+  "output": "Page<TaxPolicyView>",
+  "errors": [
+   "VALIDATION_FAILED"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Tax policies for the admin screens and the product form."
+ },
+ {
+  "id": "TaxPolicy.SetActive",
+  "module": "taxes",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/tax-policies/{taxPolicyId}/active",
+  "route_class": "ADMIN",
+  "permission": "tax:manage",
+  "input": {
+   "active": {
+    "type": "Boolean",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "taxPolicyId": {
+    "type": "Ref<taxes.TaxPolicy>",
+    "required": true
+   }
+  },
+  "output": "TaxPolicyView",
+  "errors": [
+   "TAX_POLICY_NOT_FOUND",
+   "TAX_POLICY_IN_USE",
+   "CONCURRENCY_CONFLICT",
+   "PERMISSION_DENIED"
+  ],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "Archive (active false) or restore (active true) a tax policy. A policy that is in use cannot be archived; it is never deleted."
+ },
+ {
+  "id": "Stock.Transfer",
+  "module": "transfers",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/transfers/{transferId}/dispatch",
+  "route_class": "BACK_OFFICE",
+  "permission": "stock:transfer",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "transferId": {
+    "type": "Ref<transfers.Transfer>",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "DRAFT -> DISPATCHED; TRANSFER_OUT"
+ },
+ {
+  "id": "Transfer.Cancel",
+  "module": "transfers",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/transfers/{transferId}/cancel",
+  "route_class": "BACK_OFFICE",
+  "permission": "transfer:cancel",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "reason": {
+    "type": "Text",
+    "required": true
+   },
+   "transferId": {
+    "type": "Ref<transfers.Transfer>",
+    "required": true
+   }
+  },
+  "output": "TransferView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "DRAFT only"
+ },
+ {
+  "id": "Transfer.Create",
+  "module": "transfers",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/transfers",
+  "route_class": "BACK_OFFICE",
+  "permission": "transfer:create",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "fromWarehouseId": {
+    "type": "Ref<warehouses.Warehouse>",
+    "required": true
+   },
+   "lines": {
+    "type": "List<TransferLineInput{itemId,quantity}>",
+    "required": true
+   },
+   "toWarehouseId": {
+    "type": "Ref<warehouses.Warehouse>",
+    "required": true
+   }
+  },
+  "output": "TransferView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "DRAFT"
+ },
+ {
+  "id": "Transfer.Find",
+  "module": "transfers",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/transfers",
+  "route_class": "BACK_OFFICE",
+  "permission": "inventory:read",
+  "input": {
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "lifecycle": {
+    "type": "TransferState",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   },
+   "warehouseId": {
+    "type": "Ref<warehouses.Warehouse>",
+    "required": false
+   }
+  },
+  "output": "Page<TransferView>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "Transfer.Get",
+  "module": "transfers",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/transfers/{transferId}",
+  "route_class": "BACK_OFFICE",
+  "permission": "inventory:read",
+  "input": {
+   "transferId": {
+    "type": "Ref<transfers.Transfer>",
+    "required": true
+   }
+  },
+  "output": "TransferView{lines}",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "Transfer.Receive",
+  "module": "transfers",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/transfers/{transferId}/receive",
+  "route_class": "BACK_OFFICE",
+  "permission": "transfer:receive",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "lines": {
+    "type": "List<TransferReceiptInput{itemId,receivedQuantity}>",
+    "required": true
+   },
+   "transferId": {
+    "type": "Ref<transfers.Transfer>",
+    "required": true
+   }
+  },
+  "output": "TransferView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "DISPATCHED -> RECEIVED; TRANSFER_IN; discrepancy handling per PD-V4-06"
+ },
+ {
+  "id": "Warehouse.Configure",
+  "module": "warehouses",
+  "kind": "CMD",
+  "method": "PUT",
+  "path": "/warehouses/{warehouseId}",
+  "route_class": "BACK_OFFICE",
+  "permission": "warehouse:configure",
+  "input": {
+   "active": {
+    "type": "Boolean",
+    "required": true
+   },
+   "branchId": {
+    "type": "Ref<organization.Branch>",
+    "required": true
+   },
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": false
+   },
+   "name": {
+    "type": "Text",
+    "required": true
+   },
+   "warehouseId": {
+    "type": "Ref<warehouses.Warehouse>",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [
+   "WAREHOUSE_NOT_FOUND",
+   "BRANCH_NOT_FOUND",
+   "BRANCH_INACTIVE",
+   "TERMINAL_NOT_FOUND",
+   "TERMINAL_NOT_ACTIVE"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": ""
+ },
+ {
+  "id": "Warehouse.Get",
+  "module": "warehouses",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/warehouses/{warehouseId}",
+  "route_class": "BACK_OFFICE",
+  "permission": "inventory:read",
+  "input": {
+   "warehouseId": {
+    "type": "Ref<warehouses.Warehouse>",
+    "required": true
+   }
+  },
+  "output": "WarehouseView",
+  "errors": [
+   "WAREHOUSE_NOT_FOUND",
+   "BRANCH_NOT_FOUND",
+   "BRANCH_INACTIVE",
+   "TERMINAL_NOT_FOUND",
+   "TERMINAL_NOT_ACTIVE"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": ""
+ },
+ {
+  "id": "Warehouse.List",
+  "module": "warehouses",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/warehouses",
+  "route_class": "BACK_OFFICE",
+  "permission": "inventory:read",
+  "input": {
+   "active": {
+    "type": "Boolean",
+    "required": false
+   },
+   "branchId": {
+    "type": "Ref<organization.Branch>",
+    "required": false
+   },
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   }
+  },
+  "output": null,
+  "errors": [
+   "WAREHOUSE_NOT_FOUND",
+   "BRANCH_NOT_FOUND",
+   "BRANCH_INACTIVE",
+   "TERMINAL_NOT_FOUND",
+   "TERMINAL_NOT_ACTIVE"
+  ],
+  "approval": null,
+  "backend_state": "BUILT_ON_MAIN",
+  "note": "read permission registered"
+ },
+ {
+  "id": "Warehouse.SetSalesDefault",
+  "module": "warehouses",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/warehouses/{warehouseId}/sales-default",
+  "route_class": "BACK_OFFICE",
+  "permission": "warehouse:setsalesdefault",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "expectedVersion": {
+    "type": "Version",
+    "required": true
+   },
+   "warehouseId": {
+    "type": "Ref<warehouses.Warehouse>",
+    "required": true
+   }
+  },
+  "output": "WarehouseView",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": "one sales warehouse per branch"
+ },
+ {
+  "id": "Stock.RecordWaste",
+  "module": "waste",
+  "kind": "CMD",
+  "method": "POST",
+  "path": "/waste",
+  "route_class": "BACK_OFFICE",
+  "permission": "stock:recordwaste",
+  "input": {
+   "commandId": {
+    "type": "CommandId",
+    "required": true
+   },
+   "itemId": {
+    "type": "Ref<catalog.Product>",
+    "required": true
+   },
+   "quantity": {
+    "type": "Quantity",
+    "required": true
+   },
+   "reason": {
+    "type": "WasteReason",
+    "required": true
+   },
+   "sourceId": {
+    "type": "Id",
+    "required": true
+   },
+   "sourceType": {
+    "type": "Code",
+    "required": true
+   },
+   "warehouseId": {
+    "type": "Ref<warehouses.Warehouse>",
+    "required": true
+   }
+  },
+  "output": null,
+  "errors": [],
+  "approval": {
+   "mode": "BY_POLICY",
+   "action": "STOCK_WASTE"
+  },
+  "backend_state": "SPECIFIED",
+  "note": ""
+ },
+ {
+  "id": "Waste.Find",
+  "module": "waste",
+  "kind": "QRY",
+  "method": "GET",
+  "path": "/waste",
+  "route_class": "BACK_OFFICE",
+  "permission": "inventory:read",
+  "input": {
+   "cursor": {
+    "type": "Cursor",
+    "required": false
+   },
+   "from": {
+    "type": "Timestamp",
+    "required": false
+   },
+   "limit": {
+    "type": "Integer",
+    "required": false
+   },
+   "reason": {
+    "type": "WasteReason",
+    "required": false
+   },
+   "to": {
+    "type": "Timestamp",
+    "required": false
+   },
+   "warehouseId": {
+    "type": "Ref<warehouses.Warehouse>",
+    "required": false
+   }
+  },
+  "output": "Page<WasteRecordView>",
+  "errors": [],
+  "approval": null,
+  "backend_state": "SPECIFIED",
+  "note": ""
+ }
+]

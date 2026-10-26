@@ -1,0 +1,379 @@
+[
+ {
+  "id": "BusinessDatePolicy",
+  "owner": "platform",
+  "type": "object",
+  "allowed": {
+   "cutoff": "LocalTime",
+   "mode": [
+    "PER_COMMAND_CUTOFF"
+   ],
+   "timezone": "IanaTimezone"
+  },
+  "default": null,
+  "scope_dimensions": null,
+  "note": null
+ },
+ {
+  "id": "SessionDurationPolicy",
+  "owner": "sessions",
+  "type": "object",
+  "allowed": {
+   "maxHours": "Integer",
+   "warningHours": "Integer"
+  },
+  "default": {
+   "maxHours": 24,
+   "warningHours": 12
+  },
+  "scope_dimensions": null,
+  "note": null
+ },
+ {
+  "id": "ComplimentaryOrderPolicy",
+  "owner": "orders",
+  "type": "enum",
+  "allowed": [
+   "FULL_COMP_DISCOUNT_ZERO_TENDER"
+  ],
+  "default": "FULL_COMP_DISCOUNT_ZERO_TENDER",
+  "scope_dimensions": null,
+  "note": null
+ },
+ {
+  "id": "ReturnAccountingPolicy",
+  "owner": "returns",
+  "type": "enum",
+  "allowed": [
+   "RETAIN_COGS_FOR_NONSELLABLE",
+   "REVERSE_COGS_AND_RECORD_RETURN_LOSS"
+  ],
+  "default": null,
+  "scope_dimensions": null,
+  "note": null
+ },
+ {
+  "id": "NegativeStockPolicy",
+  "owner": "inventory",
+  "type": "enum",
+  "allowed": [
+   "BLOCK",
+   "ALLOW",
+   "REQUIRE_APPROVAL"
+  ],
+  "default": "BLOCK",
+  "scope_dimensions": null,
+  "note": null
+ },
+ {
+  "id": "OverReceiptPolicy",
+  "owner": "receiving",
+  "type": "object",
+  "allowed": {
+   "aboveTolerance": [
+    "BLOCK",
+    "REQUIRE_APPROVAL"
+   ],
+   "tolerancePercent": "Percentage"
+  },
+  "default": {
+   "aboveTolerance": "BLOCK",
+   "tolerancePercent": "0"
+  },
+  "scope_dimensions": null,
+  "note": null
+ },
+ {
+  "id": "InventoryEffectTimingPolicy",
+  "owner": "inventory",
+  "type": "enum",
+  "allowed": [
+   "ON_CONFIRM",
+   "ON_COMPLETE"
+  ],
+  "default": "ON_CONFIRM",
+  "scope_dimensions": null,
+  "note": null
+ },
+ {
+  "id": "DiscountApprovalPolicy",
+  "owner": "pricing",
+  "type": "object",
+  "allowed": {
+   "thresholdPercent": "Percentage"
+  },
+  "default": {
+   "thresholdPercent": "10"
+  },
+  "scope_dimensions": null,
+  "note": null
+ },
+ {
+  "id": "PricingOrderPolicy",
+  "owner": "pricing",
+  "type": "enum",
+  "allowed": [
+   "DISCOUNT_BEFORE_TAX",
+   "DISCOUNT_AFTER_TAX"
+  ],
+  "default": null,
+  "scope_dimensions": null,
+  "note": null
+ },
+ {
+  "id": "RoundingPolicy",
+  "owner": "taxes",
+  "type": "object",
+  "allowed": {
+   "mode": [
+    "HALF_UP",
+    "HALF_EVEN",
+    "DOWN"
+   ],
+   "scale": "Integer"
+  },
+  "default": {
+   "mode": "HALF_UP",
+   "scale": 2
+  },
+  "scope_dimensions": null,
+  "note": null
+ },
+ {
+  "id": "BlindClosePolicy",
+  "owner": "sessions",
+  "type": "boolean",
+  "allowed": null,
+  "default": true,
+  "scope_dimensions": null,
+  "note": null
+ },
+ {
+  "id": "VarianceApprovalPolicy",
+  "owner": "sessions",
+  "type": "object",
+  "allowed": {
+   "threshold": "Money"
+  },
+  "default": {
+   "threshold": "0.00"
+  },
+  "scope_dimensions": null,
+  "note": null
+ },
+ {
+  "id": "SplitTenderPolicy",
+  "owner": "payments",
+  "type": "boolean",
+  "allowed": null,
+  "default": true,
+  "scope_dimensions": null,
+  "note": null
+ },
+ {
+  "id": "ApprovalRequirementPolicy",
+  "owner": "approvals",
+  "type": "map<ApprovalAction, ApprovalRule>",
+  "allowed": {
+   "field": "declared numeric (ABOVE_THRESHOLD) or boolean (WHEN_TRUE) context field of the action",
+   "mode": [
+    "ALWAYS",
+    "NEVER",
+    "ABOVE_THRESHOLD",
+    "WHEN_TRUE"
+   ],
+   "threshold": "Decimal"
+  },
+  "default": "per action in 11_APPROVAL_ACTIONS_V4.json (default_rule)",
+  "scope_dimensions": null,
+  "note": null
+ },
+ {
+  "id": "SelfApprovalPolicy",
+  "owner": "approvals",
+  "type": "map<ApprovalAction, SelfApprovalRule>",
+  "allowed": {
+   "condition": "ABOVE/BELOW threshold on a declared context field",
+   "mode": [
+    "DENY",
+    "ALLOW",
+    "CONDITIONAL"
+   ]
+  },
+  "default": null,
+  "scope_dimensions": null,
+  "note": null
+ },
+ {
+  "id": "ApprovalTtlPolicy",
+  "owner": "approvals",
+  "type": "object",
+  "allowed": {
+   "seconds": "Integer 15..900"
+  },
+  "default": {
+   "seconds": 120
+  },
+  "scope_dimensions": null,
+  "note": null
+ },
+ {
+  "id": "LoginLockoutPolicy",
+  "owner": "access",
+  "type": "object",
+  "allowed": {
+   "lockMinutes": "Integer",
+   "maxFailedAttempts": "Integer"
+  },
+  "default": {
+   "lockMinutes": 15,
+   "maxFailedAttempts": 5
+  },
+  "scope_dimensions": null,
+  "note": null
+ },
+ {
+  "id": "AuthSessionPolicy",
+  "owner": "access",
+  "type": "object",
+  "allowed": {
+   "maxHours": "Integer",
+   "pinSessionMaxHours": "Integer"
+  },
+  "default": {
+   "maxHours": 12,
+   "pinSessionMaxHours": 12
+  },
+  "scope_dimensions": null,
+  "note": null
+ },
+ {
+  "id": "CredentialPolicy",
+  "owner": "access",
+  "type": "object",
+  "allowed": {
+   "passwordMinLength": "Integer",
+   "pinLength": "Integer"
+  },
+  "default": {
+   "passwordMinLength": 10,
+   "pinLength": 6
+  },
+  "scope_dimensions": null,
+  "note": null
+ },
+ {
+  "id": "OrderNumberPolicy",
+  "owner": "orders",
+  "type": "object",
+  "allowed": {
+   "includeBranchCode": "Boolean",
+   "prefix": "Text?",
+   "width": "Integer"
+  },
+  "default": {
+   "includeBranchCode": false,
+   "prefix": null,
+   "width": 4
+  },
+  "scope_dimensions": null,
+  "note": null
+ },
+ {
+  "id": "ServiceChargePolicy",
+  "owner": "pricing",
+  "type": "object",
+  "allowed": {
+   "byChannel": "map<OrderChannel, Percentage>",
+   "taxable": "Boolean"
+  },
+  "default": {
+   "byChannel": {},
+   "taxable": true
+  },
+  "scope_dimensions": null,
+  "note": "PD-N7-SERVICE-CHARGE-POLICY-FREEZE provisional owner A, EXPERT_VALIDATION_PENDING: capture applicable channel rate, absent/zero provenance, taxability and policy identity/version/scope atomically at first successful ACTIVE participation in explicit fee-aware mode. No empty Create/Confirm-time capture, recapture after removal or implicit old-order backfill. Policy freeze is not monetary fee derivation or fiscal ratification."
+ },
+ {
+  "id": "TenderMethodPolicy",
+  "owner": "payments",
+  "type": "object",
+  "allowed": {
+   "enabled": "List<TenderMethod>",
+   "labels": "map<TenderMethod, Text>"
+  },
+  "default": {
+   "enabled": [
+    "CASH",
+    "CARD"
+   ],
+   "labels": {}
+  },
+  "scope_dimensions": null,
+  "note": null
+ },
+ {
+  "id": "RefundMethodPolicy",
+  "owner": "refunds",
+  "type": "object",
+  "allowed": {
+   "crossTender": [
+    "DENY",
+    "ALLOW_TO_CASH",
+    "ALLOW_ANY"
+   ]
+  },
+  "default": {
+   "crossTender": "DENY"
+  },
+  "scope_dimensions": null,
+  "note": null
+ },
+ {
+  "id": "LineVoidDispositionPolicy",
+  "owner": "orders",
+  "type": "object",
+  "allowed": {
+   "afterKitchenStart": "LineVoidDisposition",
+   "beforeKitchenStart": "LineVoidDisposition"
+  },
+  "default": {
+   "afterKitchenStart": "WASTE",
+   "beforeKitchenStart": "NOT_PREPARED"
+  },
+  "scope_dimensions": null,
+  "note": null
+ },
+ {
+  "id": "OrderConfirmationPricingPolicy",
+  "owner": "pricing",
+  "type": "object",
+  "allowed": {
+   "channels": "List<OrderChannel>",
+   "mode": [
+    "CAPTURED_BASE_SINGLE_TAX_POLICY",
+    "CAPTURED_BASE_MIXED_TAX_ALLOCATED",
+    "CAPTURED_BASE_INCLUSIVE_TAX_POLICY",
+    "CAPTURED_BASE_SERVICE_POLICY"
+   ]
+  },
+  "default": null,
+  "scope_dimensions": null,
+  "note": "Null is fail-closed. Captured base-sale mode is explicitly configured per scope/channel, not universal tax/promotion freeze semantics. PD-N7-MIXED-TAX-BASE-ROUNDING ratifies explicit mixed EXCLUSIVE base mode: one invoice-rounded base, signed largest-remainder allocation by captured tax-policy identity/version, then independent captured tax rounding. Legacy mode unchanged; no discounts/charges/inclusive semantics. PD-N7-INCLUSIVE-TAX-RECONCILIATION and PD-N7-INCLUSIVE-GROSS-ROUNDING-STAGE Option A: explicit homogeneous INCLUSIVE mode. Round the exact aggregate ACTIVE inclusive gross once using common captured commercial rounding before captured Taxes extraction. Net is rounded gross minus rounded tax; payable equals rounded gross. V1 aligned history unchanged; V2 freezes raw gross and separate gross adjustment. No discounts/charges/modifiers, mixed modes or new freeze point. Negative net and monetary overflow fail closed. Explicit inclusive fixed price-reduction intent is the sole discount exception, under PD-N7-INCLUSIVE-FIXED-DISCOUNT-BASIS; all other inclusive discount semantics remain unavailable. CAPTURED_BASE_SERVICE_POLICY explicitly captures ServiceChargePolicy on first participation. NO_SERVICE_CHARGE retains explicit provenance; positive taxable homogeneous EXCLUSIVE no-discount service reuses independently accepted RU013 F01 unit/real-PG and frozen legacy raw-subtotal percentage -> captured commercial charge rounding -> common EXCLUSIVE tax/final rounding. Other fee/discount/non-taxable/mixed/inclusive composition remains unavailable. Missing legacy basis is not zero; no new fiscal rule. PD-N7-SERVICE-CHARGE-DISCOUNT-ELIGIBILITY provisional owner Option A, EXPERT_VALIDATION_PENDING: homogeneous common-policy EXCLUSIVE taxable percentage service only. Frozen service policy derives original service from pre-discount raw ACTIVE items via RU013. Existing explicit ORDER_WIDE BEFORE_TAX FIXED_AMOUNT or PERCENTAGE includes items plus service in eligible base; total percentage derives once at Money4 HALF_UP. Pricing reconciles exact proportional item/service component reductions with canonical identities, not a synthetic product/OrderLine. Sum allocations equals discount, bounded by each raw component. Apply and Confirm approval consume actual discount and combined eligible base. Same frozen service lineage, dynamic draft money, immutable confirmation evidence. Non-taxable positive/mixed/inclusive service, targeting/stacking/after-tax/COMP/overrides/fee refunds remain unavailable. Old fee-free/mixed/inclusive/internal calculation histories unchanged. No foreign economic effects or fiscal certification."
+ },
+ {
+  "id": "OrderCompletionPolicy",
+  "owner": "orders",
+  "type": "object",
+  "allowed": {
+   "channels": "List<OrderChannel>",
+   "mode": [
+    "COMMERCIAL_ONLY",
+    "FULFILLMENT_REQUIRED"
+   ]
+  },
+  "default": null,
+  "scope_dimensions": null,
+  "note": "Frozen6c877256 PAID->COMPLETED is commercial-only evidence, not proof of preparation. Null/default and fulfillment-required paths fail closed; explicit channel opt-in only. No Kitchen owner simulated."
+ }
+]

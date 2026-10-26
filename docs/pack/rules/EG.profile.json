@@ -1,0 +1,656 @@
+{
+  "profile": "nerdpos.market-profile/v1",
+  "profileId": "EG",
+  "profileVersion": "1.4.0",
+  "market": "Egypt",
+  "author": {
+    "lane": "DOMAIN",
+    "agent": "opus",
+    "task": "NP-W-EG-PROFILE"
+  },
+  "baseline": {
+    "branch": "agent/claude/domain-line",
+    "commit": "f4b90711",
+    "canonical_sha256": "33e3096c201a22c42df07cdcf58d1203efbef5d53aab32f08d0551be06682c2a"
+  },
+  "source_rule": "CORE_SELLABLE_RESTAURANT section 8 (owner directive 2026-10-25): an open business decision becomes the Egyptian-market best practice as a profile value, labelled MARKET_CONVENTION, with DOMAIN's confidence and the question for the expert. The profile is data applied once at provisioning through settings.ApplyMarketProfile; later changes go through Settings.UpdatePolicy under SENSITIVE_POLICY_CHANGE. Confidence is DOMAIN's estimate of market practice, not a legal opinion; every MEDIUM or LOW row and every tax or fiscal row is confirmed by the expert or the accountant before the pilot.",
+  "values": [
+    {
+      "policyId": "PricingOrderPolicy",
+      "scope": "TENANT",
+      "value": "DISCOUNT_BEFORE_TAX",
+      "label": "MARKET_CONVENTION",
+      "confidence": "MEDIUM",
+      "reviewer": "ACCOUNTANT",
+      "expertQuestion": "Confirm that a discount reduces the VAT base (discount before tax).",
+      "source": "CORE section 8; canonical default none (must be set)"
+    },
+    {
+      "policyId": "RoundingPolicy",
+      "scope": "TENANT",
+      "value": {
+        "mode": "HALF_UP",
+        "scale": 2
+      },
+      "label": "MARKET_CONVENTION",
+      "confidence": "MEDIUM",
+      "reviewer": "ACCOUNTANT",
+      "expertQuestion": "HALF_UP or HALF_EVEN for e-receipt line totals?",
+      "source": "CORE section 8; equals the canonical default"
+    },
+    {
+      "policyId": "ServiceChargePolicy",
+      "scope": "TENANT",
+      "value": {
+        "byChannel": {
+          "DINE_IN": "12"
+        },
+        "taxable": true
+      },
+      "label": "MARKET_CONVENTION",
+      "confidence": "MEDIUM",
+      "reviewer": "ACCOUNTANT",
+      "expertQuestion": "Is 12 % on dine-in the norm for this restaurant class? Is VAT computed on the service charge? Which e-receipt tax type applies to it (OD-EG)?",
+      "source": "CORE section 8; TAKEAWAY has no entry (no service charge)"
+    },
+    {
+      "policyId": "FloorIntakePolicy",
+      "scope": "TENANT",
+      "value": {
+        "DINE_IN": "FLOOR_WITHOUT_DRAWER"
+      },
+      "label": "MARKET_CONVENTION",
+      "confidence": "HIGH",
+      "reviewer": "OWNER_EXPERT",
+      "expertQuestion": "Do waiters open and edit table checks on their own devices without a cash drawer? Counter and takeaway keep a drawer session.",
+      "source": "DOMAIN unified plan 20261025T1830Z section 2.1 (Egypt profile for restaurants with waiters); FloorIntakePolicy@2 CHANNEL_MAP, only DINE_IN may be floor"
+    },
+    {
+      "policyId": "CollectionScopePolicy",
+      "scope": "TENANT",
+      "value": {
+        "DINE_IN": "BRANCH_COLLECTING_DRAWER"
+      },
+      "label": "MARKET_CONVENTION",
+      "confidence": "HIGH",
+      "reviewer": "OWNER_EXPERT",
+      "expertQuestion": "Does any open cashier drawer in the branch collect a table check, with the waiter kept for attribution?",
+      "source": "DOMAIN unified plan 20261025T1830Z section 2.1; capture binds the capturing terminal OPEN session; counter and takeaway stay ORIGIN_SESSION"
+    },
+    {
+      "policyId": "OrderConfirmationPricingPolicy",
+      "scope": "TENANT",
+      "value": {
+        "mode": "CAPTURED_BASE_SERVICE_POLICY",
+        "channels": [
+          "DINE_IN",
+          "TAKEAWAY"
+        ]
+      },
+      "label": "MARKET_CONVENTION",
+      "confidence": "MEDIUM",
+      "reviewer": "ACCOUNTANT",
+      "expertQuestion": "Service on dine-in only, VAT on items plus service, one VAT policy per check: does that match how your receipts are calculated today?",
+      "source": "docs/25 (W6): the accepted runtime reads ServiceChargePolicy only in this mode, for the listed channels; TAKEAWAY has no rate and captures NO_SERVICE_CHARGE; canonical default null is fail-closed"
+    },
+    {
+      "policyId": "TenderMethodPolicy",
+      "scope": "TENANT",
+      "value": {
+        "enabled": [
+          "CASH",
+          "CARD",
+          "DIGITAL_WALLET"
+        ],
+        "labels": {
+          "CASH": "Cash / نقدي",
+          "CARD": "Card / بطاقة",
+          "DIGITAL_WALLET": "Wallet or InstaPay / محفظة أو إنستاباي"
+        }
+      },
+      "label": "MARKET_CONVENTION",
+      "confidence": "MEDIUM",
+      "reviewer": "OWNER_EXPERT",
+      "expertQuestion": "Which wallets and transfers must appear separately in the Z report?",
+      "source": "CORE section 8; card and wallet are recorded with a reference, no provider integration. Payment.Capture accepts CASH only until its reviewed change request ships (CORE section 3 scope restriction)"
+    },
+    {
+      "policyId": "SplitTenderPolicy",
+      "scope": "TENANT",
+      "value": true,
+      "label": "MARKET_CONVENTION",
+      "confidence": "HIGH",
+      "reviewer": "OWNER_EXPERT",
+      "expertQuestion": "Do guests split one check between cash and card?",
+      "source": "CORE section 3 registry; equals the canonical default"
+    },
+    {
+      "policyId": "BlindClosePolicy",
+      "scope": "TENANT",
+      "value": true,
+      "label": "MARKET_CONVENTION",
+      "confidence": "HIGH",
+      "reviewer": "OWNER_EXPERT",
+      "expertQuestion": "Should the cashier count the drawer without seeing the expected amount?",
+      "source": "CORE section 8"
+    },
+    {
+      "policyId": "ApprovalRequirementPolicy",
+      "scope": "TENANT",
+      "value": {
+        "LINE_VOID": {
+          "mode": "ALWAYS"
+        },
+        "ORDER_VOID": {
+          "mode": "ALWAYS"
+        },
+        "REFUND_APPROVE": {
+          "mode": "ALWAYS"
+        },
+        "SESSION_VARIANCE": {
+          "mode": "ABOVE_THRESHOLD",
+          "field": "absVariance",
+          "threshold": "10.00"
+        },
+        "SENSITIVE_POLICY_CHANGE": {
+          "mode": "ALWAYS"
+        }
+      },
+      "label": "MARKET_CONVENTION",
+      "confidence": "MEDIUM",
+      "reviewer": "OWNER_EXPERT",
+      "expertQuestion": "Tolerated drawer difference before a manager must approve (10.00 EGP)? Refund approval always, or only above an amount? Void approval also before the kitchen starts?",
+      "source": "CORE section 8 (LINE_VOID ALWAYS for a fired line per E-25; SESSION_VARIANCE 10.00 EGP); ORDER_DISCOUNT keeps its canonical default until ANY_OF exists (see pending)"
+    },
+    {
+      "policyId": "NewProductAvailabilityPolicy",
+      "scope": "TENANT",
+      "value": "CREATING_BRANCH",
+      "label": "MARKET_CONVENTION",
+      "confidence": "HIGH",
+      "reviewer": "OWNER_EXPERT",
+      "expertQuestion": "With more than one branch, should a new product appear only where it was created?",
+      "source": "CORE section 8 (single-branch pilot)"
+    },
+    {
+      "policyId": "AvailabilityReasonPolicy",
+      "scope": "TENANT",
+      "value": {
+        "SOLD_OUT": "OPTIONAL",
+        "BLOCKED": "REQUIRED"
+      },
+      "label": "MARKET_CONVENTION",
+      "confidence": "HIGH",
+      "reviewer": "OWNER_EXPERT",
+      "expertQuestion": "Should staff always give a reason when an item is blocked?",
+      "source": "CORE section 8; equals the policy default"
+    },
+    {
+      "policyId": "ZeroPricePolicy",
+      "scope": "TENANT",
+      "value": "ALLOW",
+      "label": "MARKET_CONVENTION",
+      "confidence": "MEDIUM",
+      "reviewer": "OWNER_EXPERT",
+      "expertQuestion": "Do you ring free items (bread, pickles, water, sauces) through the POS for the kitchen ticket or the receipt? If not, use DENY.",
+      "source": "docs/22 section 5 (W1, E-35)"
+    },
+    {
+      "policyId": "PriceSchedulingPolicy",
+      "scope": "TENANT",
+      "value": "FUTURE_ALLOWED",
+      "label": "MARKET_CONVENTION",
+      "confidence": "HIGH",
+      "reviewer": "OWNER_EXPERT",
+      "expertQuestion": "Do managers schedule price rises for the next business day, or only change prices immediately?",
+      "source": "docs/22 section 5 (W1, E-35)"
+    },
+    {
+      "policyId": "SkuGenerationPolicy",
+      "value": {
+        "mode": "AUTO_IF_EMPTY",
+        "defaultPrefix": "",
+        "categoryPrefixes": {},
+        "separator": "-",
+        "width": 5
+      },
+      "label": "MARKET_CONVENTION",
+      "confidence": "HIGH",
+      "reviewer": "OWNER_EXPERT",
+      "expertQuestion": "Do you already have item codes that must be kept?",
+      "source": "CORE section 8; docs/31; category prefixes are set per restaurant once its categories exist; promoted in 1.3.0 (policy registered on domain-line 3331d68a)",
+      "scope": "TENANT"
+    },
+    {
+      "policyId": "ProductNameUniquenessPolicy",
+      "value": {
+        "default": "BLOCK",
+        "byLocale": {}
+      },
+      "label": "MARKET_CONVENTION",
+      "confidence": "HIGH",
+      "reviewer": "OWNER_EXPERT",
+      "expertQuestion": "Do you sell two items with the same name (e.g. sizes as separate items)?",
+      "source": "CORE section 8; docs/31; promoted in 1.3.0 (policy registered on domain-line 3331d68a)",
+      "scope": "TENANT"
+    },
+    {
+      "policyId": "ReasonCodePolicy",
+      "value": {
+        "ORDER_CANCEL": "MANAGED",
+        "ORDER_VOID": "MANAGED",
+        "LINE_VOID": "MANAGED",
+        "DISCOUNT": "MANAGED",
+        "COMP": "MANAGED",
+        "REFUND": "MANAGED",
+        "CASH_MOVE": "MANAGED",
+        "NO_SALE": "MANAGED",
+        "TENDER_CORRECTION": "MANAGED"
+      },
+      "label": "MARKET_CONVENTION",
+      "confidence": "HIGH",
+      "reviewer": "OWNER_EXPERT",
+      "expertQuestion": "Which reasons do your staff actually use? Keep the list short.",
+      "source": "docs/24 section 6 (W4); promoted in 1.3.0 (policy registered on domain-line 3331d68a)",
+      "scope": "TENANT"
+    },
+    {
+      "policyId": "VisitAutoClosePolicy",
+      "value": "ON_LAST_CHECK_COMPLETED",
+      "label": "MARKET_CONVENTION",
+      "confidence": "MEDIUM",
+      "reviewer": "OWNER_EXPERT",
+      "expertQuestion": "Do guests often order again after paying?",
+      "source": "CORE section 8; promoted in 1.3.0 (policy registered on domain-line 3331d68a)",
+      "scope": "TENANT"
+    },
+    {
+      "policyId": "DiscountStackingPolicy",
+      "value": {
+        "mode": "NO_STACKING",
+        "autoApply": false
+      },
+      "label": "MARKET_CONVENTION",
+      "confidence": "MEDIUM",
+      "reviewer": "OWNER_EXPERT",
+      "expertQuestion": "Can a guest combine a promotion with a manager discount?",
+      "source": "CORE section 3 registry; promoted in 1.3.0 (policy registered on domain-line 3331d68a)",
+      "scope": "TENANT"
+    },
+    {
+      "policyId": "FiscalDocumentPolicy",
+      "scope": "TENANT",
+      "value": "SANDBOX",
+      "label": "MARKET_CONVENTION",
+      "confidence": "HIGH",
+      "reviewer": "ACCOUNTANT",
+      "expertQuestion": "Registration status of the pilot restaurant (OD-EG-1..7)? May receipts be issued during an outage and submitted later within the window?",
+      "source": "CORE section 8; PRODUCTION only after certification; E-40 registered FiscalDocumentPolicy (OFF|SANDBOX|PRODUCTION, SCALAR); the adapter is EG_ETA by FiscalProfile; promoted in 1.4.0"
+    }
+  ],
+  "owner_data": [
+    {
+      "id": "EG-VAT",
+      "operation": "TaxPolicy.Create",
+      "data": {
+        "name": {
+          "ar": "ضريبة القيمة المضافة",
+          "en": "VAT"
+        },
+        "jurisdiction": "EG",
+        "calculationMode": "EXCLUSIVE",
+        "rate": "14",
+        "roundingMode": "HALF_UP",
+        "roundingScale": 2
+      },
+      "label": "MARKET_CONVENTION",
+      "confidence": "HIGH",
+      "reviewer": "ACCOUNTANT",
+      "expertQuestion": "Are any menu items exempt or at another rate? Should takeaway prices be shown tax-inclusive? Which e-receipt tax type and subtype codes apply (fiscalTaxType/fiscalSubtype are left empty here)?",
+      "source": "CORE section 8 (HIGH for 14 %); docs/23 (W2, E-35)"
+    },
+    {
+      "id": "EG-BRANCH-CALENDAR",
+      "operation": "organization (Branch calendar fields at provisioning: timezone, businessDayCutoff)",
+      "data": {
+        "timezone": "Africa/Cairo",
+        "businessDayCutoff": "04:00"
+      },
+      "label": "MARKET_CONVENTION",
+      "confidence": "MEDIUM",
+      "reviewer": "OWNER_EXPERT",
+      "expertQuestion": "Does the restaurant close after midnight? At what hour does the next business day start?",
+      "source": "DOMAIN decision 20261025T1920Z (W5 Q2): the branch calendar fields read by organization.ResolveBranchContext are the single source; BusinessDatePolicy is not written"
+    },
+    {
+      "id": "EG-CURRENCY-RECEIPT",
+      "operation": "organization (Business/Branch data at provisioning)",
+      "data": {
+        "currency": "EGP",
+        "locales": [
+          "ar",
+          "en"
+        ],
+        "displayDecimals": 2
+      },
+      "label": "MARKET_CONVENTION",
+      "confidence": "HIGH",
+      "reviewer": "OWNER_EXPERT",
+      "expertQuestion": "Receipt in Arabic and English, amounts in EGP with two decimals?",
+      "source": "CORE section 8 Receipt row; one currency per business (CORE section 4)"
+    },
+    {
+      "id": "EG-REASON-CODES",
+      "operation": "ReasonCode.Create",
+      "data": {
+        "codes": [
+          {
+            "kind": "ORDER_CANCEL",
+            "code": "CUSTOMER_LEFT",
+            "label": {
+              "en": "Customer left",
+              "ar": "العميل غادر"
+            },
+            "requiresNote": false
+          },
+          {
+            "kind": "ORDER_CANCEL",
+            "code": "ORDER_MISTAKE",
+            "label": {
+              "en": "Order entered by mistake",
+              "ar": "طلب بالخطأ"
+            },
+            "requiresNote": false
+          },
+          {
+            "kind": "ORDER_CANCEL",
+            "code": "DUPLICATE",
+            "label": {
+              "en": "Duplicate order",
+              "ar": "طلب مكرر"
+            },
+            "requiresNote": false
+          },
+          {
+            "kind": "LINE_VOID",
+            "code": "WRONG_ITEM",
+            "label": {
+              "en": "Wrong item",
+              "ar": "صنف خاطئ"
+            },
+            "requiresNote": false
+          },
+          {
+            "kind": "LINE_VOID",
+            "code": "CHANGED_MIND",
+            "label": {
+              "en": "Customer changed mind",
+              "ar": "العميل غيّر رأيه"
+            },
+            "requiresNote": false
+          },
+          {
+            "kind": "LINE_VOID",
+            "code": "QUALITY",
+            "label": {
+              "en": "Quality issue",
+              "ar": "مشكلة في الجودة"
+            },
+            "requiresNote": true
+          },
+          {
+            "kind": "LINE_VOID",
+            "code": "KITCHEN_DELAY",
+            "label": {
+              "en": "Kitchen delay",
+              "ar": "تأخير المطبخ"
+            },
+            "requiresNote": false
+          },
+          {
+            "kind": "ORDER_VOID",
+            "code": "CASHIER_ERROR",
+            "label": {
+              "en": "Cashier error",
+              "ar": "خطأ كاشير"
+            },
+            "requiresNote": true
+          },
+          {
+            "kind": "ORDER_VOID",
+            "code": "TEST_ORDER",
+            "label": {
+              "en": "Test order",
+              "ar": "طلب تجريبي"
+            },
+            "requiresNote": false
+          },
+          {
+            "kind": "DISCOUNT",
+            "code": "REGULAR_GUEST",
+            "label": {
+              "en": "Regular guest",
+              "ar": "عميل دائم"
+            },
+            "requiresNote": false
+          },
+          {
+            "kind": "DISCOUNT",
+            "code": "COMPLAINT",
+            "label": {
+              "en": "Complaint",
+              "ar": "شكوى"
+            },
+            "requiresNote": true
+          },
+          {
+            "kind": "DISCOUNT",
+            "code": "MANAGER",
+            "label": {
+              "en": "Manager discretion",
+              "ar": "تقدير المدير"
+            },
+            "requiresNote": true
+          },
+          {
+            "kind": "COMP",
+            "code": "STAFF_MEAL",
+            "label": {
+              "en": "Staff meal",
+              "ar": "وجبة موظف"
+            },
+            "requiresNote": false
+          },
+          {
+            "kind": "COMP",
+            "code": "COMPLAINT",
+            "label": {
+              "en": "Complaint",
+              "ar": "شكوى"
+            },
+            "requiresNote": true
+          },
+          {
+            "kind": "COMP",
+            "code": "OWNER_GUEST",
+            "label": {
+              "en": "Owner's guest",
+              "ar": "ضيف المالك"
+            },
+            "requiresNote": false
+          },
+          {
+            "kind": "REFUND",
+            "code": "QUALITY",
+            "label": {
+              "en": "Quality issue",
+              "ar": "مشكلة في الجودة"
+            },
+            "requiresNote": true
+          },
+          {
+            "kind": "REFUND",
+            "code": "WRONG_CHARGE",
+            "label": {
+              "en": "Wrong charge",
+              "ar": "خطأ في التحصيل"
+            },
+            "requiresNote": false
+          },
+          {
+            "kind": "CASH_MOVE",
+            "code": "SUPPLIER",
+            "label": {
+              "en": "Supplier payment",
+              "ar": "دفع لمورد"
+            },
+            "requiresNote": true
+          },
+          {
+            "kind": "CASH_MOVE",
+            "code": "PETTY",
+            "label": {
+              "en": "Petty cash",
+              "ar": "مصروفات نثرية"
+            },
+            "requiresNote": true
+          },
+          {
+            "kind": "CASH_MOVE",
+            "code": "SAFE_DROP",
+            "label": {
+              "en": "Safe drop",
+              "ar": "إيداع الخزنة"
+            },
+            "requiresNote": false
+          },
+          {
+            "kind": "CASH_MOVE",
+            "code": "FLOAT_TOPUP",
+            "label": {
+              "en": "Float top-up",
+              "ar": "تعزيز الفكة"
+            },
+            "requiresNote": false
+          },
+          {
+            "kind": "NO_SALE",
+            "code": "CHANGE",
+            "label": {
+              "en": "Give change",
+              "ar": "فكّ عملة"
+            },
+            "requiresNote": false
+          },
+          {
+            "kind": "NO_SALE",
+            "code": "OTHER",
+            "label": {
+              "en": "Other",
+              "ar": "أخرى"
+            },
+            "requiresNote": true
+          },
+          {
+            "kind": "TENDER_CORRECTION",
+            "code": "WRONG_TENDER",
+            "label": {
+              "en": "Wrong payment method",
+              "ar": "وسيلة دفع خاطئة"
+            },
+            "requiresNote": false
+          }
+        ]
+      },
+      "label": "MARKET_CONVENTION",
+      "confidence": "HIGH",
+      "reviewer": "OWNER_EXPERT",
+      "expertQuestion": "Which reasons do your staff actually use? Keep the list short; add or deactivate codes before the pilot.",
+      "source": "docs/24 section 6 (W4); VARIANCE codes wait for the ReasonKind VARIANCE change request; applied before ReasonCodePolicy MANAGED"
+    }
+  ],
+  "pending": [
+    {
+      "policyId": "TipPolicy",
+      "awaiting": "D1 (TipPolicy not yet specified)",
+      "value": "OFF",
+      "label": "MARKET_CONVENTION",
+      "confidence": "MEDIUM",
+      "reviewer": "ACCOUNTANT",
+      "expertQuestion": "Do waiters receive card tips through the POS? If yes: pooled or per waiter, paid out per shift? Tax treatment?",
+      "source": "CORE section 7.4 #3 and section 8"
+    },
+    {
+      "policyId": "CashRoundingPolicy",
+      "awaiting": "D1 (CashRoundingPolicy not yet specified)",
+      "value": {
+        "mode": "HALF_UP",
+        "increment": "0.25",
+        "tenders": [
+          "CASH"
+        ]
+      },
+      "label": "MARKET_CONVENTION",
+      "confidence": "LOW",
+      "reviewer": "ACCOUNTANT",
+      "expertQuestion": "Common increment in practice (0.25 or 0.50)? How is a rounding difference shown on the e-receipt?",
+      "source": "CORE section 7.4 #2 and section 8; card is never rounded"
+    },
+    {
+      "policyId": "KitchenTimingPolicy",
+      "awaiting": "C3 L2 (KitchenTimingPolicy not yet specified)",
+      "value": {
+        "targetMinutes": 15,
+        "alertMinutes": 20
+      },
+      "label": "MARKET_CONVENTION",
+      "confidence": "MEDIUM",
+      "reviewer": "OWNER_EXPERT",
+      "expertQuestion": "Different targets per station (grill vs bar)?",
+      "source": "CORE section 8"
+    },
+    {
+      "policyId": "ApprovalRequirementPolicy",
+      "awaiting": "ANY_OF rule in the approval owner (CORE section 5, after a ratified scenario)",
+      "value": {
+        "ORDER_DISCOUNT": {
+          "mode": "ANY_OF",
+          "rules": [
+            {
+              "mode": "ABOVE_THRESHOLD",
+              "field": "discountPercent",
+              "threshold": "10"
+            },
+            {
+              "mode": "ABOVE_THRESHOLD",
+              "field": "amount",
+              "threshold": "100.00"
+            }
+          ]
+        }
+      },
+      "label": "MARKET_CONVENTION",
+      "confidence": "MEDIUM",
+      "reviewer": "OWNER_EXPERT",
+      "expertQuestion": "Discount thresholds per role (10 % or 100 EGP)?",
+      "source": "CORE section 8; until then ORDER_DISCOUNT keeps the canonical ABOVE_THRESHOLD discountPercent 10"
+    },
+    {
+      "policyId": "ApprovalRequirementPolicy",
+      "awaiting": "PRICE_CHANGE and PRODUCT_TAX_CHANGE approval actions (CORE section 5)",
+      "value": {
+        "PRICE_CHANGE": {
+          "mode": "NEVER"
+        },
+        "PRODUCT_TAX_CHANGE": {
+          "mode": "NEVER"
+        }
+      },
+      "label": "MARKET_CONVENTION",
+      "confidence": "MEDIUM",
+      "reviewer": "OWNER_EXPERT",
+      "expertQuestion": "Should a price change above a percentage, or any change of a product's tax, need a second manager?",
+      "source": "CORE section 3 (default rule NEVER, the owner opts in); docs/22 section 6"
+    }
+  ]
+}

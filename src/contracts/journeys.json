@@ -1,0 +1,1711 @@
+[
+ {
+  "id": "J-A1-1",
+  "journey": "J-A1",
+  "group": "Phase A",
+  "groupTitle": "Install the dedicated deployment",
+  "groupTitleAr": "تركيب السيرفر الخاص بالعميل",
+  "step": 1,
+  "who": "implementation-engineer",
+  "do_en": "Provision one dedicated deployment and database for this client (no shared tenant). Apply the reviewed migrations with the release runner. Configure secrets only through the environment (never in this file).",
+  "do_ar": "جهّز سيرفر وقاعدة بيانات خاصين بالعميل ده بس. شغّل الـ migrations المراجعة بأداة الإصدار. الأسرار تتحط في البيئة بس، عمرها ما تتكتب هنا.",
+  "expect_en": "Readiness reports the database and the reviewed migration head (RUNBOOK.md).",
+  "expect_ar": "فحص الجاهزية يقول إن قاعدة البيانات شغالة وآخر migration هو المراجع (RUNBOOK.md).",
+  "note": "",
+  "operations": [
+   {
+    "op": "Health.Live",
+    "http": "GET /health/live",
+    "actor": "implementation-engineer · PUBLIC",
+    "expected": "200"
+   },
+   {
+    "op": "Health.Ready",
+    "http": "GET /health/ready",
+    "actor": "implementation-engineer · PUBLIC",
+    "expected": "200 with database and migration head"
+   },
+   {
+    "op": "Platform.BuildInfo",
+    "http": "GET /meta/build",
+    "actor": "implementation-engineer · platform:read",
+    "expected": "release version and commit"
+   }
+  ]
+ },
+ {
+  "id": "J-A1-2",
+  "journey": "J-A1",
+  "group": "Phase A",
+  "groupTitle": "Install the dedicated deployment",
+  "groupTitleAr": "تركيب السيرفر الخاص بالعميل",
+  "step": 2,
+  "who": "implementation-engineer",
+  "do_en": "Log in with the bootstrap administrator issued by the environment (secure sink). Configure the business: names AR/EN and legal names. The ETA issuer identity is NOT entered here (E-40: compliance.FiscalProfile).",
+  "do_ar": "ادخل بحساب المسؤول المبدئي اللي البيئة طلعته. اكتب بيانات النشاط: الأسماء عربي وإنجليزي والاسم القانوني. بيانات التسجيل في الفاتورة الإلكترونية مش هنا (E-40).",
+  "expect_en": "Business.Get returns the names; no fiscal field exists on the business record.",
+  "expect_ar": "Business.Get يرجّع الأسماء، ومفيش أي حقل ضريبي على سجل النشاط.",
+  "note": "",
+  "operations": [
+   {
+    "op": "Auth.Login",
+    "http": "POST /auth/login",
+    "actor": "implementation-engineer · PUBLIC",
+    "expected": "authenticated"
+   },
+   {
+    "op": "Business.Configure",
+    "http": "PUT /business",
+    "actor": "implementation-engineer · business:configure",
+    "expected": "200, names stored"
+   },
+   {
+    "op": "Business.Get",
+    "http": "GET /business",
+    "actor": "implementation-engineer · business:read",
+    "expected": "the configured business"
+   }
+  ]
+ },
+ {
+  "id": "J-A1-3",
+  "journey": "J-A1",
+  "group": "Phase B",
+  "groupTitle": "Branches, devices, roles and people",
+  "groupTitleAr": "الفروع والأجهزة والصلاحيات والناس",
+  "step": 3,
+  "who": "implementation-engineer",
+  "do_en": "Create the branch with its calendar: timezone Africa/Cairo, business-day cutoff 04:00 (EG profile EG-BRANCH-CALENDAR, MEDIUM: confirm the closing hour with the owner).",
+  "do_ar": "أنشئ الفرع بالتقويم بتاعه: المنطقة الزمنية Africa/Cairo وبداية اليوم التجاري 04:00 (اسأل صاحب المطعم الساعة كام بيقفل).",
+  "expect_en": "Branch ACTIVE; the server resolves business dates from these fields for every financial command.",
+  "expect_ar": "الفرع ACTIVE، والسيرفر بيحسب اليوم التجاري من الحقول دي لكل عملية مالية.",
+  "note": "",
+  "operations": [
+   {
+    "op": "Branch.Create",
+    "http": "POST /branches",
+    "actor": "implementation-engineer · branch:create",
+    "expected": "201, branch ACTIVE"
+   },
+   {
+    "op": "Branch.Get",
+    "http": "GET /branches/{branchId}",
+    "actor": "implementation-engineer · branch:read",
+    "expected": "timezone and cutoff as entered"
+   }
+  ]
+ },
+ {
+  "id": "J-A1-4",
+  "journey": "J-A1",
+  "group": "Phase B",
+  "groupTitle": "Branches, devices, roles and people",
+  "groupTitleAr": "الفروع والأجهزة والصلاحيات والناس",
+  "step": 4,
+  "who": "implementation-engineer",
+  "do_en": "Register the devices: one cashier terminal with a drawer, one floor tablet per waiter group (no drawer), one kitchen display, one admin terminal.",
+  "do_ar": "سجّل الأجهزة: جهاز كاشير بدرج، تابلت لكل مجموعة جرسونات من غير درج، شاشة مطبخ، وجهاز إدارة.",
+  "expect_en": "Terminal.List shows the four kinds; only the cashier terminal has a drawer.",
+  "expect_ar": "Terminal.List يعرض الأنواع الأربعة، وجهاز الكاشير بس اللي عليه درج.",
+  "note": "",
+  "operations": [
+   {
+    "op": "Terminal.Register",
+    "http": "POST /terminals",
+    "actor": "implementation-engineer · terminal:register",
+    "expected": "201 per device"
+   },
+   {
+    "op": "Terminal.List",
+    "http": "GET /terminals",
+    "actor": "implementation-engineer · terminal:read",
+    "expected": "the registered devices"
+   }
+  ]
+ },
+ {
+  "id": "J-A1-5",
+  "journey": "J-A1",
+  "group": "Phase B",
+  "groupTitle": "Branches, devices, roles and people",
+  "groupTitleAr": "الفروع والأجهزة والصلاحيات والناس",
+  "step": 5,
+  "who": "implementation-engineer",
+  "do_en": "Create the roles owner, manager, cashier, waiter and chef with the permission sets of section \"Roles\" below. Create the users, give each a role and the branch scope. PINs and passwords are issued by Credential.Reset to the person directly (secure issuance sink), never typed here.",
+  "do_ar": "أنشئ الصلاحيات: مالك، مدير، كاشير، جرسون، شيف بالمجموعات اللي في جزء \"الصلاحيات\" تحت. أنشئ المستخدمين وادي كل واحد صلاحيته والفرع. الـ PIN وكلمات السر تطلع للشخص نفسه، عمرها ما تتكتب هنا.",
+  "expect_en": "Role.List shows five roles; each user sees only the branch it was given.",
+  "expect_ar": "Role.List يعرض خمس صلاحيات، وكل مستخدم يشوف الفرع بتاعه بس.",
+  "note": "",
+  "operations": [
+   {
+    "op": "Role.Create",
+    "http": "POST /roles",
+    "actor": "implementation-engineer · role:create",
+    "expected": "201 per role"
+   },
+   {
+    "op": "User.Create",
+    "http": "POST /users",
+    "actor": "implementation-engineer · user:create",
+    "expected": "201 per user"
+   },
+   {
+    "op": "User.ManageAccess",
+    "http": "POST /users/{userId}/access",
+    "actor": "implementation-engineer · user:manageaccess",
+    "expected": "role and branch scope set"
+   },
+   {
+    "op": "Credential.Reset",
+    "http": "POST /users/{userId}/credentials/reset",
+    "actor": "implementation-engineer · credential:reset",
+    "expected": "credential issued to the person"
+   }
+  ]
+ },
+ {
+  "id": "J-A1-6",
+  "journey": "J-A1",
+  "group": "Phase C",
+  "groupTitle": "Policies, tax and reason codes",
+  "groupTitleAr": "السياسات والضريبة وأسباب الإلغاء",
+  "step": 6,
+  "who": "implementation-engineer",
+  "do_en": "Apply the Egypt market profile once with the provisioning tool (settings.ApplyMarketProfile, internal). Then review every value with the owner.",
+  "do_ar": "طبّق ملف السوق المصري مرة واحدة بأداة التجهيز. بعدها راجع كل قيمة مع صاحب المطعم.",
+  "expect_en": "Settings.Effective for FloorIntakePolicy (DINE_IN) shows FLOOR_WITHOUT_DRAWER from TENANT; a second application is refused.",
+  "expect_ar": "Settings.Effective لـ FloorIntakePolicy يرجّع FLOOR_WITHOUT_DRAWER، والتطبيق التاني يترفض.",
+  "note": "",
+  "operations": [
+   {
+    "op": "settings.ApplyMarketProfile",
+    "http": "internal (no HTTP)",
+    "actor": "implementation-engineer · INTERNAL",
+    "expected": "one row per profile value, policyVersion 1"
+   },
+   {
+    "op": "settings.ApplyMarketProfile",
+    "http": "internal (no HTTP)",
+    "actor": "implementation-engineer · INTERNAL",
+    "expected": "second application refused · SETTINGS_PROFILE_ALREADY_APPLIED"
+   },
+   {
+    "op": "Settings.Effective",
+    "http": "GET /settings/effective",
+    "actor": "owner-1 · settings:read ✓",
+    "expected": "value, resolvedScope TENANT"
+   }
+  ]
+ },
+ {
+  "id": "J-A1-7",
+  "journey": "J-A1",
+  "group": "Phase C",
+  "groupTitle": "Policies, tax and reason codes",
+  "groupTitleAr": "السياسات والضريبة وأسباب الإلغاء",
+  "step": 7,
+  "who": "owner-1",
+  "do_en": "Create the VAT tax policy from the profile (14 %, EXCLUSIVE, HALF_UP, 2). Have the accountant confirm it before the first real sale.",
+  "do_ar": "أنشئ ضريبة القيمة المضافة من الملف (14%، غير شاملة، تقريب HALF_UP لرقمين). المحاسب لازم يأكدها قبل أول بيع حقيقي.",
+  "expect_en": "TaxPolicy.List shows VAT active, version 1. A second identical policy is allowed but should not be created.",
+  "expect_ar": "TaxPolicy.List يعرض الضريبة نشطة. ممكن تتعمل تاني بس ما ينفعش.",
+  "note": "",
+  "operations": [
+   {
+    "op": "TaxPolicy.Create",
+    "http": "POST /tax-policies",
+    "actor": "owner-1 · tax:manage ✓",
+    "expected": "201, VAT active"
+   },
+   {
+    "op": "TaxPolicy.List",
+    "http": "GET /tax-policies",
+    "actor": "owner-1 · tax:read ✓",
+    "expected": "VAT listed"
+   }
+  ]
+ },
+ {
+  "id": "J-A1-8",
+  "journey": "J-A1",
+  "group": "Phase C",
+  "groupTitle": "Policies, tax and reason codes",
+  "groupTitleAr": "السياسات والضريبة وأسباب الإلغاء",
+  "step": 8,
+  "who": "owner-1",
+  "do_en": "Create the reason codes of the profile (owner data EG-REASON-CODES), then switch ReasonCodePolicy to MANAGED for those kinds.",
+  "do_ar": "أنشئ أسباب الإلغاء والخصم من الملف، وبعدها حوّل ReasonCodePolicy لـ MANAGED.",
+  "expect_en": "ReasonCode.List shows the codes in Arabic and English. Switching a kind to MANAGED with no code is refused.",
+  "expect_ar": "ReasonCode.List يعرض الأسباب بالعربي والإنجليزي. تحويل نوع لـ MANAGED من غير أسباب يترفض.",
+  "note": "",
+  "operations": [
+   {
+    "op": "ReasonCode.Create",
+    "http": "POST /reason-codes",
+    "actor": "owner-1 · reasoncode:upsert ✓",
+    "expected": "201 per code"
+   },
+   {
+    "op": "ReasonCode.Create",
+    "http": "POST /reason-codes",
+    "actor": "owner-1 · reasoncode:upsert ✓",
+    "expected": "same kind and code again · REASON_CODE_TAKEN"
+   },
+   {
+    "op": "ReasonCode.List",
+    "http": "GET /reason-codes",
+    "actor": "owner-1 · settings:read ✓",
+    "expected": "active codes by kind"
+   }
+  ]
+ },
+ {
+  "id": "J-A1-9",
+  "journey": "J-A1",
+  "group": "Phase D",
+  "groupTitle": "Menu",
+  "groupTitleAr": "المنيو",
+  "step": 9,
+  "who": "owner-1",
+  "do_en": "Import the menu sheet with Catalog.Import: first dryRun true, fix every issue, then dryRun false. The import is all-or-nothing: units, categories, modifier groups and options, products, first prices per branch and channel, and availability.",
+  "do_ar": "استورد شيت المنيو بـ Catalog.Import: الأول تجربة (dryRun) وصلّح كل الأخطاء، وبعدها استيراد حقيقي. يا كله يدخل يا مفيش حاجة.",
+  "expect_en": "The dry run lists every issue with section, row and field; the real run creates everything in one transaction.",
+  "expect_ar": "التجربة بتعرض كل خطأ بالقسم والسطر والحقل، والاستيراد الحقيقي بيعمل كل حاجة مرة واحدة.",
+  "note": "",
+  "operations": [
+   {
+    "op": "Catalog.Import",
+    "http": "POST /catalog/import",
+    "actor": "owner-1 · catalog:manage ✓",
+    "expected": "dryRun: VALID or INVALID with issues; nothing written"
+   },
+   {
+    "op": "Catalog.Import",
+    "http": "POST /catalog/import",
+    "actor": "owner-1 · catalog:manage ✓",
+    "expected": "any issue on the real run: nothing written · VALIDATION_FAILED"
+   },
+   {
+    "op": "Catalog.Import",
+    "http": "POST /catalog/import",
+    "actor": "owner-1 · catalog:manage ✓",
+    "expected": "real run: every row created"
+   }
+  ]
+ },
+ {
+  "id": "J-A1-10",
+  "journey": "J-A1",
+  "group": "Phase D",
+  "groupTitle": "Menu",
+  "groupTitleAr": "المنيو",
+  "step": 10,
+  "who": "owner-1",
+  "do_en": "Without a sheet, the same in the admin screens: a unit, a category, a modifier group with options, a product, its modifier groups, its price per branch and channel, and its availability.",
+  "do_ar": "من غير شيت، نفس الكلام من شاشات الإدارة: وحدة، قسم، مجموعة إضافات، صنف، سعره لكل فرع وطريقة بيع، وإتاحته.",
+  "expect_en": "A quote of the product in the branch and DINE_IN returns the price; before the price it is refused (price not found).",
+  "expect_ar": "تسعيرة الصنف في الفرع للصالة ترجّع السعر؛ قبل السعر بترجّع \"مفيش سعر\".",
+  "note": "",
+  "operations": [
+   {
+    "op": "Unit.Create",
+    "http": "POST /units",
+    "actor": "owner-1 · catalog:manage ✓",
+    "expected": "201"
+   },
+   {
+    "op": "Category.Create",
+    "http": "POST /categories",
+    "actor": "owner-1 · catalog:manage ✓",
+    "expected": "201"
+   },
+   {
+    "op": "ModifierGroup.Create",
+    "http": "POST /modifier-groups",
+    "actor": "owner-1 · catalog:manage ✓",
+    "expected": "201"
+   },
+   {
+    "op": "ModifierOption.Create",
+    "http": "POST /modifier-groups/{groupId}/options",
+    "actor": "owner-1 · catalog:manage ✓",
+    "expected": "201"
+   },
+   {
+    "op": "Product.Create",
+    "http": "POST /catalog/products",
+    "actor": "owner-1 · catalog:upsertitem ✓",
+    "expected": "201; same name again refused under BLOCK (Product.Create@3, agent/opus/delegated-bumps) · CATALOG_PRODUCT_NAME_TAKEN"
+   },
+   {
+    "op": "Product.SetModifierGroups",
+    "http": "PUT /catalog/products/{productId}/modifier-groups",
+    "actor": "owner-1 · catalog:manage ✓",
+    "expected": "200"
+   },
+   {
+    "op": "Pricing.QuoteItem",
+    "http": "POST /pricing/items/{productId}/quote",
+    "actor": "owner-1 · catalog:read ✓",
+    "expected": "before any price · PRICE_NOT_FOUND"
+   },
+   {
+    "op": "Catalog.SetPrice",
+    "http": "PUT /catalog/products/{productId}/price",
+    "actor": "owner-1 · catalog:setprice ✓",
+    "expected": "FIRST_PRICE per branch and channel"
+   },
+   {
+    "op": "Product.SetAvailability",
+    "http": "POST /catalog/products/{productId}/availability",
+    "actor": "owner-1 · product:setavailability ✓",
+    "expected": "AVAILABLE"
+   },
+   {
+    "op": "Pricing.QuoteItem",
+    "http": "POST /pricing/items/{productId}/quote",
+    "actor": "owner-1 · catalog:read ✓",
+    "expected": "the server price"
+   }
+  ]
+ },
+ {
+  "id": "J-A1-11",
+  "journey": "J-A1",
+  "group": "Phase E",
+  "groupTitle": "Floor and kitchen",
+  "groupTitleAr": "الصالة والمطبخ",
+  "step": 11,
+  "who": "owner-1",
+  "do_en": "Create the tables, the kitchen stations and the routing rules, ending with an explicit catch-all rule (no implicit default station).",
+  "do_ar": "أنشئ الترابيزات ومحطات المطبخ وقواعد التوجيه، وآخر قاعدة \"أي حاجة تانية\" بشكل صريح.",
+  "expect_en": "RoutingRule.List: ascending priority, the catch-all last.",
+  "expect_ar": "RoutingRule.List: بالترتيب، والقاعدة العامة في الآخر.",
+  "note": "",
+  "operations": [
+   {
+    "op": "Table.Create",
+    "http": "POST /tables",
+    "actor": "owner-1 · table:upsert ✓",
+    "expected": "201 per table"
+   },
+   {
+    "op": "Table.Create",
+    "http": "POST /tables",
+    "actor": "owner-1 · table:upsert ✓",
+    "expected": "duplicate name · TABLE_NAME_TAKEN"
+   },
+   {
+    "op": "KitchenStation.Create",
+    "http": "POST /kitchen/stations",
+    "actor": "owner-1 · kitchen:configure ✓",
+    "expected": "201 per station"
+   },
+   {
+    "op": "RoutingRule.Create",
+    "http": "POST /kitchen/routing-rules",
+    "actor": "owner-1 · kitchen:configure ✓",
+    "expected": "201 per rule"
+   },
+   {
+    "op": "RoutingRule.List",
+    "http": "GET /kitchen/routing-rules",
+    "actor": "owner-1 · kitchen:read ✓",
+    "expected": "priority order"
+   }
+  ]
+ },
+ {
+  "id": "J-A1-12",
+  "journey": "J-A1",
+  "group": "Phase F",
+  "groupTitle": "Devices and fiscal registration",
+  "groupTitleAr": "الأجهزة والتسجيل الضريبي",
+  "step": 12,
+  "who": "implementation-engineer",
+  "do_en": "Connect printers and the cash drawer per terminal and print a test page. A printer failure must never block a sale (W13 docs/30).",
+  "do_ar": "وصّل الطابعات ودرج الفلوس لكل جهاز واطبع صفحة تجربة. عطل الطابعة عمره ما يوقف البيع.",
+  "expect_en": "Test page printed; unplugging the printer leaves selling possible and shows the failed job.",
+  "expect_ar": "صفحة التجربة اتطبعت؛ لو فصلت الطابعة البيع يكمل والمهمة الفاشلة تظهر.",
+  "note": "",
+  "operations": [
+   {
+    "op": "Terminal.Update",
+    "http": "PUT /terminals/{terminalId}",
+    "actor": "implementation-engineer · terminal:update",
+    "expected": "device configuration stored"
+   },
+   {
+    "op": "PrintJob.Find",
+    "http": "GET /print-jobs",
+    "actor": "implementation-engineer · print:read",
+    "expected": "failed job visible (printing is specified by F2: W13 docs/30)"
+   }
+  ]
+ },
+ {
+  "id": "J-A1-13",
+  "journey": "J-A1",
+  "group": "Phase F",
+  "groupTitle": "Devices and fiscal registration",
+  "groupTitleAr": "الأجهزة والتسجيل الضريبي",
+  "step": 13,
+  "who": "implementation-engineer",
+  "do_en": "Register the restaurant with the e-receipt system in SANDBOX first; enter the issuer identity and the item mappings in compliance (E-40). PRODUCTION only after certification and the accountant's answers (OD-EG).",
+  "do_ar": "سجّل المطعم في منظومة الإيصال الإلكتروني على بيئة التجربة الأول، وبيانات المُصدر وأكواد الأصناف في وحدة الامتثال. الإنتاج بعد الاعتماد وردود المحاسب.",
+  "expect_en": "A test receipt is accepted by the sandbox; a rejected one is listed for the manager and never edits the sale.",
+  "expect_ar": "إيصال تجربة يتقبل في بيئة التجربة؛ المرفوض يظهر للمدير وعمره ما يعدّل البيع.",
+  "note": "",
+  "operations": [
+   {
+    "op": "FiscalProfile.Configure",
+    "http": "PUT /compliance/fiscal-profiles/{branchId}",
+    "actor": "implementation-engineer · compliance:issuedocument",
+    "expected": "issuer identity of the branch (E-40)"
+   },
+   {
+    "op": "FiscalDevice.Register",
+    "http": "POST /compliance/fiscal-devices",
+    "actor": "implementation-engineer · compliance:issuedocument",
+    "expected": "one fiscal device per issuing terminal; its credential is a secret-store reference"
+   },
+   {
+    "op": "FiscalItemMapping.SetMany",
+    "http": "PUT /compliance/item-mappings",
+    "actor": "implementation-engineer · compliance:issuedocument",
+    "expected": "item type and code per product (accountant data, OD-EG-3)"
+   },
+   {
+    "op": "Settings.Effective",
+    "http": "GET /settings/effective",
+    "actor": "owner-1 · settings:read ✓",
+    "expected": "FiscalDocumentPolicy SANDBOX from the profile"
+   }
+  ]
+ },
+ {
+  "id": "J-A1-14",
+  "journey": "J-A1",
+  "group": "Phase G",
+  "groupTitle": "First sale and first close",
+  "groupTitleAr": "أول بيعة وأول قفلة",
+  "step": 14,
+  "who": "cashier-1",
+  "do_en": "On the cashier terminal: open a shift with the opening float, sell one product for TAKEAWAY, take cash, complete, look at the X report, close the shift with a count.",
+  "do_ar": "على جهاز الكاشير: افتح وردية برصيد افتتاحي، بيع صنف تيك أواي، خد كاش، اقفل الطلب، شوف تقرير X، واقفل الوردية بالعد.",
+  "expect_en": "Every amount comes from the server. The X report shows the cash line; the Z is frozen after the close.",
+  "expect_ar": "كل الأرقام من السيرفر. تقرير X يعرض الكاش، وتقرير Z يتقفل بعد القفلة.",
+  "note": "",
+  "operations": [
+   {
+    "op": "Auth.Login",
+    "http": "POST /auth/login",
+    "actor": "cashier-1 · PUBLIC",
+    "expected": "authenticated on the cashier terminal"
+   },
+   {
+    "op": "Session.Open",
+    "http": "POST /sessions",
+    "actor": "cashier-1 · session:open ✓",
+    "expected": "201, OPEN"
+   },
+   {
+    "op": "Order.Create",
+    "http": "POST /orders",
+    "actor": "cashier-1 · order:create ✓",
+    "expected": "201, TAKEAWAY, DRAFT"
+   },
+   {
+    "op": "Order.AddLines",
+    "http": "POST /orders/{orderId}/lines",
+    "actor": "cashier-1 · order:addlines ✓",
+    "expected": "captured server price"
+   },
+   {
+    "op": "Order.Confirm",
+    "http": "POST /orders/{orderId}/confirm",
+    "actor": "cashier-1 · order:confirm ✓",
+    "expected": "CONFIRMED"
+   },
+   {
+    "op": "Payment.Capture",
+    "http": "POST /orders/{orderId}/payments",
+    "actor": "cashier-1 · payment:capture ✓",
+    "expected": "cash captured"
+   },
+   {
+    "op": "Order.Complete",
+    "http": "POST /orders/{orderId}/complete",
+    "actor": "cashier-1 · order:complete ✓",
+    "expected": "COMPLETED"
+   },
+   {
+    "op": "Session.XReport",
+    "http": "GET /sessions/{sessionId}/x-report",
+    "actor": "cashier-1 · session:xreport ✓",
+    "expected": "live X"
+   },
+   {
+    "op": "Session.Close",
+    "http": "POST /sessions/{sessionId}/close",
+    "actor": "cashier-1 · session:close ✓",
+    "expected": "closed with count; variance per policy"
+   }
+  ]
+ },
+ {
+  "id": "J-A1-15",
+  "journey": "J-A1",
+  "group": "Phase G",
+  "groupTitle": "First sale and first close",
+  "groupTitleAr": "أول بيعة وأول قفلة",
+  "step": 15,
+  "who": "manager-1",
+  "do_en": "As the manager, run the daily sales and tenders reports for today.",
+  "do_ar": "كمدير، شغّل تقرير مبيعات اليوم وتقرير وسائل الدفع.",
+  "expect_en": "Daily sales shows the one order; tenders shows gross captured, refunded and net collected equal to the Z.",
+  "expect_ar": "المبيعات تعرض الطلب الوحيد، ووسائل الدفع تعرض الإجمالي والمرتجع والصافي زي تقرير Z.",
+  "note": "",
+  "operations": [
+   {
+    "op": "Session.ZReport",
+    "http": "GET /sessions/{sessionId}/z-report",
+    "actor": "manager-1 · session:zreport ✓",
+    "expected": "frozen Z"
+   },
+   {
+    "op": "Report.Run",
+    "http": "GET /reports/{reportId}",
+    "actor": "manager-1 · report:run ✓",
+    "expected": "daily_sales and tenders (W8)"
+   }
+  ]
+ },
+ {
+  "id": "J-A1-16",
+  "journey": "J-A1",
+  "group": "Phase H",
+  "groupTitle": "Backup drill and handover",
+  "groupTitleAr": "تجربة النسخ الاحتياطي والتسليم",
+  "step": 16,
+  "who": "implementation-engineer",
+  "do_en": "Take a backup, restore it to a scratch database, and prove the restored install reaches readiness and shows the first sale. Record the measured RPO and RTO in the handover (W12 docs/29).",
+  "do_ar": "خد نسخة احتياطية، رجّعها على قاعدة تجربة، واتأكد إنها جاهزة وفيها أول بيعة. سجّل الأرقام في محضر التسليم.",
+  "expect_en": "Restored readiness 200; the first order and the Z are present and identical.",
+  "expect_ar": "الجاهزية بعد الاسترجاع 200، وأول طلب وتقرير Z موجودين زي ما هم.",
+  "note": "",
+  "operations": [
+   {
+    "op": "Health.Ready",
+    "http": "GET /health/ready",
+    "actor": "implementation-engineer · PUBLIC",
+    "expected": "200 on the restored database"
+   },
+   {
+    "op": "Order.Find",
+    "http": "GET /orders",
+    "actor": "manager-1 · order:read ✓",
+    "expected": "the first order"
+   }
+  ]
+ },
+ {
+  "id": "J-A1-17",
+  "journey": "J-A1",
+  "group": "Phase H",
+  "groupTitle": "Backup drill and handover",
+  "groupTitleAr": "تجربة النسخ الاحتياطي والتسليم",
+  "step": 17,
+  "who": "implementation-engineer",
+  "do_en": "Train each role with the operator walkthrough J-R1..J-R4 and the negative controls N1..N12 on the client install, then hand over: owner credentials issued, profile questions answered or recorded.",
+  "do_ar": "درّب كل صلاحية على رحلات J-R1 لـ J-R4 والاختبارات السلبية N1 لـ N12، وبعدها سلّم: بيانات المالك اتسلمت، وأسئلة الملف اتجاوبت أو اتسجلت.",
+  "expect_en": "Signed handover sheet; open expert questions listed with their owner.",
+  "expect_ar": "محضر تسليم متوقّع، والأسئلة المفتوحة متسجلة باسم المسؤول عنها.",
+  "note": "",
+  "operations": []
+ },
+ {
+  "id": "J-R1-1",
+  "journey": "J-R1",
+  "group": "J-R1",
+  "groupTitle": "Dine-in service with two rounds, a line void, a split and a shift handover",
+  "groupTitleAr": "رحلة صالة كاملة: جولتين للمطبخ، إلغاء صنف بموافقة مدير، تقسيم الشيك، وتسليم وردية",
+  "step": 1,
+  "who": "demo-manager-1 on DEMO-ADMIN-1 · setup (no L1 screen: S-ADMIN is L2; use the API client of NP-R-13)",
+  "do_en": "Create table \"13\" (area Terrace, capacity 4). Then try to create a table named \"7\".",
+  "do_ar": "أنشئ ترابيزة \"13\" (منطقة Terrace، سعة 4). بعدها حاول تنشئ ترابيزة اسمها \"7\".",
+  "expect_en": "Table 13 appears in the table list. The second attempt is refused: the name is taken (table 7 is provisioned).",
+  "expect_ar": "ترابيزة 13 تظهر في القائمة. المحاولة التانية تترفض لأن الاسم مستخدم (ترابيزة 7 موجودة من التجهيز).",
+  "note": "Note: The journey says \"creates table 7\"; table 7 is provisioned (NP-D-11), so this step proves Table.Create with 13 and the per-branch name guard with 7.",
+  "operations": [
+   {
+    "op": "Table.Create",
+    "http": "POST /tables",
+    "actor": "demo-manager-1 · table:upsert ✓",
+    "expected": "201, table 13 ACTIVE, version 1"
+   },
+   {
+    "op": "Table.Create",
+    "http": "POST /tables",
+    "actor": "demo-manager-1 · table:upsert ✓",
+    "expected": "second call rejected; nothing written · TABLE_NAME_TAKEN 409 FIX_AND_RESUBMIT"
+   },
+   {
+    "op": "Table.List",
+    "http": "GET /tables",
+    "actor": "demo-manager-1 · table:read ✓",
+    "expected": "13 tables, including 7 and 13"
+   }
+  ]
+ },
+ {
+  "id": "J-R1-2",
+  "journey": "J-R1",
+  "group": "J-R1",
+  "groupTitle": "Dine-in service with two rounds, a line void, a split and a shift handover",
+  "groupTitleAr": "رحلة صالة كاملة: جولتين للمطبخ، إلغاء صنف بموافقة مدير، تقسيم الشيك، وتسليم وردية",
+  "step": 2,
+  "who": "demo-manager-1 on DEMO-ADMIN-1 · setup (no L1 screen: S-ADMIN is L2; use the API client of NP-R-13)",
+  "do_en": "Create station \"PASTRY\". Create a routing rule: priority 5, match product Om Ali, station PASTRY.",
+  "do_ar": "أنشئ محطة \"PASTRY\". أنشئ قاعدة توجيه: أولوية 5، الصنف أم علي، المحطة PASTRY.",
+  "expect_en": "The rule list shows priority 5 (Om Ali → PASTRY) first, then the provisioned rules 10…50 and the catch-all 1000 → GRILL.",
+  "expect_ar": "قائمة القواعد تبدأ بأولوية 5 (أم علي ← PASTRY)، بعدها القواعد المجهزة 10 لـ 50، وفي الآخر القاعدة العامة 1000 ← GRILL.",
+  "note": "",
+  "operations": [
+   {
+    "op": "KitchenStation.Create",
+    "http": "POST /kitchen/stations",
+    "actor": "demo-manager-1 · kitchen:configure ✓",
+    "expected": "201, station PASTRY ACTIVE"
+   },
+   {
+    "op": "RoutingRule.Create",
+    "http": "POST /kitchen/routing-rules",
+    "actor": "demo-manager-1 · kitchen:configure ✓",
+    "expected": "201, rule priority 5, match {productId: Om Ali}"
+   },
+   {
+    "op": "RoutingRule.List",
+    "http": "GET /kitchen/routing-rules",
+    "actor": "demo-manager-1 · kitchen:read ✓",
+    "expected": "ascending priority; ties (none here) by id (E-30)"
+   }
+  ]
+ },
+ {
+  "id": "J-R1-3",
+  "journey": "J-R1",
+  "group": "J-R1",
+  "groupTitle": "Dine-in service with two rounds, a line void, a split and a shift handover",
+  "groupTitleAr": "رحلة صالة كاملة: جولتين للمطبخ، إلغاء صنف بموافقة مدير، تقسيم الشيك، وتسليم وردية",
+  "step": 3,
+  "who": "demo-cashier-a on DEMO-CASH-1 · S-LOGIN → S22",
+  "do_en": "Log in as demo-cashier-a (credential from the environment, never written in the script). Open the shift with opening float 500.00.",
+  "do_ar": "سجّل دخول بـ demo-cashier-a (كلمة السر من البيئة، ما تتكتبش في السكريبت). افتح الوردية برصيد افتتاحي 500.00.",
+  "expect_en": "Before opening: \"no open shift\". After: shift OPEN on DEMO-CASH-1; the float shown is the server value 500.00.",
+  "expect_ar": "قبل الفتح: \"مفيش وردية مفتوحة\". بعد الفتح: الوردية OPEN على DEMO-CASH-1، والرصيد المعروض هو قيمة السيرفر 500.00.",
+  "note": "",
+  "operations": [
+   {
+    "op": "Auth.Login",
+    "http": "POST /auth/login",
+    "actor": "demo-cashier-a · PUBLIC",
+    "expected": "authenticated; terminal DEMO-CASH-1"
+   },
+   {
+    "op": "Access.Me",
+    "http": "GET /auth/me",
+    "actor": "demo-cashier-a · AUTHENTICATED",
+    "expected": "Demo Cashier, Demo Main Branch"
+   },
+   {
+    "op": "Session.Current",
+    "http": "GET /sessions/current",
+    "actor": "demo-cashier-a · session:read ✓",
+    "expected": "200 {status: NO_OPEN_SESSION} (accepted runtime, sessions/queries.ts): the \"open shift\" state, not an error"
+   },
+   {
+    "op": "Session.Open",
+    "http": "POST /sessions",
+    "actor": "demo-cashier-a · session:open ✓",
+    "expected": "201, session OPEN, openingFloat 500.0000"
+   }
+  ]
+ },
+ {
+  "id": "J-R1-4",
+  "journey": "J-R1",
+  "group": "J-R1",
+  "groupTitle": "Dine-in service with two rounds, a line void, a split and a shift handover",
+  "groupTitleAr": "رحلة صالة كاملة: جولتين للمطبخ، إلغاء صنف بموافقة مدير، تقسيم الشيك، وتسليم وردية",
+  "step": 4,
+  "who": "demo-waiter-1 on DEMO-FLOOR-1 · S-LOGIN → S25 → S12",
+  "do_en": "Log in as demo-waiter-1 on the floor tablet. On the floor map tap table 7, then \"Open table\".",
+  "do_ar": "سجّل دخول بـ demo-waiter-1 على تابلت الصالة. في خريطة الصالة اضغط ترابيزة 7، بعدها \"فتح الترابيزة\".",
+  "expect_en": "Table 7 turns occupied. No shift or drawer is asked for on this tablet.",
+  "expect_ar": "ترابيزة 7 تبقى مشغولة. التابلت ما يطلبش وردية ولا درج.",
+  "note": "",
+  "operations": [
+   {
+    "op": "Auth.Login",
+    "http": "POST /auth/login",
+    "actor": "demo-waiter-1 · PUBLIC",
+    "expected": "authenticated; terminal DEMO-FLOOR-1 (no drawer)"
+   },
+   {
+    "op": "Table.List",
+    "http": "GET /tables",
+    "actor": "demo-waiter-1 · table:read ✓",
+    "expected": "tables of the branch"
+   },
+   {
+    "op": "TableVisit.List",
+    "http": "GET /table-visits",
+    "actor": "demo-waiter-1 · table:read ✓",
+    "expected": "no open visit on 7"
+   },
+   {
+    "op": "TableVisit.Open",
+    "http": "POST /tables/{tableId}/visits",
+    "actor": "demo-waiter-1 · table:assign ✓",
+    "expected": "201, visit OPEN on table 7"
+   }
+  ]
+ },
+ {
+  "id": "J-R1-5",
+  "journey": "J-R1",
+  "group": "J-R1",
+  "groupTitle": "Dine-in service with two rounds, a line void, a split and a shift handover",
+  "groupTitleAr": "رحلة صالة كاملة: جولتين للمطبخ، إلغاء صنف بموافقة مدير، تقسيم الشيك، وتسليم وردية",
+  "step": 5,
+  "who": "demo-waiter-1 on DEMO-FLOOR-1 · S12 → S15",
+  "do_en": "Tap \"New check\".",
+  "do_ar": "اضغط \"شيك جديد\".",
+  "expect_en": "Order entry opens with an empty cart and the server's check number.",
+  "expect_ar": "شاشة الطلب تفتح بسلة فاضية ورقم الشيك من السيرفر.",
+  "note": "",
+  "operations": [
+   {
+    "op": "Order.Create",
+    "http": "POST /orders",
+    "actor": "demo-waiter-1 · order:create ✓",
+    "expected": "201, DINE_IN, DRAFT, visitId = table 7 visit, sessionId null (floor check: FloorIntakePolicy DINE_IN = FLOOR_WITHOUT_DRAWER)"
+   },
+   {
+    "op": "tables.AssertVisitOpen",
+    "http": "internal (no HTTP)",
+    "actor": "demo-waiter-1 · internal",
+    "expected": "visit OPEN (inside the same transaction)"
+   }
+  ]
+ },
+ {
+  "id": "J-R1-6",
+  "journey": "J-R1",
+  "group": "J-R1",
+  "groupTitle": "Dine-in service with two rounds, a line void, a split and a shift handover",
+  "groupTitleAr": "رحلة صالة كاملة: جولتين للمطبخ، إلغاء صنف بموافقة مدير، تقسيم الشيك، وتسليم وردية",
+  "step": 6,
+  "who": "demo-waiter-1 on DEMO-FLOOR-1 · S15",
+  "do_en": "Browse the menu. Add Grilled kofta ×2 (Doneness: Medium), Hummus ×1, Orange juice ×2 (Size: Large). Look at Kunafa.",
+  "do_ar": "تصفح المنيو. ضيف كفتة مشوية ×2 (الاستواء: Medium)، حمص ×1، عصير برتقال ×2 (الحجم: Large). بص على الكنافة.",
+  "expect_en": "5 categories in Arabic and English. Every tile price comes from a server quote. Kunafa shows \"unavailable\" and cannot be added. The size dialog shows \"+0.00\" / \"+10.00\" as server strings; the line price is a server re-quote, never a local sum. Cart lines show the captured prices from the order.",
+  "expect_ar": "5 أقسام بالعربي والإنجليزي. كل سعر على الأصناف جاي من تسعيرة السيرفر. الكنافة مكتوب عليها \"غير متاح\" وما ينفعش تتضاف. شاشة الحجم بتعرض \"+0.00\" و\"+10.00\" زي ما السيرفر بعتها، وسعر السطر تسعيرة جديدة من السيرفر مش جمع على الجهاز. سطور السلة بتعرض الأسعار المسجلة على الطلب.",
+  "note": "Note: Tester reference from the demo price list (for checking only; the UI never computes it): kofta 220.00, hummus 60.00, orange juice Large 60.00 (50.00 + 10.00).",
+  "operations": [
+   {
+    "op": "Category.List",
+    "http": "GET /categories",
+    "actor": "demo-waiter-1 · catalog:read ✓",
+    "expected": "5 active categories"
+   },
+   {
+    "op": "Catalog.Search",
+    "http": "GET /catalog/search",
+    "actor": "demo-waiter-1 · catalog:read ✓",
+    "expected": "products of the category"
+   },
+   {
+    "op": "ModifierGroup.List",
+    "http": "GET /modifier-groups",
+    "actor": "demo-waiter-1 · catalog:read ✓",
+    "expected": "Doneness (SINGLE, min 1), Size (SINGLE, min 1)"
+   },
+   {
+    "op": "Pricing.QuoteItem",
+    "http": "POST /pricing/items/{productId}/quote",
+    "actor": "demo-waiter-1 · catalog:read ✓",
+    "expected": "one quote per visible tile and per dialog change; Kunafa rejected · PRODUCT_UNAVAILABLE 409 FINAL_NEW_INTENT_ONLY"
+   },
+   {
+    "op": "Order.AddLines",
+    "http": "POST /orders/{orderId}/lines",
+    "actor": "demo-waiter-1 · order:addlines ✓",
+    "expected": "200, three lines with captured prices"
+   },
+   {
+    "op": "Order.Get",
+    "http": "GET /orders/{orderId}",
+    "actor": "demo-waiter-1 · order:read ✓",
+    "expected": "the check with its lines and version"
+   }
+  ]
+ },
+ {
+  "id": "J-R1-7",
+  "journey": "J-R1",
+  "group": "J-R1",
+  "groupTitle": "Dine-in service with two rounds, a line void, a split and a shift handover",
+  "groupTitleAr": "رحلة صالة كاملة: جولتين للمطبخ، إلغاء صنف بموافقة مدير، تقسيم الشيك، وتسليم وردية",
+  "step": 7,
+  "who": "demo-waiter-1 on DEMO-FLOOR-1 · S15",
+  "do_en": "Tap \"Send to kitchen\".",
+  "do_ar": "اضغط \"إرسال للمطبخ\".",
+  "expect_en": "Round 1. The three lines show as sent; their edit and remove controls are disabled.",
+  "expect_ar": "الجولة 1. التلات سطور بقوا \"اتبعتوا\"، وأزرار التعديل والحذف عليهم مقفولة.",
+  "note": "",
+  "operations": [
+   {
+    "op": "Order.Fire",
+    "http": "POST /orders/{orderId}/fire",
+    "actor": "demo-waiter-1 · order:fire ✓",
+    "expected": "200, fireRound 1, three lines firedAt set (expectedVersion from Order.Get)"
+   }
+  ]
+ },
+ {
+  "id": "J-R1-8",
+  "journey": "J-R1",
+  "group": "J-R1",
+  "groupTitle": "Dine-in service with two rounds, a line void, a split and a shift handover",
+  "groupTitleAr": "رحلة صالة كاملة: جولتين للمطبخ، إلغاء صنف بموافقة مدير، تقسيم الشيك، وتسليم وردية",
+  "step": 8,
+  "who": "demo-chef-1 on DEMO-KDS-1 · S28",
+  "do_en": "Log in as demo-chef-1. Open the GRILL board, then COLD, then BAR.",
+  "do_ar": "سجّل دخول بـ demo-chef-1. افتح شاشة GRILL، بعدها COLD، بعدها BAR.",
+  "expect_en": "GRILL: round 1, Grilled kofta ×2 Medium. COLD: Hummus ×1. BAR: Orange juice ×2 Large. One ticket per station for round 1.",
+  "expect_ar": "GRILL: الجولة 1، كفتة مشوية ×2 Medium. COLD: حمص ×1. BAR: عصير برتقال ×2 Large. تذكرة واحدة لكل محطة في الجولة 1.",
+  "note": "Note: Tickets are created by the worker after the Fire commit; allow the worker poll interval before judging.",
+  "operations": [
+   {
+    "op": "kitchen.fire-round",
+    "http": "internal (no HTTP)",
+    "actor": "demo-chef-1 · internal",
+    "expected": "consumes OrderFired once; routes by rule (mains 50 → GRILL, starters 30 → COLD, cold 20 → BAR)"
+   },
+   {
+    "op": "orders.FiredRoundLines",
+    "http": "internal (no HTTP)",
+    "actor": "demo-chef-1 · internal",
+    "expected": "the round-1 lines"
+   },
+   {
+    "op": "KitchenStation.List",
+    "http": "GET /kitchen/stations",
+    "actor": "demo-chef-1 · kitchen:read ✓",
+    "expected": "GRILL, COLD, BAR, PASTRY"
+   },
+   {
+    "op": "Kitchen.Board",
+    "http": "GET /kitchen/board",
+    "actor": "demo-chef-1 · kitchen:read ✓",
+    "expected": "QUEUED tickets per station"
+   }
+  ]
+ },
+ {
+  "id": "J-R1-9",
+  "journey": "J-R1",
+  "group": "J-R1",
+  "groupTitle": "Dine-in service with two rounds, a line void, a split and a shift handover",
+  "groupTitleAr": "رحلة صالة كاملة: جولتين للمطبخ، إلغاء صنف بموافقة مدير، تقسيم الشيك، وتسليم وردية",
+  "step": 9,
+  "who": "demo-waiter-1 on DEMO-FLOOR-1 · S15",
+  "do_en": "Add Om Ali ×1, Tea ×2 (Size: Regular) and Green salad ×1. Change Tea to 3. Remove Green salad. Try to change the kofta quantity.",
+  "do_ar": "ضيف أم علي ×1، شاي ×2 (الحجم: Regular)، سلطة خضراء ×1. غيّر الشاي لـ 3. امسح السلطة. حاول تغيّر كمية الكفتة.",
+  "expect_en": "Om Ali ×1 and Tea ×3 remain unsent. The salad is gone. The kofta line cannot be edited (sent).",
+  "expect_ar": "أم علي ×1 وشاي ×3 لسه ما اتبعتوش. السلطة اتشالت. سطر الكفتة ما ينفعش يتعدل لأنه اتبعت.",
+  "note": "",
+  "operations": [
+   {
+    "op": "Order.AddLines",
+    "http": "POST /orders/{orderId}/lines",
+    "actor": "demo-waiter-1 · order:addlines ✓",
+    "expected": "200, three new unfired lines"
+   },
+   {
+    "op": "Order.UpdateLine",
+    "http": "PATCH /orders/{orderId}/lines/{lineId}",
+    "actor": "demo-waiter-1 · order:updateline ✓",
+    "expected": "200, tea quantity 3"
+   },
+   {
+    "op": "Order.RemoveLine",
+    "http": "DELETE /orders/{orderId}/lines/{lineId}",
+    "actor": "demo-waiter-1 · order:removeline ✓",
+    "expected": "200, salad removed (unfired only)"
+   },
+   {
+    "op": "Order.UpdateLine",
+    "http": "PATCH /orders/{orderId}/lines/{lineId}",
+    "actor": "demo-waiter-1 · order:updateline ✓",
+    "expected": "only if forced through the API: rejected, nothing written · LINE_ALREADY_FIRED 409 FINAL_NEW_INTENT_ONLY"
+   }
+  ]
+ },
+ {
+  "id": "J-R1-10",
+  "journey": "J-R1",
+  "group": "J-R1",
+  "groupTitle": "Dine-in service with two rounds, a line void, a split and a shift handover",
+  "groupTitleAr": "رحلة صالة كاملة: جولتين للمطبخ، إلغاء صنف بموافقة مدير، تقسيم الشيك، وتسليم وردية",
+  "step": 10,
+  "who": "demo-waiter-1 on DEMO-FLOOR-1 · S15 (then S28)",
+  "do_en": "Tap \"Send to kitchen\" again.",
+  "do_ar": "اضغط \"إرسال للمطبخ\" تاني.",
+  "expect_en": "Round 2 contains only Om Ali ×1 and Tea ×3. On the KDS: PASTRY shows Om Ali (rule 5 wins over desserts 40), BAR shows Tea ×3; round-1 tickets are unchanged.",
+  "expect_ar": "الجولة 2 فيها أم علي ×1 وشاي ×3 بس. في المطبخ: PASTRY تعرض أم علي (قاعدة 5 بتغلب قاعدة الحلويات 40)، وBAR تعرض شاي ×3. تذاكر الجولة 1 زي ما هي.",
+  "note": "",
+  "operations": [
+   {
+    "op": "Order.Fire",
+    "http": "POST /orders/{orderId}/fire",
+    "actor": "demo-waiter-1 · order:fire ✓",
+    "expected": "200, fireRound 2, only the new lines"
+   }
+  ]
+ },
+ {
+  "id": "J-R1-11",
+  "journey": "J-R1",
+  "group": "J-R1",
+  "groupTitle": "Dine-in service with two rounds, a line void, a split and a shift handover",
+  "groupTitleAr": "رحلة صالة كاملة: جولتين للمطبخ، إلغاء صنف بموافقة مدير، تقسيم الشيك، وتسليم وردية",
+  "step": 11,
+  "who": "demo-chef-1 on DEMO-KDS-1 · S28",
+  "do_en": "On GRILL, start the round-1 kofta ticket.",
+  "do_ar": "في GRILL، ابدأ تذكرة الكفتة بتاعة الجولة 1.",
+  "expect_en": "The ticket moves from QUEUED to STARTED.",
+  "expect_ar": "التذكرة بتتحول من QUEUED لـ STARTED.",
+  "note": "",
+  "operations": [
+   {
+    "op": "Kitchen.AdvanceTicket",
+    "http": "POST /kitchen/tickets/{ticketId}/advance",
+    "actor": "demo-chef-1 · kitchen:advanceticket ✓",
+    "expected": "200, QUEUED → STARTED (forward transitions only, CAS)"
+   }
+  ]
+ },
+ {
+  "id": "J-R1-12",
+  "journey": "J-R1",
+  "group": "J-R1",
+  "groupTitle": "Dine-in service with two rounds, a line void, a split and a shift handover",
+  "groupTitleAr": "رحلة صالة كاملة: جولتين للمطبخ، إلغاء صنف بموافقة مدير، تقسيم الشيك، وتسليم وردية",
+  "step": 12,
+  "who": "demo-waiter-1 on DEMO-FLOOR-1 · S15 → S-VOID",
+  "do_en": "Select the sent Hummus line, tap \"Void\", choose reason WRONG_ITEM. When the approval dialog opens, demo-manager-1 picks their name and enters their PIN on the tablet.",
+  "do_ar": "اختار سطر الحمص اللي اتبعت، اضغط \"إلغاء\"، واختار السبب WRONG_ITEM. لما شاشة الموافقة تفتح، demo-manager-1 يختار اسمه ويكتب الـ PIN بتاعه على التابلت.",
+  "expect_en": "The approval dialog appears without an error banner. After approval the Hummus line is shown voided and the server total no longer includes it. COLD shows the hummus line cancelled.",
+  "expect_ar": "شاشة الموافقة تظهر من غير رسالة خطأ. بعد الموافقة سطر الحمص يظهر ملغي، والإجمالي من السيرفر ما بقاش فيه. محطة COLD تعرض سطر الحمص ملغي.",
+  "note": "Approver: demo-manager-1 · approve:line_void ✓ (not the requester)",
+  "operations": [
+   {
+    "op": "Order.VoidLine",
+    "http": "POST /orders/{orderId}/lines/{lineId}/void",
+    "actor": "demo-waiter-1 · order:voidline ✓",
+    "expected": "first call without a grant: approval needed; nothing written · APPROVAL_REQUIRED 403 APPROVAL_FLOW_SAME_ID"
+   },
+   {
+    "op": "Approval.Grant",
+    "http": "POST /approvals",
+    "actor": "demo-waiter-1 · approval:grant ✓",
+    "expected": "201, grant bound to {order, line, version, WRONG_ITEM, line amount}, expires per ApprovalTtlPolicy (120 s)"
+   },
+   {
+    "op": "Order.VoidLine",
+    "http": "POST /orders/{orderId}/lines/{lineId}/void",
+    "actor": "demo-waiter-1 · order:voidline ✓",
+    "expected": "same X-Command-Id resubmitted with approvalGrantId: 200, line VOIDED, grant consumed"
+   },
+   {
+    "op": "kitchen.order-ended",
+    "http": "internal (no HTTP)",
+    "actor": "demo-waiter-1 · internal",
+    "expected": "OrderLineVoided: the COLD ticket line becomes CANCELLED (not started)"
+   }
+  ]
+ },
+ {
+  "id": "J-R1-13",
+  "journey": "J-R1",
+  "group": "J-R1",
+  "groupTitle": "Dine-in service with two rounds, a line void, a split and a shift handover",
+  "groupTitleAr": "رحلة صالة كاملة: جولتين للمطبخ، إلغاء صنف بموافقة مدير، تقسيم الشيك، وتسليم وردية",
+  "step": 13,
+  "who": "demo-waiter-1 on DEMO-FLOOR-1 · S-SPLIT",
+  "do_en": "Open \"Split\". Create a second check on table 7. Move Orange juice ×2 and Tea ×3 to it.",
+  "do_ar": "افتح \"تقسيم\". اعمل شيك تاني على ترابيزة 7. انقل عصير البرتقال ×2 والشاي ×3 ليه.",
+  "expect_en": "Table 7 has two checks. Check 1: kofta ×2, hummus (voided), Om Ali. Check 2: orange juice ×2, tea ×3.",
+  "expect_ar": "ترابيزة 7 عليها شيكين. الشيك 1: كفتة ×2، حمص (ملغي)، أم علي. الشيك 2: عصير برتقال ×2، شاي ×3.",
+  "note": "",
+  "operations": [
+   {
+    "op": "Order.Create",
+    "http": "POST /orders",
+    "actor": "demo-waiter-1 · order:create ✓",
+    "expected": "201, second floor check on the same visit (CheckCompositionPolicy VISIT_MULTI_CHECK)"
+   },
+   {
+    "op": "Order.MoveLines",
+    "http": "POST /orders/{orderId}/lines/move",
+    "actor": "demo-waiter-1 · order:updateline ✓",
+    "expected": "200, both orders updated with CAS; fire rounds kept"
+   },
+   {
+    "op": "Order.Find",
+    "http": "GET /orders",
+    "actor": "demo-waiter-1 · order:read ✓",
+    "expected": "two checks for the visit"
+   }
+  ]
+ },
+ {
+  "id": "J-R1-14",
+  "journey": "J-R1",
+  "group": "J-R1",
+  "groupTitle": "Dine-in service with two rounds, a line void, a split and a shift handover",
+  "groupTitleAr": "رحلة صالة كاملة: جولتين للمطبخ، إلغاء صنف بموافقة مدير، تقسيم الشيك، وتسليم وردية",
+  "step": 14,
+  "who": "demo-cashier-a on DEMO-CASH-1 · S16",
+  "do_en": "On the cashier station open table 7, choose check 2, tap \"Confirm\".",
+  "do_ar": "على الكاشير افتح ترابيزة 7، اختار الشيك 2، واضغط \"تأكيد\".",
+  "expect_en": "Check 2 CONFIRMED. Subtotal, tax and total are shown exactly as returned by the server.",
+  "expect_ar": "الشيك 2 اتأكد (CONFIRMED). المجموع والضريبة والإجمالي معروضين زي ما السيرفر رجّعهم بالظبط.",
+  "note": "",
+  "operations": [
+   {
+    "op": "Order.Find",
+    "http": "GET /orders",
+    "actor": "demo-cashier-a · order:read ✓",
+    "expected": "the visit's checks"
+   },
+   {
+    "op": "Order.Confirm",
+    "http": "POST /orders/{orderId}/confirm",
+    "actor": "demo-cashier-a · order:confirm ✓",
+    "expected": "200, CONFIRMED, server totals"
+   }
+  ]
+ },
+ {
+  "id": "J-R1-15",
+  "journey": "J-R1",
+  "group": "J-R1",
+  "groupTitle": "Dine-in service with two rounds, a line void, a split and a shift handover",
+  "groupTitleAr": "رحلة صالة كاملة: جولتين للمطبخ، إلغاء صنف بموافقة مدير، تقسيم الشيك، وتسليم وردية",
+  "step": 15,
+  "who": "demo-cashier-a on DEMO-CASH-1 · S16",
+  "do_en": "Pay check 2 in cash: type the received amount (any amount at or above the total, e.g. 300.00).",
+  "do_ar": "ادفع الشيك 2 كاش: اكتب المبلغ المستلم (أي مبلغ يساوي الإجمالي أو أكتر، مثلًا 300.00).",
+  "expect_en": "The change shown is the server's change value. The settlement shows nothing remaining.",
+  "expect_ar": "الباقي المعروض هو قيمة الباقي من السيرفر. التسوية بتقول إن مفيش مبلغ متبقي.",
+  "note": "",
+  "operations": [
+   {
+    "op": "Payment.GetSettlement",
+    "http": "GET /orders/{orderId}/settlement",
+    "actor": "demo-cashier-a · payment:read ✓",
+    "expected": "remaining amount (the cash tender amount is this server value)"
+   },
+   {
+    "op": "Payment.Capture",
+    "http": "POST /orders/{orderId}/payments",
+    "actor": "demo-cashier-a · payment:capture ✓",
+    "expected": "201, CASH capture; tendered and change computed by the server"
+   },
+   {
+    "op": "Payment.GetSettlement",
+    "http": "GET /orders/{orderId}/settlement",
+    "actor": "demo-cashier-a · payment:read ✓",
+    "expected": "settled"
+   }
+  ]
+ },
+ {
+  "id": "J-R1-16",
+  "journey": "J-R1",
+  "group": "J-R1",
+  "groupTitle": "Dine-in service with two rounds, a line void, a split and a shift handover",
+  "groupTitleAr": "رحلة صالة كاملة: جولتين للمطبخ، إلغاء صنف بموافقة مدير، تقسيم الشيك، وتسليم وردية",
+  "step": 16,
+  "who": "demo-cashier-a on DEMO-CASH-1 · S16",
+  "do_en": "Tap \"Complete\".",
+  "do_ar": "اضغط \"إنهاء\".",
+  "expect_en": "Check 2 COMPLETED. Table 7 stays occupied because check 1 is still open.",
+  "expect_ar": "الشيك 2 خلص (COMPLETED). ترابيزة 7 لسه مشغولة لأن الشيك 1 مفتوح.",
+  "note": "",
+  "operations": [
+   {
+    "op": "Order.Complete",
+    "http": "POST /orders/{orderId}/complete",
+    "actor": "demo-cashier-a · order:complete ✓",
+    "expected": "200, COMPLETED"
+   }
+  ]
+ },
+ {
+  "id": "J-R1-17",
+  "journey": "J-R1",
+  "group": "J-R1",
+  "groupTitle": "Dine-in service with two rounds, a line void, a split and a shift handover",
+  "groupTitleAr": "رحلة صالة كاملة: جولتين للمطبخ، إلغاء صنف بموافقة مدير، تقسيم الشيك، وتسليم وردية",
+  "step": 17,
+  "who": "demo-cashier-a on DEMO-CASH-1 · S22",
+  "do_en": "Open the X report. Then close the shift: count the drawer and type the counted amount (500.00 float + the check 2 cash amount).",
+  "do_ar": "افتح تقرير X. بعدها اقفل الوردية: عِد الدرج واكتب المبلغ المعدود (500.00 رصيد افتتاحي + كاش الشيك 2).",
+  "expect_en": "X: a CASH line equal to check 2's capture and no card line; expected cash is hidden until the count (blind close). The close succeeds while check 1 is still open; variance 0.00 from the server.",
+  "expect_ar": "تقرير X: سطر كاش بقيمة دفع الشيك 2 ومفيش سطر كارت، والكاش المتوقع مخفي لحد العد (إقفال أعمى). الإقفال بينجح والشيك 1 لسه مفتوح، والفرق 0.00 من السيرفر.",
+  "note": "Note: A counted amount that differs triggers the SESSION_VARIANCE approval (threshold 0.00); that path is not part of this walkthrough.",
+  "operations": [
+   {
+    "op": "Session.XReport",
+    "http": "GET /sessions/{sessionId}/x-report",
+    "actor": "demo-cashier-a · session:xreport ✓",
+    "expected": "tenderBreakdown CASH only; expectedCash absent (BlindClosePolicy default)"
+   },
+   {
+    "op": "Session.Close",
+    "http": "POST /sessions/{sessionId}/close",
+    "actor": "demo-cashier-a · session:close ✓",
+    "expected": "200, CLOSED, variance 0.00; the floor check (sessionId null) does not block (docs/15 §5)"
+   }
+  ]
+ },
+ {
+  "id": "J-R1-18",
+  "journey": "J-R1",
+  "group": "J-R1",
+  "groupTitle": "Dine-in service with two rounds, a line void, a split and a shift handover",
+  "groupTitleAr": "رحلة صالة كاملة: جولتين للمطبخ، إلغاء صنف بموافقة مدير، تقسيم الشيك، وتسليم وردية",
+  "step": 18,
+  "who": "demo-cashier-b on DEMO-CASH-1 · S-LOGIN → S22",
+  "do_en": "demo-cashier-a logs out. demo-cashier-b logs in and opens a shift with float 500.00.",
+  "do_ar": "demo-cashier-a يعمل تسجيل خروج. demo-cashier-b يسجّل دخول ويفتح وردية برصيد 500.00.",
+  "expect_en": "\"No open shift\", then a new OPEN shift for cashier B.",
+  "expect_ar": "\"مفيش وردية مفتوحة\"، بعدها وردية جديدة مفتوحة لكاشير B.",
+  "note": "",
+  "operations": [
+   {
+    "op": "Auth.Logout",
+    "http": "POST /auth/logout",
+    "actor": "demo-cashier-a · AUTHENTICATED",
+    "expected": "cashier A signed out"
+   },
+   {
+    "op": "Auth.Login",
+    "http": "POST /auth/login",
+    "actor": "demo-cashier-b · PUBLIC",
+    "expected": "cashier B on DEMO-CASH-1"
+   },
+   {
+    "op": "Session.Current",
+    "http": "GET /sessions/current",
+    "actor": "demo-cashier-b · session:read ✓",
+    "expected": "200 {status: NO_OPEN_SESSION}"
+   },
+   {
+    "op": "Session.Open",
+    "http": "POST /sessions",
+    "actor": "demo-cashier-b · session:open ✓",
+    "expected": "201, OPEN, openingFloat 500.0000"
+   }
+  ]
+ },
+ {
+  "id": "J-R1-19",
+  "journey": "J-R1",
+  "group": "J-R1",
+  "groupTitle": "Dine-in service with two rounds, a line void, a split and a shift handover",
+  "groupTitleAr": "رحلة صالة كاملة: جولتين للمطبخ، إلغاء صنف بموافقة مدير، تقسيم الشيك، وتسليم وردية",
+  "step": 19,
+  "who": "demo-cashier-b on DEMO-CASH-1 · S16",
+  "do_en": "Open table 7, choose check 1, tap \"Confirm\".",
+  "do_ar": "افتح ترابيزة 7، اختار الشيك 1، واضغط \"تأكيد\".",
+  "expect_en": "Check 1 CONFIRMED by cashier B. The voided hummus is not in the server total.",
+  "expect_ar": "الشيك 1 اتأكد من كاشير B. الحمص الملغي مش داخل في إجمالي السيرفر.",
+  "note": "",
+  "operations": [
+   {
+    "op": "Order.Find",
+    "http": "GET /orders",
+    "actor": "demo-cashier-b · order:read ✓",
+    "expected": "the open check of the visit"
+   },
+   {
+    "op": "Order.Confirm",
+    "http": "POST /orders/{orderId}/confirm",
+    "actor": "demo-cashier-b · order:confirm ✓",
+    "expected": "200, CONFIRMED, server totals"
+   }
+  ]
+ },
+ {
+  "id": "J-R1-20",
+  "journey": "J-R1",
+  "group": "J-R1",
+  "groupTitle": "Dine-in service with two rounds, a line void, a split and a shift handover",
+  "groupTitleAr": "رحلة صالة كاملة: جولتين للمطبخ، إلغاء صنف بموافقة مدير، تقسيم الشيك، وتسليم وردية",
+  "step": 20,
+  "who": "demo-cashier-b on DEMO-CASH-1 · S16",
+  "do_en": "Pay 200.00 in cash (received 200.00). For the rest choose Card and type reference DEMO-REF-0001.",
+  "do_ar": "ادفع 200.00 كاش (المستلم 200.00). والباقي اختار كارت واكتب المرجع DEMO-REF-0001.",
+  "expect_en": "Two payments: cash 200.00 and card \"recorded, ref DEMO-REF-0001\" for the remaining amount the server returned. Nothing remaining.",
+  "expect_ar": "دفعتين: كاش 200.00 وكارت \"مسجّل، مرجع DEMO-REF-0001\" بالمبلغ المتبقي اللي السيرفر رجّعه. مفيش متبقي.",
+  "note": "Note: Split tender is allowed by default (SplitTenderPolicy true; TenderMethodPolicy enables CASH and CARD).",
+  "operations": [
+   {
+    "op": "Payment.Capture",
+    "http": "POST /orders/{orderId}/payments",
+    "actor": "demo-cashier-b · payment:capture ✓",
+    "expected": "201, CASH 200.0000"
+   },
+   {
+    "op": "Payment.GetSettlement",
+    "http": "GET /orders/{orderId}/settlement",
+    "actor": "demo-cashier-b · payment:read ✓",
+    "expected": "remaining (server value used as the card amount)"
+   },
+   {
+    "op": "Payment.Capture",
+    "http": "POST /orders/{orderId}/payments",
+    "actor": "demo-cashier-b · payment:capture ✓",
+    "expected": "201, CARD with tenderReference (recorded, no provider)"
+   }
+  ]
+ },
+ {
+  "id": "J-R1-21",
+  "journey": "J-R1",
+  "group": "J-R1",
+  "groupTitle": "Dine-in service with two rounds, a line void, a split and a shift handover",
+  "groupTitleAr": "رحلة صالة كاملة: جولتين للمطبخ، إلغاء صنف بموافقة مدير، تقسيم الشيك، وتسليم وردية",
+  "step": 21,
+  "who": "demo-cashier-b on DEMO-CASH-1 · S16",
+  "do_en": "Tap \"Complete\".",
+  "do_ar": "اضغط \"إنهاء\".",
+  "expect_en": "Check 1 COMPLETED.",
+  "expect_ar": "الشيك 1 خلص (COMPLETED).",
+  "note": "",
+  "operations": [
+   {
+    "op": "Order.Complete",
+    "http": "POST /orders/{orderId}/complete",
+    "actor": "demo-cashier-b · order:complete ✓",
+    "expected": "200, COMPLETED"
+   }
+  ]
+ },
+ {
+  "id": "J-R1-22",
+  "journey": "J-R1",
+  "group": "J-R1",
+  "groupTitle": "Dine-in service with two rounds, a line void, a split and a shift handover",
+  "groupTitleAr": "رحلة صالة كاملة: جولتين للمطبخ، إلغاء صنف بموافقة مدير، تقسيم الشيك، وتسليم وردية",
+  "step": 22,
+  "who": "demo-waiter-1 on DEMO-FLOOR-1 · S25",
+  "do_en": "On the floor map open table 7 and tap \"Close table\".",
+  "do_ar": "في خريطة الصالة افتح ترابيزة 7 واضغط \"قفل الترابيزة\".",
+  "expect_en": "Table 7 is free again.",
+  "expect_ar": "ترابيزة 7 بقت فاضية.",
+  "note": "",
+  "operations": [
+   {
+    "op": "TableVisit.Close",
+    "http": "POST /table-visits/{visitId}/close",
+    "actor": "demo-waiter-1 · table:release ✓",
+    "expected": "200, visit CLOSED (closing a visit never completes or voids a check, E-31)"
+   }
+  ]
+ },
+ {
+  "id": "J-R1-23",
+  "journey": "J-R1",
+  "group": "J-R1",
+  "groupTitle": "Dine-in service with two rounds, a line void, a split and a shift handover",
+  "groupTitleAr": "رحلة صالة كاملة: جولتين للمطبخ، إلغاء صنف بموافقة مدير، تقسيم الشيك، وتسليم وردية",
+  "step": 23,
+  "who": "demo-cashier-b on DEMO-CASH-1 · S22",
+  "do_en": "Cashier B closes the shift: count the drawer and type 700.00 (500.00 float + 200.00 cash; the card is not in the drawer). Then demo-manager-1 opens the Z report of this shift on DEMO-ADMIN-1.",
+  "do_ar": "كاشير B يقفل الوردية: يعد الدرج ويكتب 700.00 (500.00 رصيد + 200.00 كاش؛ الكارت مش في الدرج). بعدها demo-manager-1 يفتح تقرير Z للوردية دي على DEMO-ADMIN-1.",
+  "expect_en": "Close succeeds with variance 0.00. Z shows CASH 200.00 and CARD (recorded, ref DEMO-REF-0001) as separate lines; expected cash excludes the card.",
+  "expect_ar": "الإقفال ينجح والفرق 0.00. تقرير Z يعرض كاش 200.00 وكارت (مسجّل، مرجع DEMO-REF-0001) في سطرين منفصلين، والكاش المتوقع ما فيهوش الكارت.",
+  "note": "",
+  "operations": [
+   {
+    "op": "Session.Close",
+    "http": "POST /sessions/{sessionId}/close",
+    "actor": "demo-cashier-b · session:close ✓",
+    "expected": "200, CLOSED, variance 0.00"
+   },
+   {
+    "op": "Session.ZReport",
+    "http": "GET /sessions/{sessionId}/z-report",
+    "actor": "demo-manager-1 · session:zreport ✓",
+    "expected": "immutable close snapshot; cash and card separate (docs/15)"
+   }
+  ]
+ },
+ {
+  "id": "J-R2-1",
+  "journey": "J-R2",
+  "group": "J-R2",
+  "groupTitle": "Whole-check void after sending, unpaid",
+  "groupTitleAr": "إلغاء شيك كامل بعد ما اتبعت للمطبخ ومن غير دفع",
+  "step": 1,
+  "who": "demo-waiter-1 on DEMO-FLOOR-1 · S25 → S15 (cashier: S22, S16)",
+  "do_en": "demo-cashier-a opens a new shift on DEMO-CASH-1 (float 500.00). The waiter opens table 3, creates a check, adds Mixed grill ×1 (Well done) and sends it. The cashier confirms the check.",
+  "do_ar": "demo-cashier-a يفتح وردية جديدة على DEMO-CASH-1 (رصيد 500.00). الويتر يفتح ترابيزة 3، يعمل شيك، يضيف مشويات مشكلة ×1 (Well done) ويبعتها. الكاشير يأكد الشيك.",
+  "expect_en": "Check CONFIRMED and unpaid. GRILL shows the mixed grill ticket.",
+  "expect_ar": "الشيك متأكد ومش مدفوع. GRILL تعرض تذكرة المشويات.",
+  "note": "",
+  "operations": [
+   {
+    "op": "Session.Open",
+    "http": "POST /sessions",
+    "actor": "demo-cashier-a · session:open ✓",
+    "expected": "201, OPEN"
+   },
+   {
+    "op": "TableVisit.Open",
+    "http": "POST /tables/{tableId}/visits",
+    "actor": "demo-waiter-1 · table:assign ✓",
+    "expected": "201, visit on table 3"
+   },
+   {
+    "op": "Order.Create",
+    "http": "POST /orders",
+    "actor": "demo-waiter-1 · order:create ✓",
+    "expected": "201, floor check"
+   },
+   {
+    "op": "Order.AddLines",
+    "http": "POST /orders/{orderId}/lines",
+    "actor": "demo-waiter-1 · order:addlines ✓",
+    "expected": "200"
+   },
+   {
+    "op": "Order.Fire",
+    "http": "POST /orders/{orderId}/fire",
+    "actor": "demo-waiter-1 · order:fire ✓",
+    "expected": "200, round 1"
+   },
+   {
+    "op": "Order.Confirm",
+    "http": "POST /orders/{orderId}/confirm",
+    "actor": "demo-cashier-a · order:confirm ✓",
+    "expected": "200, CONFIRMED"
+   }
+  ]
+ },
+ {
+  "id": "J-R2-2",
+  "journey": "J-R2",
+  "group": "J-R2",
+  "groupTitle": "Whole-check void after sending, unpaid",
+  "groupTitleAr": "إلغاء شيك كامل بعد ما اتبعت للمطبخ ومن غير دفع",
+  "step": 2,
+  "who": "demo-manager-1 on DEMO-ADMIN-1 · S-VOID",
+  "do_en": "The guests leave. demo-manager-1 opens the check, taps \"Void check\", chooses CUSTOMER_LEFT and writes a note. demo-manager-2 approves with their own PIN. Then the waiter closes table 3.",
+  "do_ar": "الزباين مشيوا. demo-manager-1 يفتح الشيك، يضغط \"إلغاء الشيك\"، يختار CUSTOMER_LEFT ويكتب ملاحظة. demo-manager-2 يوافق بالـ PIN بتاعه. بعدها الويتر يقفل ترابيزة 3.",
+  "expect_en": "The check is VOIDED. Its lines and totals stay exactly as they were (history); no money moves. The GRILL ticket is cancelled. Table 3 is free.",
+  "expect_ar": "الشيك اتلغى (VOIDED). السطور والإجمالي زي ما هم بالظبط (سجل تاريخي)، ومفيش فلوس اتحركت. تذكرة GRILL اتلغت. ترابيزة 3 فاضية.",
+  "note": "Approver: demo-manager-2 · approve:order_void ✓ (not the requester)",
+  "operations": [
+   {
+    "op": "Order.Get",
+    "http": "GET /orders/{orderId}",
+    "actor": "demo-manager-1 · order:read ✓",
+    "expected": "the confirmed check"
+   },
+   {
+    "op": "Order.Void",
+    "http": "POST /orders/{orderId}/void",
+    "actor": "demo-manager-1 · order:void ✓",
+    "expected": "first call: approval needed; nothing written · APPROVAL_REQUIRED 403 APPROVAL_FLOW_SAME_ID"
+   },
+   {
+    "op": "Approval.Grant",
+    "http": "POST /approvals",
+    "actor": "demo-manager-1 · approval:grant ✓",
+    "expected": "201, ORDER_VOID grant by manager 2 (self-approval is denied: N5)"
+   },
+   {
+    "op": "Order.Void",
+    "http": "POST /orders/{orderId}/void",
+    "actor": "demo-manager-1 · order:void ✓",
+    "expected": "same X-Command-Id with approvalGrantId: 200, VOIDED, snapshot unchanged"
+   },
+   {
+    "op": "kitchen.order-ended",
+    "http": "internal (no HTTP)",
+    "actor": "demo-manager-1 · internal",
+    "expected": "OrderVoided: non-completed tickets CANCELLED"
+   },
+   {
+    "op": "TableVisit.Close",
+    "http": "POST /table-visits/{visitId}/close",
+    "actor": "demo-waiter-1 · table:release ✓",
+    "expected": "200, CLOSED"
+   }
+  ]
+ },
+ {
+  "id": "J-R3-1",
+  "journey": "J-R3",
+  "group": "J-R3",
+  "groupTitle": "Login context, floor and kitchen administration, table transfer",
+  "groupTitleAr": "الدخول والسياق، إدارة الصالة والمطبخ، ونقل ترابيزة",
+  "step": 1,
+  "who": "demo-cashier-a on DEMO-CASH-1 · S-LOGIN",
+  "do_en": "Log in as demo-cashier-a. Read the header (user, branch, terminal, shift). Log out, then try any action from the same page.",
+  "do_ar": "سجّل دخول بـ demo-cashier-a. اقرا الهيدر (المستخدم، الفرع، الجهاز، الوردية). اعمل تسجيل خروج، وبعدها جرّب أي حركة من نفس الصفحة.",
+  "expect_en": "The header matches the server context. After logout every call is refused and the app returns to the login screen as the same user.",
+  "expect_ar": "الهيدر مطابق لسياق السيرفر. بعد الخروج أي طلب بيترفض والتطبيق يرجع لشاشة الدخول لنفس المستخدم.",
+  "note": "",
+  "operations": [
+   {
+    "op": "Auth.Login",
+    "http": "POST /auth/login",
+    "actor": "demo-cashier-a · PUBLIC",
+    "expected": "authenticated"
+   },
+   {
+    "op": "Access.Me",
+    "http": "GET /auth/me",
+    "actor": "demo-cashier-a · AUTHENTICATED",
+    "expected": "user, role, branch, terminal"
+   },
+   {
+    "op": "Session.Current",
+    "http": "GET /sessions/current",
+    "actor": "demo-cashier-a · session:read ✓",
+    "expected": "200 {status: OPEN, item} for the J-R2 shift, or {status: NO_OPEN_SESSION}"
+   },
+   {
+    "op": "Auth.Logout",
+    "http": "POST /auth/logout",
+    "actor": "demo-cashier-a · AUTHENTICATED",
+    "expected": "signed out"
+   },
+   {
+    "op": "Access.Me",
+    "http": "GET /auth/me",
+    "actor": "demo-cashier-a · AUTHENTICATED",
+    "expected": "after logout: refused · UNAUTHENTICATED 401 REAUTHENTICATE_SAME_ACTOR"
+   }
+  ]
+ },
+ {
+  "id": "J-R3-2",
+  "journey": "J-R3",
+  "group": "J-R3",
+  "groupTitle": "Login context, floor and kitchen administration, table transfer",
+  "groupTitleAr": "الدخول والسياق، إدارة الصالة والمطبخ، ونقل ترابيزة",
+  "step": 2,
+  "who": "demo-manager-1 on DEMO-ADMIN-1 · setup (no L1 screen: S-ADMIN is L2; use the API client of NP-R-13)",
+  "do_en": "demo-waiter-1 opens table 5. The manager sets table 13 to capacity 6, deactivates table 13, then tries to deactivate table 5.",
+  "do_ar": "demo-waiter-1 يفتح ترابيزة 5. المدير يغيّر سعة ترابيزة 13 لـ 6، يقفّل ترابيزة 13 (غير نشطة)، وبعدها يحاول يقفّل ترابيزة 5.",
+  "expect_en": "Table 13 shows capacity 6, then disappears from the floor map (inactive). Deactivating table 5 is refused because it is occupied.",
+  "expect_ar": "ترابيزة 13 سعتها بقت 6، وبعدها اختفت من خريطة الصالة (غير نشطة). تقفيل ترابيزة 5 بيترفض لأنها مشغولة.",
+  "note": "",
+  "operations": [
+   {
+    "op": "TableVisit.Open",
+    "http": "POST /tables/{tableId}/visits",
+    "actor": "demo-waiter-1 · table:assign ✓",
+    "expected": "201, visit on table 5"
+   },
+   {
+    "op": "Table.Configure",
+    "http": "PUT /tables/{tableId}",
+    "actor": "demo-manager-1 · table:upsert ✓",
+    "expected": "200, capacity 6 (CAS)"
+   },
+   {
+    "op": "Table.SetActive",
+    "http": "POST /tables/{tableId}/active",
+    "actor": "demo-manager-1 · table:upsert ✓",
+    "expected": "200, table 13 inactive"
+   },
+   {
+    "op": "Table.SetActive",
+    "http": "POST /tables/{tableId}/active",
+    "actor": "demo-manager-1 · table:upsert ✓",
+    "expected": "table 5: rejected, nothing written · TABLE_OCCUPIED 409 FINAL_NEW_INTENT_ONLY"
+   },
+   {
+    "op": "Table.List",
+    "http": "GET /tables",
+    "actor": "demo-manager-1 · table:read ✓",
+    "expected": "active and inactive tables"
+   },
+   {
+    "op": "TableVisit.List",
+    "http": "GET /table-visits",
+    "actor": "demo-manager-1 · table:read ✓",
+    "expected": "open visits (table 5)"
+   }
+  ]
+ },
+ {
+  "id": "J-R3-3",
+  "journey": "J-R3",
+  "group": "J-R3",
+  "groupTitle": "Login context, floor and kitchen administration, table transfer",
+  "groupTitleAr": "الدخول والسياق، إدارة الصالة والمطبخ، ونقل ترابيزة",
+  "step": 3,
+  "who": "demo-manager-1 on DEMO-ADMIN-1 · setup (no L1 screen: S-ADMIN is L2; use the API client of NP-R-13)",
+  "do_en": "Rename station PASTRY to \"DESSERT BAR\". Change the Om Ali rule from priority 5 to 45. Repeat the rule change with the old version.",
+  "do_ar": "غيّر اسم محطة PASTRY لـ \"DESSERT BAR\". غيّر أولوية قاعدة أم علي من 5 لـ 45. كرّر تعديل القاعدة بالنسخة القديمة.",
+  "expect_en": "The station is renamed. The rule list now puts desserts (40) before Om Ali (45), so Om Ali routes to COLD from the next round. The stale repeat is refused and the screen reloads.",
+  "expect_ar": "المحطة اتغيّر اسمها. القائمة بقت فيها الحلويات (40) قبل أم علي (45)، فأم علي هتروح COLD من الجولة الجاية. التكرار بالنسخة القديمة بيترفض والشاشة بتعمل تحديث.",
+  "note": "",
+  "operations": [
+   {
+    "op": "KitchenStation.Configure",
+    "http": "PUT /kitchen/stations/{stationId}",
+    "actor": "demo-manager-1 · kitchen:configure ✓",
+    "expected": "200, renamed"
+   },
+   {
+    "op": "RoutingRule.Configure",
+    "http": "PUT /kitchen/routing-rules/{ruleId}",
+    "actor": "demo-manager-1 · kitchen:configure ✓",
+    "expected": "200, priority 45"
+   },
+   {
+    "op": "RoutingRule.Configure",
+    "http": "PUT /kitchen/routing-rules/{ruleId}",
+    "actor": "demo-manager-1 · kitchen:configure ✓",
+    "expected": "stale expectedVersion: rejected · CONCURRENCY_CONFLICT 409 REFRESH_THEN_DECIDE"
+   },
+   {
+    "op": "RoutingRule.List",
+    "http": "GET /kitchen/routing-rules",
+    "actor": "demo-manager-1 · kitchen:read ✓",
+    "expected": "new order"
+   }
+  ]
+ },
+ {
+  "id": "J-R3-4",
+  "journey": "J-R3",
+  "group": "J-R3",
+  "groupTitle": "Login context, floor and kitchen administration, table transfer",
+  "groupTitleAr": "الدخول والسياق، إدارة الصالة والمطبخ، ونقل ترابيزة",
+  "step": 4,
+  "who": "demo-waiter-1 on DEMO-FLOOR-1 · S25",
+  "do_en": "Move the party on table 5 to table 6. Then try to move it to table 13 (inactive), and to a table that is occupied.",
+  "do_ar": "انقل الزباين من ترابيزة 5 لترابيزة 6. بعدها حاول تنقلهم لترابيزة 13 (غير نشطة)، ولترابيزة مشغولة.",
+  "expect_en": "The visit is now on table 6; table 5 is free; its checks follow the visit. Both other moves are refused.",
+  "expect_ar": "الزيارة بقت على ترابيزة 6، وترابيزة 5 فضيت، والشيكات ماشية مع الزيارة. النقلتين التانيين بيترفضوا.",
+  "note": "",
+  "operations": [
+   {
+    "op": "TableVisit.Transfer",
+    "http": "POST /table-visits/{visitId}/transfer",
+    "actor": "demo-waiter-1 · table:transfer ✓",
+    "expected": "200, visit moved 5 → 6"
+   },
+   {
+    "op": "TableVisit.Transfer",
+    "http": "POST /table-visits/{visitId}/transfer",
+    "actor": "demo-waiter-1 · table:transfer ✓",
+    "expected": "to table 13: rejected · TABLE_INACTIVE 409 FIX_AND_RESUBMIT"
+   },
+   {
+    "op": "TableVisit.Transfer",
+    "http": "POST /table-visits/{visitId}/transfer",
+    "actor": "demo-waiter-1 · table:transfer ✓",
+    "expected": "to an occupied table: rejected · TABLE_OCCUPIED 409 FINAL_NEW_INTENT_ONLY"
+   }
+  ]
+ },
+ {
+  "id": "J-R4-1",
+  "journey": "J-R4",
+  "group": "J-R4",
+  "groupTitle": "Cash refund after payment, approved by another manager",
+  "groupTitleAr": "استرداد كاش بعد الدفع، بموافقة مدير تاني",
+  "step": 1,
+  "who": "demo-manager-1 on DEMO-CASH-1 · S16 (refund)",
+  "do_en": "A shift is open on DEMO-CASH-1 (J-R2 step 1). demo-manager-1 logs in there, opens J-R1 check 1 (completed) and opens \"Refund\".",
+  "do_ar": "فيه وردية مفتوحة على DEMO-CASH-1 (من J-R2 الخطوة 1). demo-manager-1 يسجّل دخول هناك، يفتح الشيك 1 بتاع J-R1 (خلصان) ويفتح \"استرداد\".",
+  "expect_en": "The refundable lines and amounts per payment are shown exactly as the server returns them; the UI never computes \"remaining\".",
+  "expect_ar": "السطور والمبالغ القابلة للاسترداد لكل دفعة معروضة زي ما السيرفر رجّعها؛ الواجهة عمرها ما تحسب \"المتبقي\".",
+  "note": "",
+  "operations": [
+   {
+    "op": "Order.Find",
+    "http": "GET /orders",
+    "actor": "demo-manager-1 · order:read ✓",
+    "expected": "completed check 1"
+   },
+   {
+    "op": "Refund.Refundable",
+    "http": "GET /orders/{orderId}/refundable",
+    "actor": "demo-manager-1 · refund:read ✓",
+    "expected": "per line and per capture refundable amounts"
+   }
+  ]
+ },
+ {
+  "id": "J-R4-2",
+  "journey": "J-R4",
+  "group": "J-R4",
+  "groupTitle": "Cash refund after payment, approved by another manager",
+  "groupTitleAr": "استرداد كاش بعد الدفع، بموافقة مدير تاني",
+  "step": 2,
+  "who": "demo-manager-1 on DEMO-CASH-1 · S16 (refund)",
+  "do_en": "Refund Om Ali ×1 against the cash payment, reason QUALITY_ISSUE with a note. First try allocating it to the card payment. Then demo-manager-2 logs in on DEMO-CASH-1 and approves; the cash is paid out from the drawer.",
+  "do_ar": "استرد أم علي ×1 من الدفعة الكاش، السبب QUALITY_ISSUE مع ملاحظة. الأول جرّب تحطه على دفعة الكارت. بعدها demo-manager-2 يسجّل دخول على DEMO-CASH-1 ويوافق، والكاش يطلع من الدرج.",
+  "expect_en": "The card allocation is refused (refunds are cash only in L1). The request becomes PENDING_APPROVAL, then APPROVED with the cash payout. The open shift's X report shows the refund separately.",
+  "expect_ar": "التحميل على الكارت بيترفض (الاسترداد كاش بس في L1). الطلب يبقى PENDING_APPROVAL، بعدها APPROVED مع صرف الكاش. تقرير X للوردية المفتوحة يعرض الاسترداد في سطر لوحده.",
+  "note": "",
+  "operations": [
+   {
+    "op": "Refund.Request",
+    "http": "POST /orders/{orderId}/refund-requests",
+    "actor": "demo-manager-1 · refund:request ✓",
+    "expected": "card allocation: rejected · CROSS_TENDER_REFUND_DENIED 409 FINAL_NEW_INTENT_ONLY"
+   },
+   {
+    "op": "Refund.Request",
+    "http": "POST /orders/{orderId}/refund-requests",
+    "actor": "demo-manager-1 · refund:request ✓",
+    "expected": "201, PENDING_APPROVAL, reason persisted"
+   },
+   {
+    "op": "Refund.Approve",
+    "http": "POST /refund-requests/{refundCaseId}/approve",
+    "actor": "demo-manager-2 · refund:approve ✓",
+    "expected": "200, approved under lock; CASH payout from the open session (if the server asks for a grant: APPROVAL_REQUIRED, REFUND_APPROVE, approver ≠ requester)"
+   },
+   {
+    "op": "Refund.Get",
+    "http": "GET /refund-requests/{refundCaseId}",
+    "actor": "demo-manager-1 · refund:read ✓",
+    "expected": "the approved case with its payout"
+   },
+   {
+    "op": "Session.XReport",
+    "http": "GET /sessions/{sessionId}/x-report",
+    "actor": "demo-cashier-a · session:xreport ✓",
+    "expected": "refundBreakdown shows the cash refund"
+   }
+  ]
+ }
+]

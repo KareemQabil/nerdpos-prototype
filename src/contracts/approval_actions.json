@@ -1,0 +1,278 @@
+[
+ {
+  "id": "ORDER_DISCOUNT",
+  "commands": [
+   "Order.ApplyDiscount"
+  ],
+  "target": "orders.Order",
+  "context": [
+   "amount",
+   "discountPercent",
+   "kind"
+  ],
+  "default_rule": {
+   "field": "discountPercent",
+   "mode": "ABOVE_THRESHOLD",
+   "threshold": "10"
+  },
+  "approver_permission": "approve:order_discount"
+ },
+ {
+  "id": "ORDER_VOID",
+  "commands": [
+   "Order.Void"
+  ],
+  "target": "orders.Order",
+  "context": [
+   "orderId",
+   "orderVersion",
+   "reasonCode",
+   "payableBasis",
+   "payable",
+   "currentEffectivePaid",
+   "captureCount"
+  ],
+  "default_rule": {
+   "mode": "ALWAYS"
+  },
+  "approver_permission": "approve:order_void"
+ },
+ {
+  "id": "LINE_VOID",
+  "commands": [
+   "Order.VoidLine"
+  ],
+  "target": "orders.OrderLine",
+  "context": [
+   "orderId",
+   "lineId",
+   "lineVersion",
+   "reasonCode",
+   "lineAmount",
+   "fireRound"
+  ],
+  "default_rule": {
+   "mode": "ALWAYS"
+  },
+  "approver_permission": "approve:line_void"
+ },
+ {
+  "id": "REFUND_APPROVE",
+  "commands": [
+   "Refund.Approve"
+  ],
+  "target": "refunds.RefundCase",
+  "context": [
+   "amount",
+   "reasonCode",
+   "method"
+  ],
+  "default_rule": {
+   "mode": "ALWAYS"
+  },
+  "approver_permission": "approve:refund_approve"
+ },
+ {
+  "id": "SESSION_VARIANCE",
+  "commands": [
+   "Session.Close"
+  ],
+  "target": "sessions.Session",
+  "context": [
+   "countedCash",
+   "expectedCash",
+   "absVariance"
+  ],
+  "default_rule": {
+   "field": "absVariance",
+   "mode": "ABOVE_THRESHOLD",
+   "threshold": "0.00"
+  },
+  "approver_permission": "approve:session_variance"
+ },
+ {
+  "id": "CASH_MOVE",
+  "commands": [
+   "Cash.Move"
+  ],
+  "target": "sessions.Session",
+  "context": [
+   "kind",
+   "amount",
+   "reasonCode"
+  ],
+  "default_rule": {
+   "field": "amount",
+   "mode": "ABOVE_THRESHOLD",
+   "threshold": "0.00"
+  },
+  "approver_permission": "approve:cash_move"
+ },
+ {
+  "id": "DRAWER_NO_SALE",
+  "commands": [
+   "Drawer.OpenNoSale"
+  ],
+  "target": "sessions.Session",
+  "context": [
+   "reasonCode"
+  ],
+  "default_rule": {
+   "mode": "NEVER"
+  },
+  "approver_permission": "approve:drawer_no_sale"
+ },
+ {
+  "id": "TENDER_CORRECTION",
+  "commands": [
+   "Payment.CorrectTender"
+  ],
+  "target": "payments.PaymentCapture",
+  "context": [
+   "fromMethod",
+   "toMethod",
+   "amount",
+   "reasonCode"
+  ],
+  "default_rule": {
+   "mode": "ALWAYS"
+  },
+  "approver_permission": "approve:tender_correction"
+ },
+ {
+  "id": "INVENTORY_ADJUST",
+  "commands": [
+   "Inventory.Adjust",
+   "GoodsReceipt.Reverse",
+   "SupplierReturn.Post"
+  ],
+  "target": "inventory.InventoryItem",
+  "context": [
+   "warehouseId",
+   "quantityDelta",
+   "reasonCode"
+  ],
+  "default_rule": {
+   "mode": "ALWAYS"
+  },
+  "approver_permission": "approve:inventory_adjust"
+ },
+ {
+  "id": "STOCK_COUNT_POST",
+  "commands": [
+   "Stock.Count"
+  ],
+  "target": "counts_adjustments.StockCount",
+  "context": [
+   "warehouseId",
+   "absVarianceValue",
+   "lineCount"
+  ],
+  "default_rule": {
+   "field": "absVarianceValue",
+   "mode": "ABOVE_THRESHOLD",
+   "threshold": "0.00"
+  },
+  "approver_permission": "approve:stock_count_post"
+ },
+ {
+  "id": "STOCK_WASTE",
+  "commands": [
+   "Stock.RecordWaste"
+  ],
+  "target": "inventory.InventoryItem",
+  "context": [
+   "warehouseId",
+   "quantity",
+   "value",
+   "reasonCode"
+  ],
+  "default_rule": {
+   "field": "value",
+   "mode": "ABOVE_THRESHOLD",
+   "threshold": "0.00"
+  },
+  "approver_permission": "approve:stock_waste"
+ },
+ {
+  "id": "SENSITIVE_POLICY_CHANGE",
+  "commands": [
+   "Settings.UpdatePolicy",
+   "TaxPolicy.Upsert"
+  ],
+  "target": "settings.PolicyValue",
+  "context": [
+   "policyId",
+   "oldValueHash",
+   "newValueHash"
+  ],
+  "default_rule": {
+   "mode": "ALWAYS"
+  },
+  "approver_permission": "approve:sensitive_policy_change"
+ },
+ {
+  "id": "OUTBOX_REDRIVE",
+  "commands": [
+   "Outbox.Redrive"
+  ],
+  "target": "events.ConsumerDelivery",
+  "context": [
+   "consumerId",
+   "attempts"
+  ],
+  "default_rule": {
+   "mode": "NEVER"
+  },
+  "approver_permission": "approve:outbox_redrive"
+ },
+ {
+  "id": "USER_ACCESS_CHANGE",
+  "commands": [
+   "User.Create",
+   "User.ManageAccess",
+   "Role.Create",
+   "Role.Update"
+  ],
+  "target": "access.User",
+  "context": [
+   "active",
+   "roleIdsHash",
+   "branchScopeHash"
+  ],
+  "default_rule": {
+   "mode": "NEVER"
+  },
+  "approver_permission": "approve:user_access_change"
+ },
+ {
+  "id": "CREDENTIAL_RESET",
+  "commands": [
+   "Credential.Reset"
+  ],
+  "target": "access.User",
+  "context": [
+   "userId",
+   "kind"
+  ],
+  "default_rule": {
+   "mode": "NEVER"
+  },
+  "approver_permission": "approve:credential_reset"
+ },
+ {
+  "id": "PRICE_OVERRIDE",
+  "commands": [
+   "Order.OverrideLinePrice"
+  ],
+  "target": "orders.OrderLine",
+  "context": [
+   "oldUnitPrice",
+   "newUnitPrice"
+  ],
+  "default_rule": {
+   "mode": "ALWAYS"
+  },
+  "approver_permission": "approve:price_override"
+ }
+]

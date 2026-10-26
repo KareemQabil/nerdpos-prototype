@@ -1,0 +1,83 @@
+// Node smoke test of the mock: runs a J-R1-like flow through fetch → mock kernel.
+(globalThis as any).__DEBUG_FETCH = true;
+(globalThis as any).window = globalThis;
+const { installMockFetch } = await import('../src/mock/fetch');
+const { call, ApiFailure } = await import('../src/api/client');
+const { demo } = await import('../src/mock/demo');
+const { sim } = await import('../src/mock/sim');
+installMockFetch();
+sim.set({ latencyMs: 0 });
+demo.reset('DEMO');
+sim.set({ latencyMs: 0 });
+const PIN = demo.pin;
+const dev = (deviceId: string, terminalId: string | null) => ({ deviceId, label: deviceId, terminalId, branchId: null, token: null as string | null });
+const T1 = dev('T1', 't_cash'), T2 = dev('T2', 't_floor'), K1 = dev('K1', 't_kds'), A = dev('ADMIN', 't_admin');
+async function login(d: any, username: string) { const r = await call(d, 'Auth.Login', { body: { method: 'PIN', username, secret: PIN } }); d.token = r.data.token; }
+async function expectErr(p: Promise<any>, code: string) { try { await p; throw new Error('expected ' + code); } catch (e: any) { if (!(e instanceof ApiFailure) || e.code !== code) throw e; console.log('  ✓ refused', code); } }
+const log = (...a: any[]) => console.log(...a);
+
+await login(T1, 'demo-cashier-a');
+const s = (await call(T1, 'Session.Open', { body: { terminalId: 't_cash', openingFloat: '500.00' } })).data; log('session', s.id, s.openingFloat);
+await login(T2, 'demo-waiter-1');
+const v = (await call(T2, 'TableVisit.Open', { params: { tableId: 'tbl_7' }, body: { guestCount: 4 } })).data; log('visit', v.id);
+await expectErr(call(T2, 'TableVisit.Open', { params: { tableId: 'tbl_7' }, body: { guestCount: 2 } }), 'TABLE_OCCUPIED');
+let o = (await call(T2, 'Order.Create', { body: { channel: 'DINE_IN', tableId: 'tbl_7' } })).data; log('order', o.number, 'session', o.sessionId);
+await expectErr(call(T2, 'Pricing.QuoteItem', { params: { productId: 'p_kunafa' }, body: { branchId: 'branch_main', channel: 'DINE_IN', quantity: '1', modifierOptionIds: [] } }), 'PRODUCT_UNAVAILABLE');
+const q = (await call(T2, 'Pricing.QuoteItem', { params: { productId: 'p_orange_juice' }, body: { branchId: 'branch_main', channel: 'DINE_IN', quantity: '2', modifierOptionIds: ['opt_size_large'] } })).data; log('quote OJ large x2', q.unitTotal, q.lineTotal);
+o = (await call(T2, 'Order.AddLines', { params: { orderId: o.id }, body: { expectedVersion: o.version, lines: [ { productId: 'p_kofta', quantity: '2', modifierOptionIds: ['opt_medium'] }, { productId: 'p_hummus', quantity: '1', modifierOptionIds: [] }, { productId: 'p_orange_juice', quantity: '2', modifierOptionIds: ['opt_size_large'] } ] } })).data;
+log('preview', o.totals.itemsSubtotal, 'svc', o.totals.serviceCharge, 'vat', o.totals.tax, 'payable', o.totals.payable);
+const fireCmd = 'cmd-fire-1';
+const f1 = await call(T2, 'Order.Fire', { params: { orderId: o.id }, body: { expectedVersion: o.version }, commandId: fireCmd }); log('fire round', f1.data.fireRound);
+const f1b = await call(T2, 'Order.Fire', { params: { orderId: o.id }, body: { expectedVersion: o.version }, commandId: fireCmd }); log('  replay → replayed', f1b.replayed, 'round', f1b.data.fireRound);
+await new Promise((r) => setTimeout(r, 50));
+await login(K1, 'demo-chef-1');
+const board = (await call(K1, 'Kitchen.Board', {})).data; log('kitchen tickets', board.items.map((t: any) => `${t.stationName}:${t.items.length}`).join(' '));
+o = (await call(T2, 'Order.Get', { params: { orderId: o.id } })).data;
+const kofta = o.lines.find((l: any) => l.productId === 'p_kofta');
+await expectErr(call(T2, 'Order.UpdateLine', { params: { orderId: o.id, lineId: kofta.id }, body: { expectedVersion: o.version, expectedLineVersion: kofta.version, quantity: '3' } }), 'LINE_ALREADY_FIRED');
+await expectErr(call(T2, 'Order.Fire', { params: { orderId: o.id }, body: { expectedVersion: o.version } }), 'NOTHING_TO_FIRE');
+o = (await call(T2, 'Order.AddLines', { params: { orderId: o.id }, body: { expectedVersion: o.version, lines: [ { productId: 'p_om_ali', quantity: '1' }, { productId: 'p_tea', quantity: '2', modifierOptionIds: ['opt_size_regular'] } ] } })).data;
+const f2 = await call(T2, 'Order.Fire', { params: { orderId: o.id }, body: { expectedVersion: o.version } }); log('fire round', f2.data.fireRound);
+o = f2.data.order;
+const hummus = o.lines.find((l: any) => l.productId === 'p_hummus');
+const voidCmd = 'cmd-void-1';
+let grantDetails: any;
+try { await call(T2, 'Order.VoidLine', { params: { orderId: o.id, lineId: hummus.id }, body: { expectedVersion: o.version, reasonCode: 'WRONG_ITEM' }, commandId: voidCmd }); } catch (e: any) { log('  ✓ refused', e.code); grantDetails = e.details; }
+await expectErr(call(T2, 'Approval.Grant', { body: { action: 'LINE_VOID', targetType: grantDetails.targetType, targetId: grantDetails.targetId, context: grantDetails.context, approverUserId: 'u_waiter_1', approverCredentialKind: 'PIN', approverSecret: PIN } }), 'APPROVER_NOT_AUTHORIZED');
+const g = (await call(T2, 'Approval.Grant', { body: { action: 'LINE_VOID', targetType: grantDetails.targetType, targetId: grantDetails.targetId, context: grantDetails.context, approverUserId: 'u_manager_1', approverCredentialKind: 'PIN', approverSecret: PIN } })).data; log('grant', g.grantId);
+o = (await call(T2, 'Order.VoidLine', { params: { orderId: o.id, lineId: hummus.id }, body: { expectedVersion: o.version, reasonCode: 'WRONG_ITEM', approvalGrantId: g.grantId }, commandId: voidCmd })).data; log('voided; payable', o.totals.payable);
+let o2 = (await call(T2, 'Order.Create', { body: { channel: 'DINE_IN', tableId: 'tbl_7' } })).data;
+const moveIds = o.lines.filter((l: any) => ['p_orange_juice', 'p_tea'].includes(l.productId) && l.status === 'ACTIVE').map((l: any) => l.id);
+const mv = (await call(T2, 'Order.MoveLines', { params: { orderId: o.id }, body: { expectedVersion: o.version, targetExpectedVersion: o2.version, targetOrderId: o2.id, lineIds: moveIds } })).data;
+o = mv.source; o2 = mv.target; log('check1 payable', o.totals.payable, 'check2 payable', o2.totals.payable);
+o2 = (await call(T1, 'Order.Confirm', { params: { orderId: o2.id }, body: { expectedVersion: o2.version } })).data; log('confirm msg', o2.confirmMessage, o2.totals.payable);
+const cap = (await call(T1, 'Payment.Capture', { params: { orderId: o2.id }, body: { tenders: [{ method: 'CASH', tendered: '300.00' }] } })).data; log('change', cap.change, 'remaining', cap.settlement.remaining);
+o2 = (await call(T1, 'Order.Get', { params: { orderId: o2.id } })).data;
+o2 = (await call(T1, 'Order.Complete', { params: { orderId: o2.id }, body: { expectedVersion: o2.version } })).data; log('check2', o2.status);
+const x = (await call(T1, 'Session.XReport', { params: { sessionId: s.id } })).data; log('X tenders', JSON.stringify(x.tenderBreakdown), 'expected hidden', x.expectedCash === undefined);
+const sess = (await call(T1, 'Session.Get', { params: { sessionId: s.id } })).data;
+const close = (await call(T1, 'Session.Close', { params: { sessionId: s.id }, body: { expectedVersion: sess.version, countedCash: (500 + Number(o2.totals.payable)).toFixed(2) } })).data; log('closed variance', close.variance, 'outstanding', close.z.outstandingChecks.length);
+await expectErr(call(T2, 'TableVisit.Close', { params: { visitId: v.id }, body: { expectedVersion: (await call(T2, 'TableVisit.List', { query: { state: 'OPEN' } })).data.items[0].version } }), 'TABLE_HAS_OPEN_CHECKS');
+await login(T1, 'demo-cashier-b');
+const s2 = (await call(T1, 'Session.Open', { body: { terminalId: 't_cash', openingFloat: '500.00' } })).data;
+o = (await call(T1, 'Order.Confirm', { params: { orderId: o.id }, body: { expectedVersion: o.version } })).data; log('check1 confirm', o.confirmMessage, o.totals.payable);
+await call(T1, 'Payment.Capture', { params: { orderId: o.id }, body: { tenders: [{ method: 'CASH', tendered: '200.00' }] } });
+const st = (await call(T1, 'Payment.GetSettlement', { params: { orderId: o.id } })).data;
+await expectErr(call(T1, 'Payment.Capture', { params: { orderId: o.id }, body: { tenders: [{ method: 'CARD', amount: st.remaining }] } }), 'TENDER_REFERENCE_REQUIRED');
+// N12: lost response then retry
+sim.set({ dropNextResponse: 'Payment.Capture' });
+const capCmd = 'cmd-cap-card';
+try { await call(T1, 'Payment.Capture', { params: { orderId: o.id }, body: { tenders: [{ method: 'CARD', amount: st.remaining, reference: 'DEMO-REF-0001' }] }, commandId: capCmd }); } catch (e: any) { log('  ✓ lost response →', e.code); }
+const rr = await call(T1, 'Payment.Capture', { params: { orderId: o.id }, body: { tenders: [{ method: 'CARD', amount: st.remaining, reference: 'DEMO-REF-0001' }] }, commandId: capCmd }); log('  retry replayed', rr.replayed, 'remaining', rr.data.settlement.remaining);
+o = (await call(T1, 'Order.Get', { params: { orderId: o.id } })).data;
+o = (await call(T1, 'Order.Complete', { params: { orderId: o.id }, body: { expectedVersion: o.version } })).data; log('check1', o.status);
+const vl = (await call(T2, 'TableVisit.List', { query: { tableId: 'tbl_7' } })).data; log('visit state', vl.items.map((x: any) => x.state).join(','));
+const sess2 = (await call(T1, 'Session.Get', { params: { sessionId: s2.id } })).data;
+const close2 = (await call(T1, 'Session.Close', { params: { sessionId: s2.id }, body: { expectedVersion: sess2.version, countedCash: '700.00' } })).data; log('close2 variance', close2.variance);
+await login(A, 'demo-manager-1');
+const z = (await call(A, 'Session.ZReport', { params: { sessionId: s2.id } })).data; log('Z tenders', JSON.stringify(z.tenderBreakdown));
+await new Promise((r) => setTimeout(r, 50));
+const docs = (await call(A, 'Compliance.Find', {})).data; log('fiscal docs', docs.items.map((d: any) => d.state + ':' + d.issues.map((i: any) => i.code).join('|')).join(' '));
+const rep = (await call(A, 'Report.Run', { params: { reportId: 'daily_sales' }, query: { fromBusinessDate: o.completedBusinessDate } })).data; log('daily', JSON.stringify(rep.sections[0].rows.slice(0, 8)));
+console.log('SMOKE OK');
+process.exit(0);

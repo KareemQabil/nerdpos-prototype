@@ -1,0 +1,1794 @@
+[
+ {
+  "code": "ACCESS_USER_NOT_FOUND",
+  "http_status": 404,
+  "condition": "ref_userId not found",
+  "safe_message": "Access user not found",
+  "retryable": false
+ },
+ {
+  "code": "APPROVALS_APPROVALGRANT_NOT_FOUND",
+  "http_status": 404,
+  "condition": "ref_approvalGrantId not found",
+  "safe_message": "Approvals approvalgrant not found",
+  "retryable": false
+ },
+ {
+  "code": "APPROVAL_CONTEXT_INVALID",
+  "http_status": 400,
+  "condition": "context fields do not match the action schema",
+  "safe_message": "Approval context invalid",
+  "retryable": false
+ },
+ {
+  "code": "APPROVAL_CONTEXT_VALUE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Approval context value not found",
+  "retryable": false
+ },
+ {
+  "code": "APPROVAL_GRANT_ALREADY_CONSUMED",
+  "http_status": 409,
+  "condition": "grant already consumed",
+  "safe_message": "Approval grant already consumed",
+  "retryable": false
+ },
+ {
+  "code": "APPROVAL_GRANT_EXPIRED",
+  "http_status": 403,
+  "condition": "grant expired",
+  "safe_message": "Approval grant expired",
+  "retryable": false
+ },
+ {
+  "code": "APPROVAL_GRANT_INVALID",
+  "http_status": 403,
+  "condition": "grant unknown or bound to another action/target/context/requester",
+  "safe_message": "Approval grant invalid",
+  "retryable": false
+ },
+ {
+  "code": "APPROVAL_GRANT_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Approval grant not found",
+  "retryable": false
+ },
+ {
+  "code": "APPROVAL_NOT_USABLE",
+  "http_status": 409,
+  "condition": "grant.consumedAt == null and grant.expiresAt > now",
+  "safe_message": "Approval not usable",
+  "retryable": false
+ },
+ {
+  "code": "APPROVAL_REQUIRED",
+  "http_status": 403,
+  "condition": "policy requires an approval grant and none was supplied; details carry action, target, context fields",
+  "safe_message": "Approval required",
+  "retryable": false
+ },
+ {
+  "code": "APPROVER_NOT_AUTHORIZED",
+  "http_status": 403,
+  "condition": "approver lacks approve:<action> in branch, inactive, or credential invalid",
+  "safe_message": "Approver not authorized",
+  "retryable": false
+ },
+ {
+  "code": "AUDIT_APPEND_FAILED",
+  "http_status": 500,
+  "condition": "audit append failed; business writes rolled back",
+  "safe_message": "Audit append failed",
+  "retryable": true
+ },
+ {
+  "code": "AUDIT_ENTRY_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Audit entry not found",
+  "retryable": false
+ },
+ {
+  "code": "AUTHENTICATION_ATTEMPT_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Authentication attempt not found",
+  "retryable": false
+ },
+ {
+  "code": "AUTH_SESSION_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Auth session not found",
+  "retryable": false
+ },
+ {
+  "code": "BARCODE_TAKEN",
+  "http_status": 409,
+  "condition": "barcode used by another active variant",
+  "safe_message": "Barcode taken",
+  "retryable": false
+ },
+ {
+  "code": "BRANCH_CODE_TAKEN",
+  "http_status": 409,
+  "condition": "branch code not unique",
+  "safe_message": "Branch code taken",
+  "retryable": false
+ },
+ {
+  "code": "BRANCH_INACTIVE",
+  "http_status": 409,
+  "condition": "branch is inactive",
+  "safe_message": "Branch inactive",
+  "retryable": false
+ },
+ {
+  "code": "BRANCH_NOT_FOUND",
+  "http_status": 404,
+  "condition": null,
+  "safe_message": "Branch not found",
+  "retryable": false
+ },
+ {
+  "code": "BUSINESS_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Business not found",
+  "retryable": false
+ },
+ {
+  "code": "CAPABILITY_NOT_AVAILABLE",
+  "http_status": 409,
+  "condition": "the operation or tender needs a capability absent from this tenant's composition",
+  "safe_message": "Capability not available",
+  "retryable": false
+ },
+ {
+  "code": "CASH_ENTRY_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Cash entry not found",
+  "retryable": false
+ },
+ {
+  "code": "CASH_MOVE_KIND_NOT_ALLOWED",
+  "http_status": 400,
+  "condition": "Cash.Move accepts PAY_IN/DROP/PAYOUT/PETTY_CASH only",
+  "safe_message": "Cash move kind not allowed",
+  "retryable": false
+ },
+ {
+  "code": "CATALOG_CATEGORY_NOT_FOUND",
+  "http_status": 404,
+  "condition": "ref_categoryId not found",
+  "safe_message": "Catalog category not found",
+  "retryable": false
+ },
+ {
+  "code": "CATALOG_PRODUCT_NAME_TAKEN",
+  "http_status": 409,
+  "condition": "another active product has the same normalized name in a locale whose ProductNameUniquenessPolicy value is BLOCK",
+  "safe_message": "Catalog product name taken",
+  "retryable": false
+ },
+ {
+  "code": "CATALOG_PRODUCT_NOT_FOUND",
+  "http_status": 404,
+  "condition": "ref_itemId not found",
+  "safe_message": "Catalog product not found",
+  "retryable": false
+ },
+ {
+  "code": "CATALOG_SKU_SEQUENCE_EXHAUSTED",
+  "http_status": 409,
+  "condition": "the next generated number for the prefix does not fit the configured width, or 1000 consecutive candidates are already taken by manually typed skus",
+  "safe_message": "Catalog sku sequence exhausted",
+  "retryable": false
+ },
+ {
+  "code": "CATALOG_SKU_TAKEN",
+  "http_status": 409,
+  "condition": "another product already uses this sku (business-wide, archived products included)",
+  "safe_message": "Catalog sku taken",
+  "retryable": false
+ },
+ {
+  "code": "CATALOG_UNIT_NOT_FOUND",
+  "http_status": 404,
+  "condition": "ref_unitId not found",
+  "safe_message": "Catalog unit not found",
+  "retryable": false
+ },
+ {
+  "code": "CATEGORY_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Category not found",
+  "retryable": false
+ },
+ {
+  "code": "CHANGE_NOT_ALLOWED",
+  "http_status": 400,
+  "condition": "change only for CASH",
+  "safe_message": "Change not allowed",
+  "retryable": false
+ },
+ {
+  "code": "COMMAND_ALREADY_APPLIED",
+  "http_status": 409,
+  "condition": "tier-B command key already committed; read current state",
+  "safe_message": "Command already applied",
+  "retryable": false
+ },
+ {
+  "code": "COMMAND_ALREADY_PROCESSING",
+  "http_status": 409,
+  "condition": "same key is IN_PROGRESS; retry later with the same key",
+  "safe_message": "Command already processing",
+  "retryable": true
+ },
+ {
+  "code": "COMMAND_EXECUTION_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Command execution not found",
+  "retryable": false
+ },
+ {
+  "code": "CONCURRENCY_CONFLICT",
+  "http_status": 409,
+  "condition": "expectedVersion mismatch, CAS failure, lock timeout or SQLSTATE 40001/40P01",
+  "safe_message": "Concurrency conflict",
+  "retryable": true
+ },
+ {
+  "code": "CONSUMER_DELIVERY_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Consumer delivery not found",
+  "retryable": false
+ },
+ {
+  "code": "CONTEXT_REQUIRED",
+  "http_status": 400,
+  "condition": "operation needs terminal/session/branch context that is absent or invalid",
+  "safe_message": "Context required",
+  "retryable": false
+ },
+ {
+  "code": "COUNTS_ADJUSTMENTS_STOCKCOUNT_NOT_FOUND",
+  "http_status": 404,
+  "condition": "ref_countId not found",
+  "safe_message": "Counts adjustments stockcount not found",
+  "retryable": false
+ },
+ {
+  "code": "CREDENTIAL_LOCKED",
+  "http_status": 423,
+  "condition": "too many failed attempts; lockedUntil in details (not on login: login returns UNAUTHENTICATED)",
+  "safe_message": "Credential locked",
+  "retryable": false
+ },
+ {
+  "code": "CREDENTIAL_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Credential not found",
+  "retryable": false
+ },
+ {
+  "code": "CREDENTIAL_POLICY_VIOLATION",
+  "http_status": 400,
+  "condition": "new secret violates CredentialPolicy",
+  "safe_message": "Credential policy violation",
+  "retryable": false
+ },
+ {
+  "code": "CROSS_TENDER_REFUND_DENIED",
+  "http_status": 409,
+  "condition": "RefundMethodPolicy forbids method",
+  "safe_message": "Cross tender refund denied",
+  "retryable": false
+ },
+ {
+  "code": "CURRENCY_IMMUTABLE",
+  "http_status": 409,
+  "condition": "business currency cannot change after provisioning",
+  "safe_message": "Currency immutable",
+  "retryable": false
+ },
+ {
+  "code": "CURRENT_CREDENTIAL_MISMATCH",
+  "http_status": 403,
+  "condition": "self rotation: current secret wrong",
+  "safe_message": "Current credential mismatch",
+  "retryable": false
+ },
+ {
+  "code": "CUSTOMERS_CUSTOMER_NOT_FOUND",
+  "http_status": 404,
+  "condition": "ref_customerId not found",
+  "safe_message": "Customers customer not found",
+  "retryable": false
+ },
+ {
+  "code": "CUSTOMER_ADDRESS_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Customer address not found",
+  "retryable": false
+ },
+ {
+  "code": "CUSTOMER_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Customer not found",
+  "retryable": false
+ },
+ {
+  "code": "DELIVERY_DELIVERY_NOT_FOUND",
+  "http_status": 404,
+  "condition": "ref_deliveryId not found",
+  "safe_message": "Delivery delivery not found",
+  "retryable": false
+ },
+ {
+  "code": "DELIVERY_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Delivery not found",
+  "retryable": false
+ },
+ {
+  "code": "DELIVERY_ORDER_NOT_DELIVERY_CHANNEL",
+  "http_status": 409,
+  "condition": "order channel is not DELIVERY",
+  "safe_message": "Delivery order not delivery channel",
+  "retryable": false
+ },
+ {
+  "code": "DELIVERY_TRANSITION_INVALID",
+  "http_status": 409,
+  "condition": "transition not allowed from current state",
+  "safe_message": "Delivery transition invalid",
+  "retryable": false
+ },
+ {
+  "code": "DELIVERY_TRANSITION_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Delivery transition not found",
+  "retryable": false
+ },
+ {
+  "code": "DISCOUNT_ALLOCATION_UNAVAILABLE",
+  "http_status": 409,
+  "condition": "Exact Money4 proportional allocation cannot satisfy group bounds; sub-unit bases are not rounded up to fake eligibility",
+  "safe_message": null,
+  "retryable": null
+ },
+ {
+  "code": "DISCOUNT_EXCEEDS_ELIGIBLE_BASE",
+  "http_status": 409,
+  "condition": "Explicit fixed discount exceeds current eligible positive base; never clamp or reopen collection",
+  "safe_message": null,
+  "retryable": null
+ },
+ {
+  "code": "DISCOUNT_STACKING_NOT_ALLOWED",
+  "http_status": 409,
+  "condition": "DiscountStackingPolicy does not allow another active discount on this order",
+  "safe_message": "Discount stacking not allowed",
+  "retryable": false
+ },
+ {
+  "code": "DRAWER_EVENT_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Drawer event not found",
+  "retryable": false
+ },
+ {
+  "code": "EVENTS_CONSUMERDELIVERY_NOT_FOUND",
+  "http_status": 404,
+  "condition": "ref_deliveryId not found",
+  "safe_message": "Events consumerdelivery not found",
+  "retryable": false
+ },
+ {
+  "code": "FISCAL_DOCUMENT_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Fiscal document not found",
+  "retryable": false
+ },
+ {
+  "code": "GOODS_RECEIPT_LINE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Goods receipt line not found",
+  "retryable": false
+ },
+ {
+  "code": "GOODS_RECEIPT_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Goods receipt not found",
+  "retryable": false
+ },
+ {
+  "code": "IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST",
+  "http_status": 422,
+  "condition": "same key, different canonical fingerprint",
+  "safe_message": "Idempotency key reused with different request",
+  "retryable": false
+ },
+ {
+  "code": "INCLUSIVE_DISCOUNT_COMPONENT_UNAVAILABLE",
+  "http_status": 409,
+  "condition": "Captured tax rounding produces a negative derived net-discount effect not representable by existing nonnegative PricingSnapshot.discount; no constraint relaxation or rounding disguise",
+  "safe_message": null,
+  "retryable": null
+ },
+ {
+  "code": "INCLUSIVE_DISCOUNT_QUANTUM_UNAVAILABLE",
+  "http_status": 409,
+  "condition": "Discounted inclusive gross cannot preserve the exact stated concession at captured payable rounding quantum; never clamp or round the intent",
+  "safe_message": null,
+  "retryable": null
+ },
+ {
+  "code": "INSUFFICIENT_STOCK",
+  "http_status": 409,
+  "condition": null,
+  "safe_message": "Insufficient stock",
+  "retryable": false
+ },
+ {
+  "code": "INTERNAL_ERROR",
+  "http_status": 500,
+  "condition": "unexpected server fault before commit",
+  "safe_message": "Internal error",
+  "retryable": true
+ },
+ {
+  "code": "INVENTORY_CAPABILITY_UNAVAILABLE",
+  "http_status": 409,
+  "condition": null,
+  "safe_message": "Inventory capability unavailable",
+  "retryable": false
+ },
+ {
+  "code": "INVENTORY_ITEM_INACTIVE",
+  "http_status": 409,
+  "condition": "Explicit stock owner eligibility/quantity boundary",
+  "safe_message": null,
+  "retryable": false
+ },
+ {
+  "code": "INVENTORY_ITEM_NOT_FOUND",
+  "http_status": 404,
+  "condition": "downstream stock_movements.GetAuthoritativeOnHand",
+  "safe_message": "Inventory item not found",
+  "retryable": false
+ },
+ {
+  "code": "KITCHEN_ITEM_PROGRESS_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Kitchen item progress not found",
+  "retryable": false
+ },
+ {
+  "code": "KITCHEN_KITCHENTICKET_NOT_FOUND",
+  "http_status": 404,
+  "condition": "ref_ticketId not found",
+  "safe_message": "Kitchen kitchenticket not found",
+  "retryable": false
+ },
+ {
+  "code": "KITCHEN_OBLIGATION_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Kitchen obligation not found",
+  "retryable": false
+ },
+ {
+  "code": "KITCHEN_ROUTE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "downstream kitchen_routing.Resolve",
+  "safe_message": "Kitchen route not found",
+  "retryable": false
+ },
+ {
+  "code": "KITCHEN_STATION_INACTIVE",
+  "http_status": 409,
+  "condition": "kitchen station is deactivated",
+  "safe_message": "Kitchen station inactive",
+  "retryable": false
+ },
+ {
+  "code": "KITCHEN_STATION_NAME_TAKEN",
+  "http_status": 409,
+  "condition": "station name not unique in branch",
+  "safe_message": "Kitchen station name taken",
+  "retryable": false
+ },
+ {
+  "code": "KITCHEN_STATION_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Kitchen station not found",
+  "retryable": false
+ },
+ {
+  "code": "KITCHEN_TICKET_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Kitchen ticket not found",
+  "retryable": false
+ },
+ {
+  "code": "KITCHEN_TRANSITION_INVALID",
+  "http_status": 409,
+  "condition": "ticket transition not allowed",
+  "safe_message": "Kitchen transition invalid",
+  "retryable": false
+ },
+ {
+  "code": "LAST_OWNER_PROTECTED",
+  "http_status": 409,
+  "condition": "change would leave no active user holding role:update",
+  "safe_message": "Last owner protected",
+  "retryable": false
+ },
+ {
+  "code": "LINE_ALREADY_FIRED",
+  "http_status": 409,
+  "condition": "fired line: use Order.VoidLine",
+  "safe_message": "Line already fired",
+  "retryable": false
+ },
+ {
+  "code": "LINE_ALREADY_REMOVED",
+  "http_status": 409,
+  "condition": "DRAFT line already removed; not a fired-line void",
+  "safe_message": null,
+  "retryable": null
+ },
+ {
+  "code": "LINE_ALREADY_VOIDED",
+  "http_status": 409,
+  "condition": "line VOIDED",
+  "safe_message": "Line already voided",
+  "retryable": false
+ },
+ {
+  "code": "LINE_NOT_FIRED",
+  "http_status": 409,
+  "condition": "unfired line: use Order.RemoveLine",
+  "safe_message": "Line not fired",
+  "retryable": false
+ },
+ {
+  "code": "LOYALTY_BALANCE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Loyalty balance not found",
+  "retryable": false
+ },
+ {
+  "code": "LOYALTY_ENTRY_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Loyalty entry not found",
+  "retryable": false
+ },
+ {
+  "code": "MODIFIER_DEFINITION_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Modifier definition not found",
+  "retryable": false
+ },
+ {
+  "code": "MODIFIER_OPTION_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Modifier option not found",
+  "retryable": false
+ },
+ {
+  "code": "MODIFIER_SELECTION_INVALID",
+  "http_status": 400,
+  "condition": null,
+  "safe_message": "Modifier selection is invalid",
+  "retryable": false
+ },
+ {
+  "code": "MODIFIER_UNAVAILABLE",
+  "http_status": 409,
+  "condition": null,
+  "safe_message": "Selected modifier is unavailable",
+  "retryable": false
+ },
+ {
+  "code": "NEGATIVE_STOCK_BLOCKED",
+  "http_status": 409,
+  "condition": "downstream stock_movements.Append",
+  "safe_message": "Negative stock blocked",
+  "retryable": false
+ },
+ {
+  "code": "NOTHING_TO_FIRE",
+  "http_status": 409,
+  "condition": "no unfired ACTIVE line",
+  "safe_message": "Nothing to fire",
+  "retryable": false
+ },
+ {
+  "code": "OFFLINE_COMMAND_NOT_ALLOWED",
+  "http_status": 400,
+  "condition": "command type outside the offline allowlist",
+  "safe_message": "Offline command not allowed",
+  "retryable": false
+ },
+ {
+  "code": "OFFLINE_COMMAND_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Offline command not found",
+  "retryable": false
+ },
+ {
+  "code": "ORDERS_ORDERLINE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "ref_orderLineId not found",
+  "safe_message": "Orders orderline not found",
+  "retryable": false
+ },
+ {
+  "code": "ORDERS_ORDER_NOT_FOUND",
+  "http_status": 404,
+  "condition": "ref_orderId not found",
+  "safe_message": "Orders order not found",
+  "retryable": false
+ },
+ {
+  "code": "ORDER_ALREADY_FIRED",
+  "http_status": 409,
+  "condition": "cancel rejected: a round was fired (use Void)",
+  "safe_message": "Order already fired",
+  "retryable": false
+ },
+ {
+  "code": "ORDER_CHANNEL_UNAVAILABLE",
+  "http_status": 409,
+  "condition": null,
+  "safe_message": "Order channel unavailable",
+  "retryable": false
+ },
+ {
+  "code": "ORDER_DISCOUNT_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Order discount not found",
+  "retryable": false
+ },
+ {
+  "code": "ORDER_EMPTY",
+  "http_status": 409,
+  "condition": "confirm needs at least one ACTIVE line",
+  "safe_message": "Order empty",
+  "retryable": false
+ },
+ {
+  "code": "ORDER_FIRE_ROUND_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Order fire round not found",
+  "retryable": false
+ },
+ {
+  "code": "ORDER_HAS_PAYMENTS",
+  "http_status": 409,
+  "condition": "effectivePaid > 0 (refund first; paid void per PD-V4-01)",
+  "safe_message": "Order has payments",
+  "retryable": false
+ },
+ {
+  "code": "ORDER_LINE_CHANGE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Order line change not found",
+  "retryable": false
+ },
+ {
+  "code": "ORDER_LINE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Order line not found",
+  "retryable": false
+ },
+ {
+  "code": "ORDER_NOT_CONFIRMED",
+  "http_status": 409,
+  "condition": "operation needs CONFIRMED",
+  "safe_message": "Order not confirmed",
+  "retryable": false
+ },
+ {
+  "code": "ORDER_NOT_DRAFT",
+  "http_status": 409,
+  "condition": "operation needs DRAFT",
+  "safe_message": "Order not draft",
+  "retryable": false
+ },
+ {
+  "code": "ORDER_NOT_EDITABLE",
+  "http_status": 409,
+  "condition": "order is COMPLETED/CANCELLED/VOIDED",
+  "safe_message": "Order not editable",
+  "retryable": false
+ },
+ {
+  "code": "ORDER_NOT_FIRED",
+  "http_status": 409,
+  "condition": "DRAFT check never fired; use Order.Cancel",
+  "safe_message": "Order not fired",
+  "retryable": false
+ },
+ {
+  "code": "ORDER_NOT_FOUND",
+  "http_status": 404,
+  "condition": "downstream payments.GetSettlement",
+  "safe_message": "Order not found",
+  "retryable": false
+ },
+ {
+  "code": "ORDER_NOT_PAYABLE",
+  "http_status": 409,
+  "condition": "downstream orders.GetPayable",
+  "safe_message": "Order not payable",
+  "retryable": false
+ },
+ {
+  "code": "ORDER_NOT_SETTLED",
+  "http_status": 409,
+  "condition": "complete requires original financial coverage; net retained is separate",
+  "safe_message": "Order not settled",
+  "retryable": false
+ },
+ {
+  "code": "ORDER_NUMBER_SEQUENCE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Order number sequence not found",
+  "retryable": false
+ },
+ {
+  "code": "ORGANIZATION_BRANCH_NOT_FOUND",
+  "http_status": 404,
+  "condition": "ref_branchId not found",
+  "safe_message": "Organization branch not found",
+  "retryable": false
+ },
+ {
+  "code": "ORGANIZATION_TERMINAL_NOT_FOUND",
+  "http_status": 404,
+  "condition": "ref_terminalId not found",
+  "safe_message": "Organization terminal not found",
+  "retryable": false
+ },
+ {
+  "code": "OUTBOX_APPEND_FAILED",
+  "http_status": 500,
+  "condition": "outbox append failed; business writes rolled back",
+  "safe_message": "Outbox append failed",
+  "retryable": true
+ },
+ {
+  "code": "OUTBOX_EVENT_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Outbox event not found",
+  "retryable": false
+ },
+ {
+  "code": "OVERPAYMENT",
+  "http_status": 409,
+  "condition": "sum(input.tenders.amount) <= payable - effectivePaid",
+  "safe_message": "Overpayment",
+  "retryable": false
+ },
+ {
+  "code": "OVER_RECEIPT_BLOCKED",
+  "http_status": 409,
+  "condition": "OverReceiptPolicy BLOCK above tolerance",
+  "safe_message": "Over receipt blocked",
+  "retryable": false
+ },
+ {
+  "code": "PAYABLE_BELOW_PAID",
+  "http_status": 409,
+  "condition": "change would make payable < effectivePaid",
+  "safe_message": "Payable below paid",
+  "retryable": false
+ },
+ {
+  "code": "PAYLOAD_TOO_LARGE",
+  "http_status": 413,
+  "condition": "body above the route limit",
+  "safe_message": "Payload too large",
+  "retryable": false
+ },
+ {
+  "code": "PAYMENTS_PAYMENTCAPTURE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "paymentCapture not found",
+  "safe_message": "Payments paymentcapture not found",
+  "retryable": false
+ },
+ {
+  "code": "PAYMENT_CAPTURE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Payment capture not found",
+  "retryable": false
+ },
+ {
+  "code": "PAYMENT_SETTLEMENT_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Payment settlement not found",
+  "retryable": false
+ },
+ {
+  "code": "PAYMENT_TENDER_CORRECTION_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Payment tender correction not found",
+  "retryable": false
+ },
+ {
+  "code": "PERMISSION_DENIED",
+  "http_status": 403,
+  "condition": "actor lacks the operation permission in the context branch",
+  "safe_message": "Permission denied",
+  "retryable": false
+ },
+ {
+  "code": "POLICY_REQUIRES_VALIDATION",
+  "http_status": 409,
+  "condition": "ACCOUNTANT/COMPLIANCE-validated policy without validation record (production profile)",
+  "safe_message": "Policy requires validation",
+  "retryable": false
+ },
+ {
+  "code": "POLICY_VALUE_INVALID",
+  "http_status": 400,
+  "condition": "value does not match the policy's typed schema",
+  "safe_message": "Policy value invalid",
+  "retryable": false
+ },
+ {
+  "code": "POLICY_VALUE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Policy value not found",
+  "retryable": false
+ },
+ {
+  "code": "PRICE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "downstream pricing.Quote",
+  "safe_message": "Price not found",
+  "retryable": false
+ },
+ {
+  "code": "PRICE_RULE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Price rule not found",
+  "retryable": false
+ },
+ {
+  "code": "PRICE_SCHEDULE_CONFLICT",
+  "http_status": 409,
+  "condition": "the requested effective window would overlap a price window of the same (product, branch, channel) that starts later, or would correct a window that has already started",
+  "safe_message": "Price schedule conflict",
+  "retryable": false
+ },
+ {
+  "code": "PRICE_SCHEDULING_NOT_ALLOWED",
+  "http_status": 422,
+  "condition": "effectiveFrom is later than the server time and PriceSchedulingPolicy resolves to IMMEDIATE_ONLY",
+  "safe_message": "Price scheduling not allowed",
+  "retryable": false
+ },
+ {
+  "code": "PRICE_ZERO_NOT_ALLOWED",
+  "http_status": 422,
+  "condition": "amount is 0.0000 and ZeroPricePolicy resolves to DENY for the branch",
+  "safe_message": "Price zero not allowed",
+  "retryable": false
+ },
+ {
+  "code": "PRICING_POLICY_REJECTED",
+  "http_status": 409,
+  "condition": "downstream pricing.Quote",
+  "safe_message": "Pricing policy rejected",
+  "retryable": false
+ },
+ {
+  "code": "PRICING_PRICERULE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "priceRule not found",
+  "safe_message": "Pricing pricerule not found",
+  "retryable": false
+ },
+ {
+  "code": "PRICING_PRICINGSNAPSHOT_NOT_FOUND",
+  "http_status": 404,
+  "condition": "orderDiscounts not found",
+  "safe_message": "Pricing pricingsnapshot not found",
+  "retryable": false
+ },
+ {
+  "code": "PRICING_SNAPSHOT_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Pricing snapshot not found",
+  "retryable": false
+ },
+ {
+  "code": "PRINT_ATTEMPT_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Print attempt not found",
+  "retryable": false
+ },
+ {
+  "code": "PRINT_JOB_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Print job not found",
+  "retryable": false
+ },
+ {
+  "code": "PRINT_JOB_NOT_RETRYABLE",
+  "http_status": 409,
+  "condition": "job SUCCEEDED or PENDING",
+  "safe_message": "Print job not retryable",
+  "retryable": false
+ },
+ {
+  "code": "PRODUCTION_RUN_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Production run not found",
+  "retryable": false
+ },
+ {
+  "code": "PRODUCT_AVAILABILITY_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Product availability not found",
+  "retryable": false
+ },
+ {
+  "code": "PRODUCT_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Product not found",
+  "retryable": false
+ },
+ {
+  "code": "PRODUCT_UNAVAILABLE",
+  "http_status": 409,
+  "condition": "product SOLD_OUT/BLOCKED or inactive",
+  "safe_message": "Product unavailable",
+  "retryable": false
+ },
+ {
+  "code": "PROMOTION_CODE_INVALID",
+  "http_status": 422,
+  "condition": "the code matches no active promotion valid now for this branch and channel (also returned for an expired, future, inactive or other-branch code: no existence leak)",
+  "safe_message": "Promotion code invalid",
+  "retryable": false
+ },
+ {
+  "code": "PROMOTION_CODE_TAKEN",
+  "http_status": 409,
+  "condition": "another promotion already uses this code (archived promotions included)",
+  "safe_message": "Promotion code taken",
+  "retryable": false
+ },
+ {
+  "code": "PROMOTION_NOT_APPLICABLE",
+  "http_status": 422,
+  "condition": "the promotion is valid but its conditions do not hold for this order (minimum subtotal, schedule window, channel)",
+  "safe_message": "Promotion not applicable",
+  "retryable": false
+ },
+ {
+  "code": "PROMOTION_NOT_FOUND",
+  "http_status": 404,
+  "condition": "the promotion id does not exist",
+  "safe_message": "Promotion not found",
+  "retryable": false
+ },
+ {
+  "code": "PURCHASE_ORDER_HAS_RECEIPTS",
+  "http_status": 409,
+  "condition": "PO cancel rejected: receipts exist (use Close)",
+  "safe_message": "Purchase order has receipts",
+  "retryable": false
+ },
+ {
+  "code": "PURCHASE_ORDER_LINE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Purchase order line not found",
+  "retryable": false
+ },
+ {
+  "code": "PURCHASE_ORDER_NOT_DRAFT",
+  "http_status": 409,
+  "condition": "PO not DRAFT",
+  "safe_message": "Purchase order not draft",
+  "retryable": false
+ },
+ {
+  "code": "PURCHASE_ORDER_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Purchase order not found",
+  "retryable": false
+ },
+ {
+  "code": "PURCHASE_ORDER_NOT_OPEN",
+  "http_status": 409,
+  "condition": "PO CLOSED/CANCELLED/RECEIVED",
+  "safe_message": "Purchase order not open",
+  "retryable": false
+ },
+ {
+  "code": "PURCHASING_PURCHASEORDER_NOT_FOUND",
+  "http_status": 404,
+  "condition": "ref_purchaseOrderId not found",
+  "safe_message": "Purchasing purchaseorder not found",
+  "retryable": false
+ },
+ {
+  "code": "QUANTITY_PRECISION_UNSUPPORTED",
+  "http_status": 409,
+  "condition": "Explicit stock owner eligibility/quantity boundary",
+  "safe_message": null,
+  "retryable": false
+ },
+ {
+  "code": "RATE_LIMITED",
+  "http_status": 429,
+  "condition": "rate limit; Retry-After header",
+  "safe_message": "Rate limited",
+  "retryable": true
+ },
+ {
+  "code": "REASON_CODE_INVALID",
+  "http_status": 400,
+  "condition": "reasonCode unknown, inactive or wrong ReasonKind",
+  "safe_message": "Reason code invalid",
+  "retryable": false
+ },
+ {
+  "code": "REASON_CODE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Reason code not found",
+  "retryable": false
+ },
+ {
+  "code": "REASON_CODE_TAKEN",
+  "http_status": 409,
+  "condition": "another reason code of the same kind already uses this code",
+  "safe_message": "Reason code taken",
+  "retryable": false
+ },
+ {
+  "code": "REASON_REQUIRED",
+  "http_status": 400,
+  "condition": "reasonCode (and note when requiresNote) required",
+  "safe_message": "Reason required",
+  "retryable": false
+ },
+ {
+  "code": "RECEIPT_ALREADY_REVERSED",
+  "http_status": 409,
+  "condition": "receipt already reversed",
+  "safe_message": "Receipt already reversed",
+  "retryable": false
+ },
+ {
+  "code": "RECIPES_RECIPEVERSION_NOT_FOUND",
+  "http_status": 404,
+  "condition": "ref_recipeVersionId not found",
+  "safe_message": "Recipes recipeversion not found",
+  "retryable": false
+ },
+ {
+  "code": "RECIPES_RECIPE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "ref_recipeId not found",
+  "safe_message": "Recipes recipe not found",
+  "retryable": false
+ },
+ {
+  "code": "RECIPE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Recipe not found",
+  "retryable": false
+ },
+ {
+  "code": "RECIPE_VERSION_NOT_FOUND",
+  "http_status": 404,
+  "condition": null,
+  "safe_message": "Recipe version not found",
+  "retryable": false
+ },
+ {
+  "code": "RECONCILIATION_NOT_ACKNOWLEDGEABLE",
+  "http_status": 409,
+  "condition": "only UNEXPLAINED_DIFFERENCE/EXPLAINED results can be acknowledged; BROKEN_INVARIANT never",
+  "safe_message": "Reconciliation not acknowledgeable",
+  "retryable": false
+ },
+ {
+  "code": "RECONCILIATION_RESULT_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Reconciliation result not found",
+  "retryable": false
+ },
+ {
+  "code": "RECONCILIATION_RUN_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Reconciliation run not found",
+  "retryable": false
+ },
+ {
+  "code": "REFUNDS_REFUNDCASE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "ref_refundCaseId not found",
+  "safe_message": "Refunds refundcase not found",
+  "retryable": false
+ },
+ {
+  "code": "REFUNDS_REFUNDFINANCIALENTRY_NOT_FOUND",
+  "http_status": 404,
+  "condition": "refundFinancialEntry not found",
+  "safe_message": "Refunds refundfinancialentry not found",
+  "retryable": false
+ },
+ {
+  "code": "REFUND_ALLOCATION_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Refund allocation not found",
+  "retryable": false
+ },
+ {
+  "code": "REFUND_CASE_ALLOCATION_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Refund case allocation not found",
+  "retryable": false
+ },
+ {
+  "code": "REFUND_CASE_LINE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Refund case line not found",
+  "retryable": false
+ },
+ {
+  "code": "REFUND_CASE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Refund case not found",
+  "retryable": false
+ },
+ {
+  "code": "REFUND_CASE_NOT_PENDING",
+  "http_status": 409,
+  "condition": "case not PENDING_APPROVAL",
+  "safe_message": "Refund case not pending",
+  "retryable": false
+ },
+ {
+  "code": "REFUND_EXCEEDS_CAPTURE",
+  "http_status": 409,
+  "condition": "allocation > capture remaining",
+  "safe_message": "Refund exceeds capture",
+  "retryable": false
+ },
+ {
+  "code": "REFUND_EXCEEDS_PAID",
+  "http_status": 409,
+  "condition": "total > effectivePaid",
+  "safe_message": "Refund exceeds paid",
+  "retryable": false
+ },
+ {
+  "code": "REFUND_FINANCIAL_ENTRY_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Refund financial entry not found",
+  "retryable": false
+ },
+ {
+  "code": "REPORT_EXECUTION_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Report execution not found",
+  "retryable": false
+ },
+ {
+  "code": "REPORT_NOT_FOUND",
+  "http_status": 404,
+  "condition": "reportId is not in the report catalog, or the caller may not run it (no existence leak)",
+  "safe_message": "Report not found",
+  "retryable": false
+ },
+ {
+  "code": "RETURN_DISPOSITION_ENTRY_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Return disposition entry not found",
+  "retryable": false
+ },
+ {
+  "code": "REVERSAL_EXCEEDS_OUTSTANDING_OBLIGATION",
+  "http_status": 409,
+  "condition": "downstream inventory.ReverseOutstandingObligation",
+  "safe_message": "Reversal exceeds outstanding obligation",
+  "retryable": false
+ },
+ {
+  "code": "ROLE_ASSIGNMENT_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Role assignment not found",
+  "retryable": false
+ },
+ {
+  "code": "ROLE_INACTIVE",
+  "http_status": 409,
+  "condition": "assignment references an inactive role",
+  "safe_message": "Role inactive",
+  "retryable": false
+ },
+ {
+  "code": "ROLE_NAME_TAKEN",
+  "http_status": 409,
+  "condition": "role name not unique",
+  "safe_message": "Role name taken",
+  "retryable": false
+ },
+ {
+  "code": "ROLE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Role not found",
+  "retryable": false
+ },
+ {
+  "code": "ROUTE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "no such route",
+  "safe_message": "Route not found",
+  "retryable": false
+ },
+ {
+  "code": "ROUTING_RULE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Routing rule not found",
+  "retryable": false
+ },
+ {
+  "code": "SALES_WAREHOUSE_NOT_CONFIGURED",
+  "http_status": 409,
+  "condition": "branch has no sales warehouse",
+  "safe_message": "Sales warehouse not configured",
+  "retryable": false
+ },
+ {
+  "code": "SELF_APPROVAL_DENIED",
+  "http_status": 403,
+  "condition": "SelfApprovalPolicy denies approver == requester",
+  "safe_message": "Self approval denied",
+  "retryable": false
+ },
+ {
+  "code": "SERVICE_UNAVAILABLE",
+  "http_status": 503,
+  "condition": "dependency down before any write",
+  "safe_message": "Service unavailable",
+  "retryable": true
+ },
+ {
+  "code": "SESSIONS_SESSIONCLOSESNAPSHOT_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Session close snapshot not found",
+  "retryable": false
+ },
+ {
+  "code": "SESSIONS_SESSION_NOT_FOUND",
+  "http_status": 404,
+  "condition": "ref_sessionId not found",
+  "safe_message": "Sessions session not found",
+  "retryable": false
+ },
+ {
+  "code": "SESSION_ALREADY_OPEN",
+  "http_status": 409,
+  "condition": "terminal already has an OPEN session",
+  "safe_message": "Session already open",
+  "retryable": false
+ },
+ {
+  "code": "SESSION_CLOSE_SNAPSHOT_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Session close snapshot not found",
+  "retryable": false
+ },
+ {
+  "code": "SESSION_HAS_OPEN_ORDERS",
+  "http_status": 409,
+  "condition": "DRAFT/CONFIRMED orders on the session",
+  "safe_message": "Session has open orders",
+  "retryable": false
+ },
+ {
+  "code": "SESSION_NOT_FOUND",
+  "http_status": 404,
+  "condition": "downstream sessions.AssertOpen",
+  "safe_message": "Session not found",
+  "retryable": false
+ },
+ {
+  "code": "SESSION_NOT_OPEN",
+  "http_status": 409,
+  "condition": "downstream cash.RecordRefundEffect",
+  "safe_message": "Session not open",
+  "retryable": false
+ },
+ {
+  "code": "SETTINGS_POLICYVALUE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "currentPolicyValue not found",
+  "safe_message": "Settings policyvalue not found",
+  "retryable": false
+ },
+ {
+  "code": "SETTINGS_POLICY_SCOPE_NOT_ALLOWED",
+  "http_status": 422,
+  "condition": "scopeType is not one of the policy scope dimensions (tenant, branch, terminal)",
+  "safe_message": "Settings policy scope not allowed",
+  "retryable": false
+ },
+ {
+  "code": "SETTINGS_POLICY_UNKNOWN",
+  "http_status": 404,
+  "condition": "policyId is not in the typed policy registry (canonical policies plus accepted policy fragments)",
+  "safe_message": "Settings policy unknown",
+  "retryable": false
+ },
+ {
+  "code": "SETTINGS_PROFILE_ALREADY_APPLIED",
+  "http_status": 409,
+  "condition": "the tenant already has at least one settings.PolicyValue row; later changes go through Settings.UpdatePolicy",
+  "safe_message": "Settings profile already applied",
+  "retryable": false
+ },
+ {
+  "code": "SPLIT_TENDER_DISABLED",
+  "http_status": 409,
+  "condition": "SplitTenderPolicy false and a capture exists",
+  "safe_message": "Split tender disabled",
+  "retryable": false
+ },
+ {
+  "code": "STOCK_BALANCE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Stock balance not found",
+  "retryable": false
+ },
+ {
+  "code": "STOCK_COUNT_INCOMPLETE",
+  "http_status": 409,
+  "condition": "line without counted quantity",
+  "safe_message": "Stock count incomplete",
+  "retryable": false
+ },
+ {
+  "code": "STOCK_COUNT_LINE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Stock count line not found",
+  "retryable": false
+ },
+ {
+  "code": "STOCK_COUNT_NOT_DRAFT",
+  "http_status": 409,
+  "condition": "count not DRAFT",
+  "safe_message": "Stock count not draft",
+  "retryable": false
+ },
+ {
+  "code": "STOCK_COUNT_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Stock count not found",
+  "retryable": false
+ },
+ {
+  "code": "STOCK_COUNT_NOT_SUBMITTED",
+  "http_status": 409,
+  "condition": "count not SUBMITTED",
+  "safe_message": "Stock count not submitted",
+  "retryable": false
+ },
+ {
+  "code": "STOCK_MOVEMENT_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Stock movement not found",
+  "retryable": false
+ },
+ {
+  "code": "STOCK_MOVEMENT_REJECTED",
+  "http_status": 409,
+  "condition": "downstream stock_movements.Append",
+  "safe_message": "Stock movement rejected",
+  "retryable": false
+ },
+ {
+  "code": "STOCK_UNIT_MISMATCH",
+  "http_status": 409,
+  "condition": "Explicit stock owner eligibility/quantity boundary",
+  "safe_message": null,
+  "retryable": false
+ },
+ {
+  "code": "SUBMISSION_ATTEMPT_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Submission attempt not found",
+  "retryable": false
+ },
+ {
+  "code": "SUPPLIERS_SUPPLIER_NOT_FOUND",
+  "http_status": 404,
+  "condition": "ref_supplierId not found",
+  "safe_message": "Suppliers supplier not found",
+  "retryable": false
+ },
+ {
+  "code": "SUPPLIER_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Supplier not found",
+  "retryable": false
+ },
+ {
+  "code": "SUPPLIER_RETURN_LINE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Supplier return line not found",
+  "retryable": false
+ },
+ {
+  "code": "SUPPLIER_RETURN_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Supplier return not found",
+  "retryable": false
+ },
+ {
+  "code": "TABLES_TABLE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "ref_tableId not found",
+  "safe_message": "Tables table not found",
+  "retryable": false
+ },
+ {
+  "code": "TABLE_HAS_OPEN_CHECKS",
+  "http_status": 409,
+  "condition": "the visit still has a check that is not completed, cancelled or voided",
+  "safe_message": "Table has open checks",
+  "retryable": false
+ },
+ {
+  "code": "TABLE_INACTIVE",
+  "http_status": 409,
+  "condition": "table is deactivated",
+  "safe_message": "Table inactive",
+  "retryable": false
+ },
+ {
+  "code": "TABLE_NAME_TAKEN",
+  "http_status": 409,
+  "condition": "table name not unique in branch",
+  "safe_message": "Table name taken",
+  "retryable": false
+ },
+ {
+  "code": "TABLE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Table not found",
+  "retryable": false
+ },
+ {
+  "code": "TABLE_NOT_OCCUPIED",
+  "http_status": 409,
+  "condition": "no occupancy to release/transfer",
+  "safe_message": "Table not occupied",
+  "retryable": false
+ },
+ {
+  "code": "TABLE_OCCUPANCY_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Table occupancy not found",
+  "retryable": false
+ },
+ {
+  "code": "TABLE_OCCUPIED",
+  "http_status": 409,
+  "condition": "table already occupied",
+  "safe_message": "Table occupied",
+  "retryable": false
+ },
+ {
+  "code": "TABLE_VISIT_CLOSED",
+  "http_status": 409,
+  "condition": "the referenced table visit is CLOSED; open a new visit",
+  "safe_message": "Table visit closed",
+  "retryable": false
+ },
+ {
+  "code": "TABLE_VISIT_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Table visit not found",
+  "retryable": false
+ },
+ {
+  "code": "TAX_CALCULATION_FAILED",
+  "http_status": 409,
+  "condition": "downstream taxes.Calculate",
+  "safe_message": "Tax calculation failed",
+  "retryable": false
+ },
+ {
+  "code": "TAX_POLICY_ARCHIVED",
+  "http_status": 409,
+  "condition": "the tax policy is archived (active false): it cannot be configured or newly assigned to a product",
+  "safe_message": "Tax policy archived",
+  "retryable": false
+ },
+ {
+  "code": "TAX_POLICY_IN_USE",
+  "http_status": 409,
+  "condition": "the tax policy cannot be archived: at least one product (archived products included) references it, or it is the value of ProductTaxDefaultPolicy",
+  "safe_message": "Tax policy in use",
+  "retryable": false
+ },
+ {
+  "code": "TAX_POLICY_NOT_FOUND",
+  "http_status": 404,
+  "condition": "downstream taxes.Calculate",
+  "safe_message": "Tax policy not found",
+  "retryable": false
+ },
+ {
+  "code": "TENDER_CORRECTION_SAME_METHOD",
+  "http_status": 400,
+  "condition": "from and to method equal",
+  "safe_message": "Tender correction same method",
+  "retryable": false
+ },
+ {
+  "code": "TENDER_METHOD_DISABLED",
+  "http_status": 409,
+  "condition": "method not enabled by TenderMethodPolicy",
+  "safe_message": "Tender method disabled",
+  "retryable": false
+ },
+ {
+  "code": "TENDER_REFERENCE_REQUIRED",
+  "http_status": 400,
+  "condition": "a recorded external tender (CARD) was captured without externalReference",
+  "safe_message": "Tender reference required",
+  "retryable": false
+ },
+ {
+  "code": "TERMINAL_CODE_TAKEN",
+  "http_status": 409,
+  "condition": "terminal code not unique in branch",
+  "safe_message": "Terminal code taken",
+  "retryable": false
+ },
+ {
+  "code": "TERMINAL_NOT_ACTIVE",
+  "http_status": 409,
+  "condition": "terminal decommissioned or not in branch",
+  "safe_message": "Terminal not active",
+  "retryable": false
+ },
+ {
+  "code": "TERMINAL_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Terminal not found",
+  "retryable": false
+ },
+ {
+  "code": "TIMEZONE_INVALID",
+  "http_status": 400,
+  "condition": "not an IANA timezone",
+  "safe_message": "Timezone invalid",
+  "retryable": false
+ },
+ {
+  "code": "TRANSFERS_TRANSFER_NOT_FOUND",
+  "http_status": 404,
+  "condition": "ref_transferId not found",
+  "safe_message": "Transfers transfer not found",
+  "retryable": false
+ },
+ {
+  "code": "TRANSFER_LINE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Transfer line not found",
+  "retryable": false
+ },
+ {
+  "code": "TRANSFER_NOT_DISPATCHED",
+  "http_status": 409,
+  "condition": "transfer not DISPATCHED",
+  "safe_message": "Transfer not dispatched",
+  "retryable": false
+ },
+ {
+  "code": "TRANSFER_NOT_DRAFT",
+  "http_status": 409,
+  "condition": "transfer not DRAFT",
+  "safe_message": "Transfer not draft",
+  "retryable": false
+ },
+ {
+  "code": "TRANSFER_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Transfer not found",
+  "retryable": false
+ },
+ {
+  "code": "TRANSFER_SAME_WAREHOUSE",
+  "http_status": 400,
+  "condition": "from == to",
+  "safe_message": "Transfer same warehouse",
+  "retryable": false
+ },
+ {
+  "code": "UNAUTHENTICATED",
+  "http_status": 401,
+  "condition": "missing/invalid/expired/revoked token, stale credentialVersion, or failed login (no user enumeration)",
+  "safe_message": "Unauthenticated",
+  "retryable": false
+ },
+ {
+  "code": "UNIT_CODE_TAKEN",
+  "http_status": 409,
+  "condition": "another unit already uses this code",
+  "safe_message": "Unit code taken",
+  "retryable": false
+ },
+ {
+  "code": "UNIT_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Unit not found",
+  "retryable": false
+ },
+ {
+  "code": "UNIT_PRECISION_IMMUTABLE",
+  "http_status": 409,
+  "condition": "unit precision fixed after first quantity fact",
+  "safe_message": "Unit precision immutable",
+  "retryable": false
+ },
+ {
+  "code": "UNKNOWN_OUTCOME",
+  "http_status": 503,
+  "condition": "commit acknowledgement or external adapter result unknown; retry with the SAME key only",
+  "safe_message": "Unknown outcome",
+  "retryable": true
+ },
+ {
+  "code": "UNKNOWN_PERMISSION_ID",
+  "http_status": 400,
+  "condition": "permissionIds contains an id outside the generated registry",
+  "safe_message": "Unknown permission id",
+  "retryable": false
+ },
+ {
+  "code": "USERNAME_TAKEN",
+  "http_status": 409,
+  "condition": "username not unique",
+  "safe_message": "Username taken",
+  "retryable": false
+ },
+ {
+  "code": "USER_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "User not found",
+  "retryable": false
+ },
+ {
+  "code": "VALIDATION_FAILED",
+  "http_status": 400,
+  "condition": "request schema, type, enum, decimal scale or bound violated",
+  "safe_message": "Validation failed",
+  "retryable": false
+ },
+ {
+  "code": "VARIANT_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Variant not found",
+  "retryable": false
+ },
+ {
+  "code": "WAREHOUSES_WAREHOUSE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "ref_warehouseId not found",
+  "safe_message": "Warehouses warehouse not found",
+  "retryable": false
+ },
+ {
+  "code": "WAREHOUSE_INACTIVE",
+  "http_status": 409,
+  "condition": "Explicit stock owner eligibility/quantity boundary",
+  "safe_message": null,
+  "retryable": false
+ },
+ {
+  "code": "WAREHOUSE_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Warehouse not found",
+  "retryable": false
+ },
+ {
+  "code": "WASTE_RECORD_NOT_FOUND",
+  "http_status": 404,
+  "condition": "Authoritative record absent",
+  "safe_message": "Waste record not found",
+  "retryable": false
+ }
+]

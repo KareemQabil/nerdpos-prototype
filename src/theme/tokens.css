@@ -1,0 +1,168 @@
+/* =====================================================================
+   NerdPOS design system — the ONE theme file.
+   Copied from the legacy frontend (src/app/styles/globals.css + glass.css)
+   and DESIGN_SYSTEM.md. Swapping the design system = replacing this file.
+   ===================================================================== */
+@import "tailwindcss";
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-container: var(--primary-container);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-info: var(--info);
+  --font-sans: 'Almarai', 'Inter', system-ui, sans-serif;
+  --font-numbers: 'Arial', 'Inter', sans-serif;
+  --animate-fade-in: fade-in 0.2s ease-out;
+  --animate-scale-in: scale-in 0.2s ease-out;
+  --animate-slide-up: slide-up 0.3s ease-out;
+  --animate-pulse-glow: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes fade-in { from { opacity: 0 } to { opacity: 1 } }
+@keyframes scale-in { from { transform: scale(.95); opacity: 0 } to { transform: scale(1); opacity: 1 } }
+@keyframes slide-up { from { transform: translateY(16px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
+@keyframes pulse-glow { 0%,100% { box-shadow: 0 0 0 0 var(--primary-glow) } 50% { box-shadow: 0 0 20px 8px var(--primary-glow-dim) } }
+
+/* Dark (default legacy) */
+:root, [data-theme="dark"] {
+  --primary: #22d3ee;
+  --primary-foreground: #0a1929;
+  --primary-container: rgba(34, 211, 238, 0.15);
+  --primary-glow: rgba(34, 211, 238, 0.4);
+  --primary-glow-dim: rgba(34, 211, 238, 0.2);
+  --background: #020617;
+  --foreground: #f1f5f9;
+  --card: #0f172a;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --border: rgba(71, 85, 105, 0.5);
+  --success: #10b981;
+  --warning: #fbbf24;
+  --error: #f87171;
+  --info: #60a5fa;
+  --glass-bg: rgba(15, 23, 42, 0.6);
+  --glass-bg-light: rgba(15, 23, 42, 0.4);
+  --glass-bg-strong: rgba(15, 23, 42, 0.85);
+  --glass-border: rgba(148, 163, 184, 0.15);
+  --app-bg: linear-gradient(135deg, #023047 0%, #001219 50%, #000a0f 100%);
+  --sidebar-bg: linear-gradient(180deg, #023047, #001219);
+  --surface-1: rgba(255, 255, 255, 0.05);
+  --surface-2: rgba(255, 255, 255, 0.08);
+  --surface-3: rgba(255, 255, 255, 0.12);
+  --line: rgba(255, 255, 255, 0.08);
+  --text-dim: rgba(255, 255, 255, 0.5);
+  --text-soft: rgba(255, 255, 255, 0.7);
+}
+
+[data-theme="light"] {
+  --primary: #0891b2;
+  --primary-foreground: #ffffff;
+  --primary-container: rgba(8, 145, 178, 0.15);
+  --primary-glow: rgba(8, 145, 178, 0.3);
+  --primary-glow-dim: rgba(8, 145, 178, 0.15);
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --border: rgba(148, 163, 184, 0.5);
+  --success: #059669;
+  --warning: #d97706;
+  --error: #dc2626;
+  --info: #2563eb;
+  --glass-bg: rgba(255, 255, 255, 0.75);
+  --glass-bg-light: rgba(255, 255, 255, 0.55);
+  --glass-bg-strong: rgba(255, 255, 255, 0.92);
+  --glass-border: rgba(148, 163, 184, 0.35);
+  --app-bg: linear-gradient(135deg, #e0f2fe 0%, #f8fafc 50%, #eef2f7 100%);
+  --sidebar-bg: linear-gradient(180deg, #0e3a52, #062231);
+  --surface-1: rgba(15, 23, 42, 0.04);
+  --surface-2: rgba(15, 23, 42, 0.06);
+  --surface-3: rgba(15, 23, 42, 0.1);
+  --line: rgba(15, 23, 42, 0.1);
+  --text-dim: rgba(15, 23, 42, 0.55);
+  --text-soft: rgba(15, 23, 42, 0.75);
+}
+
+[data-theme="luxury"] {
+  --primary: #f59e0b;
+  --primary-foreground: #000000;
+  --primary-container: rgba(245, 158, 11, 0.15);
+  --primary-glow: rgba(245, 158, 11, 0.4);
+  --primary-glow-dim: rgba(245, 158, 11, 0.2);
+  --background: #000000;
+  --foreground: #fafaf9;
+  --card: #0a0a0a;
+  --muted: #171717;
+  --muted-foreground: #a8a29e;
+  --border: rgba(120, 113, 108, 0.5);
+  --success: #10b981;
+  --warning: #eab308;
+  --error: #ef4444;
+  --info: #3b82f6;
+  --glass-bg: rgba(10, 10, 10, 0.65);
+  --glass-bg-light: rgba(10, 10, 10, 0.4);
+  --glass-bg-strong: rgba(10, 10, 10, 0.9);
+  --glass-border: rgba(245, 158, 11, 0.2);
+  --app-bg: linear-gradient(135deg, #1c1408 0%, #000 60%);
+  --sidebar-bg: linear-gradient(180deg, #1c1408, #000);
+  --surface-1: rgba(255, 255, 255, 0.04);
+  --surface-2: rgba(255, 255, 255, 0.07);
+  --surface-3: rgba(255, 255, 255, 0.11);
+  --line: rgba(245, 158, 11, 0.12);
+  --text-dim: rgba(250, 250, 249, 0.5);
+  --text-soft: rgba(250, 250, 249, 0.75);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+html { font-family: 'Almarai', 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+body { margin: 0; background: var(--app-bg); color: var(--foreground); }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+input, select, textarea { font: inherit; color: inherit; }
+
+/* Numbers and prices are always LTR, Arial */
+.num, [data-numeric] { direction: ltr; unicode-bidi: isolate; font-family: 'Arial', 'Inter', sans-serif; font-variant-numeric: tabular-nums; }
+
+/* Glass utilities (legacy glass.css) */
+.glass { background: var(--glass-bg); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid var(--glass-border); box-shadow: 0 8px 32px rgba(0,0,0,.12); }
+.glass-strong { background: var(--glass-bg-strong); backdrop-filter: blur(32px); -webkit-backdrop-filter: blur(32px); border: 1px solid var(--glass-border); box-shadow: 0 12px 48px rgba(0,0,0,.18); }
+.glass-light { background: var(--glass-bg-light); backdrop-filter: blur(16px); border: 1px solid var(--glass-border); }
+.glass-overlay { background: rgba(0,0,0,.55); backdrop-filter: blur(4px); }
+.glass-input { background: var(--surface-1); border: 1px solid var(--border); border-radius: .75rem; padding: .6rem .8rem; transition: all .2s ease; outline: none; }
+.glass-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow-dim); }
+.surface-1 { background: var(--surface-1); }
+.surface-2 { background: var(--surface-2); }
+.surface-3 { background: var(--surface-3); }
+.line { border-color: var(--line); }
+.text-dim { color: var(--text-dim); }
+.text-soft { color: var(--text-soft); }
+.sidebar-bg { background: var(--sidebar-bg); }
+.btn-primary-grad { background: linear-gradient(90deg, var(--primary), color-mix(in srgb, var(--primary) 80%, #0369a1)); color: var(--primary-foreground); box-shadow: 0 0 24px var(--primary-glow-dim); }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: rgba(255,255,255,.04); }
+::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--primary) 40%, transparent); border-radius: 4px; }
+* { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--primary) 40%, transparent) transparent; }
+*:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.scrollbar-hide { scrollbar-width: none; }
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+
+/* Feedback mode: highlight hovered element */
+.fb-mode [data-fb-hover] { outline: 2px dashed #f472b6 !important; outline-offset: 2px; cursor: crosshair !important; }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+
+/* Receipt paper */
+.paper { background: #fffef8; color: #111; font-family: 'Almarai', 'Arial', sans-serif; }
+.paper .num { font-family: 'Courier New', monospace; }
