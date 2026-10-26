@@ -1,11 +1,11 @@
 // Counter and takeaway: order, pay first (fire at confirm), receipt. Also the staff meal (D9, direction).
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Plus, ShoppingBag, Utensils, Coffee, Bike, Wallet } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../app/hooks';
 import { OrderWorkspace, needsDialog } from './OrderScreen';
 import { MenuGrid } from './order/MenuGrid';
 import { ProductDialog, type LineDraft } from './order/ProductDialog';
-import { PageHeader, StateBadge, Button, Banner, Money, Pill, Modal, Input, Field, EmptyState, Skeleton } from '../ui';
+import { PageHeader, StateBadge, Button, Banner, Money, Pill, Modal, Input, Field, EmptyState, Skeleton, Kbd } from '../ui';
 import { t, L } from '../i18n';
 import { cn, money, qty } from '../lib/format';
 import { StatusPill } from './order/CheckPanel';
@@ -21,6 +21,16 @@ export default function Counter() {
     const o = await run<any>('Order.Create', { body: { channel } }, { success: channel === 'TAKEAWAY' ? t('طلب تيك أواي جديد') : t('طلب صالة كاونتر جديد') });
     if (o) nav('counter', { orderId: o.id });
   };
+  // cashier keyboard: F2 = new takeaway
+  const createRef = useRef(create);
+  createRef.current = create;
+  const hasSession = !!session.data;
+  useEffect(() => {
+    if (!hasSession) return;
+    const h = (e: KeyboardEvent) => { if (e.key === 'F2' && !document.querySelector('[role="dialog"]')) { e.preventDefault(); createRef.current('TAKEAWAY'); } };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [hasSession]);
   if (!terminal?.drawer) return <EmptyState icon={<ShoppingBag />} title={t('الجهاز ده من غير درج')} text={t('البيع على الكاونتر والتيك أواي بيكون من جهاز الكاشير اللي فيه درج.')} />;
   if (session.loading && !session.data) return <Skeleton className="h-64 rounded-2xl" />;
   if (!session.data) return (
@@ -35,7 +45,7 @@ export default function Counter() {
       <div className="flex items-center gap-2 flex-wrap">
         <h1 className="text-[22px] font-extrabold tracking-tight me-1">{t('نقطة البيع')}</h1>
         <StateBadge ops={['Order.Create', 'Order.AddLines', 'Order.Confirm', 'Payment.Capture', 'Order.Complete']} />
-        <Button variant="primary" size="lg" onClick={() => create('TAKEAWAY')} loading={busy} data-fb="new-takeaway"><ShoppingBag className="w-4 h-4" />{t('تيك أواي جديد')}</Button>
+        <Button variant="primary" size="lg" onClick={() => create('TAKEAWAY')} loading={busy} data-fb="new-takeaway"><ShoppingBag className="w-4 h-4" />{t('تيك أواي جديد')}<Kbd className="hidden xl:inline-flex !bg-black/10 !border-black/10 !text-current">F2</Kbd></Button>
         <Button size="lg" onClick={() => create('DINE_IN')} loading={busy} data-fb="new-counter-dinein"><Utensils className="w-4 h-4" />{t('صالة كاونتر')}</Button>
         {can('delivery:create') && <Button size="lg" onClick={() => nav('delivery-new')} data-fb="counter-delivery"><Bike className="w-4 h-4" />{t('دليفري')}</Button>}
         <Button variant="ghost" size="lg" onClick={() => setStaffMeal(true)} data-fb="staff-meal"><Coffee className="w-4 h-4" />{t('وجبة موظف')} <StateBadge state="PROPOSED" /></Button>

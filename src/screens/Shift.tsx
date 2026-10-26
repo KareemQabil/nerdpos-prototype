@@ -21,7 +21,8 @@ const DENOMS: { p: number; label: string; coin?: boolean }[] = [
 const fromPiasters = (p: number) => `${Math.floor(p / 100)}.${String(p % 100).padStart(2, '0')}`;
 
 export default function Shift() {
-  const { terminal } = useDev();
+  const { terminal, can } = useDev();
+  const canZ = can('session:zreport');
   const cur = useQuery<any>(terminal?.drawer ? 'Session.Current' : null, { query: { terminalId: terminal?.id } });
   const past = useQuery<any>('Session.Find', { query: { limit: 30 } });
   const [z, setZ] = useState<string | null>(null);
@@ -35,14 +36,14 @@ export default function Shift() {
           <Stepper steps={[{ label: t('افتح الوردية'), hint: t('الفكة أول اليوم') }, { label: t('اشتغل'), hint: t('بيع وتحصيل') }, { label: t('اعد الدرج'), hint: t('بالفئات') }, { label: t('اقفل'), hint: t('تقرير القفلة') }]} current={open ? 1 : 0} />
         </Card>
       )}
-      {terminal?.drawer && (cur.loading && !cur.data ? <Skeleton className="h-48 rounded-2xl" /> : open ? <OpenSession sid={cur.data.id} onZ={setZ} /> : <OpenShift />)}
+      {terminal?.drawer && (cur.loading && !cur.data ? <Skeleton className="h-48 rounded-2xl" /> : open ? <OpenSession sid={cur.data.id} onZ={(id) => (canZ ? setZ(id) : undefined)} /> : <OpenShift />)}
       <Card title={<span className="flex items-center gap-2"><History className="w-4 h-4" />{t('الورديات')}</span>} padding="none">
         <Table align={['start', 'start', 'start', 'start', 'start', 'end', 'end']} loading={past.loading} maxHeight={420}
           head={[t('الجهاز'), t('الكاشير'), t('الحالة'), t('فتحت'), t('اتقفلت'), t('فرق العد'), '']}
           rows={(past.data?.items ?? []).map((s: any) => [
             deviceName(s.terminalId), personName(null, s.cashierName), <Pill tone={s.state === 'OPEN' ? 'success' : 'neutral'} dot>{s.state === 'OPEN' ? t('مفتوحة') : t('مقفولة')}</Pill>, <span className="num text-xs">{dateTime(s.openedAt)}</span>, <span className="num text-xs">{s.closedAt ? dateTime(s.closedAt) : '—'}</span>,
             s.close ? <VarianceText v={s.close.variance} short /> : <span className="text-dim">—</span>,
-            s.state === 'CLOSED' ? <Button size="sm" variant="ghost" onClick={() => setZ(s.id)} data-fb={`z-open:${s.id}`}><FileText className="w-3.5 h-3.5" />{t('تقرير القفلة')}</Button> : null,
+            s.state === 'CLOSED' && canZ ? <Button size="sm" variant="ghost" onClick={() => setZ(s.id)} data-fb={`z-open:${s.id}`}><FileText className="w-3.5 h-3.5" />{t('تقرير القفلة')}</Button> : null,
           ])} empty={<EmptyState compact icon={<Clock />} title={t('لسه مفيش ورديات')} text={t('أول وردية هتظهر هنا بعد ما تتفتح.')} />} />
       </Card>
       {z && <ZDialog sid={z} onClose={() => setZ(null)} />}

@@ -63,7 +63,7 @@ export default function Drivers() {
       {!terminal?.drawer && <Banner tone="info">{t('استلام فلوس الطيار بيتعمل من جهاز الكاشير اللي فيه درج مفتوح (الفلوس بتدخل الدرج ده).')}</Banner>}
       <Card title={<span className="flex items-center gap-2"><History className="w-4 h-4" />{t('آخر تسليمات الفلوس')}</span>}>
         <Table head={[t('الوقت'), t('الطيار'), t('المفروض'), t('اتعد'), t('الفرق'), t('عدد الطلبات'), t('استلم')]} empty={t('لسه مفيش تسليمات النهارده')}
-          rows={(q.data?.recentSettlements ?? []).map((x: any) => [<span className="num text-xs">{dateTime(x.at)}</span>, x.driverName, <Money v={x.expected} />, <Money v={x.counted} />, <Money v={x.variance} tone={Number(x.variance) < 0 ? 'error' : Number(x.variance) > 0 ? 'success' : 'dim'} />, x.deliveryIds.length, x.byName])} />
+          rows={(q.data?.recentSettlements ?? []).map((x: any) => [<span className="num text-xs">{dateTime(x.at)}</span>, x.driverName, <Money v={x.expected} />, <Money v={x.counted} />, <Money v={x.variance} tone={Number(x.variance) < 0 ? 'error' : Number(x.variance) > 0 ? 'success' : 'dim'} />, <span className="num">{x.deliveryIds.length}</span>, x.byName])} />
       </Card>
       {edit && <DriverDialog d={edit} onClose={() => setEdit(null)} />}
       {settle && <SettleDialog d={settle} onClose={() => setSettle(null)} />}
@@ -122,12 +122,16 @@ function SettleDialog({ d, onClose }: { d: any; onClose: () => void }) {
         </div>
       ) : (
         <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-2xl p-3 text-center border border-[color-mix(in_srgb,var(--warning)_40%,transparent)] bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]"><div className="text-xs text-soft font-bold">{all ? t('المفروض يسلّم') : t('الطلبات المختارة')}</div>{all ? <Money v={d.cashInHand} className="text-3xl" /> : <div className="text-3xl font-extrabold num">{chosen.length}</div>}</div>
+            <div className="rounded-2xl p-3 text-center border border-[color-mix(in_srgb,var(--primary)_30%,transparent)] bg-[var(--primary-container)]"><div className="text-xs text-soft font-bold">{t('اللي اتعد')}</div><Money v={counted || '0'} className="text-3xl text-[var(--primary)]" /></div>
+          </div>
           <div className="text-sm text-dim">{t('اختار الطلبات اللي الطيار بيسلّم فلوسها، وعد الفلوس اللي في إيده.')}</div>
           <div className="space-y-1.5">
             {d.cashDeliveries.map((x: any) => (
               <label key={x.id} className={cn('flex items-center gap-3 rounded-xl border px-3 py-2 text-sm cursor-pointer', picked.includes(x.id) ? 'border-[var(--primary)] bg-[var(--primary-container)]' : 'surface-1 border-[var(--glass-border)]')}>
                 <input type="checkbox" checked={picked.includes(x.id)} onChange={(e) => setPicked(e.target.checked ? [...picked, x.id] : picked.filter((p) => p !== x.id))} />
-                <span className="flex-1">{x.number} · #{x.orderNumber} · {x.customerName}<span className="block text-[11px] text-dim">{t('اتسلّم')} {time(x.deliveredAt)}</span></span>
+                <span className="flex-1"><span className="num">{x.number}</span> · <span className="num">#{x.orderNumber}</span> · {x.customerName}<span className="block text-[11px] text-dim">{t('اتسلّم')} {time(x.deliveredAt)}</span></span>
                 <Money v={x.amount} />
               </label>
             ))}

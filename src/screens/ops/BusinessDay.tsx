@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Moon, CheckCircle2, XCircle, AlertTriangle, ChevronDown, ArrowLeft, CalendarDays, Lock, Receipt, Users, TrendingUp, Wallet, Ban, Percent, RotateCcw, Scale, HandCoins, Clock } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';
-import { Section, StateBadge, Card, Button, Pill, Banner, Money, Field, Input, Textarea, Table, Empty, Spinner, KV } from '../../ui';
+import { Section, StateBadge, Card, Button, Pill, Banner, Money, Field, Input, Textarea, Table, Empty, Spinner, KV, confirmDialog } from '../../ui';
 import { t, L } from '../../i18n';
 import { Tech } from '../../app/tech';
 import { cn, money, dateTime } from '../../lib/format';
@@ -158,7 +158,7 @@ function ClosePanel({ d }: { d: any }) {
   const [note, setNote] = useState('');
   const [ack, setAck] = useState(false);
   useEffect(() => setAck(false), [d.date]);
-  const close = () => run('BusinessDay.Close', { params: { date: d.date }, body: { note: note || undefined, acknowledgeWarnings: d.warnings ? ack : undefined } }, { success: t('اليوم اتقفل — اليوم التجاري الجاي {n}', { n: d.nextBusinessDate }) });
+  const close = async () => (await confirmDialog(t('تقفل يوم {d}؟ بعد القفل أرقام اليوم بتتثبت وتتبعت للحسابات ومش هتتغير.', { d: dayName(d.date) }), { title: t('قفل اليوم'), confirmLabel: t('أيوه، اقفل اليوم') })) && run('BusinessDay.Close', { params: { date: d.date }, body: { note: note || undefined, acknowledgeWarnings: d.warnings ? ack : undefined } }, { success: t('اليوم اتقفل — اليوم التجاري الجاي {n}', { n: d.nextBusinessDate }) });
   return (
     <Card title={<span className="flex items-center gap-2"><Lock className="w-4 h-4" />{t('اقفل اليوم')}</span>}>
       <div className="space-y-3">
