@@ -1,0 +1,203 @@
+// Plain-language overlay for the guided journeys. The source texts (contracts/journeys.json and the inline
+// texts in scripts.ts) contain codes, ids and usernames: they stay available inside <Tech>.
+// Demo users read these: who does what, on which device, and what they should see.
+import { getLang } from '../i18n';
+
+export interface Bi { ar: string; en: string }
+export interface StepPlain { do: Bi; expect: Bi; who?: Bi }
+export interface JourneyPlain { title: Bi; intro: Bi; summary: Bi[]; needs?: Bi }
+export const pick = (b: Bi | undefined) => (b ? (getLang() === 'en' ? b.en : b.ar) : '');
+const B = (ar: string, en: string): Bi => ({ ar, en });
+const S = (doAr: string, doEn: string, exAr: string, exEn: string, who?: Bi): StepPlain => ({ do: B(doAr, doEn), expect: B(exAr, exEn), who });
+
+export const JOURNEY_PLAIN: Record<string, JourneyPlain> = {
+  'J-R1': {
+    title: B('يوم صالة كامل', 'A full dine-in day'),
+    intro: B('ويتر بيفتح ترابيزة ويبعت للمطبخ على دفعتين، إلغاء صنف بموافقة المدير، تقسيم الشيك، دفع كاش وكارت، تسليم الوردية بين كاشيرين، وتقارير الوردية.',
+      'A waiter seats a table and sends to the kitchen in two rounds, a manager-approved void, a split check, cash and card, a shift handover between two cashiers, and the shift reports.'),
+    summary: [
+      B('الويتر فتح الترابيزة والشيك من التابلت من غير درج فلوس.', 'The waiter opened the table and the check from the tablet, without a cash drawer.'),
+      B('الطلب راح المطبخ على دفعتين، وكل محطة شافت أصنافها بس.', 'The order went to the kitchen in two rounds; each station saw only its own items.'),
+      B('الصنف اللي اتبعت للمطبخ مينفعش يتعدل — اتلغى بموافقة المدير.', 'An item already sent to the kitchen cannot be edited — it was voided with a manager approval.'),
+      B('الشيك اتقسم على اتنين، واتدفع كاش وكارت.', 'The check was split in two and paid with cash and card.'),
+      B('الوردية اتقفلت بالعد الأعمى والفرق صفر، واتسلمت لكاشير تاني.', 'The shift was closed with a blind count (zero difference) and handed to another cashier.'),
+      B('تقرير قفلة الوردية بيفصل الكاش عن الكارت.', 'The end-of-shift report shows cash and card separately.'),
+    ],
+  },
+  'J-R2': {
+    title: B('إلغاء شيك بعد ما اتبعت', 'Cancelling a check after it was sent'),
+    intro: B('شيك اتبعت للمطبخ واتأكد بس ما اتدفعش — والزباين مشيوا. المدير بيلغي الشيك بموافقة مدير تاني.', 'A check was sent and confirmed but not paid — the guests left. The manager cancels it with a second manager approving.'),
+    summary: [
+      B('المدير مينفعش يوافق على طلبه هو — لازم مدير تاني.', 'A manager cannot approve their own request — another manager must.'),
+      B('الشيك الملغي بيفضل متسجل بأصنافه وأرقامه.', 'The cancelled check stays on record with its items and amounts.'),
+      B('طلب المطبخ اتلغى، والترابيزة فضيت، ومفيش فلوس اتحركت.', 'The kitchen order was cancelled, the table was freed and no money moved.'),
+    ],
+  },
+  'J-R3': {
+    title: B('الدخول وترتيب الصالة والمطبخ', 'Sign-in, floor and kitchen setup'),
+    intro: B('أعلى الشاشة بيقول مين داخل وفين، تعديل الترابيزات ومحطات المطبخ، ونقل زباين لترابيزة تانية.', 'The top of the screen shows who is signed in and where; editing tables and kitchen stations; moving guests to another table.'),
+    summary: [
+      B('بعد الخروج من الجهاز مفيش أي حركة بتعدي.', 'After signing out, nothing goes through.'),
+      B('الترابيزة المشغولة مينفعش تتوقف أو حد يتنقل عليها.', 'An occupied table cannot be turned off or used as a move target.'),
+      B('لو اتنين عدّلوا نفس الحاجة، التاني بيتنبّه ويشوف آخر نسخة.', 'If two people edit the same thing, the second one is told and sees the latest version.'),
+    ],
+  },
+  'J-R4': {
+    title: B('مرتجع كاش بموافقة مدير', 'Cash refund with a manager approval'),
+    intro: B('الزبون اشتكى من أم علي بعد ما دفع. المرتجع بيرجع كاش من الدرج بموافقة مدير تاني — ومحاولة ترجيعه على الكارت بتترفض.', 'The guest complained about the Om Ali after paying. The refund goes back as cash from the drawer with a second manager approving — refunding it to the card is refused.'),
+    needs: B('محتاجة رحلة «يوم صالة كامل» تكون اتعملت قبلها.', 'Needs the "full dine-in day" journey done first.'),
+    summary: [
+      B('المرتجع لازم يرجع بنفس طريقة الدفع (كاش لكاش).', 'A refund goes back the way it was paid (cash for cash).'),
+      B('المرتجع محتاج موافقة مدير تاني.', 'A refund needs a second manager to approve.'),
+      B('فلوس المرتجع بتطلع من الدرج وبتظهر في تقرير الوردية.', 'The refund cash leaves the drawer and shows in the shift report.'),
+    ],
+  },
+  'J-A1': {
+    title: B('تركيب مطعم من الصفر', 'Setting up a restaurant from zero'),
+    intro: B('من سيرفر فاضي لحد أول بيعة: بيانات المطعم والفرع، الأجهزة، الناس وصلاحياتهم، إعدادات مصر، الضريبة، المنيو، المطبخ، الإيصال الإلكتروني، أول وردية وأول تقرير.', 'From an empty server to the first sale: restaurant and branch, devices, people and permissions, Egypt settings, tax, menu, kitchen, e-receipts, the first shift and the first report.'),
+    summary: [
+      B('المطعم اتعمل من الصفر: الفرع والأجهزة والناس وصلاحياتهم.', 'The restaurant was built from zero: branch, devices, people and permissions.'),
+      B('إعدادات السوق المصري اتطبقت مرة واحدة وبتتراجع مع صاحب المطعم.', 'Egypt market settings were applied once, to review with the owner.'),
+      B('المنيو اتستورد من شيت: يا كله يدخل يا مفيش حاجة.', 'The menu was imported from a sheet: all or nothing.'),
+      B('أول بيعة وأول قفلة وردية وأول تقرير — كل الأرقام من السيرفر.', 'The first sale, first shift close and first report — all numbers from the server.'),
+    ],
+  },
+  'J-C1': {
+    title: B('كاونتر وتيك أواي', 'Counter & takeaway'),
+    intro: B('طلب تيك أواي على الكاشير: الدفع الأول، والطلب بيروح المطبخ وقت التأكيد، والإيصال ونسخته.', 'A takeaway at the cashier: pay first, the order goes to the kitchen on confirm, the receipt and its copy.'),
+    summary: [
+      B('التيك أواي ليه أسعار خاصة ومفيش عليه خدمة.', 'Takeaway has its own prices and no service charge.'),
+      B('الطلب راح المطبخ أول ما الشيك اتأكد.', 'The order went to the kitchen as soon as the check was confirmed.'),
+      B('نسخة الإيصال مكتوب عليها «نسخة» ومش بتعمل إيصال جديد.', 'A receipt copy says "COPY" and never creates a new receipt.'),
+    ],
+  },
+  'J-F1': {
+    title: B('لما حاجة تقع', 'When something breaks'),
+    intro: B('رد الدفع يضيع، جهازين على نفس الشيك، الطابعة تقع، شاشة المطبخ تقع، ومنظومة الإيصال الإلكتروني تقع يوم كامل — والبيع ما بيقفش.', 'A lost payment response, two devices on one check, a printer down, the kitchen screen down, and the e-receipt platform down for a day — selling never stops.'),
+    summary: [
+      B('إعادة المحاولة بعد رد ضايع مش بتكرر الدفع.', 'Retrying after a lost response never charges twice.'),
+      B('لو جهازين عدّلوا نفس الشيك، واحد بس بينجح.', 'If two devices edit one check, only one succeeds.'),
+      B('عطل الطابعة أو شاشة المطبخ أو منظومة الضرايب مش بيوقف البيع.', 'A printer, kitchen screen or tax platform outage never stops a sale.'),
+    ],
+  },
+};
+
+const MGR = B('أحمد (مدير الصالة) على كمبيوتر المدير', 'Ahmed (floor manager) on the manager PC');
+export const STEP_PLAIN: Record<string, StepPlain> = {
+  // ───────── J-R1
+  'J-R1-1': S('اعمل ترابيزة جديدة رقم 13 في التراس (4 كراسي). بعدها جرّب تعمل ترابيزة تانية اسمها 7.', 'Create a new table 13 on the terrace (4 seats). Then try to create another table named 7.',
+    'ترابيزة 13 بتظهر في القايمة. المحاولة التانية بتترفض لأن فيه ترابيزة 7 أصلًا.', 'Table 13 appears in the list. The second try is refused because table 7 already exists.', MGR),
+  'J-R1-2': S('اعمل محطة مطبخ جديدة اسمها «الحلواني»، وخلّي «أم علي» يروح عليها قبل أي قاعدة تانية.', 'Create a new kitchen station "Pastry" and send Om Ali to it before any other rule.',
+    'قايمة التوجيه بتبدأ بـ «أم علي ← الحلواني»، وبعدها باقي القواعد، وفي الآخر «أي حاجة تانية ← المشويات».', 'The routing list starts with "Om Ali → Pastry", then the other rules, and last "anything else → Grill".', MGR),
+  'J-R1-3': S('سارة تدخل على جهاز الكاشير وتفتح الوردية بـ 500 جنيه في الدرج.', 'Sara signs in on the cashier station and opens the shift with 500 EGP in the drawer.',
+    'قبل الفتح مكتوب «مفيش وردية مفتوحة». بعد الفتح الوردية مفتوحة والدرج فيه 500 جنيه.', 'Before: "no open shift". After: the shift is open with 500 EGP in the drawer.'),
+  'J-R1-4': S('محمود يدخل على تابلت الويتر، يضغط ترابيزة 7 في خريطة الصالة، وبعدين «فتح الترابيزة».', 'Mahmoud signs in on the waiter tablet, taps table 7 on the floor map, then "Open table".',
+    'ترابيزة 7 بقت مشغولة. التابلت ما طلبش وردية ولا درج.', 'Table 7 is now taken. The tablet did not ask for a shift or a drawer.'),
+  'J-R1-5': S('اضغط «شيك جديد».', 'Tap "New check".', 'شاشة الشيك بتفتح فاضية، ورقم الشيك جاي من السيرفر.', 'The check opens empty, with its number from the server.'),
+  'J-R1-6': S('من المنيو ضيف: كفتة مشوية ×2 (ميديم)، حمص ×1، عصير برتقال ×2 (كبير). وبص على الكنافة.', 'From the menu add: grilled kofta ×2 (medium), hummus ×1, orange juice ×2 (large). Look at the kunafa.',
+    'الكنافة مكتوب عليها «مش متاحة» ومينفعش تتضاف. كل الأسعار جاية من السيرفر (العصير الكبير = 50 + 10 = 60 جنيه).', 'Kunafa says "not available" and cannot be added. All prices come from the server (large juice = 50 + 10 = 60 EGP).'),
+  'J-R1-7': S('اضغط «ابعت للمطبخ».', 'Tap "Send to kitchen".', 'دي الدفعة الأولى. التلات أصناف بقوا «اتبعتوا»، ومينفعش يتعدلوا أو يتشالوا.', 'This is round 1. The three items are now "sent" and cannot be edited or removed.'),
+  'J-R1-8': S('الشيف حسن يدخل على شاشة المطبخ ويفتح محطة المشويات، وبعدين البارد، وبعدين البار.', 'Chef Hassan signs in on the kitchen screen and opens the Grill station, then Cold, then Bar.',
+    'المشويات: كفتة ×2 ميديم. البارد: حمص ×1. البار: عصير برتقال ×2 كبير. طلب واحد لكل محطة.', 'Grill: kofta ×2 medium. Cold: hummus ×1. Bar: orange juice ×2 large. One ticket per station.'),
+  'J-R1-9': S('ضيف أم علي ×1، شاي ×2 (عادي)، سلطة خضرا ×1. غيّر الشاي لـ 3. شيل السلطة. وجرّب تغيّر كمية الكفتة.', 'Add Om Ali ×1, tea ×2 (regular), green salad ×1. Change the tea to 3. Remove the salad. Try to change the kofta quantity.',
+    'أم علي والشاي ×3 لسه ما اتبعتوش. السلطة اتشالت. الكفتة مينفعش تتعدل لأنها اتبعتت للمطبخ.', 'Om Ali and tea ×3 are not sent yet. The salad is gone. The kofta cannot be changed because it was sent.'),
+  'J-R1-10': S('اضغط «ابعت للمطبخ» تاني.', 'Tap "Send to kitchen" again.',
+    'الدفعة التانية فيها أم علي والشاي ×3 بس. أم علي راحت محطة الحلواني (حسب القاعدة اللي عملناها)، والشاي راح البار. طلبات الدفعة الأولى زي ما هي.', 'Round 2 has only Om Ali and tea ×3. Om Ali went to Pastry (our new rule), tea went to Bar. Round 1 tickets are unchanged.'),
+  'J-R1-11': S('في محطة المشويات، اضغط «ابدأ» على طلب الكفتة.', 'At the Grill station, tap "Start" on the kofta ticket.', 'الطلب بيتحول من «جديد» لـ «بيتحضّر».', 'The ticket moves from "new" to "in progress".'),
+  'J-R1-12': S('اختار الحمص (اللي اتبعت)، اضغط «إلغاء» واختار السبب «صنف غلط». لما شاشة الموافقة تظهر، أحمد يختار اسمه ويكتب رقمه السري على التابلت.', 'Select the hummus (already sent), tap "Void" and pick the reason "wrong item". When the approval screen opens, Ahmed picks his name and types his PIN on the tablet.',
+    'شاشة الموافقة بتظهر (مش رسالة خطأ). بعد موافقة أحمد الحمص بيظهر ملغي والإجمالي بيقل، ومحطة البارد بتعرضه ملغي.', 'The approval screen appears (not an error). After Ahmed approves, the hummus shows as voided, the total drops, and the Cold station shows it voided.',
+    B('محمود على تابلت الويتر، وأحمد بيوافق', 'Mahmoud on the waiter tablet, Ahmed approves')),
+  'J-R1-13': S('افتح «تقسيم»، اعمل شيك تاني على ترابيزة 7، وانقل له العصير ×2 والشاي ×3.', 'Open "Split", create a second check on table 7 and move the juice ×2 and tea ×3 to it.',
+    'ترابيزة 7 عليها شيكين: الأول فيه الكفتة والحمص الملغي وأم علي، والتاني فيه العصير والشاي.', 'Table 7 has two checks: the first has kofta, the voided hummus and Om Ali; the second has juice and tea.'),
+  'J-R1-14': S('على جهاز الكاشير، افتح ترابيزة 7، اختار الشيك التاني، واضغط «تأكيد».', 'On the cashier station, open table 7, pick the second check and tap "Confirm".',
+    'الشيك اتأكد. المجموع والخدمة والضريبة والإجمالي ظاهرين زي ما السيرفر حسبهم بالظبط.', 'The check is confirmed. Subtotal, service, tax and total are shown exactly as the server computed them.'),
+  'J-R1-15': S('ادفع الشيك التاني كاش: اكتب المبلغ اللي الزبون إداه (مثلًا 300 جنيه).', 'Pay the second check in cash: type what the guest handed over (e.g. 300 EGP).',
+    'الباقي اللي بيظهر محسوب من السيرفر، ومفيش متبقي على الشيك.', 'The change shown comes from the server; nothing is left to pay.'),
+  'J-R1-16': S('اضغط «إنهاء».', 'Tap "Complete".', 'الشيك التاني خلص. ترابيزة 7 لسه مشغولة لأن الشيك الأول مفتوح.', 'The second check is done. Table 7 stays taken because the first check is still open.'),
+  'J-R1-17': S('افتح تقرير نص الوردية (X). وبعدين اقفل الوردية: عد الدرج واكتب المبلغ (500 + كاش الشيك التاني).', 'Open the mid-shift report (X). Then close the shift: count the drawer and type the amount (500 + the second check\'s cash).',
+    'التقرير بيعرض الكاش من غير المبلغ المتوقع (عد أعمى). الوردية بتتقفل والفرق صفر، والشيك الأول لسه مفتوح عادي.', 'The report shows cash without the expected amount (blind count). The shift closes with zero difference; the first check stays open.'),
+  'J-R1-18': S('سارة تخرج من الجهاز. منى تدخل وتفتح وردية جديدة بـ 500 جنيه.', 'Sara signs out. Mona signs in and opens a new shift with 500 EGP.',
+    'بيظهر «مفيش وردية مفتوحة»، وبعدين وردية جديدة باسم منى.', '"No open shift" appears, then a new shift in Mona\'s name.'),
+  'J-R1-19': S('افتح ترابيزة 7، اختار الشيك الأول، واضغط «تأكيد».', 'Open table 7, pick the first check and tap "Confirm".', 'منى أكدت الشيك الأول. الحمص الملغي مش محسوب في الإجمالي.', 'Mona confirmed the first check. The voided hummus is not in the total.'),
+  'J-R1-20': S('ادفع 200 جنيه كاش، والباقي كارت واكتب رقم العملية DEMO-REF-0001.', 'Pay 200 EGP cash and the rest by card with the transaction number DEMO-REF-0001.',
+    'دفعتين: كاش 200 جنيه، وكارت بالمبلغ المتبقي. مفيش متبقي.', 'Two payments: 200 EGP cash and the remainder by card. Nothing left.'),
+  'J-R1-21': S('اضغط «إنهاء».', 'Tap "Complete".', 'الشيك الأول خلص — وترابيزة 7 فضيت لوحدها (حسب إعدادات مصر).', 'The first check is done — and table 7 freed itself (Egypt settings).'),
+  'J-R1-22': S('في خريطة الصالة افتح ترابيزة 7 واضغط «قفل الترابيزة» لو لسه مشغولة.', 'On the floor map open table 7 and tap "Close table" if it is still taken.',
+    'ترابيزة 7 فاضية. (لو الإعداد «الويتر يقفلها بإيده»، هنا بيقفلها.)', 'Table 7 is free. (With the "waiter closes it" setting, this is where he closes it.)'),
+  'J-R1-23': S('منى تقفل الوردية: تعد الدرج وتكتب 700 جنيه (500 + 200 كاش؛ الكارت مش في الدرج). وبعدين أحمد يفتح تقرير قفلة الوردية (Z) على كمبيوتر المدير.', 'Mona closes the shift: she counts 700 EGP (500 + 200 cash; card money is not in the drawer). Then Ahmed opens the end-of-shift report (Z) on the manager PC.',
+    'الوردية بتتقفل والفرق صفر. التقرير بيعرض الكاش 200 جنيه والكارت في سطرين منفصلين، والكارت مش محسوب في فلوس الدرج.', 'The shift closes with zero difference. The report shows 200 EGP cash and the card on separate lines; the card is not counted as drawer cash.',
+    B('منى على جهاز الكاشير، وبعدين أحمد على كمبيوتر المدير', 'Mona on the cashier station, then Ahmed on the manager PC')),
+  // ───────── J-R2
+  'J-R2-1': S('سارة تفتح وردية جديدة على جهاز الكاشير (500 جنيه). محمود يفتح ترابيزة 3، يعمل شيك، يضيف مشويات مشكلة (مستوية كويس) ويبعتها للمطبخ. سارة تأكد الشيك.', 'Sara opens a new shift on the cashier station (500 EGP). Mahmoud opens table 3, creates a check, adds a mixed grill (well done) and sends it. Sara confirms the check.',
+    'الشيك متأكد ولسه ما اتدفعش. محطة المشويات فيها الطلب.', 'The check is confirmed and unpaid. The Grill station has the ticket.', B('سارة على جهاز الكاشير، ومحمود على تابلت الويتر', 'Sara on the cashier station, Mahmoud on the waiter tablet')),
+  'J-R2-2': S('الزباين مشيوا. أحمد يفتح الشيك ويضغط «إلغاء الشيك»، يختار «الزبون مشي» ويكتب ملاحظة. أحمد يحاول يوافق لنفسه، وبعدين هبة توافق برقمها السري. محمود يقفل ترابيزة 3.', 'The guests left. Ahmed opens the check, taps "Void check", picks "customer left" and writes a note. Ahmed tries to approve it himself, then Heba approves with her PIN. Mahmoud closes table 3.',
+    'موافقة أحمد لنفسه بتترفض. بعد موافقة هبة الشيك بيتلغي، والأصناف والأرقام بتفضل متسجلة زي ما هي، ومفيش فلوس اتحركت. طلب المشويات اتلغى، وترابيزة 3 فضيت.', 'Ahmed\'s self-approval is refused. After Heba approves, the check is voided, items and amounts stay on record, no money moved. The grill ticket is cancelled and table 3 is free.',
+    B('أحمد على كمبيوتر المدير، وهبة بتوافق', 'Ahmed on the manager PC, Heba approves')),
+  // ───────── J-R3
+  'J-R3-1': S('سارة تدخل على جهاز الكاشير. بص في أعلى الشاشة (الاسم، الفرع، الجهاز، الوردية). وبعدين تخرج وتجرّب تعمل أي حاجة من نفس الصفحة.', 'Sara signs in on the cashier station. Read the top bar (name, branch, device, shift). Then sign out and try any action from the same page.',
+    'أعلى الشاشة بيعرض البيانات الصح. بعد الخروج أي حركة بتترفض والجهاز بيرجع لشاشة الدخول.', 'The top bar shows the right details. After signing out every action is refused and the device goes back to sign-in.'),
+  'J-R3-2': S('محمود يفتح ترابيزة 5. أحمد يخلّي ترابيزة 13 فيها 6 كراسي، ويوقّفها، وبعدين يحاول يوقّف ترابيزة 5.', 'Mahmoud opens table 5. Ahmed sets table 13 to 6 seats, turns it off, then tries to turn off table 5.',
+    'ترابيزة 13 بقت 6 كراسي، وبعد ما اتوقفت اختفت من خريطة الصالة. إيقاف ترابيزة 5 بيترفض لأن عليها زباين.', 'Table 13 has 6 seats and disappears from the floor map once turned off. Turning off table 5 is refused: guests are seated.', MGR),
+  'J-R3-3': S('غيّر اسم محطة «الحلواني» لـ «بار الحلويات». غيّر ترتيب قاعدة أم علي عشان تيجي بعد قاعدة الحلويات. وبعدين كرر نفس التعديل من شاشة قديمة (مش متحدثة).', 'Rename the "Pastry" station to "Dessert bar". Move the Om Ali rule after the desserts rule. Then repeat the same edit from an old (not refreshed) screen.',
+    'الاسم اتغير. أم علي هتروح محطة البارد من الدفعة الجاية. التعديل من الشاشة القديمة بيترفض («حد تاني عدّل») والشاشة بتتحدث.', 'The name changed. Om Ali will go to Cold from the next round. The edit from the old screen is refused ("someone else changed it") and the screen refreshes.', MGR),
+  'J-R3-4': S('انقل الزباين من ترابيزة 5 لترابيزة 6. وبعدين جرّب تنقلهم لترابيزة 13 (متوقفة) ولترابيزة مشغولة.', 'Move the guests from table 5 to table 6. Then try moving them to table 13 (turned off) and to a taken table.',
+    'الزباين بقوا على ترابيزة 6 والشيكات معاهم، وترابيزة 5 فضيت. النقلتين التانيين بيترفضوا.', 'The guests are on table 6 with their checks; table 5 is free. The other two moves are refused.'),
+  // ───────── J-R4
+  'J-R4-1': S('لازم يكون فيه وردية مفتوحة على جهاز الكاشير. أحمد يدخل هناك، يفتح الشيك الأول بتاع رحلة «يوم صالة كامل» (خلصان)، ويضغط «مرتجع».', 'A shift must be open on the cashier station. Ahmed signs in there, opens the first check of the "full dine-in day" journey (completed) and taps "Refund".',
+    'الأصناف والمبالغ اللي ينفع ترجع لكل دفعة ظاهرة زي ما السيرفر حسبها.', 'The refundable items and amounts per payment are shown as the server computed them.', B('أحمد على جهاز الكاشير', 'Ahmed on the cashier station')),
+  'J-R4-2': S('رجّع «أم علي» ×1 من الدفعة الكاش، السبب «مشكلة في الجودة» مع ملاحظة. جرّب الأول تحطه على دفعة الكارت. وبعدين هبة توافق، والكاش يطلع من الدرج.', 'Refund Om Ali ×1 from the cash payment, reason "quality issue" with a note. First try putting it on the card payment. Then Heba approves and the cash leaves the drawer.',
+    'المرتجع على الكارت بيترفض (اللي اتدفع كاش يرجع كاش بس). الطلب بيستنى موافقة، وبعد موافقة هبة الفلوس بتطلع من الدرج وبتظهر سطر لوحدها في تقرير الوردية.', 'The card refund is refused (cash paid, cash back only). The request waits for approval; after Heba approves the cash leaves the drawer and shows as its own line in the shift report.',
+    B('أحمد على جهاز الكاشير، وهبة بتوافق', 'Ahmed on the cashier station, Heba approves')),
+  // ───────── J-A1
+  'J-A1-1': S('كريم مهندس التركيب بيجهّز سيرفر خاص بالمطعم ده بس (في العرض ده السيرفر جوه المتصفح).', 'Karim, the setup engineer, prepares a server just for this restaurant (in this demo the server runs inside the browser).',
+    'السيستم بيقول إنه جاهز.', 'The system reports it is ready.'),
+  'J-A1-2': S('كريم يدخل ويكتب بيانات المطعم: الاسم بالعربي والإنجليزي والاسم القانوني.', 'Karim signs in and types the restaurant details: Arabic and English names and the legal name.',
+    'بيانات المطعم اتحفظت. بيانات الضرايب مش هنا (ليها شاشة لوحدها).', 'The details are saved. Tax registration is not here (it has its own screen).'),
+  'J-A1-3': S('اعمل الفرع: توقيت القاهرة، واليوم التجاري يبدأ الساعة 4 الفجر (اسأل صاحب المطعم بيقفل إمتى).', 'Create the branch: Cairo time, business day starting at 4 am (ask the owner when they close).',
+    'الفرع شغال، وكل بيعة بتتحسب على اليوم الصح حسب الساعة دي.', 'The branch is active; every sale counts on the right business day.'),
+  'J-A1-4': S('سجّل الأجهزة: جهاز كاشير بدرج، تابلت ويتر من غير درج، شاشة مطبخ، وكمبيوتر إدارة.', 'Register the devices: a cashier station with a drawer, a waiter tablet without one, a kitchen screen and a back-office PC.',
+    'الأربع أجهزة ظاهرين، وجهاز الكاشير بس اللي عليه درج.', 'All four devices are listed; only the cashier station has a drawer.'),
+  'J-A1-5': S('اعمل الأدوار (صاحب المطعم، مدير، كاشير، ويتر، مطبخ) وضيف الناس: عم سيد، طارق، نادية، إيمان، خالد، الشيف رضا.', 'Create the roles (owner, manager, cashier, waiter, kitchen) and add the people: Uncle Sayed, Tarek, Nadia, Eman, Khaled, Chef Reda.',
+    'خمس أدوار، وكل واحد شايف الفرع بتاعه بس.', 'Five roles; everyone sees only their own branch.'),
+  'J-A1-6': S('طبّق إعدادات السوق المصري مرة واحدة، وبعدين راجع كل قيمة مع صاحب المطعم من «إعدادات المطعم».', 'Apply the Egypt market settings once, then review each value with the owner in "Restaurant settings".',
+    'مثلًا: الويتر يقدر يفتح الشيك من التابلت من غير درج. والتطبيق مرة تانية مش بيكرر حاجة.', 'For example: waiters can open checks from the tablet without a drawer. Applying again changes nothing.'),
+  'J-A1-7': S('عم سيد يعمل ضريبة القيمة المضافة 14% (مش شاملة في السعر، تقريب عادي لأقرب قرش). المحاسب لازم يأكدها قبل أول بيعة حقيقية.', 'Uncle Sayed creates VAT 14% (added on top of prices, normal rounding to the piaster). The accountant confirms it before the first real sale.',
+    'الضريبة شغالة، وأي صنف جديد بياخدها أوتوماتيك.', 'The tax is active and every new item gets it automatically.', B('عم سيد (صاحب المطعم) على الإدارة', 'Uncle Sayed (owner) in the back office')),
+  'J-A1-8': S('ضيف أسباب الإلغاء والخصم الجاهزة، وخلّي الموظفين يختاروا من القايمة.', 'Add the ready-made void and discount reasons, and make staff pick from the list.',
+    'الأسباب ظاهرة بالعربي والإنجليزي.', 'The reasons show in Arabic and English.'),
+  'J-A1-9': S('استورد شيت المنيو: الأول «تجربة من غير حفظ» وصلّح الأخطاء، وبعدين الاستيراد الحقيقي. يا كله يدخل يا مفيش حاجة.', 'Import the menu sheet: first a "trial run without saving", fix the errors, then the real import. All or nothing.',
+    'التجربة بتعرض كل غلطة مكانها فين (الصفحة والسطر والخانة). الاستيراد بالأخطاء بيترفض كله، وبعد التصليح كل حاجة بتدخل مرة واحدة.', 'The trial lists each error with its sheet, row and field. Importing with errors is refused entirely; after fixing, everything goes in at once.'),
+  'J-A1-10': S('من غير شيت: اعمل قسم «شوربة» وصنف «شوربة عدس» بسعر 45 جنيه للصالة والتيك أواي.', 'Without a sheet: create a "Soups" category and a "Lentil soup" item at 45 EGP for dine-in and takeaway.',
+    'الصنف ليه سعر وبيتباع على طول في الفرع ده، والكود اتعمل أوتوماتيك.', 'The item has a price, sells right away in this branch, and its code was generated automatically.'),
+  'J-A1-11': S('اعمل الترابيزات (1 لـ 6) ومحطات المطبخ (المشويات، البارد، البار)، وقواعد مين يروح فين، وآخر قاعدة «أي حاجة تانية ← المشويات».', 'Create tables 1–6, the kitchen stations (Grill, Cold, Bar), the routing rules, and a last rule "anything else → Grill".',
+    'القواعد مترتبة، والقاعدة العامة في الآخر.', 'The rules are in order, with the catch-all last.'),
+  'J-A1-12': S('وصّل الطابعات واطبع صفحة تجربة على طابعة الكاشير.', 'Connect the printers and print a test page on the cashier printer.',
+    'صفحة التجربة اتطبعت. لو الطابعة وقعت البيع بيكمل عادي (جرّبها من «محاكاة الأعطال»).', 'The test page printed. If the printer goes down, selling continues (try it in "Simulate failures").', B('كريم (مهندس التركيب) على الإدارة', 'Karim (setup engineer) in the back office')),
+  'J-A1-13': S('سجّل المطعم في منظومة الإيصال الإلكتروني على بيئة التجربة الأول: بيانات المطعم، جهاز الكاشير، وأكواد الأصناف.', 'Register the restaurant on the e-receipt platform in the test environment first: restaurant details, the cashier device and item codes.',
+    'إيصال تجربة بيتقبل. الرسمي بعد اعتماد المحاسب.', 'A test receipt is accepted. Going live comes after the accountant signs off.'),
+  'J-A1-14': S('إيمان على جهاز الكاشير: تفتح وردية بـ 300 جنيه، تبيع 2 كشري تيك أواي، تاخد 200 كاش، تقفل الطلب، تشوف تقرير نص الوردية، وتقفل الوردية بالعد.', 'Eman on the cashier station: opens a shift with 300 EGP, sells 2 koshari takeaway, takes 200 cash, completes the order, views the mid-shift report and closes the shift by counting.',
+    'كل الأرقام من السيرفر. الوردية بتتقفل والفرق صفر.', 'All numbers come from the server. The shift closes with zero difference.'),
+  'J-A1-15': S('طارق المدير يفتح تقرير مبيعات اليوم وتقرير طرق الدفع.', 'Tarek, the manager, opens the daily sales and payment methods reports.',
+    'المبيعات فيها الطلب الوحيد، وطرق الدفع بتطابق تقرير قفلة الوردية.', 'Sales show the single order; payment methods match the end-of-shift report.'),
+  'J-A1-16': S('خد نسخة احتياطية من البيانات واتأكد إنها بترجع (في العرض: «البيانات ← احفظ نسخة من البيانات»).', 'Take a backup and check it restores (in the demo: "Data → save a copy").',
+    'النسخة فيها أول بيعة وتقرير القفلة زي ما هم.', 'The backup holds the first sale and the shift report intact.', B('كريم (مهندس التركيب) على الإدارة', 'Karim (setup engineer) in the back office')),
+  'J-A1-17': S('درّب كل واحد على الرحلات وعلى «سيناريوهات الفشل»، وسلّم المطعم: بيانات صاحب المطعم اتسلمت، وأسئلة الإعدادات اتجاوبت أو اتسجلت.', 'Train everyone on the journeys and the "failure scenarios", then hand over: owner credentials delivered, settings questions answered or recorded.',
+    'محضر تسليم، والأسئلة المفتوحة متسجلة باسم المسؤول عنها.', 'A handover record, with open questions assigned to an owner.'),
+  // ───────── J-C1
+  'J-C1-1': S('افتح وردية لو مش مفتوحة، واعمل طلب تيك أواي: شاورما فراخ (جبنة زيادة) وعصير برتقال.', 'Open a shift if needed and start a takeaway: chicken shawarma (extra cheese) and orange juice.',
+    'العصير في التيك أواي بـ 45 جنيه (سعر خاص بالتيك أواي) مش 50. ومفيش خدمة على التيك أواي.', 'Takeaway orange juice is 45 EGP (its own takeaway price), not 50. No service charge on takeaway.'),
+  'J-C1-2': S('الدفع الأول: اضغط «تأكيد» (الطلب بيروح المطبخ وقت التأكيد)، وبعدين ادفع 300 جنيه كاش.', 'Pay first: tap "Confirm" (the order goes to the kitchen on confirm), then pay 300 EGP cash.',
+    'الطلب راح المطبخ أول ما اتأكد. الباقي محسوب من السيرفر.', 'The order went to the kitchen when confirmed. The change comes from the server.'),
+  'J-C1-3': S('افتح الإيصال، وبعدين اطبع نسخة.', 'Open the receipt, then print a copy.', 'الإيصال عليه QR الإيصال الإلكتروني. النسخة مكتوب عليها «نسخة» ومش بتعمل إيصال جديد.', 'The receipt carries the e-receipt QR. The copy says "COPY" and never creates a new receipt.'),
+  // ───────── J-F1
+  'J-F1-1': S('دفع ضاع رده: السيستم هيضيّع رد الدفع الجاي. ادفع الطلب من شاشة التحصيل بنفسك، هتظهر «النتيجة مش معروفة» — اضغط «إعادة المحاولة».', 'A lost payment response: the system will lose the next payment reply. Pay the order yourself on the payment screen; "result unknown" appears — tap "Retry".',
+    'إعادة المحاولة بترجع نفس النتيجة، والفلوس اتحسبت مرة واحدة بس. ومفيش «دفعة جديدة» طول ما النتيجة مش معروفة.', 'Retry returns the same result and the money is counted once. No "new payment" while the result is unknown.'),
+  'J-F1-2': S('جهازين على نفس الشيك: محمود ويوسف بيضغطوا «ابعت للمطبخ» على نفس الشيك في نفس اللحظة.', 'Two devices on one check: Mahmoud and Youssef tap "Send to kitchen" on the same check at the same moment.',
+    'واحد بس بينجح؛ التاني بيشوف «حد تاني عدّل الشيك» والشاشة بتتحدث. المطبخ بياخد الطلب مرة واحدة.', 'Only one succeeds; the other sees "someone else changed this check" and the screen refreshes. The kitchen gets the order once.', B('محمود على تابلت الويتر، ويوسف على جهاز تاني', 'Mahmoud on the waiter tablet, Youssef on another device')),
+  'J-F1-3': S('طابعة الكاشير واقعة، وبيع تيك أواي يتقفل.', 'The cashier printer is down; a takeaway sale is completed.',
+    'البيع بيخلص عادي. أمر الطباعة بيفشل وبيتعاد لوحده، وبعد 5 محاولات بيقف ومستني حد يعيده.', 'The sale completes normally. The print job fails and retries by itself; after 5 tries it stops and waits for someone to retry it.'),
+  'J-F1-4': S('شاشة المطبخ واقعة، ومحمود يبعت طلب. بعدين الشاشة ترجع ويعيد الإرسال.', 'The kitchen screen is down and Mahmoud sends an order. Then the screen comes back and he re-sends.',
+    'الطلب بيتسجل، والشيك بيقول «ما وصلش المطبخ» مع زرار إعادة إرسال. إعادة الإرسال بتوصّل الطلب مرة واحدة بس.', 'The order is recorded and the check says "not delivered to the kitchen" with a re-send button. Re-sending delivers it exactly once.'),
+  'J-F1-5': S('منظومة الإيصال الإلكتروني واقعة يوم كامل: بيع يتقفل، والساعة تتقدم 12 ساعة وبعدين 20 ساعة، وبعدين المنظومة ترجع.', 'The e-receipt platform is down for a whole day: a sale completes, the clock moves 12 then 20 hours, then the platform comes back.',
+    'البيع خلص عادي. الإيصال بيستنى في الطابور، وفيه تنبيه بعد 12 ساعة و20 ساعة قبل مهلة الـ 24 ساعة. لما المنظومة ترجع الإيصال بيتقبل.', 'The sale is done. The receipt waits in the queue, with alerts at 12 and 20 hours before the 24-hour deadline. When the platform returns it is accepted.', MGR),
+};

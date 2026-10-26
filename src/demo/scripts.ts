@@ -9,6 +9,8 @@ import { clock } from '../mock/clock';
 import { devices } from '../app/devices';
 import { runOutbox } from '../mock/outbox';
 import { ApiFailure } from '../api/client';
+import { egp } from './humanLog';
+import { personaDisplayName, deviceName, branchLabel } from './people';
 
 export interface StepText { who: string; do_ar: string; do_en: string; expect_ar: string; expect_en: string; note?: string; operations: { op: string; http: string; actor: string; expected: string }[] }
 export interface StepDef { before?: () => void; id: string; device: string; user: string; screen?: string | (() => [string, Record<string, any>]); run: (log: Logger) => Promise<void>; text?: StepText }
@@ -22,7 +24,7 @@ const R1: StepDef[] = [
   { id: 'J-R1-1', device: 't_admin', user: 'demo-manager-1', screen: 'stations', run: async (log) => {
     const a = await as('t_admin', 'demo-manager-1', log);
     if (!store.db.tables.some((t) => t.name === '13' && t.branchId === 'branch_main')) await api(a, 'Table.Create', { body: { name: '13', area: 'Terrace', capacity: 4 } }, log, 'table 13');
-    await expectRefusal(api(a, 'Table.Create', { body: { name: '7', area: 'Hall', capacity: 4 } }), 'TABLE_NAME_TAKEN', log, 'table "7"');
+    await expectRefusal(api(a, 'Table.Create', { body: { name: '7', area: 'Hall', capacity: 4 } }), 'TABLE_NAME_TAKEN', log, 'table "7"', 'محاولة عمل ترابيزة تانية اسمها 7');
   } },
   { id: 'J-R1-2', device: 't_admin', user: 'demo-manager-1', screen: 'stations', run: async (log) => {
     const a = await as('t_admin', 'demo-manager-1', log);
@@ -33,12 +35,12 @@ const R1: StepDef[] = [
   { id: 'J-R1-3', device: 't_cash', user: 'demo-cashier-a', screen: 'shift', run: async (log) => {
     const c = await as('t_cash', 'demo-cashier-a', log);
     if (!openSession('t_cash')) await api(c, 'Session.Open', { body: { terminalId: 't_cash', openingFloat: '500.00' } }, log, 'float 500.00');
-    else log({ ok: null, text: 'shift already open' });
+    else log({ ok: null, text: 'shift already open', plain: 'الوردية كانت مفتوحة قبل كده' });
   } },
   { id: 'J-R1-4', device: 't_floor', user: 'demo-waiter-1', screen: 'floor', run: async (log) => {
     const w = await as('t_floor', 'demo-waiter-1', log);
     if (!openVisit('7')) await api(w, 'TableVisit.Open', { params: { tableId: tableId('7') }, body: { guestCount: 4 } }, log, 'table 7');
-    else log({ ok: null, text: 'table 7 already open' });
+    else log({ ok: null, text: 'table 7 already open', plain: 'ترابيزة 7 كانت مفتوحة قبل كده' });
   } },
   { id: 'J-R1-5', device: 't_floor', user: 'demo-waiter-1', screen: () => ['order', { orderId: checksOf(openVisit('7')!.id)[0]?.id, back: 'floor' }], run: async (log) => {
     const w = await as('t_floor', 'demo-waiter-1', log);
@@ -49,7 +51,7 @@ const R1: StepDef[] = [
     const w = await as('t_floor', 'demo-waiter-1', log);
     const o = checksOf(openVisit('7')!.id)[0];
     await api(w, 'Category.List', { query: { active: true } }, log);
-    await expectRefusal(api(w, 'Pricing.QuoteItem', { params: { productId: 'p_kunafa' }, body: { branchId: 'branch_main', channel: 'DINE_IN', quantity: '1', modifierOptionIds: [] } }), 'PRODUCT_UNAVAILABLE', log, 'Kunafa');
+    await expectRefusal(api(w, 'Pricing.QuoteItem', { params: { productId: 'p_kunafa' }, body: { branchId: 'branch_main', channel: 'DINE_IN', quantity: '1', modifierOptionIds: [] } }), 'PRODUCT_UNAVAILABLE', log, 'Kunafa', 'محاولة إضافة كنافة');
     const q = await api<any>(w, 'Pricing.QuoteItem', { params: { productId: 'p_orange_juice' }, body: { branchId: 'branch_main', channel: 'DINE_IN', quantity: '1', modifierOptionIds: ['opt_size_large'] } }, log, 'orange juice Large');
     log({ ok: true, text: `quote OJ Large unit = ${q.unitTotal} (server)` });
     if (!o.lines.length) await api(w, 'Order.AddLines', { params: { orderId: o.id }, body: { expectedVersion: order(o.id).version, lines: [{ productId: 'p_kofta', quantity: '2', modifierOptionIds: ['opt_medium'] }, { productId: 'p_hummus', quantity: '1', modifierOptionIds: [] }, { productId: 'p_orange_juice', quantity: '2', modifierOptionIds: ['opt_size_large'] }] } }, log, 'kofta ×2, hummus ×1, OJ ×2 L');
@@ -58,7 +60,7 @@ const R1: StepDef[] = [
     const w = await as('t_floor', 'demo-waiter-1', log);
     const o = checksOf(openVisit('7')!.id)[0];
     const r = await api<any>(w, 'Order.Fire', { params: { orderId: o.id }, body: { expectedVersion: order(o.id).version } }, log, 'send to kitchen');
-    log({ ok: true, text: `fireRound ${r.fireRound}, ${r.lineIds.length} lines locked` });
+    log({ ok: true, text: `fireRound ${r.fireRound}, ${r.lineIds.length} lines locked`, plain: `الدفعة رقم ${r.fireRound}: ${r.lineIds.length} أصناف راحوا المطبخ ومينفعش يتعدلوا` });
   } },
   { id: 'J-R1-8', device: 't_kds', user: 'demo-chef-1', screen: 'kitchen', run: async (log) => {
     const k = await as('t_kds', 'demo-chef-1', log);
@@ -77,13 +79,13 @@ const R1: StepDef[] = [
     const salad = order(id).lines.find((l) => l.productId === 'p_green_salad' && l.status === 'ACTIVE')!;
     await api(w, 'Order.RemoveLine', { params: { orderId: id, lineId: salad.id }, body: { expectedVersion: order(id).version, expectedLineVersion: salad.version }, query: { expectedVersion: order(id).version, expectedLineVersion: salad.version } }, log, 'remove salad');
     const kofta = order(id).lines.find((l) => l.productId === 'p_kofta')!;
-    await expectRefusal(api(w, 'Order.UpdateLine', { params: { orderId: id, lineId: kofta.id }, body: { expectedVersion: order(id).version, expectedLineVersion: kofta.version, quantity: '3' } }), 'LINE_ALREADY_FIRED', log, 'change kofta qty');
+    await expectRefusal(api(w, 'Order.UpdateLine', { params: { orderId: id, lineId: kofta.id }, body: { expectedVersion: order(id).version, expectedLineVersion: kofta.version, quantity: '3' } }), 'LINE_ALREADY_FIRED', log, 'change kofta qty', 'محاولة تغيير كمية الكفتة');
   } },
   { id: 'J-R1-10', device: 't_floor', user: 'demo-waiter-1', screen: () => ['order', { orderId: checksOf(openVisit('7')!.id)[0]?.id, back: 'floor' }], run: async (log) => {
     const w = await as('t_floor', 'demo-waiter-1', log);
     const id = checksOf(openVisit('7')!.id)[0].id;
     const r = await api<any>(w, 'Order.Fire', { params: { orderId: id }, body: { expectedVersion: order(id).version } }, log, 'send round 2');
-    log({ ok: true, text: `fireRound ${r.fireRound} (Om Ali → PASTRY by the priority-5 rule)` });
+    log({ ok: true, text: `fireRound ${r.fireRound} (Om Ali → PASTRY by the priority-5 rule)`, plain: `الدفعة رقم ${r.fireRound}: أم علي راحت محطة الحلواني حسب القاعدة الجديدة` });
   } },
   { id: 'J-R1-11', device: 't_kds', user: 'demo-chef-1', screen: 'kitchen', run: async (log) => {
     const k = await as('t_kds', 'demo-chef-1', log);
@@ -96,7 +98,7 @@ const R1: StepDef[] = [
     const w = await as('t_floor', 'demo-waiter-1', log);
     const id = checksOf(openVisit('7')!.id)[0].id;
     const h = order(id).lines.find((l) => l.productId === 'p_hummus' && l.status === 'ACTIVE');
-    if (!h) return log({ ok: null, text: 'hummus already voided' });
+    if (!h) return log({ ok: null, text: 'hummus already voided', plain: 'الحمص كان اتلغى قبل كده' });
     await withApproval(w, 'Order.VoidLine', { params: { orderId: id, lineId: h.id }, body: { expectedVersion: order(id).version, reasonCode: 'WRONG_ITEM' } }, 'demo-manager-1', log, 'void hummus');
   } },
   { id: 'J-R1-13', device: 't_floor', user: 'demo-waiter-1', screen: () => ['order', { orderId: checksOf(openVisit('7')!.id)[1]?.id ?? checksOf(openVisit('7')!.id)[0]?.id, back: 'floor' }], run: async (log) => {
@@ -116,7 +118,7 @@ const R1: StepDef[] = [
     const c = await as('t_cash', 'demo-cashier-a', log);
     const c2 = checksOf(openVisit('7')!.id)[1];
     const r = await api<any>(c, 'Payment.Capture', { params: { orderId: c2.id }, body: { tenders: [{ method: 'CASH', tendered: '300.00' }] } }, log, 'cash 300.00');
-    log({ ok: true, text: `change ${r.change} (server) · remaining ${r.settlement.remaining}` });
+    log({ ok: true, text: `change ${r.change} (server) · remaining ${r.settlement.remaining}`, plain: Number(r.settlement.remaining) === 0 ? 'مفيش متبقي على الشيك (الباقي محسوب من السيرفر)' : `لسه متبقي ${egp(r.settlement.remaining)}` });
   } },
   { id: 'J-R1-16', device: 't_cash', user: 'demo-cashier-a', screen: () => ['pay', { orderId: checksOf(lastVisit('7')!.id)[1]?.id, back: 'floor' }], run: async (log) => {
     const c = await as('t_cash', 'demo-cashier-a', log);
@@ -126,13 +128,13 @@ const R1: StepDef[] = [
   { id: 'J-R1-17', device: 't_cash', user: 'demo-cashier-a', screen: 'shift', run: async (log) => {
     const c = await as('t_cash', 'demo-cashier-a', log);
     const s = openSession('t_cash');
-    if (!s) return log({ ok: null, text: 'no open shift' });
+    if (!s) return log({ ok: null, text: 'no open shift', plain: 'مفيش وردية مفتوحة' });
     const x = await api<any>(c, 'Session.XReport', { params: { sessionId: s.id } }, log, 'X report');
-    log({ ok: x.expectedCash === undefined, text: `X tenders ${JSON.stringify(x.tenderBreakdown)} · expectedCash ${x.expectedCash === undefined ? 'hidden (blind)' : x.expectedCash}` });
+    log({ ok: x.expectedCash === undefined, text: `X tenders ${JSON.stringify(x.tenderBreakdown)} · expectedCash ${x.expectedCash === undefined ? 'hidden (blind)' : x.expectedCash}`, plain: x.expectedCash === undefined ? 'تقرير نص الوردية بيعرض الكاش، والمبلغ المتوقع في الدرج مخفي (عد أعمى)' : 'المبلغ المتوقع ظاهر في التقرير — كان المفروض يبقى مخفي' });
     const c2 = checksOf(lastVisit('7')!.id)[1];
     const cash = store.db.captures.filter((cp) => cp.orderId === c2.id && cp.method === 'CASH').reduce((a, cp) => a + Number(cp.amount), 0);
     const r = await api<any>(c, 'Session.Close', { params: { sessionId: s.id }, body: { expectedVersion: store.db.sessions.find((x2) => x2.id === s.id)!.version, countedCash: (500 + cash).toFixed(2) } }, log, `count ${(500 + cash).toFixed(2)}`);
-    log({ ok: true, text: `variance ${r.variance} · outstanding checks ${r.z.outstandingChecks.length} (check 1 does not block)` });
+    log({ ok: true, text: `variance ${r.variance} · outstanding checks ${r.z.outstandingChecks.length} (check 1 does not block)`, plain: 'الشيك الأول لسه مفتوح، ومش مانع قفل الوردية' });
   } },
   { id: 'J-R1-18', device: 't_cash', user: 'demo-cashier-b', screen: 'shift', run: async (log) => {
     const prev = devices.get('t_cash');
@@ -143,7 +145,7 @@ const R1: StepDef[] = [
   { id: 'J-R1-19', device: 't_cash', user: 'demo-cashier-b', screen: () => ['pay', { orderId: checksOf(lastVisit('7')!.id)[0]?.id, back: 'floor' }], run: async (log) => {
     const c = await as('t_cash', 'demo-cashier-b', log);
     const c1 = checksOf(lastVisit('7')!.id)[0];
-    if (order(c1.id).status === 'DRAFT') { const r = await api<any>(c, 'Order.Confirm', { params: { orderId: c1.id }, body: { expectedVersion: order(c1.id).version } }, log, 'confirm check 1'); log({ ok: true, text: `${r.confirmMessage} · payable ${r.totals.payable}` }); }
+    if (order(c1.id).status === 'DRAFT') { const r = await api<any>(c, 'Order.Confirm', { params: { orderId: c1.id }, body: { expectedVersion: order(c1.id).version } }, log, 'confirm check 1'); log({ ok: true, text: `${r.confirmMessage} · payable ${r.totals.payable}`, plain: 'الحمص الملغي مش محسوب في الإجمالي' }); }
   } },
   { id: 'J-R1-20', device: 't_cash', user: 'demo-cashier-b', screen: () => ['pay', { orderId: checksOf(lastVisit('7')!.id)[0]?.id, back: 'floor' }], run: async (log) => {
     const c = await as('t_cash', 'demo-cashier-b', log);
@@ -157,13 +159,13 @@ const R1: StepDef[] = [
     const c1 = checksOf(lastVisit('7')!.id)[0];
     await api(c, 'Order.Complete', { params: { orderId: c1.id }, body: { expectedVersion: order(c1.id).version } }, log, 'complete check 1');
     const v = lastVisit('7')!;
-    log({ ok: null, text: `table 7 visit: ${v.state}${v.state === 'CLOSED' ? ' (VisitAutoClosePolicy ON_LAST_CHECK_COMPLETED)' : ''}` });
+    log({ ok: null, text: `table 7 visit: ${v.state}${v.state === 'CLOSED' ? ' (VisitAutoClosePolicy ON_LAST_CHECK_COMPLETED)' : ''}`, plain: v.state === 'CLOSED' ? 'ترابيزة 7 فضيت لوحدها بعد آخر شيك (حسب إعدادات مصر)' : 'ترابيزة 7 لسه مشغولة — الويتر هيقفلها' });
   } },
   { id: 'J-R1-22', device: 't_floor', user: 'demo-waiter-1', screen: 'floor', run: async (log) => {
     const w = await as('t_floor', 'demo-waiter-1', log);
     const v = lastVisit('7')!;
     if (v.state === 'OPEN') await api(w, 'TableVisit.Close', { params: { visitId: v.id }, body: { expectedVersion: v.version } }, log, 'close table 7');
-    else log({ ok: true, text: 'table 7 already free: the policy closed it when the last check completed (EG profile value; with MANUAL the waiter closes it here)' });
+    else log({ ok: true, text: 'table 7 already free: the policy closed it when the last check completed (EG profile value; with MANUAL the waiter closes it here)', plain: 'ترابيزة 7 فاضية خلاص: فضيت لوحدها لما آخر شيك خلص (لو الإعداد «الويتر يقفلها بإيده» كان هيقفلها هنا)' });
   } },
   { id: 'J-R1-23', device: 't_admin', user: 'demo-manager-1', screen: 'shift', run: async (log) => {
     const c = await as('t_cash', 'demo-cashier-b', log);
@@ -171,7 +173,7 @@ const R1: StepDef[] = [
     if (s) { const r = await api<any>(c, 'Session.Close', { params: { sessionId: s.id }, body: { expectedVersion: s.version, countedCash: '700.00' } }, log, 'count 700.00'); log({ ok: true, text: `variance ${r.variance}` }); }
     const m = await as('t_admin', 'demo-manager-1', log);
     const last = [...store.db.sessions].reverse().find((x) => x.terminalId === 't_cash' && x.state === 'CLOSED');
-    if (last) { const z = await api<any>(m, 'Session.ZReport', { params: { sessionId: last.id } }, log, 'Z report'); log({ ok: true, text: `Z tenders ${JSON.stringify(z.tenderBreakdown)} · expected ${z.expectedCash} · counted ${z.countedCash}` }); }
+    if (last) { const z = await api<any>(m, 'Session.ZReport', { params: { sessionId: last.id } }, log, 'Z report'); log({ ok: true, text: `Z tenders ${JSON.stringify(z.tenderBreakdown)} · expected ${z.expectedCash} · counted ${z.countedCash}`, plain: `تقرير القفلة: الكاش والكارت في سطرين منفصلين — المتوقع في الدرج ${egp(z.expectedCash)} والمعدود ${egp(z.countedCash)}` }); }
   } },
 ];
 
@@ -197,14 +199,14 @@ const R2: StepDef[] = [
         await api(m, 'Order.Void', { params: { orderId: o.id }, body: { expectedVersion: order(o.id).version, reasonCode: 'CUSTOMER_LEFT', reason: 'الضيوف مشيوا قبل الأكل' } }, undefined, 'void check');
       } catch (e) {
         if (!(e instanceof ApiFailure) || e.code !== 'APPROVAL_REQUIRED') throw e;
-        log({ ok: true, text: 'Order.Void → 403 APPROVAL_REQUIRED (ORDER_VOID ALWAYS)' });
-        await expectRefusal(api(m, 'Approval.Grant', { body: { action: 'ORDER_VOID', targetType: e.details.targetType, targetId: e.details.targetId, context: e.details.context, approverUserId: userIdOf('demo-manager-1'), approverCredentialKind: 'PIN', approverSecret: demo.pin } }), 'SELF_APPROVAL_DENIED', log, 'manager-1 approves own void (N5)');
+        log({ ok: true, text: 'Order.Void → 403 APPROVAL_REQUIRED (ORDER_VOID ALWAYS)', plain: 'إلغاء الشيك محتاج موافقة مدير دايمًا — شاشة الموافقة ظهرت' });
+        await expectRefusal(api(m, 'Approval.Grant', { body: { action: 'ORDER_VOID', targetType: e.details.targetType, targetId: e.details.targetId, context: e.details.context, approverUserId: userIdOf('demo-manager-1'), approverCredentialKind: 'PIN', approverSecret: demo.pin } }), 'SELF_APPROVAL_DENIED', log, 'manager-1 approves own void (N5)', 'أحمد حاول يوافق على طلبه هو');
         await withApproval(m, 'Order.Void', { params: { orderId: o.id }, body: { expectedVersion: order(o.id).version, reasonCode: 'CUSTOMER_LEFT', reason: 'الضيوف مشيوا قبل الأكل' } }, 'demo-manager-2', log, 'void check, manager-2 approves');
       }
     }
     const v2 = lastVisit('3')!;
     if (v2.state === 'OPEN') { const w = await as('t_floor', 'demo-waiter-1', log); await api(w, 'TableVisit.Close', { params: { visitId: v2.id }, body: { expectedVersion: v2.version } }, log, 'close table 3'); }
-    else log({ ok: true, text: 'table 3 freed automatically (void ends the last check)' });
+    else log({ ok: true, text: 'table 3 freed automatically (void ends the last check)', plain: 'ترابيزة 3 فضيت لوحدها (إلغاء آخر شيك بيفضّيها)' });
   } },
 ];
 
@@ -213,10 +215,10 @@ const R3: StepDef[] = [
   { id: 'J-R3-1', device: 't_cash', user: 'demo-cashier-a', screen: 'shift', run: async (log) => {
     const c = await as('t_cash', 'demo-cashier-a', log);
     const me = await api<any>(c, 'Access.Me', {}, log, 'header');
-    log({ ok: true, text: `${me.user.displayName} · branch ${me.branchId} · terminal ${me.terminalId}` });
+    log({ ok: true, text: `${me.user.displayName} · branch ${me.branchId} · terminal ${me.terminalId}`, plain: `أعلى الشاشة: ${me.user.displayName} · ${branchLabel(store.db.branches.find((b) => b.id === me.branchId))} · ${deviceName(me.terminalId)}` });
     const token = c.token;
     await api(c, 'Auth.Logout', { body: {} }, log, 'logout');
-    await expectRefusal(api({ ...c, token }, 'Session.Current', { query: { terminalId: 't_cash' } }), 'UNAUTHENTICATED', log, 'action after logout');
+    await expectRefusal(api({ ...c, token }, 'Session.Current', { query: { terminalId: 't_cash' } }), 'UNAUTHENTICATED', log, 'action after logout', 'محاولة حركة بعد الخروج');
     devices.logout('t_cash');
   } },
   { id: 'J-R3-2', device: 't_admin', user: 'demo-manager-1', screen: 'stations', run: async (log) => {
@@ -230,27 +232,27 @@ const R3: StepDef[] = [
     t13 = store.db.tables.find((t) => t.id === t13!.id)!;
     if (t13.active) await api(m, 'Table.SetActive', { params: { tableId: t13.id }, body: { expectedVersion: t13.version, active: false } }, log, 'deactivate 13');
     const t5 = store.db.tables.find((t) => t.id === tableId('5'))!;
-    await expectRefusal(api(m, 'Table.SetActive', { params: { tableId: t5.id }, body: { expectedVersion: t5.version, active: false } }), 'TABLE_OCCUPIED', log, 'deactivate 5 (seated)');
+    await expectRefusal(api(m, 'Table.SetActive', { params: { tableId: t5.id }, body: { expectedVersion: t5.version, active: false } }), 'TABLE_OCCUPIED', log, 'deactivate 5 (seated)', 'محاولة إيقاف ترابيزة 5 وعليها زباين');
   } },
   { id: 'J-R3-3', device: 't_admin', user: 'demo-manager-1', screen: 'stations', run: async (log) => {
     const m = await as('t_admin', 'demo-manager-1', log);
     const st = store.db.stations.find((s) => s.name === 'PASTRY' || s.name === 'DESSERT BAR');
-    if (!st) return log({ ok: false, text: 'run J-R1 step 2 first (station PASTRY)' });
+    if (!st) return log({ ok: false, text: 'run J-R1 step 2 first (station PASTRY)', plain: 'لازم الخطوة 2 من رحلة «يوم صالة كامل» تتعمل الأول (محطة الحلواني)' });
     if (st.name === 'PASTRY') await api(m, 'KitchenStation.Configure', { params: { stationId: st.id }, body: { expectedVersion: st.version, name: 'DESSERT BAR' } }, log, 'rename → DESSERT BAR');
     const rule = store.db.routingRules.find((r) => r.match.productId === 'p_om_ali')!;
     const oldVersion = rule.version;
     if (rule.priority !== 45) await api(m, 'RoutingRule.Configure', { params: { ruleId: rule.id }, body: { expectedVersion: oldVersion, priority: 45 } }, log, 'Om Ali rule priority 5 → 45');
-    await expectRefusal(api(m, 'RoutingRule.Configure', { params: { ruleId: rule.id }, body: { expectedVersion: oldVersion, priority: 45 } }), 'CONCURRENCY_CONFLICT', log, 'repeat with the old version');
+    await expectRefusal(api(m, 'RoutingRule.Configure', { params: { ruleId: rule.id }, body: { expectedVersion: oldVersion, priority: 45 } }), 'CONCURRENCY_CONFLICT', log, 'repeat with the old version', 'تكرار نفس التعديل من شاشة قديمة');
   } },
   { id: 'J-R3-4', device: 't_floor', user: 'demo-waiter-1', screen: 'floor', run: async (log) => {
     const w = await as('t_floor', 'demo-waiter-1', log);
     let v = openVisit('5') ?? openVisit('6');
-    if (!v) return log({ ok: false, text: 'run step 2 first' });
+    if (!v) return log({ ok: false, text: 'run step 2 first', plain: 'اعمل الخطوة 2 الأول' });
     if (store.db.tables.find((t) => t.id === v!.tableId)!.name === '5') await api(w, 'TableVisit.Transfer', { params: { visitId: v.id }, body: { expectedVersion: v.version, toTableId: tableId('6') } }, log, '5 → 6');
     v = openVisit('6')!;
-    await expectRefusal(api(w, 'TableVisit.Transfer', { params: { visitId: v.id }, body: { expectedVersion: v.version, toTableId: tableId('13') } }), 'TABLE_INACTIVE', log, '→ 13 (inactive)');
+    await expectRefusal(api(w, 'TableVisit.Transfer', { params: { visitId: v.id }, body: { expectedVersion: v.version, toTableId: tableId('13') } }), 'TABLE_INACTIVE', log, '→ 13 (inactive)', 'محاولة نقل الزباين لترابيزة 13 (متوقفة)');
     if (!openVisit('8')) await api(w, 'TableVisit.Open', { params: { tableId: tableId('8') }, body: { guestCount: 2 } }, log, 'seat table 8');
-    await expectRefusal(api(w, 'TableVisit.Transfer', { params: { visitId: v.id }, body: { expectedVersion: openVisit('6')!.version, toTableId: tableId('8') } }), 'TABLE_OCCUPIED', log, '→ 8 (occupied)');
+    await expectRefusal(api(w, 'TableVisit.Transfer', { params: { visitId: v.id }, body: { expectedVersion: openVisit('6')!.version, toTableId: tableId('8') } }), 'TABLE_OCCUPIED', log, '→ 8 (occupied)', 'محاولة نقلهم لترابيزة 8 (مشغولة)');
   } },
 ];
 
@@ -262,9 +264,9 @@ const R4: StepDef[] = [
     const m = await as('t_cash', 'demo-manager-1', log);
     const v = lastVisit('7');
     const c1 = v ? checksOf(v.id)[0] : null;
-    if (!c1 || order(c1.id).status !== 'COMPLETED') return log({ ok: false, text: 'run J-R1 first (completed check 1)' });
+    if (!c1 || order(c1.id).status !== 'COMPLETED') return log({ ok: false, text: 'run J-R1 first (completed check 1)', plain: 'لازم رحلة «يوم صالة كامل» تتعمل الأول' });
     const rf = await api<any>(m, 'Refund.Refundable', { params: { orderId: c1.id } }, log, `check #${c1.number}`);
-    log({ ok: true, text: `captures: ${rf.captures.map((x: any) => `${x.method} ${x.remaining}`).join(', ')} · effectivePaid ${rf.effectivePaid}` });
+    log({ ok: true, text: `captures: ${rf.captures.map((x: any) => `${x.method} ${x.remaining}`).join(', ')} · effectivePaid ${rf.effectivePaid}`, plain: `ينفع يترجع من: ${rf.captures.map((x: any) => `${x.method === 'CASH' ? 'الكاش' : x.method === 'CARD' ? 'الكارت' : 'المحفظة'} ${egp(x.remaining)}`).join('، ')}` });
   } },
   { id: 'J-R4-2', device: 't_cash', user: 'demo-manager-1', screen: 'refunds', run: async (log) => {
     const m = await as('t_cash', 'demo-manager-1', log);
@@ -274,7 +276,7 @@ const R4: StepDef[] = [
     const amount = omali.unitRefundable;
     const card = rf.captures.find((x: any) => x.method === 'CARD');
     const cash = rf.captures.find((x: any) => x.method === 'CASH');
-    if (card) await expectRefusal(api(m, 'Refund.Request', { params: { orderId: c1.id }, body: { amount, method: 'CASH', allocations: [{ captureId: card.captureId, amount }], lines: [{ lineId: omali.lineId, quantity: '1' }], reasonCode: 'QUALITY_ISSUE', reason: 'الأم علي كانت باردة' } }), 'CROSS_TENDER_REFUND_DENIED', log, 'allocate to the card payment');
+    if (card) await expectRefusal(api(m, 'Refund.Request', { params: { orderId: c1.id }, body: { amount, method: 'CASH', allocations: [{ captureId: card.captureId, amount }], lines: [{ lineId: omali.lineId, quantity: '1' }], reasonCode: 'QUALITY_ISSUE', reason: 'الأم علي كانت باردة' } }), 'CROSS_TENDER_REFUND_DENIED', log, 'allocate to the card payment', 'محاولة ترجيع أم علي على دفعة الكارت');
     const r = await api<any>(m, 'Refund.Request', { params: { orderId: c1.id }, body: { amount, method: 'CASH', allocations: [{ captureId: cash.captureId, amount }], lines: [{ lineId: omali.lineId, quantity: '1' }], reasonCode: 'QUALITY_ISSUE', reason: 'الأم علي كانت باردة' } }, log, `request ${amount} against cash`);
     await withApproval(m, 'Refund.Approve', { params: { refundCaseId: r.id }, body: { expectedVersion: 1, payoutMethod: 'CASH' } }, 'demo-manager-2', log, 'approve + cash payout (manager-2)');
   } },
@@ -315,7 +317,7 @@ const A1: StepDef[] = [
   { id: 'J-A1-1', device: 'BO', user: 'implementation-engineer', screen: 'home', run: async (log) => {
     const bo = devices.auth('BO');
     const ready = await api<any>({ ...bo, token: null }, 'Health.Live', {}, log).catch(() => null);
-    log({ ok: true, text: 'dedicated deployment (in-browser): readiness ok' + (ready ? '' : '') });
+    log({ ok: true, text: 'dedicated deployment (in-browser): readiness ok' + (ready ? '' : ''), plain: 'السيستم جاهز (السيرفر شغال جوه المتصفح في العرض ده)' });
   } },
   { id: 'J-A1-2', device: 'BO', user: 'implementation-engineer', screen: 'org', run: async (log) => {
     const e = await as('BO', 'implementation-engineer', log);
@@ -339,51 +341,51 @@ const A1: StepDef[] = [
     const b = store.db.branches[0].id;
     for (const [name, perms] of Object.entries(ROLE_SETS)) if (!store.db.roles.some((r) => r.name === name)) await api(e, 'Role.Create', { body: { name, permissionIds: perms } }, log, `role ${name}`);
     for (const [u, role] of [['owner-1', 'owner'], ['manager-1', 'manager'], ['cashier-1', 'cashier'], ['waiter-1', 'waiter'], ['chef-1', 'chef'], ['manager-2', 'manager']]) {
-      if (!store.db.users.some((x) => x.username === u)) await api(e, 'User.Create', { body: { username: u, displayName: u, password: demo.password, pin: demo.pin, roleAssignments: [{ roleId: store.db.roles.find((r) => r.name === role)!.id, branchIds: [b] }] } }, log, `${u} (${role})`);
+      if (!store.db.users.some((x) => x.username === u)) await api(e, 'User.Create', { body: { username: u, displayName: personaDisplayName(u), password: demo.password, pin: demo.pin, roleAssignments: [{ roleId: store.db.roles.find((r) => r.name === role)!.id, branchIds: [b] }] } }, log, `${u} (${role})`);
     }
   } },
   { id: 'J-A1-6', device: 'BO', user: 'implementation-engineer', screen: 'settings', run: async (log) => {
     demo.applyEgProfile();
-    log({ ok: true, text: 'settings.ApplyMarketProfile (internal): EG.profile 1.4.0 applied — review each value with the owner (Policy Panel / B4)' });
+    log({ ok: true, text: 'settings.ApplyMarketProfile (internal): EG.profile 1.4.0 applied — review each value with the owner (Policy Panel / B4)', plain: 'إعدادات السوق المصري اتطبقت — راجعها مع صاحب المطعم من «إعدادات المطعم»' });
   } },
   { id: 'J-A1-7', device: 'BO', user: 'owner-1', screen: 'taxes', run: async (log) => {
     const o = await as('BO', 'owner-1', log);
     if (!store.db.taxPolicies.length) await api(o, 'TaxPolicy.Create', { body: { name: { ar: 'ضريبة القيمة المضافة', en: 'VAT' }, jurisdiction: 'EG', calculationMode: 'EXCLUSIVE', rate: '14', roundingMode: 'HALF_UP', roundingScale: 2 } }, log, 'VAT 14 % EXCLUSIVE HALF_UP 2');
     demo.setPolicy('ProductTaxDefaultPolicy', { taxPolicyId: store.db.taxPolicies[0].id });
-    log({ ok: null, text: 'ProductTaxDefaultPolicy → VAT (new products get it by default)' });
+    log({ ok: null, text: 'ProductTaxDefaultPolicy → VAT (new products get it by default)', plain: 'أي صنف جديد هياخد ضريبة القيمة المضافة أوتوماتيك' });
   } },
   { id: 'J-A1-8', device: 'BO', user: 'owner-1', screen: 'settings', run: async (log) => {
     const o = await as('BO', 'owner-1', log);
     const codes = (await import('../mock/contracts')).egProfile.owner_data.find((d) => d.id === 'EG-REASON-CODES')!.data.codes;
     let n = 0;
     for (const c of codes) if (!store.db.reasonCodes.some((r) => r.kind === c.kind && r.code === c.code)) { await api(o, 'ReasonCode.Create', { body: c }); n++; }
-    log({ ok: true, text: `ReasonCode.Create × ${n} (EG-REASON-CODES); ReasonCodePolicy MANAGED from the profile` });
+    log({ ok: true, text: `ReasonCode.Create × ${n} (EG-REASON-CODES); ReasonCodePolicy MANAGED from the profile`, plain: `اتضاف ${n} سبب جاهز، والموظفين هيختاروا من القايمة` });
   } },
   { id: 'J-A1-9', device: 'BO', user: 'owner-1', screen: 'import', run: async (log) => {
     const o = await as('BO', 'owner-1', log);
     const code = store.db.branches[0].code;
     const dry1 = await api<any>(o, 'Catalog.Import', { body: { dryRun: true, ...importBody(code, true) } }, log, 'dry run (sheet with one bad row)');
-    log({ ok: dry1.issues.length > 0, text: `issues: ${dry1.issues.map((i: any) => `${i.sheet} r${i.row} ${i.field} ${i.code}`).join(' · ')}` });
-    await expectRefusal(api(o, 'Catalog.Import', { body: { dryRun: false, ...importBody(code, true) } }), 'VALIDATION_FAILED', log, 'apply with errors (all-or-nothing)');
+    log({ ok: dry1.issues.length > 0, text: `issues: ${dry1.issues.map((i: any) => `${i.sheet} r${i.row} ${i.field} ${i.code}`).join(' · ')}`, plain: `التجربة لقت ${dry1.issues.length} غلطة، كل واحدة بمكانها: ${[...new Set(dry1.issues.map((i: any) => `صفحة ${({ prices: 'الأسعار', products: 'الأصناف', categories: 'الأقسام', units: 'الوحدات' } as Record<string, string>)[i.sheet] ?? i.sheet} سطر ${i.row}`))].join('، ')}` });
+    await expectRefusal(api(o, 'Catalog.Import', { body: { dryRun: false, ...importBody(code, true) } }), 'VALIDATION_FAILED', log, 'apply with errors (all-or-nothing)', 'محاولة الاستيراد الحقيقي والأخطاء لسه موجودة');
     const dry2 = await api<any>(o, 'Catalog.Import', { body: { dryRun: true, ...importBody(code, false) } }, log, 'dry run (fixed)');
     if (dry2.ok && !store.db.products.length) await api(o, 'Catalog.Import', { body: { dryRun: false, ...importBody(code, false) } }, log, 'apply');
   } },
   { id: 'J-A1-10', device: 'BO', user: 'owner-1', screen: 'menu', run: async (log) => {
     const o = await as('BO', 'owner-1', log);
     const b = store.db.branches[0].id;
-    if (store.db.products.some((p) => p.name.en === 'Lentil soup')) return log({ ok: null, text: 'already added' });
+    if (store.db.products.some((p) => p.name.en === 'Lentil soup')) return log({ ok: null, text: 'already added', plain: 'الصنف متضاف قبل كده' });
     const cat = await api<any>(o, 'Category.Create', { body: { name: { ar: 'شوربة', en: 'Soups' } } }, log, 'category');
     const unit = store.db.units.find((u) => u.code === 'EA')!;
     const p = await api<any>(o, 'Product.Create', { body: { name: { ar: 'شوربة عدس', en: 'Lentil soup' }, categoryId: cat.id, unitId: unit.id } }, log, 'product (sku auto)');
     await api(o, 'Catalog.SetPrice', { params: { productId: p.id }, body: { branchId: b, channel: 'DINE_IN', amount: '45.00', currency: 'EGP' } }, log, 'price DINE_IN 45');
     await api(o, 'Catalog.SetPrice', { params: { productId: p.id }, body: { branchId: b, channel: 'TAKEAWAY', amount: '45.00', currency: 'EGP' } }, log, 'price TAKEAWAY 45');
-    log({ ok: null, text: `NewProductAvailabilityPolicy CREATING_BRANCH → available on the creating branch (sku ${p.sku})` });
+    log({ ok: null, text: `NewProductAvailabilityPolicy CREATING_BRANCH → available on the creating branch (sku ${p.sku})`, plain: 'الصنف بيتباع على طول في الفرع اللي اتعمل فيه، واتعمله كود أوتوماتيك' });
     if (!store.db.availability.some((a) => a.productId === p.id)) await api(o, 'Product.SetAvailability', { params: { productId: p.id }, body: { state: 'AVAILABLE', branchId: b } }, log, 'availability');
   } },
   { id: 'J-A1-11', device: 'BO', user: 'owner-1', screen: 'stations', run: async (log) => {
     const o = await as('BO', 'owner-1', log);
     for (let i = 1; i <= 6; i++) if (!store.db.tables.some((t) => t.name === String(i))) await api(o, 'Table.Create', { body: { name: String(i), area: 'Hall', capacity: 4 } });
-    log({ ok: true, text: 'tables 1–6' });
+    log({ ok: true, text: 'tables 1–6', plain: 'الترابيزات من 1 لـ 6 اتعملت' });
     for (const n of ['GRILL', 'COLD', 'BAR']) if (!store.db.stations.some((s) => s.name === n)) await api(o, 'KitchenStation.Create', { body: { name: n } }, log, n);
     const st = (n: string) => store.db.stations.find((s) => s.name === n)!.id;
     const cats = store.db.categories;
@@ -395,7 +397,7 @@ const A1: StepDef[] = [
   { id: 'J-A1-12', device: 'BO', user: 'implementation-engineer', screen: 'prints', run: async (log) => {
     const e = await as('BO', 'implementation-engineer', log);
     await api(e, 'Print.Document', { body: { documentType: 'X_REPORT', documentId: 'TEST-PAGE', terminalId: term('CASH-1'), label: 'Test page CASH-1' } }, log, 'test page on CASH-1');
-    log({ ok: null, text: 'a print failure never blocks a sale (try the printer simulator: DOWN)' });
+    log({ ok: null, text: 'a print failure never blocks a sale (try the printer simulator: DOWN)', plain: 'عطل الطابعة عمره ما يوقف البيع (جرّبه من «محاكاة الأعطال»)' });
   } },
   { id: 'J-A1-13', device: 'BO', user: 'implementation-engineer', screen: 'fiscal', run: async (log) => {
     const e = await as('BO', 'implementation-engineer', log);
@@ -424,14 +426,14 @@ const A1: StepDef[] = [
     const m = await as(term('ADMIN-1'), 'manager-1', log);
     const bd = store.db.orders.at(-1)?.completedBusinessDate ?? '';
     const r = await api<any>(m, 'Report.Run', { params: { reportId: 'daily_sales' }, query: { fromBusinessDate: bd } }, log, `daily_sales ${bd}`);
-    log({ ok: true, text: r.sections[0].rows.slice(0, 6).map((x: any[]) => `${x[0]}=${x[1]}`).join(' · ') });
+    log({ ok: true, text: r.sections[0].rows.slice(0, 6).map((x: any[]) => `${x[0]}=${x[1]}`).join(' · '), plain: 'تقرير المبيعات فيه بيعة النهارده' });
     await api(m, 'Report.Run', { params: { reportId: 'tenders' }, query: { fromBusinessDate: bd } }, log, 'tenders');
   } },
   { id: 'J-A1-16', device: 'BO', user: 'implementation-engineer', screen: 'home', run: async (log) => {
-    log({ ok: true, text: `backup drill (demo): state export = ${Math.round(store.exportJson().length / 1024)} KB JSON; use the data menu ⟲ → export/import to restore. RPO/RTO are measured on the real install.` });
+    log({ ok: true, text: `backup drill (demo): state export = ${Math.round(store.exportJson().length / 1024)} KB JSON; use the data menu ⟲ → export/import to restore. RPO/RTO are measured on the real install.`, plain: `اتعملت نسخة احتياطية (${Math.round(store.exportJson().length / 1024)} كيلوبايت). في العرض بترجع من «البيانات ← رجّع نسخة محفوظة».` });
   } },
   { id: 'J-A1-17', device: 'BO', user: 'implementation-engineer', screen: 'home', run: async (log) => {
-    log({ ok: true, text: 'handover: train each role with J-R1..J-R4 and N1..N12 (see the "سيناريوهات الفشل" panel); profile questions are listed in the Policy Panel.' });
+    log({ ok: true, text: 'handover: train each role with J-R1..J-R4 and N1..N12 (see the "سيناريوهات الفشل" panel); profile questions are listed in the Policy Panel.', plain: 'التسليم: درّب كل واحد على الرحلات و«سيناريوهات الفشل»؛ وأسئلة الإعدادات موجودة في «إعدادات المطعم».' });
   } },
 ];
 
@@ -444,14 +446,14 @@ const C1: StepDef[] = [
     await api(c, 'Order.AddLines', { params: { orderId: o.id }, body: { expectedVersion: order(o.id).version, lines: [{ productId: 'p_chicken_shawarma', quantity: '1', modifierOptionIds: ['opt_cheese'] }, { productId: 'p_orange_juice', quantity: '1', modifierOptionIds: ['opt_size_regular'] }] } }, log, 'shawarma + OJ');
     devices.navigate('t_cash', 'counter', { orderId: o.id });
     const t = order(o.id);
-    log({ ok: true, text: `OJ line ${t.lines[1].lineTotal} · service: ${t.service?.origin}` });
+    log({ ok: true, text: `OJ line ${t.lines[1].lineTotal} · service: ${t.service?.origin}`, plain: `سعر العصير في التيك أواي: ${egp(t.lines[1].lineTotal)}` });
   } },
   { id: 'J-C1-2', device: 't_cash', user: 'demo-cashier-a', screen: () => ['pay', { orderId: [...store.db.orders].reverse().find((o) => o.channel === 'TAKEAWAY')?.id, back: 'counter' }], text: { who: 'demo-cashier-a on DEMO-CASH-1', do_ar: 'ادفع الأول: تأكيد (بيبعت للمطبخ وقت التأكيد) ثم كاش 300.', do_en: 'Pay first: confirm (fires at confirm), then cash 300.', expect_ar: 'التأكيد بيعمل جولة للمطبخ (AT_CONFIRM). الباقي من السيرفر.', expect_en: 'Confirm creates the kitchen round (AT_CONFIRM). Change from the server.', operations: [] }, run: async (log) => {
     const c = await as('t_cash', 'demo-cashier-a', log);
     const o = [...store.db.orders].reverse().find((x) => x.channel === 'TAKEAWAY' && x.status === 'DRAFT');
-    if (!o) return log({ ok: false, text: 'run step 1 first' });
+    if (!o) return log({ ok: false, text: 'run step 1 first', plain: 'اعمل الخطوة 1 الأول' });
     const conf = await api<any>(c, 'Order.Confirm', { params: { orderId: o.id }, body: { expectedVersion: order(o.id).version } }, log, 'confirm');
-    log({ ok: true, text: `round via CONFIRM: ${conf.confirmFireRound}` });
+    log({ ok: true, text: `round via CONFIRM: ${conf.confirmFireRound}`, plain: 'الطلب راح المطبخ أول ما الشيك اتأكد' });
     const cap = await api<any>(c, 'Payment.Capture', { params: { orderId: o.id }, body: { tenders: [{ method: 'CASH', tendered: '300.00' }] } }, log, 'cash 300');
     log({ ok: true, text: `change ${cap.change}` });
     await api(c, 'Order.Complete', { params: { orderId: o.id }, body: { expectedVersion: order(o.id).version } }, log, 'complete');
@@ -473,7 +475,7 @@ const F1: StepDef[] = [
     await api(c, 'Order.AddLines', { params: { orderId: o.id }, body: { expectedVersion: order(o.id).version, lines: [{ productId: 'p_kofta', quantity: '1', modifierOptionIds: ['opt_medium'] }] } }, log, 'kofta');
     await api(c, 'Order.Confirm', { params: { orderId: o.id }, body: { expectedVersion: order(o.id).version } }, log, 'confirm');
     sim.set({ dropNextResponse: 'Payment.Capture' });
-    log({ ok: null, text: 'simulator: the next Payment.Capture response will be lost — now pay it in the UI' });
+    log({ ok: null, text: 'simulator: the next Payment.Capture response will be lost — now pay it in the UI', plain: 'جهّزنا العطل: رد الدفع الجاي هيضيع — ادفع الطلب بنفسك من شاشة التحصيل' });
     devices.navigate('t_cash', 'pay', { orderId: o.id, back: 'counter' });
   } },
   { id: 'J-F1-2', device: 't_floor', user: 'demo-waiter-1', screen: 'floor', before: () => sim.set({ dropNextResponse: null }), text: { who: 'demo-waiter-1 (T2) and demo-waiter-2', do_ar: 'جهازين بيعدلوا نفس الشيك: الاتنين بيضغطوا "ابعت للمطبخ" على نفس النسخة.', do_en: 'Two devices edit one check: both send to the kitchen from the same version.', expect_ar: 'واحد بس بينجح؛ التاني بياخد CONCURRENCY_CONFLICT "حد تاني عدّل الشيك ده" وبيعمل تحديث. جولة واحدة وتذاكر مرة واحدة.', expect_en: 'Exactly one succeeds; the other gets CONCURRENCY_CONFLICT and refreshes. One round, one ticket set.', operations: [{ op: 'Order.Fire', http: 'POST /orders/{orderId}/fire', actor: 'two waiters', expected: 'N3' }] }, run: async (log) => {
@@ -486,12 +488,12 @@ const F1: StepDef[] = [
     const w2 = await as('t_admin', 'demo-waiter-2', log);
     const res = await Promise.allSettled([api(w1, 'Order.Fire', { params: { orderId: o.id }, body: { expectedVersion: v } }), api(w2, 'Order.Fire', { params: { orderId: o.id }, body: { expectedVersion: v } })]);
     const ok = res.filter((r) => r.status === 'fulfilled').length;
-    log({ ok: ok === 1, text: `${ok} success, ${res.length - ok} CONCURRENCY_CONFLICT · rounds ${order(o.id).rounds.length}` });
+    log({ ok: ok === 1, text: `${ok} success, ${res.length - ok} CONCURRENCY_CONFLICT · rounds ${order(o.id).rounds.length}`, plain: ok === 1 ? 'واحد بس نجح، والتاني اتنبّه إن حد عدّل الشيك — والمطبخ أخد الطلب مرة واحدة' : `نجح ${ok} من 2 — كان المفروض واحد بس` });
     devices.navigate('t_floor', 'order', { orderId: o.id, back: 'floor' });
   } },
   { id: 'J-F1-3', device: 't_cash', user: 'demo-cashier-a', screen: 'prints', text: { who: 'demo-cashier-a on DEMO-CASH-1', do_ar: 'الطابعة واقعة: طابعة الكاشير DOWN، وبيع تيك أواي يتقفل.', do_en: 'Printer down: the cashier printer is DOWN; a takeaway sale completes.', expect_ar: 'البيع بيخلص عادي. مهمة الطباعة FAILED وبتتعاد تلقائي، وبعد 5 محاولات DEAD. إعادة المحاولة بنفس المهمة ونفس النسخة.', expect_en: 'The sale completes. The print job FAILS, retries, then DEAD after 5 attempts. Retry reuses the same job and copy.', operations: [{ op: 'PrintJob.Retry', http: 'POST /print-jobs/{id}/retry', actor: 'cashier', expected: 'same job' }] }, run: async (log) => {
     sim.set({ printers: { ...sim.get().printers, t_cash: 'DOWN' }, dropNextResponse: null });
-    log({ ok: null, text: 'simulator: DEMO-CASH-1 printer DOWN' });
+    log({ ok: null, text: 'simulator: DEMO-CASH-1 printer DOWN', plain: 'جهّزنا العطل: طابعة الكاشير واقعة' });
     const c = await as('t_cash', 'demo-cashier-a', log);
     if (!openSession('t_cash')) await api(c, 'Session.Open', { body: { terminalId: 't_cash', openingFloat: '500.00' } }, log, 'shift');
     const o = await api<any>(c, 'Order.Create', { body: { channel: 'TAKEAWAY' } }, log, 'takeaway');
@@ -501,28 +503,28 @@ const F1: StepDef[] = [
     await api(c, 'Order.Complete', { params: { orderId: o.id }, body: { expectedVersion: order(o.id).version } }, log, 'complete — sale done');
     for (let i = 0; i < 6; i++) { clock.advance(6 * 60_000); runOutbox(); }
     const j = store.db.printJobs.find((x) => x.documentId === o.id)!;
-    log({ ok: j.state === 'DEAD', text: `print job ${j.id}: ${j.state} after ${j.attempts.length} attempts (clock moved forward)` });
+    log({ ok: j.state === 'DEAD', text: `print job ${j.id}: ${j.state} after ${j.attempts.length} attempts (clock moved forward)`, plain: j.state === 'DEAD' ? `أمر الطباعة فشل ${j.attempts.length} مرات واتوقف ومستني حد يعيده — والبيع خلص عادي` : 'أمر الطباعة لسه بيحاول' });
   } },
   { id: 'J-F1-4', device: 't_floor', user: 'demo-waiter-1', screen: 'floor', text: { who: 'demo-waiter-1 on T2', do_ar: 'شاشة المطبخ واقعة: KDS DOWN، والويتر يبعت جولة. بعدين نرجّعها ونعمل إعادة إرسال.', do_en: 'Kitchen screen down: KDS DOWN, the waiter sends a round. Then bring it back and re-send.', expect_ar: 'الجولة بتتسجل والشيك بيعرض "ما وصلش المطبخ" + إعادة إرسال. إعادة الإرسال بتعمل التذاكر مرة واحدة بس.', expect_en: 'The round is recorded; the check shows "not delivered" with re-send. Re-send creates the tickets exactly once.', operations: [{ op: 'Kitchen.Resend', http: 'POST /orders/{orderId}/kitchen/resend', actor: 'waiter', expected: 'no duplicate' }] }, run: async (log) => {
     sim.set({ kds: 'DOWN' });
-    log({ ok: null, text: 'simulator: kitchen delivery DOWN' });
+    log({ ok: null, text: 'simulator: kitchen delivery DOWN', plain: 'جهّزنا العطل: شاشة المطبخ واقعة' });
     const w = await as('t_floor', 'demo-waiter-1', log);
     if (!openVisit('4')) await api(w, 'TableVisit.Open', { params: { tableId: tableId('4') }, body: { guestCount: 2 } }, log, 'table 4');
     const o = await api<any>(w, 'Order.Create', { body: { channel: 'DINE_IN', tableId: tableId('4') } }, log, 'check');
     await api(w, 'Order.AddLines', { params: { orderId: o.id }, body: { expectedVersion: order(o.id).version, lines: [{ productId: 'p_hummus', quantity: '1' }, { productId: 'p_tea', quantity: '1', modifierOptionIds: ['opt_size_regular'] }] } }, log, 'hummus + tea');
     await api(w, 'Order.Fire', { params: { orderId: o.id }, body: { expectedVersion: order(o.id).version } }, log, 'send');
     await sleep(200); runOutbox();
-    log({ ok: true, text: `delivery: ${store.db.kitchenDeliveries.filter((d) => d.orderId === o.id).map((d) => d.state).join(',')}` });
+    log({ ok: true, text: `delivery: ${store.db.kitchenDeliveries.filter((d) => d.orderId === o.id).map((d) => d.state).join(',')}`, plain: 'الطلب اتسجل بس ما وصلش المطبخ — الشيك بيعرض «ما وصلش» وزرار إعادة إرسال' });
     sim.set({ kds: 'UP' });
     await api(w, 'Kitchen.Resend', { params: { orderId: o.id }, body: {} }, log, 're-send');
     await sleep(200); runOutbox();
-    await expectRefusal(api(w, 'Kitchen.Resend', { params: { orderId: o.id }, body: {} }), 'VALIDATION_FAILED', log, 'second re-send (nothing to re-send)');
-    log({ ok: store.db.tickets.filter((t) => t.orderId === o.id).length === 2, text: `tickets for this check: ${store.db.tickets.filter((t) => t.orderId === o.id).length} (one per station)` });
+    await expectRefusal(api(w, 'Kitchen.Resend', { params: { orderId: o.id }, body: {} }), 'VALIDATION_FAILED', log, 'second re-send (nothing to re-send)', 'محاولة إعادة الإرسال مرة تانية (مفيش حاجة تتبعت)');
+    log({ ok: store.db.tickets.filter((t) => t.orderId === o.id).length === 2, text: `tickets for this check: ${store.db.tickets.filter((t) => t.orderId === o.id).length} (one per station)`, plain: `المطبخ استلم ${store.db.tickets.filter((t) => t.orderId === o.id).length} طلب (واحد لكل محطة) — من غير تكرار` });
     devices.navigate('t_floor', 'order', { orderId: o.id, back: 'floor' });
   } },
   { id: 'J-F1-5', device: 't_admin', user: 'demo-manager-1', screen: 'ereceipts', text: { who: 'demo-manager-1 on ADMIN', do_ar: 'منصة الإيصال الإلكتروني واقعة يوم: ETA DOWN، بيع يتقفل، والساعة تتقدم 12 ثم 20 ساعة، وبعدين ETA ترجع.', do_en: 'E-receipt platform down for a day: ETA DOWN, a sale completes, the clock moves 12 h then 20 h, then ETA comes back.', expect_ar: 'البيع خلص. الإيصال في الطابور، تنبيه عند 12 ساعة و20 ساعة قبل مهلة 24 ساعة. لما المنصة ترجع بيتقبل.', expect_en: 'The sale is done. The document queues; alerts at 12 h and 20 h before the 24 h deadline. Accepted when the platform returns.', operations: [{ op: 'Compliance.Find', http: 'GET /compliance/documents', actor: 'manager', expected: 'queue + alerts' }] }, run: async (log) => {
     sim.set({ eta: 'DOWN' });
-    log({ ok: null, text: 'simulator: ETA DOWN' });
+    log({ ok: null, text: 'simulator: ETA DOWN', plain: 'جهّزنا العطل: منظومة الإيصال الإلكتروني واقعة' });
     const c = await as('t_cash', 'demo-cashier-a', log);
     if (!openSession('t_cash')) await api(c, 'Session.Open', { body: { terminalId: 't_cash', openingFloat: '500.00' } }, log, 'shift');
     const o = await api<any>(c, 'Order.Create', { body: { channel: 'TAKEAWAY' } }, log, 'takeaway');
@@ -534,10 +536,10 @@ const F1: StepDef[] = [
     clock.advance(12 * 3_600_000 + 60_000); runOutbox(); await sleep(2100); runOutbox();
     clock.advance(8 * 3_600_000); await sleep(2100); runOutbox();
     const doc = store.db.fiscalDocuments.find((d) => d.orderId === o.id)!;
-    log({ ok: true, text: `document ${doc.state}; alerts: ${store.db.alerts.filter((a) => a.ref?.endsWith(doc.id)).map((a) => a.kind + ' ' + a.severity).join(', ')}` });
+    log({ ok: true, text: `document ${doc.state}; alerts: ${store.db.alerts.filter((a) => a.ref?.endsWith(doc.id)).map((a) => a.kind + ' ' + a.severity).join(', ')}`, plain: `الساعة اتقدمت: الإيصال مستني في الطابور، وطلع ${store.db.alerts.filter((a) => a.ref?.endsWith(doc.id)).length} تنبيه للمدير` });
     sim.set({ eta: 'UP' });
     doc.nextTryAtMs = 0; runOutbox();
-    log({ ok: store.db.fiscalDocuments.find((d) => d.id === doc.id)!.state === 'ACCEPTED', text: `ETA back up → ${store.db.fiscalDocuments.find((d) => d.id === doc.id)!.state}` });
+    log({ ok: store.db.fiscalDocuments.find((d) => d.id === doc.id)!.state === 'ACCEPTED', text: `ETA back up → ${store.db.fiscalDocuments.find((d) => d.id === doc.id)!.state}`, plain: store.db.fiscalDocuments.find((d) => d.id === doc.id)!.state === 'ACCEPTED' ? 'المنظومة رجعت والإيصال اتقبل' : 'المنظومة رجعت بس الإيصال لسه ما اتقبلش' });
   } },
 ];
 

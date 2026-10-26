@@ -3,7 +3,12 @@ import { seed, egProfile } from './contracts';
 import { POLICIES, startingValue } from './policyRegistry';
 import type { DB, Product, PriceRule, Channel, PolicyValue, ReasonCode } from './types';
 import { m4 } from './money';
+import { seedOps } from './seed-ops';
+import { seedMenu } from './seed-menu';
+import { seedCrm, CRM_EMPTY } from './seed-crm';
+import { personaDisplayName } from '../demo/people'; // friendly demo names (displayName only)
 
+import { seedInventory } from './seed-inventory';
 export const DEMO_PIN = '123456';
 export const DEMO_PASSWORD = 'demo-password-1';
 
@@ -22,7 +27,7 @@ export function buildSeed(nowMs: number): DB {
       ...seed.roles.map((r: any) => ({ id: r.key, name: r.name, permissionIds: [...r.permissionIds], active: true, version: 1 })),
     ],
     users: seed.users.map((u: any) => ({
-      id: u.key, username: u.username, displayName: u.displayName, active: true, version: 1, pin: DEMO_PIN, password: DEMO_PASSWORD,
+      id: u.key, username: u.username, displayName: personaDisplayName(u.username), active: true, version: 1, pin: DEMO_PIN, password: DEMO_PASSWORD,
       roleAssignments: [{ roleId: u.role, branchIds: [u.branch] }], failedAttempts: 0, lockedUntil: null, credentialVersion: 1, mustChangeCredentials: false,
     })),
     authSessions: [],
@@ -82,7 +87,7 @@ export function buildSeed(nowMs: number): DB {
     r.permissionIds = [...new Set([...r.permissionIds, ...add])];
   }
   db.roles.push({ id: 'role_owner', name: 'Demo Owner', permissionIds: ['*'], active: true, version: 1, demoAdded: ['*'] } as any);
-  db.users.push({ id: 'u_owner', username: 'demo-owner', displayName: 'Demo Owner', active: true, version: 1, pin: DEMO_PIN, password: DEMO_PASSWORD, roleAssignments: [{ roleId: 'role_owner', branchIds: ['*'] }], failedAttempts: 0, lockedUntil: null, credentialVersion: 1, mustChangeCredentials: false });
+  db.users.push({ id: 'u_owner', username: 'demo-owner', displayName: personaDisplayName('demo-owner'), active: true, version: 1, pin: DEMO_PIN, password: DEMO_PASSWORD, roleAssignments: [{ roleId: 'role_owner', branchIds: ['*'] }], failedAttempts: 0, lockedUntil: null, credentialVersion: 1, mustChangeCredentials: false });
 
   // Availability: seed product availability per branch (Kunafa SOLD_OUT).
   for (const p of seed.products) {
@@ -125,6 +130,7 @@ export function buildSeed(nowMs: number): DB {
 
   // Direction demo (مقترح): a "product direction" category with sizes, half-and-half, a combo and a table-tax item.
   addDirectionCatalog(db, startOfPrices);
+  seedMenu(db, nowMs); // menu & pricing area: dayparts, menus, combos, sizes, half-and-half (seed-menu.ts)
 
   // E-receipt starting point: profile and device exist for the main branch cashier terminal; item codes missing for
   // a few products, so the queue shows PENDING_DATA until the manager maps them (G3/G4).
@@ -137,15 +143,18 @@ export function buildSeed(nowMs: number): DB {
   db.promotions.push({ id: 'promo_1', name: { ar: 'هابي أور مشروبات باردة 20%', en: 'Happy hour cold drinks 20%' }, kind: 'AUTOMATIC', code: null, benefitType: 'PERCENTAGE', benefitValue: '20', branchIds: ['branch_main'], channels: ['DINE_IN', 'TAKEAWAY'], minSubtotal: null, schedule: { days: [0, 1, 2, 3, 4, 5, 6], start: '15:00', end: '18:00' }, validFrom: null, validTo: null, active: true, version: 1 });
   db.promotions.push({ id: 'promo_2', name: { ar: 'كود ترحيب 50 جنيه', en: 'Welcome code 50 EGP' }, kind: 'CODED', code: 'WELCOME50', benefitType: 'FIXED_AMOUNT', benefitValue: '50', branchIds: ['branch_main'], channels: ['DINE_IN', 'TAKEAWAY'], minSubtotal: m4('300'), schedule: null, validFrom: null, validTo: null, active: true, version: 1 });
 
+  seedCrm(db, nowMs); // customers, delivery, loyalty, online orders (seed-crm.ts)
+  seedOps(db, nowMs); // operations & system area: floor plans, history, reconciliation, webhooks, schedules
+  seedInventory(db, nowMs); // inventory & purchasing area: warehouses, items, recipes, suppliers, history (seed-inventory.ts)
   db.events.push({ id: 'ev_0', at: nowIso, type: 'Provisioned', ref: 'biz', text: 'demo-provisioning 1.2.0 + EG.profile 1.4.0 applied' });
   return db;
 }
 
 export const DEMO_ROLE_ADDITIONS: Record<string, string[]> = {
-  role_waiter: ['order:cancel', 'settings:read', 'print:read', 'order:changechannel', 'order:updatedetails', 'order:setcustomer'],
-  role_cashier: ['order:changechannel', 'order:updatedetails', 'order:setcustomer', 'order:removediscount', 'order:create', 'order:addlines', 'order:updateline', 'order:removeline', 'order:fire', 'order:cancel', 'order:applydiscount', 'order:comp', 'cash:move', 'drawer:opennosale', 'print:reprint', 'print:retry', 'print:read', 'settings:read', 'report:run', 'kitchen:read', 'compliance:read'],
-  role_manager: ['order:changechannel', 'order:updatedetails', 'order:setcustomer', 'order:removediscount', 'tax:read', 'settings:read', 'order:create', 'order:addlines', 'order:updateline', 'order:removeline', 'order:fire', 'order:cancel', 'order:applydiscount', 'order:comp', 'payment:capture', 'session:open', 'session:close', 'drawer:opennosale', 'print:reprint', 'print:retry', 'print:read', 'compliance:read', 'compliance:issuedocument', 'user:read', 'user:create', 'user:manageaccess', 'role:read', 'role:create', 'role:update', 'credential:reset', 'approve:order_discount', 'approve:order_comp', 'approve:price_change', 'approve:product_tax_change', 'approve:receipt_reprint', 'approve:credential_reset', 'approve:user_access_change', 'approve:drawer_no_sale', 'approve:tender_correction', 'approve:price_override', 'payment:correcttender', 'business:read', 'branch:read', 'terminal:read', 'audit:read', 'approval:read', 'kitchen:advanceticket'],
-  role_chef: ['print:read', 'settings:read'],
+  role_waiter: ['order:cancel', 'settings:read', 'print:read', 'order:changechannel', 'order:updatedetails', 'order:setcustomer', 'customer:pii:read', 'customer:create', 'customer:update', 'customeraddress:upsert', 'loyalty:read' /* crm area */],
+  role_cashier: ['product:setavailability', 'order:changechannel', 'order:updatedetails', 'order:setcustomer', 'order:removediscount', 'order:create', 'order:addlines', 'order:updateline', 'order:removeline', 'order:fire', 'order:cancel', 'order:applydiscount', 'order:comp', 'cash:move', 'drawer:opennosale', 'print:reprint', 'print:retry', 'print:read', 'settings:read', 'report:run', 'kitchen:read', 'compliance:read', 'customer:pii:read', 'customer:create', 'customer:update', 'customeraddress:upsert', 'loyalty:read', 'delivery:read', 'delivery:create', 'delivery:assign', 'delivery:dispatch', 'delivery:complete', 'delivery:failattempt', 'delivery:cancel', 'delivery:settlecash', 'channel:manage', 'channel:ingest' /* crm area */],
+  role_manager: ['order:changechannel', 'order:updatedetails', 'order:setcustomer', 'order:removediscount', 'tax:read', 'settings:read', 'order:create', 'order:addlines', 'order:updateline', 'order:removeline', 'order:fire', 'order:cancel', 'order:applydiscount', 'order:comp', 'payment:capture', 'session:open', 'session:close', 'drawer:opennosale', 'print:reprint', 'print:retry', 'print:read', 'compliance:read', 'compliance:issuedocument', 'user:read', 'user:create', 'user:manageaccess', 'role:read', 'role:create', 'role:update', 'credential:reset', 'approve:order_discount', 'approve:order_comp', 'approve:price_change', 'approve:product_tax_change', 'approve:receipt_reprint', 'approve:credential_reset', 'approve:user_access_change', 'approve:drawer_no_sale', 'approve:tender_correction', 'approve:price_override', 'payment:correcttender', 'business:read', 'branch:read', 'terminal:read', 'audit:read', 'approval:read', 'kitchen:advanceticket', 'customer:pii:read', 'customer:create', 'customer:update', 'customeraddress:upsert', 'loyalty:read', 'loyalty:adjust', 'loyalty:configure', 'delivery:read', 'delivery:create', 'delivery:assign', 'delivery:dispatch', 'delivery:complete', 'delivery:failattempt', 'delivery:cancel', 'delivery:settlecash', 'delivery:configure', 'channel:manage', 'channel:ingest', 'approve:loyalty_adjust', 'approve:delivery_cancel', 'approve:driver_cash_variance' /* crm area */, 'inventory:read', 'warehouse:configure', 'warehouse:setsalesdefault', 'inventoryitem:configure', 'inventory:adjust', 'stock:count', 'stockcount:start', 'stockcount:recordobservations', 'stockcount:submit', 'stockcount:cancel', 'stock:transfer', 'transfer:create', 'transfer:receive', 'transfer:cancel', 'stock:recordwaste', 'stock:recordreturn', 'recipe:define', 'recipe:read', 'production:post', 'supplier:upsert', 'purchasing:read', 'purchaseorder:create', 'purchaseorder:update', 'purchaseorder:issue', 'purchaseorder:close', 'purchaseorder:cancel', 'goodsreceipt:post', 'goodsreceipt:reverse', 'supplierreturn:post', 'approve:inventory_adjust', 'approve:stock_count_post', 'approve:stock_waste' /* inventory area */],
+  role_chef: ['catalog:read', 'product:setavailability', 'inventory:read', 'recipe:read', 'stockcount:recordobservations', 'stock:recordwaste', 'production:post', 'transfer:receive' /* inventory area */, 'print:read', 'settings:read'],
 };
 
 const OPTION_AR: Record<string, string> = { opt_size_regular: 'عادي', opt_size_large: 'كبير', opt_medium: 'ميديم', opt_well: 'مستوي كويس', opt_cheese: 'جبنة زيادة', opt_egg: 'بيضة', opt_hot_sauce: 'صوص حار' };
@@ -210,11 +219,14 @@ export function buildEmpty(nowMs: number): DB {
     business: { id: 'biz', name: '', nameAr: '', legalName: null, currency: 'EGP', version: 1 },
     branches: [], terminals: [],
     roles: [{ id: 'role_bootstrap', name: 'Bootstrap administrator', permissionIds: ['*'], active: true, version: 1 }],
-    users: [{ id: 'u_engineer', username: 'implementation-engineer', displayName: 'Implementation engineer', active: true, version: 1, pin: DEMO_PIN, password: DEMO_PASSWORD, roleAssignments: [{ roleId: 'role_bootstrap', branchIds: ['*'] }], failedAttempts: 0, lockedUntil: null, credentialVersion: 1, mustChangeCredentials: false }],
+    users: [{ id: 'u_engineer', username: 'implementation-engineer', displayName: personaDisplayName('implementation-engineer'), active: true, version: 1, pin: DEMO_PIN, password: DEMO_PASSWORD, roleAssignments: [{ roleId: 'role_bootstrap', branchIds: ['*'] }], failedAttempts: 0, lockedUntil: null, credentialVersion: 1, mustChangeCredentials: false }],
     authSessions: [], units: [], categories: [], modifierGroups: [], products: [], availability: [], priceRules: [], taxPolicies: [], tables: [], visits: [], orders: [],
     stations: [], routingRules: [], tickets: [], kitchenDeliveries: [], sessions: [], cashEntries: [], captures: [], refunds: [], grants: [], reasonCodes: [],
     policyValues: [], policyHistory: [], printJobs: [], fiscalProfiles: [], fiscalDevices: [], itemMappings: [], fiscalDocuments: [], promotions: [], audit: [], idem: {}, alerts: [],
     deposits: [], reservations: [], tips: [],
+    ...CRM_EMPTY,
+    menu: undefined, // menu area: no dayparts/menus on a fresh install (nothing restricted)
+    inv: undefined, // inventory area: a fresh install starts with no warehouses or stock
     events: [{ id: 'ev_0', at: nowIso, type: 'Installed', ref: 'biz', text: 'dedicated deployment ready — bootstrap administrator only' }],
   };
 }

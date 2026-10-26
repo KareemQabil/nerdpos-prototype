@@ -7,6 +7,8 @@ import { Section, StateBadge, Card, Button, Field, Input, Select, Money, Banner,
 import { t, L } from '../i18n';
 import { money, time, dateTime } from '../lib/format';
 import { useReasons } from './order/CheckPanel';
+import { TransferSessionDialog } from './ops/TransferSessionDialog';
+import { ArrowRightLeft } from 'lucide-react';
 
 export default function Shift() {
   const { terminal } = useDev();
@@ -63,6 +65,7 @@ function OpenSession({ sid, onZ }: { sid: string; onZ: (id: string) => void }) {
           </div>
         </div>
         {ses.durationWarning && <Banner tone="warning"><AlertTriangle className="w-4 h-4 inline" /> {t('الوردية مفتوحة من وقت طويل (SessionDurationPolicy)')}</Banner>}
+        <OpenOrders sid={ses.id} />
         <div className="mt-3">
           <Table head={[t('الوقت'), t('النوع'), t('المبلغ'), t('السبب'), t('المرجع')]} rows={ses.cashEntries.slice().reverse().map((e: any) => [<span className="num text-xs">{time(e.at)}</span>, kindLabel(e.kind), <Money v={e.amount} />, e.reasonCode ?? '', <span className="num text-xs">{e.ref ?? ''}{e.approvalGrantId ? ' · ✓' : ''}</span>])} />
         </div>
@@ -164,6 +167,7 @@ function CloseDialog({ ses, onClose, onZ }: { ses: any; onClose: () => void; onZ
         {blind.data?.value !== false ? <Banner tone="info">{t('إقفال أعمى: اعد الدرج واكتب المبلغ من غير ما تشوف المتوقع (BlindClosePolicy). الفرق بيطلع من السيرفر بعد القفل.')}</Banner> : <Banner tone="warning">{t('الإقفال الأعمى مقفول: المتوقع')} {x.data?.expectedCash ? money(x.data.expectedCash) : '—'}</Banner>}
         <Field label={t('الكاش المعدود في الدرج')}><Input value={counted} onChange={(e) => setCounted(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" className="text-2xl" data-fb="counted-cash" /></Field>
         <Field label={t('ملاحظة (لو في فرق)')}><Textarea value={note} onChange={(e) => setNote(e.target.value)} /></Field>
+        <OpenOrders sid={ses.id} warn />
         <div className="text-[11px] text-dim">{t('الفرق فوق حد SESSION_VARIANCE بيطلب موافقة مدير. شيكات الصالة المأكدة والمش مدفوعة مش بتمنع القفل — بتظهر في Z كشيكات مفتوحة. طلبات التيك أواي المفتوحة على الوردية دي بتمنع (SESSION_HAS_OPEN_ORDERS).')}</div>
       </div>
     </Modal>
@@ -180,5 +184,29 @@ function TipsDialog({ ses, onClose }: { ses: any; onClose: () => void }) {
         {res && <div><b>{res.mode}</b> · {t('الإجمالي')} <Money v={res.total} />{res.lines.map((l: any) => <div key={l.userId} className="flex justify-between"><span>{l.name}</span><Money v={l.amount} /></div>)}</div>}
       </div>
     </Modal>
+  );
+}
+
+/** Open checks that belong to this drawer (takeaway / counter). They must be paid, cancelled or handed over before closing. */
+function OpenOrders({ sid, warn }: { sid: string; warn?: boolean }) {
+  const q = useQuery<any>('Order.Find', { query: { sessionId: sid, lifecycle: 'DRAFT,CONFIRMED', limit: 50 } });
+  const [move, setMove] = useState<any[] | null>(null);
+  const list: any[] = (q.data?.items ?? []).filter((o: any) => o.sessionId === sid);
+  if (!list.length) return null;
+  return (
+    <div className="mt-3 rounded-xl border p-3 space-y-2 border-[color-mix(in_srgb,var(--warning)_40%,transparent)] bg-[color-mix(in_srgb,var(--warning)_8%,transparent)]" data-fb="shift-open-orders">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="text-sm font-bold">{t('{n} شيك مفتوح على الدرج ده', { n: list.length })}{warn && <span className="text-xs font-normal text-dim"> — {t('لازم يتحصلوا أو يتلغوا أو يتنقلوا لدرج تاني قبل القفل')}</span>}</div>
+        <Button size="sm" variant="outline" onClick={() => setMove(list)} data-fb="shift-transfer-all"><ArrowRightLeft className="w-3.5 h-3.5" />{t('انقلهم كلهم لدرج تاني')}</Button>
+      </div>
+      {list.map((o) => (
+        <div key={o.id} className="flex items-center gap-2 text-sm px-2 py-1 rounded-lg surface-1">
+          <span className="num font-bold">#{o.number}</span><span className="text-dim text-xs">{o.channel === 'TAKEAWAY' ? t('تيك أواي') : t('كاونتر')} · {o.serverName}</span>
+          <span className="flex-1" /><Money v={o.totals?.payable} />
+          <Button size="sm" variant="ghost" onClick={() => setMove([o])} data-fb={`shift-transfer:${o.number}`}><ArrowRightLeft className="w-3.5 h-3.5" /></Button>
+        </div>
+      ))}
+      {move && <TransferSessionDialog orders={move} onClose={() => setMove(null)} />}
+    </div>
   );
 }

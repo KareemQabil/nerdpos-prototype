@@ -1,12 +1,14 @@
 // D1 Pay: confirm, pay cash (tendered and change), card with terminal reference, wallets, split tender,
 // partial payment, remaining shown; complete when paid. Every amount comes from the server.
 import React, { useState } from 'react';
-import { ArrowRight, Banknote, CreditCard, Smartphone, CheckCircle2, Receipt, PiggyBank, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Banknote, CreditCard, Smartphone, CheckCircle2, Receipt, PiggyBank, ShieldCheck, Star } from 'lucide-react';
 import { useDev, useQuery, useCommand, useUnknowns } from '../app/hooks';
 import { Section, StateBadge, Button, Card, Money, Field, Input, Select, Banner, Pill, Tabs, KV, Spinner, Table } from '../ui';
 import { t, L } from '../i18n';
 import { cn, money, qty, time } from '../lib/format';
 import { StatusPill } from './order/CheckPanel';
+import { CustomerChip } from './customers/common'; // crm area
+import { LoyaltyRedeemBox, ExternalAuthBox, EarnedNote } from './customers/PayExtras'; // crm area
 
 export default function Pay() {
   const { params, nav } = useDev();
@@ -31,10 +33,11 @@ export function PayPanel({ orderId, onBack }: { orderId: string; onBack: () => v
   const complete = async () => { await run('Order.Complete', { params: { orderId }, body: { expectedVersion: order.version } }, { success: t('الشيك اتقفل') }); };
   return (
     <div data-screen="D1" className="space-y-4">
-      <Section title={`${t('التحصيل')} · #${order.number}`} badge={<StateBadge ops={['Order.Confirm', 'Payment.Capture', 'Payment.GetSettlement', 'Order.Complete']} />} sub={order.tableName ? `${t('ترابيزة')} ${order.tableName} · ${t('شيك')} ${order.checkNo}` : order.channel === 'TAKEAWAY' ? t('تيك أواي') : ''}
+      <Section title={`${t('التحصيل')} · #${order.number}`} badge={<StateBadge ops={['Order.Confirm', 'Payment.Capture', 'Payment.GetSettlement', 'Order.Complete']} />} sub={order.tableName ? `${t('ترابيزة')} ${order.tableName} · ${t('شيك')} ${order.checkNo}` : order.channel === 'TAKEAWAY' ? t('تيك أواي') : order.channel === 'DELIVERY' ? t('دليفري') : ''}
         actions={<Button variant="ghost" onClick={onBack}><ArrowRight className="w-4 h-4 ltr:rotate-180" />{t('رجوع')}</Button>} />
       <div className="grid lg:grid-cols-[1fr_420px] gap-4">
         <Card title={<span className="flex items-center gap-2">{t('الشيك')} <StatusPill s={order.status} /></span>}>
+          {order.kind !== 'STAFF_MEAL' && <div className="mb-3"><CustomerChip order={order} editable={order.status !== 'COMPLETED'} /></div>}
           <div className="space-y-1 text-sm">
             {order.lines.filter((l: any) => l.status === 'ACTIVE' || l.status === 'VOIDED').map((l: any) => (
               <div key={l.id} className={cn('flex justify-between gap-2', l.status === 'VOIDED' && 'line-through opacity-50')}>
@@ -83,6 +86,7 @@ export function PayPanel({ orderId, onBack }: { orderId: string; onBack: () => v
                 <CheckCircle2 className="w-12 h-12 mx-auto text-[var(--success)]" />
                 <div className="font-bold text-lg">{t('الشيك اتقفل')}</div>
                 {lastChange && lastChange !== '0.0000' && <div className="text-2xl num font-bold text-[var(--success)]">{t('الباقي')} {money(lastChange)}</div>}
+                <EarnedNote order={order} />
                 <div className="flex gap-2 justify-center flex-wrap">
                   <Button onClick={() => nav('receipt', { orderId })}><Receipt className="w-4 h-4" />{t('الإيصال')}</Button>
                   <Button variant="primary" onClick={onBack}>{t('رجوع')}</Button>
@@ -98,7 +102,7 @@ export function PayPanel({ orderId, onBack }: { orderId: string; onBack: () => v
   );
 }
 
-const methodLabel = (m: string) => ({ CASH: t('كاش'), CARD: t('كارت'), DIGITAL_WALLET: t('محفظة'), DEPOSIT: t('عربون') } as Record<string, string>)[m] ?? m;
+const methodLabel = (m: string) => ({ CASH: t('كاش'), CARD: t('كارت'), DIGITAL_WALLET: t('محفظة'), DEPOSIT: t('عربون'), LOYALTY: t('نقاط'), ONLINE: t('مدفوع أونلاين'), EXTERNAL: t('دفع إلكتروني') } as Record<string, string>)[m] ?? m;
 const Line = ({ k, v }: { k: React.ReactNode; v: string }) => <div className="flex justify-between"><span className="text-dim">{k}</span><span className="num">{money(v)}</span></div>;
 
 function TenderBox({ order, remaining, onChange }: { order: any; remaining: string; onChange: (c: string | null) => void }) {
@@ -132,7 +136,11 @@ function TenderBox({ order, remaining, onChange }: { order: any; remaining: stri
         <Tabs value={method} onChange={setMethod} tabs={[
           ...enabled.map((m) => ({ id: m, label: <span className="flex items-center gap-1">{m === 'CASH' ? <Banknote className="w-4 h-4" /> : m === 'CARD' ? <CreditCard className="w-4 h-4" /> : <Smartphone className="w-4 h-4" />}{methodLabel(m)}</span> })),
           ...(held.length ? [{ id: 'DEPOSIT', label: <span className="flex items-center gap-1"><PiggyBank className="w-4 h-4" />{t('عربون')}</span> }] : []),
+          ...(order.customerId ? [{ id: 'LOYALTY', label: <span className="flex items-center gap-1"><Star className="w-4 h-4" />{t('نقاط')}</span> }] : []),
+          { id: 'EXTERNAL', label: <span className="flex items-center gap-1"><ShieldCheck className="w-4 h-4" />{t('دفع إلكتروني')}</span> },
         ]} />
+        {method === 'LOYALTY' && <LoyaltyRedeemBox order={order} />}
+        {method === 'EXTERNAL' && <ExternalAuthBox order={order} remaining={remaining} />}
         {method === 'CASH' && (
           <>
             <Field label={t('المبلغ المستلم')} hint={t('لو أقل من المتبقي = دفع جزئي (تقسيم الدفع)')}><Input data-fb="cash-tendered" value={tendered} onChange={(e) => setTendered(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" placeholder={remainingDisplay} className="text-2xl" /></Field>
@@ -149,8 +157,8 @@ function TenderBox({ order, remaining, onChange }: { order: any; remaining: stri
         {method === 'DEPOSIT' && (
           <div className="space-y-1.5">{held.map((d: any) => <div key={d.id} className="flex items-center justify-between rounded-xl surface-1 px-3 py-2 text-sm"><span>{d.customer} · {d.purpose}</span><span className="flex items-center gap-2"><Money v={d.amount} /><Button size="sm" onClick={() => applyDeposit(d.id)}>{t('اخصم')}</Button></span></div>)}<div className="text-[11px] text-dim">{t('العربون التزام مش مبيعات لحد ما يتخصم من شيك.')} <StateBadge state="PROPOSED" /></div></div>
         )}
-        {tipsOn && method !== 'DEPOSIT' && <Field label={<span className="flex items-center gap-1">{t('بقشيش')} <StateBadge state="PROPOSED" /></span>} hint={t('فلوس لوحدها مش مبيعات، بتظهر في تقرير الوردية')}><Input value={tipAmt} onChange={(e) => setTipAmt(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" /></Field>}
-        {method !== 'DEPOSIT' && <Button variant="primary" size="xl" className="w-full" loading={busy} onClick={pay} data-fb="capture">{t('ادفع')}</Button>}
+        {tipsOn && !['DEPOSIT', 'LOYALTY', 'EXTERNAL'].includes(method) && <Field label={<span className="flex items-center gap-1">{t('بقشيش')} <StateBadge state="PROPOSED" /></span>} hint={t('فلوس لوحدها مش مبيعات، بتظهر في تقرير الوردية')}><Input value={tipAmt} onChange={(e) => setTipAmt(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" /></Field>}
+        {!['DEPOSIT', 'LOYALTY', 'EXTERNAL'].includes(method) && <Button variant="primary" size="xl" className="w-full" loading={busy} onClick={pay} data-fb="capture">{t('ادفع')}</Button>}
       </div>
     </Card>
   );

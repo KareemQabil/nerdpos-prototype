@@ -65,6 +65,14 @@ export const DIRECTION_PERMISSION: Record<string, string> = {
   'Table.Merge': 'table:assign', 'Table.AssignWaiter': 'table:assign', 'Reservation.Create': 'table:assign', 'Reservation.Find': 'table:read',
   'Ticket.Recall': 'kitchen:advanceticket', 'TicketItem.Bump': 'kitchen:advanceticket', 'Ticket.SetPriority': 'kitchen:advanceticket', 'Ticket.TransferStation': 'kitchen:advanceticket', 'Ticket.Refire': 'kitchen:advanceticket',
   'Compliance.VerifyChain': 'compliance:read',
+  // operations & system area (ops.ts, floor.ts, kitchen.ts, catalog.ts promotions)
+  'Floor.Upsert': 'table:upsert', 'Table.MarkClean': 'table:release', 'Order.TransferSession': 'session:close', 'BusinessDay.Close': 'session:zreport', 'ApprovalRequest.Create': 'AUTHENTICATED',
+  'Promotion.Upsert': 'catalog:setprice', 'Sync.ResolveConflict': 'sync:replay', 'Report.Export': 'report:run', 'Report.Schedule': 'report:run', 'Profile.SetCapability': 'settings:updatepolicy',
+  // crm area (customers, delivery, loyalty, channels)
+  'Customer.Merge': 'customer:update', 'DeliveryZone.Upsert': 'delivery:configure', 'Driver.Upsert': 'delivery:configure', 'Driver.UpdateLocation': 'delivery:dispatch',
+  'Driver.SettleCash': 'delivery:settlecash', 'Loyalty.Redeem': 'payment:capture', 'LoyaltyTier.Upsert': 'loyalty:configure', 'Channel.IngestExternalOrder': 'channel:ingest', 'Payment.AuthorizeExternal': 'payment:capture',
+  // inventory area (SPECIFIED with permission INTERNAL)
+  'InventoryItem.SetLevels': 'inventoryitem:configure', 'Inventory.LowStock': 'inventory:read', 'Inventory.Expiring': 'inventory:read', 'Recipe.Cost': 'recipe:read', 'Production.Preview': 'recipe:read',
 };
 export function effectivePermission(op: OperationDef): string {
   if (op.permission === 'INTERNAL' && DIRECTION_PERMISSION[op.id]) return DIRECTION_PERMISSION[op.id];

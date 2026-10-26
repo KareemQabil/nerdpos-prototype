@@ -7,6 +7,7 @@ import { Button, Pill, Modal, Field, Select, Input, Textarea, Money, StateBadge,
 import { t, L } from '../../i18n';
 import { cn, money, qty, time } from '../../lib/format';
 import { ALLERGEN_AR } from './MenuGrid';
+import { CustomerChip } from '../customers/common'; // crm area: customer on the check
 
 export function useReasons(kind: string) {
   const r = useQuery<any>('ReasonCode.List', { query: { kind, active: true } });
@@ -45,13 +46,14 @@ export function CheckPanel({ order, refetch, mode, onCheckSwitch }: { order: any
       <div className="px-4 py-3 border-b line space-y-2">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
-            <div className="font-bold flex items-center gap-2 flex-wrap">{order.kind === 'STAFF_MEAL' ? t('وجبة موظف') : order.tableName ? `${t('ترابيزة')} ${order.tableName}` : order.channel === 'TAKEAWAY' ? t('تيك أواي') : t('صالة كاونتر')}{order.tableName && <span className="text-dim font-normal text-sm">· {t('شيك')} {order.checkNo}</span>}<StatusPill s={order.status} /></div>
+            <div className="font-bold flex items-center gap-2 flex-wrap">{order.kind === 'STAFF_MEAL' ? t('وجبة موظف') : order.tableName ? `${t('ترابيزة')} ${order.tableName}` : order.channel === 'TAKEAWAY' ? t('تيك أواي') : order.channel === 'DELIVERY' ? t('دليفري') : t('صالة كاونتر')}{order.tableName && <span className="text-dim font-normal text-sm">· {t('شيك')} {order.checkNo}</span>}<StatusPill s={order.status} /></div>
             <div className="text-[11px] text-dim num">#{order.number} · v{order.version} · {order.serverName} · {order.sessionId ? t('على وردية درج') : t('شيك صالة من غير درج')}</div>
           </div>
           <div className="flex gap-1">
             <button title={t('السجل')} onClick={() => setShowHist(true)} className="w-8 h-8 rounded-lg surface-1 flex items-center justify-center"><History className="w-4 h-4" /></button>
           </div>
         </div>
+        {order.kind !== 'STAFF_MEAL' && <CustomerChip order={order} />}
         {siblings.length > 1 && (
           <div className="flex gap-1 overflow-x-auto scrollbar-hide">{siblings.map((c: any) => <button key={c.id} onClick={() => onCheckSwitch?.(c.id)} className={cn('px-2.5 h-7 rounded-lg text-xs border whitespace-nowrap', c.id === order.id ? 'bg-[var(--primary)] text-[var(--primary-foreground)] border-transparent font-bold' : 'surface-1 border-[var(--glass-border)]')}>{t('شيك')} {c.checkNo} · <span className="num">{money(c.payable, false)}</span></button>)}</div>
         )}

@@ -1,10 +1,11 @@
 // Mock database shape. One in-memory object, persisted to localStorage.
 import type { Money } from './money';
+import type { CrmCollections } from './types-crm';
 
 export type Channel = 'DINE_IN' | 'TAKEAWAY' | 'DELIVERY';
 export type Loc = { ar: string; en: string };
 export type ScopeType = 'TENANT' | 'BRANCH' | 'CHANNEL' | 'TERMINAL';
-export type TenderMethod = 'CASH' | 'CARD' | 'DIGITAL_WALLET' | 'DEPOSIT';
+export type TenderMethod = 'CASH' | 'CARD' | 'DIGITAL_WALLET' | 'DEPOSIT' | 'LOYALTY' | 'ONLINE'; // LOYALTY/ONLINE: crm area (points redeemed, paid on a delivery app)
 
 export interface Business { id: string; name: string; legalName: string | null; currency: 'EGP'; nameAr?: string; version: number }
 export interface Branch { id: string; code: string; name: string; timezone: string; businessDayCutoff: string; active: boolean; version: number }
@@ -20,12 +21,17 @@ export interface AuthSession { id: string; userId: string; terminalId: string | 
 
 export interface Unit { id: string; code: string; precision: number; active: boolean; used: boolean; version: number }
 export interface Category { id: string; name: Loc; active: boolean; sortOrder: number; colorCode?: string; version: number }
-export interface ModifierOption { id: string; name: Loc; priceDelta: Money; active: boolean; allergens?: string[]; version: number }
-export interface ModifierGroup { id: string; name: Loc; selectionRule: 'SINGLE' | 'MULTIPLE'; min: number; max: number; active: boolean; options: ModifierOption[]; version: number }
+export interface ModifierOption { id: string; name: Loc; priceDelta: Money; active: boolean; allergens?: string[]; version: number;
+  /** menu area (proposed): preselected, display order, a sub-choice (one level), price of an EXTRA level */
+  isDefault?: boolean; sortOrder?: number; nestedGroupId?: string | null; extraPriceDelta?: Money | null }
+export interface ModifierGroup { id: string; name: Loc; selectionRule: 'SINGLE' | 'MULTIPLE'; min: number; max: number; active: boolean; options: ModifierOption[]; version: number;
+  /** menu area (proposed): INGREDIENTS = no/less/extra per ingredient; size multiplier on or off; toppings per pizza half */
+  kind?: 'STANDARD' | 'INGREDIENTS'; scalesWithSize?: boolean; allowHalfPlacement?: boolean }
 /** Direction D1: a size of a product. */
-export interface Variant { id: string; name: Loc; priceDelta: Money; modifierMultiplier: string; active: boolean }
+export interface Variant { id: string; name: Loc; priceDelta: Money; modifierMultiplier: string; active: boolean;
+  sku?: string | null; barcode?: string | null; attributes?: { name: string; value: string }[]; calories?: number | null; isDefault?: boolean; sortOrder?: number; version?: number }
 /** Direction D1: a combo slot. */
-export interface ComboSlot { id: string; name: Loc; options: { productId: string; upcharge: Money; nestedGroupId?: string }[]; defaultProductId: string }
+export interface ComboSlot { id: string; name: Loc; options: { productId: string; upcharge: Money; nestedGroupId?: string; variantId?: string | null }[]; defaultProductId: string; required?: boolean; sortOrder?: number }
 export interface Product {
   id: string; sku: string; name: Loc; categoryId: string; unitId: string; taxPolicyId: string | null;
   modifierGroupIds: string[]; imageUrl?: string; colorCode?: string; description?: Loc;
@@ -33,11 +39,14 @@ export interface Product {
   // direction (مقترح)
   direction?: boolean; allergens?: string[]; variants?: Variant[]; halfAndHalf?: boolean; combo?: ComboSlot[];
   chargeTags?: string[]; // e.g. TABLE_TAX
+  // menu area (proposed): calories, which products can be paired as halves, the half price ratio for SUM_OF_HALVES
+  calories?: number | null; halfGroup?: string | null; halfPriceRatio?: string | null;
 }
-export interface Availability { productId: string; branchId: string; state: 'AVAILABLE' | 'SOLD_OUT' | 'BLOCKED'; reason: string | null; updatedAt: string; updatedBy: string | null }
+export interface Availability { productId: string; branchId: string; state: 'AVAILABLE' | 'SOLD_OUT' | 'BLOCKED'; reason: string | null; updatedAt: string; updatedBy: string | null; /** sold out for this business date only (auto back next day) */ soldOutFor?: string | null }
 export interface PriceRule {
   id: string; productId: string; branchId: string; channel: Channel; amount: Money; currency: 'EGP';
   effectiveFrom: number; effectiveTo: number | null; createdAt: string; createdBy: string; version: number; replacesRuleId?: string | null;
+  /** menu area (proposed): own price of one size; absent = the product price */ variantId?: string | null; bulkChangeId?: string | null;
 }
 export interface TaxPolicy {
   id: string; name: Loc; jurisdiction: string; rate: string; calculationMode: 'EXCLUSIVE' | 'INCLUSIVE';
@@ -54,7 +63,7 @@ export interface TableVisit {
 
 export interface HistoryEntry { at: string; by: string; byName?: string; terminal?: string; kind: string; text: Loc | string; data?: unknown }
 
-export interface LineModifier { optionId: string; groupId: string; name: Loc; priceDelta: Money }
+export interface LineModifier { optionId: string; groupId: string; name: Loc; priceDelta: Money; level?: string; placement?: string; parentOptionId?: string }
 export type LineStatus = 'ACTIVE' | 'VOIDED' | 'REMOVED' | 'MOVED';
 export interface OrderLine {
   id: string; productId: string; sku: string; name: Loc; categoryId: string;
@@ -66,7 +75,8 @@ export interface OrderLine {
   movedTo?: string; movedFrom?: string;
   // direction
   seat?: number | null; variant?: { id: string; name: Loc; priceDelta: Money } | null;
-  children?: { kind: 'COMBO_SLOT' | 'HALF' | 'NESTED'; name: Loc; productId?: string; upcharge: Money; detail?: Loc }[];
+  children?: { kind: 'COMBO_SLOT' | 'HALF' | 'NESTED'; name: Loc; productId?: string; upcharge: Money; detail?: Loc; slotId?: string; variantId?: string | null; allocated?: Money; taxPolicyId?: string; categoryId?: string }[];
+  taxSplit?: import('./menu-types').LineTaxPart[];
   allergens?: string[]; chargeTags?: string[]; kitchenMods?: { id: string; at: string; by: string; text: string }[];
   shareOf?: { lineId: string; parts: number; index: number } | null;
 }
@@ -86,7 +96,7 @@ export interface ServiceCapture { rate: string; taxable: boolean; origin: 'POLIC
 export interface Totals {
   itemsSubtotal: Money; itemDiscount: Money; serviceCharge: Money; serviceDiscount: Money; serviceRate: string | null;
   charges: { id: string; label: Loc; amount: Money; taxable: boolean }[]; tableTax: Money;
-  taxBase: Money; tax: Money; taxLines: { rate: string; base: Money; amount: Money; name: Loc }[];
+  taxBase: Money; tax: Money; taxLines: { rate: string; base: Money; amount: Money; name: Loc; mode?: string }[];
   discountTotal: Money; discountAfterTax: Money; payable: Money; netSales: Money; comp: boolean;
 }
 export type OrderStatus = 'DRAFT' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'VOIDED' | 'MERGED';
@@ -101,6 +111,8 @@ export interface Order {
   lines: OrderLine[]; discounts: OrderDiscount[]; comp: { reasonCode: string; reason?: string; at: string; by: string } | null;
   policy: PolicySnapshot; service: ServiceCapture | null; confirmation: Totals | null;
   history: HistoryEntry[]; customerName?: string; guestCount?: number;
+  // crm area (types-crm.ts): customer snapshot, delivery and online-order links
+  customerId?: string | null; customerPhone?: string | null; deliveryId?: string | null; externalOrderId?: string | null;
 }
 
 export interface KitchenStation { id: string; branchId: string; name: string; active: boolean; version: number; targetMinutes?: number }
@@ -169,7 +181,7 @@ export interface Deposit { id: string; branchId: string; customer: string; phone
 export interface Reservation { id: string; branchId: string; customer: string; phone: string; partySize: number; at: string; tableId: string | null; depositId: string | null; noShowFee: Money; state: 'BOOKED' | 'SEATED' | 'NO_SHOW' | 'CANCELLED'; createdAt: string; visitId?: string | null }
 export interface TipEntry { id: string; captureId: string; orderId: string; amount: Money; method: TenderMethod; serverUserId: string; sessionId: string; at: string; businessDate: string; distributed: boolean }
 
-export interface DB {
+export interface DB extends CrmCollections {
   schema: number;
   seq: Record<string, number>;
   business: Business;
@@ -213,4 +225,25 @@ export interface DB {
   reservations: Reservation[];
   tips: TipEntry[];
   events: { id: string; at: string; type: string; ref: string; text: string }[];
+  // inventory & purchasing area (types-inventory.ts) — optional, read through invOf(db)
+  inv?: import('./types-inventory').InventoryState;
+  // menu & pricing area (menu-types.ts) — optional, read through menuState(db)
+  menu?: import('./menu-types').MenuState;
+  // operations & system area (types-ops.ts) — optional, always read with a default
+  floors?: import('./types-ops').FloorPlan[];
+  tableLayouts?: import('./types-ops').TableLayout[];
+  tableTurns?: import('./types-ops').TableTurn[];
+  ticketMeta?: import('./types-ops').TicketMeta[];
+  approvalRequests?: import('./types-ops').ApprovalRequestRec[];
+  offlineItems?: import('./types-ops').OfflineItem[];
+  syncTerminals?: import('./types-ops').SyncTerminalState[];
+  webhookDeliveries?: import('./types-ops').WebhookDelivery[];
+  reconRuns?: import('./types-ops').ReconRun[];
+  reconResults?: import('./types-ops').ReconResult[];
+  settlementBatches?: import('./types-ops').SettlementBatch[];
+  businessDays?: import('./types-ops').BusinessDayRec[];
+  salesHistory?: import('./types-ops').SalesHistoryDay[];
+  reportSchedules?: import('./types-ops').ReportSchedule[];
+  reportExports?: import('./types-ops').ReportExport[];
+  capabilities?: import('./types-ops').CapabilityState[];
 }

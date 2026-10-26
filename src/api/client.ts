@@ -1,5 +1,6 @@
 // Client for the (mocked) NerdPOS API. Paths come from the contracts; every command carries X-Command-Id.
 import { buildPath, opsById } from '../mock/contracts';
+import { sim } from '../mock/sim'; // demo network simulator: a device whose network is cut never sends a request
 
 export interface DeviceAuth { deviceId: string; label: string; terminalId: string | null; branchId: string | null; token: string | null }
 
@@ -9,21 +10,33 @@ export class ApiFailure extends Error {
   messageAr: string | null;
   details: any;
   network: boolean;
+  /** The device has no network: the request never left it (nothing can have been written). */
+  offline: boolean;
   commandId: string | null;
   opId: string;
-  constructor(init: { status: number; code: string; message: string; messageAr?: string | null; details?: any; network?: boolean; commandId?: string | null; opId: string }) {
+  constructor(init: { status: number; code: string; message: string; messageAr?: string | null; details?: any; network?: boolean; offline?: boolean; commandId?: string | null; opId: string }) {
     super(init.message);
     this.status = init.status;
     this.code = init.code;
     this.messageAr = init.messageAr ?? null;
     this.details = init.details ?? null;
     this.network = !!init.network;
+    this.offline = !!init.offline;
     this.commandId = init.commandId ?? null;
     this.opId = init.opId;
   }
 }
 
-export interface CallResult<T = any> { status: number; data: T; replayed: boolean; commandId: string | null }
+export interface CallResult<T = any> { status: number; data: T; replayed: boolean; commandId: string | null; /** served from the device's last copy while offline */ stale?: boolean }
+
+// Last good answer of every read, per device: while the device is offline its screens keep showing them.
+const readCache = new Map<string, unknown>();
+const cacheKey = (dev: DeviceAuth, url: string) => `${dev.deviceId}|${dev.token ?? ''}|${url}`;
+function remember(key: string, data: unknown) {
+  readCache.delete(key);
+  readCache.set(key, data);
+  if (readCache.size > 600) readCache.delete(readCache.keys().next().value as string);
+}
 
 export const newCommandId = () => (crypto?.randomUUID ? crypto.randomUUID() : `cmd-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
@@ -39,9 +52,14 @@ export async function call<T = any>(dev: DeviceAuth, opId: string, opts: { param
   if (dev.terminalId) headers['x-terminal-id'] = dev.terminalId;
   if (!dev.terminalId && dev.branchId) headers['x-branch-id'] = dev.branchId;
   if (commandId) headers['x-command-id'] = commandId;
+  const url = '/api' + path + (qs.length > 1 ? qs : '');
+  if (sim.isOffline(dev.deviceId)) {
+    if (!isCmd && readCache.has(cacheKey(dev, url))) return { status: 200, data: readCache.get(cacheKey(dev, url)) as T, replayed: false, commandId: null, stale: true };
+    throw new ApiFailure({ status: 0, code: 'OFFLINE', message: 'device offline (simulated)', messageAr: null, network: true, offline: true, commandId, opId });
+  }
   let res: Response;
   try {
-    res = await fetch('/api' + path + (qs.length > 1 ? qs : ''), { method, headers, body: method === 'GET' ? undefined : JSON.stringify(opts.body ?? {}) });
+    res = await fetch(url, { method, headers, body: method === 'GET' ? undefined : JSON.stringify(opts.body ?? {}) });
   } catch (e) {
     if ((globalThis as any).__DEBUG_FETCH) console.error(e);
     throw new ApiFailure({ status: 0, code: 'UNKNOWN_OUTCOME', message: 'network failure', messageAr: null, network: true, commandId, opId });
@@ -52,5 +70,6 @@ export async function call<T = any>(dev: DeviceAuth, opId: string, opts: { param
     const err = data?.error ?? {};
     throw new ApiFailure({ status: res.status, code: err.code ?? 'INTERNAL_ERROR', message: err.message ?? res.statusText, messageAr: err.messageAr, details: err.details, commandId, opId });
   }
+  if (!isCmd) remember(cacheKey(dev, url), data);
   return { status: res.status, data, replayed: res.headers.get('idempotent-replayed') === 'true', commandId };
 }

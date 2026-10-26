@@ -1,6 +1,6 @@
 // Counter and takeaway: order, pay first (fire at confirm), receipt. Also the staff meal (D9, direction).
 import React, { useState } from 'react';
-import { Plus, ShoppingBag, Utensils, Coffee } from 'lucide-react';
+import { Plus, ShoppingBag, Utensils, Coffee, Bike } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../app/hooks';
 import { OrderWorkspace, needsDialog } from './OrderScreen';
 import { MenuGrid } from './order/MenuGrid';
@@ -11,7 +11,7 @@ import { cn, money, qty } from '../lib/format';
 import { StatusPill } from './order/CheckPanel';
 
 export default function Counter() {
-  const { terminal, nav, params, screen } = useDev();
+  const { terminal, nav, params, screen, can } = useDev();
   const session = useQuery<any>(terminal?.drawer ? 'Session.Current' : null, { query: { terminalId: terminal?.id } });
   const open = useQuery<any>(session.data ? 'Order.Find' : null, { query: { sessionId: session.data?.id, lifecycle: 'DRAFT,CONFIRMED' } });
   const { run, busy } = useCommand();
@@ -37,10 +37,11 @@ export default function Counter() {
         <StateBadge ops={['Order.Create', 'Order.AddLines', 'Order.Confirm', 'Payment.Capture', 'Order.Complete']} />
         <Button variant="primary" onClick={() => create('TAKEAWAY')} loading={busy} data-fb="new-takeaway"><ShoppingBag className="w-4 h-4" />{t('تيك أواي جديد')}</Button>
         <Button onClick={() => create('DINE_IN')} loading={busy}><Utensils className="w-4 h-4" />{t('صالة كاونتر')}</Button>
+        {can('delivery:create') && <Button onClick={() => nav('delivery-new')} data-fb="counter-delivery"><Bike className="w-4 h-4" />{t('دليفري')}</Button>}
         <Button variant="ghost" onClick={() => setStaffMeal(true)}><Coffee className="w-4 h-4" />{t('وجبة موظف')} <StateBadge state="PROPOSED" /></Button>
         <div className="flex-1" />
         <div className="flex gap-1.5 overflow-x-auto scrollbar-hide max-w-[50%]">
-          {orders.map((o) => <button key={o.id} onClick={() => nav('counter', { orderId: o.id })} className={cn('px-3 h-9 rounded-lg border text-xs whitespace-nowrap flex items-center gap-1.5', current === o.id ? 'border-[var(--primary)] bg-[var(--primary-container)]' : 'surface-1 border-[var(--glass-border)]')}><span className="num font-bold">#{o.number}</span>{o.channel === 'TAKEAWAY' ? t('تيك أواي') : t('صالة')} · <span className="num">{money(o.totals.payable, false)}</span></button>)}
+          {orders.map((o) => <button key={o.id} onClick={() => nav('counter', { orderId: o.id })} className={cn('px-3 h-9 rounded-lg border text-xs whitespace-nowrap flex items-center gap-1.5', current === o.id ? 'border-[var(--primary)] bg-[var(--primary-container)]' : 'surface-1 border-[var(--glass-border)]')}><span className="num font-bold">#{o.number}</span>{o.channel === 'TAKEAWAY' ? t('تيك أواي') : o.channel === 'DELIVERY' ? t('دليفري') : t('صالة')} · <span className="num">{money(o.totals.payable, false)}</span></button>)}
         </div>
       </div>
       <div className="flex-1 min-h-0">

@@ -6,6 +6,8 @@ import { cn, money } from '../lib/format';
 import { t, L } from '../i18n';
 import type { BadgeState } from '../mock/contracts';
 import { badgeOfOps, opsById } from '../mock/contracts';
+import { useTech } from '../app/tech';
+import { deviceName } from '../demo/people';
 
 type BtnVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success' | 'warning' | 'outline';
 export function Button({ variant = 'secondary', size = 'md', className, loading, children, ...rest }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: BtnVariant; size?: 'sm' | 'md' | 'lg' | 'xl'; loading?: boolean }) {
@@ -190,12 +192,16 @@ export function toast(tone: Toast['tone'], text: string, sub?: string, device?: 
   tl.forEach((f) => f());
   setTimeout(() => { toasts = toasts.filter((x) => x.id !== item.id); tl.forEach((f) => f()); }, tone === 'error' ? 7000 : 3500);
 }
+// A toast sub-line is shown to demo users only when it is plain Arabic; technical sub-lines
+// ("Auth.Login 200 · DEMO-ADMIN-1", "CONCURRENCY_CONFLICT 409") appear only with technical details on.
+const plainSub = (s: string) => /[\u0600-\u06FF]/.test(s) && !/[A-Z]{2,}_[A-Z]|\b[A-Z][a-z]+\.[A-Z][a-z]+|\b\d{3}\b|X-Command|Idempotent/.test(s);
 export function Toasts() {
   const list = useSyncExternalStore((cb) => { tl.add(cb); return () => tl.delete(cb); }, () => toasts);
+  const tech = useTech();
   return (
     <div className="fixed bottom-4 start-1/2 -translate-x-1/2 rtl:translate-x-1/2 z-[100] flex flex-col gap-2 w-[min(520px,92vw)] pointer-events-none">
       {list.map((x) => (
-        <div key={x.id} className="pointer-events-auto animate-slide-up"><Banner tone={x.tone}><div className="font-bold">{x.device && <span className="text-dim font-normal">[{x.device}] </span>}{x.text}</div>{x.sub && <div className="text-xs text-dim mt-0.5 num" style={{ direction: 'ltr', textAlign: 'start' }}>{x.sub}</div>}</Banner></div>
+        <div key={x.id} className="pointer-events-auto animate-slide-up"><Banner tone={x.tone}><div className="font-bold">{x.device && <span className="text-dim font-normal">{tech ? `[${x.device}] ` : `${deviceName(x.device)}: `}</span>}{x.text}</div>{x.sub && (tech || plainSub(x.sub)) && <div className={cn('text-xs text-dim mt-0.5', tech && !plainSub(x.sub) && 'num')} style={tech && !plainSub(x.sub) ? { direction: 'ltr', textAlign: 'start' } : undefined}>{x.sub}</div>}</Banner></div>
       ))}
     </div>
   );

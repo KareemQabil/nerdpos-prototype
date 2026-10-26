@@ -1,16 +1,20 @@
 // B4 Settings & reason codes: the REAL settings screen. Every change is an append-only policy row through
 // Settings.UpdatePolicy and needs SENSITIVE_POLICY_CHANGE approval by policy (the Policy Panel is the demo shortcut).
+// Everything is shown in plain words (src/demo/policyText.ts); raw ids, JSON and codes only inside <Tech>.
 import React, { useMemo, useState } from 'react';
-import { History, Pencil, Search, ShieldAlert, Undo2, Plus, Power, ListChecks, SlidersHorizontal } from 'lucide-react';
+import { History, Pencil, Search, ShieldAlert, Undo2, Plus, Power, ListChecks, SlidersHorizontal, HelpCircle } from 'lucide-react';
 import { useCommand, useQuery } from '../../app/hooks';
 import { Banner, Button, Card, Field, Input, KV, Pill, Section, Select, StateBadge, Switch, Table, Tabs, Textarea } from '../../ui';
+import { Tech } from '../../app/tech';
 import { t, useLang } from '../../i18n';
 import { cn, dateTime } from '../../lib/format';
-import { POLICIES, POLICY_GROUPS, APPROVAL_ACTIONS, type PolicyMeta, type Field as PField } from '../../mock/policyRegistry';
-import { useList, show, getPath, setPath, ruleText, usePerm, RulePill, Refused, REASON_KINDS, reasonKindLabel, Modal } from './org/common';
+import { POLICIES, POLICY_GROUPS, type PolicyMeta } from '../../mock/policyRegistry';
+import { useList, usePerm, Refused, REASON_KINDS, Modal, useApprovalRule } from './org/common';
+import { PolicyEditor, PolicyValueView, PolicyCompare, ScopesLine, rawJson } from '../../demo/PolicyEditors';
+import { policyTitle, policyExplain, policyReacts, policyQuestion, STATE_TEXT, appliesToText, scopeText, valueSummary, viaText, historyValueText, reasonKindText, ruleSentence, optionText, type Ctx } from '../../demo/policyText';
+import { branchLabel } from '../../demo/people';
 
 const stateTone = { CANONICAL: 'success', CORE: 'info', PENDING: 'warning', DIRECTION: 'violet' } as const;
-const stateLabel = { CANONICAL: 'متصمم (canonical)', CORE: 'CORE جديد', PENDING: 'معلّق للخبير', DIRECTION: 'مقترح' } as const;
 const TENANT_ID = 'biz'; // the business id (Business.Get) is the TENANT scope id
 
 export default function SettingsScreen() {
@@ -20,13 +24,24 @@ export default function SettingsScreen() {
       <Section
         title={t('الإعدادات والأسباب')}
         badge={<StateBadge ops={['Settings.Effective', 'Settings.UpdatePolicy', 'Policy.History', 'ReasonCode.List', 'ReasonCode.Create', 'ReasonCode.Configure']} />}
-        sub={t('شاشة الإعدادات الحقيقية: كل تغيير صف جديد في السجل (مفيش مسح ولا تعديل لصف قديم)، وبيحتاج موافقة مدير تاني حسب قاعدة SENSITIVE_POLICY_CHANGE. لوحة الإعدادات اللي فوق هي نسخة العرض السريعة.')}
-        actions={<RulePill action="SENSITIVE_POLICY_CHANGE" />}
+        sub={t('هنا بتتغيّر طريقة شغل المطعم بجد. كل تغيير بيتسجل في السجل ومش بيمسح اللي قبله، وتغيير الإعدادات الحساسة محتاج موافقة مدير تاني.')}
+        actions={<SensitiveRulePill />}
       />
-      <Tabs value={tab} onChange={setTab} tabs={[{ id: 'policies', label: <span className="flex items-center gap-1"><SlidersHorizontal className="w-4 h-4" />{t('السياسات')}</span> }, { id: 'reasons', label: <span className="flex items-center gap-1"><ListChecks className="w-4 h-4" />{t('أسباب الإلغاء والخصم')}</span> }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ id: 'policies', label: <span className="flex items-center gap-1"><SlidersHorizontal className="w-4 h-4" />{t('إعدادات المطعم')}</span> }, { id: 'reasons', label: <span className="flex items-center gap-1"><ListChecks className="w-4 h-4" />{t('أسباب الإلغاء والخصم')}</span> }]} />
       {tab === 'policies' ? <PoliciesTab /> : <ReasonsTab />}
     </div>
   );
+}
+
+function SensitiveRulePill() {
+  const { rule } = useApprovalRule('SENSITIVE_POLICY_CHANGE');
+  const needs = rule && rule.mode !== 'NEVER';
+  return <Pill tone={needs ? 'warning' : 'neutral'} title={t('قاعدة موافقة «تغيير إعداد حساس»')}>{t('تغيير إعداد')}: {ruleSentence('SENSITIVE_POLICY_CHANGE', rule)}</Pill>;
+}
+
+function useTaxCtx(): Ctx {
+  const taxes = useList<any>('TaxPolicy.List');
+  return { taxName: (id) => { const x = taxes.items.find((p) => p.id === id); return x ? (typeof x.name === 'string' ? x.name : x.name?.ar ?? x.name?.en) : undefined; } };
 }
 
 // ───────── policies
@@ -34,30 +49,34 @@ function PoliciesTab() {
   const lang = useLang();
   const branches = useList<any>('Branch.List');
   const users = useList<any>('User.Find');
+  const ctx = useTaxCtx();
   const [group, setGroup] = useState('orders');
   const [q, setQ] = useState('');
   const [scope, setScope] = useState('TENANT');
   const scopeType = scope === 'TENANT' ? 'TENANT' : 'BRANCH';
   const scopeId = scope === 'TENANT' ? TENANT_ID : scope;
-  const list = POLICIES.filter((p) => (q ? (p.id + p.title + p.titleEn + p.description).toLowerCase().includes(q.toLowerCase()) : p.group === group));
-  const nameOf = (id: string) => users.items.find((u) => u.id === id)?.displayName ?? id;
+  const branch = branches.items.find((b) => b.id === scope);
+  const needle = q.trim().toLowerCase();
+  const list = POLICIES.filter((p) => (needle ? (p.id + p.title + p.titleEn + p.description + policyTitle(p) + policyExplain(p)).toLowerCase().includes(needle) : p.group === group));
+  const nameOf = (id: string) => users.items.find((u) => u.id === id)?.displayName ?? (id === 'demo' ? t('لوحة العرض') : id === 'provisioning' ? t('التجهيز') : t('شخص تاني'));
   return (
     <div className="space-y-3">
       <div className="flex gap-2 flex-wrap items-center">
-        <div className="relative flex-1 min-w-[220px]"><Search className="w-4 h-4 absolute top-3 start-3 text-dim" /><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('دوّر على سياسة…')} className="ps-9" data-fb="settings:search" /></div>
+        <div className="relative flex-1 min-w-[220px]"><Search className="w-4 h-4 absolute top-3 start-3 text-dim" /><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('دوّر على إعداد… (مثلًا: خدمة، درج، خصم)')} className="ps-9" data-fb="settings:search" /></div>
         <Select value={scope} onChange={(e) => setScope(e.target.value)} className="max-w-[260px]" data-fb="settings:scope"
-          options={[{ value: 'TENANT', label: t('النطاق: النشاط كله (TENANT)') }, ...branches.items.map((b) => ({ value: b.id, label: t('النطاق: فرع {c} (BRANCH)', { c: `${b.code} · ${b.name}` }) }))]} />
+          options={[{ value: 'TENANT', label: t('بتظبط: المطعم كله') }, ...branches.items.map((b) => ({ value: b.id, label: t('بتظبط: {b} بس', { b: branchLabel(b) }) }))]} />
       </div>
-      {!q && <Tabs value={group} onChange={setGroup} tabs={POLICY_GROUPS.map((g) => ({ id: g.id, label: lang === 'ar' ? g.title : g.titleEn }))} />}
-      <Banner tone="info">{t('الترتيب: الجهاز ← الفرع ← النشاط ← الافتراضي الآمن. التغيير بيطبق على العمليات الجديدة بس، والشيكات اللي اتسجلت محتفظة بقيمتها. الموافقة لازم تيجي من مدير غير اللي طالب التغيير (مثلاً demo-manager-2).')}</Banner>
+      {!needle && <Tabs value={group} onChange={setGroup} tabs={POLICY_GROUPS.map((g) => ({ id: g.id, label: lang === 'ar' ? g.title.replace(' (مقترح)', '') : g.titleEn }))} />}
+      <Banner tone="info">{t('لو الفرع مالوش قيمة خاصة، بياخد قيمة المطعم كله، ولو مفيش بياخد الافتراضي الآمن. التغيير بيطبق على اللي جاي بس — الشيكات القديمة محتفظة بقيمتها. الموافقة لازم تيجي من مدير غير اللي طالب التغيير (مثلًا هبة — مديرة الفرع).')}</Banner>
       <div className="grid xl:grid-cols-2 gap-3">
-        {list.map((p) => <PolicyCard key={`${p.id}:${scopeId}`} p={p} scopeType={scopeType} scopeId={scopeId} nameOf={nameOf} />)}
+        {list.map((p) => <PolicyCard key={`${p.id}:${scopeId}`} p={p} scopeType={scopeType} scopeId={scopeId} scopeName={branch ? branchLabel(branch) : undefined} nameOf={nameOf} ctx={ctx} />)}
       </div>
+      {list.length === 0 && <div className="text-sm text-dim text-center py-6">{t('مفيش إعداد بالاسم ده')}</div>}
     </div>
   );
 }
 
-function PolicyCard({ p, scopeType, scopeId, nameOf }: { p: PolicyMeta; scopeType: 'TENANT' | 'BRANCH'; scopeId: string; nameOf: (id: string) => string }) {
+function PolicyCard({ p, scopeType, scopeId, scopeName, nameOf, ctx }: { p: PolicyMeta; scopeType: 'TENANT' | 'BRANCH'; scopeId: string; scopeName?: string; nameOf: (id: string) => string; ctx: Ctx }) {
   const eff = useQuery<any>('Settings.Effective', { query: { policyId: p.id, scopeType, scopeId } });
   const perm = usePerm('settings:updatepolicy');
   const [draft, setDraft] = useState<any>(undefined);
@@ -66,117 +85,63 @@ function PolicyCard({ p, scopeType, scopeId, nameOf }: { p: PolicyMeta; scopeTyp
   const row = (eff.data?.rows ?? []).find((r: any) => r.scopeType === scopeType && r.scopeId === scopeId) ?? null;
   const value = eff.data?.value;
   const scopeAllowed = p.scopes.includes(scopeType);
-  const editable = p.editor.kind === 'enum' || p.editor.kind === 'bool' || p.editor.kind === 'object';
+  const editable = p.editor.kind !== 'readonly';
   const editing = draft !== undefined;
+  const reacts = policyReacts(p);
+  const question = policyQuestion(p);
   return (
     <div className="glass rounded-xl p-3 space-y-2" data-fb={`settings:policy:${p.id}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="font-bold text-sm">{p.title}</div>
-          <div className="text-[11px] text-dim num">{p.id}</div>
+          <div className="font-bold text-sm">{policyTitle(p)}</div>
+          <Tech><div className="text-[10px] text-dim num" dir="ltr">{p.id}</div></Tech>
         </div>
         <div className="flex items-center gap-1 flex-wrap justify-end">
-          {p.state === 'DIRECTION' ? <StateBadge state="PROPOSED" /> : <Pill tone={stateTone[p.state]}>{t(stateLabel[p.state])}</Pill>}
+          <Pill tone={stateTone[p.state]} title={t(STATE_TEXT[p.state].help)}>{t(STATE_TEXT[p.state].label)}</Pill>
           {p.sensitive && <Pill tone="warning">{t('حساس')}</Pill>}
-          <Pill tone="neutral">{p.appliesTo === 'NEW_CHECKS' ? t('للشيكات الجديدة') : t('للعمليات الجديدة')}</Pill>
         </div>
       </div>
-      <div className="text-xs text-soft">{p.description}</div>
+      <div className="text-xs text-soft leading-relaxed">{policyExplain(p)}</div>
       <Refused error={eff.error} />
-      <div className="rounded-lg surface-1 p-2">
-        <div className="flex items-center justify-between gap-2 mb-1">
-          <span className="text-[11px] text-dim">{editing ? t('القيمة الجديدة (لسه متحفظتش)') : t('القيمة الفعلية')}</span>
-          {!editing && <span className="text-[10px] text-dim">{row ? t('من النطاق ده · نسخة {v}', { v: row.version }) : t('موروثة من نطاق أعلى أو الافتراضي')}</span>}
+      <div className="rounded-lg surface-1 p-2.5">
+        <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
+          <span className="text-[11px] text-dim">{editing ? t('القيمة الجديدة (لسه ما اتحفظتش)') : t('دلوقتي')} · {scopeText(scopeType, scopeName)}</span>
+          {!editing && <span className="text-[10px] text-dim">{row ? t('متظبطة هنا (التعديل رقم {v})', { v: row.version }) : t('جاية من مستوى أعلى أو الافتراضي')}</span>}
         </div>
-        {editing ? <Editor p={p} value={draft} onChange={setDraft} /> : <ValueView p={p} value={value} />}
+        {editing ? <PolicyEditor p={p} value={draft} onChange={setDraft} /> : value === undefined && !eff.error ? <div className="text-xs text-dim">{t('بيحمّل…')}</div> : <PolicyValueView p={p} value={value} ctx={ctx} big />}
       </div>
-      {row && <div className="text-[10px] text-dim">{t('آخر تغيير')}: {dateTime(row.updatedAt)} · {nameOf(row.updatedBy)} · <span className="num">{row.source}</span></div>}
-      <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[11px]">
-        <span className="text-dim">{t('بروفايل مصر')}</span><span className="num break-all">{show(p.egValue)}{p.confidence ? ` · ${p.confidence}` : ''}{p.reviewer ? ` · ${p.reviewer}` : ''}</span>
-        <span className="text-dim">{t('الافتراضي الآمن')}</span><span className="num break-all">{show(p.canonicalDefault)}</span>
-        <span className="text-dim">{t('النطاقات المسموحة')}</span><span className="num">{p.scopes.join(' · ')}</span>
-        {p.reacts && <><span className="text-dim">{t('بيأثر على')}</span><span>{p.reacts}</span></>}
-      </div>
-      {p.question && <div className="text-[11px] rounded-lg bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] border border-[color-mix(in_srgb,var(--warning)_30%,transparent)] px-2 py-1"><b>{t('سؤال للخبير')}:</b> {p.question}</div>}
-      {!scopeAllowed && <div className="text-[11px] text-[var(--warning)]">{t('النطاق ده مش مسموح للسياسة دي (SETTINGS_POLICY_SCOPE_NOT_ALLOWED) — المسموح: {s}', { s: p.scopes.join(', ') })}</div>}
-      {!editable && <div className="text-[11px] text-dim">{t('بتتعدل من لوحة الإعدادات (Policy Panel) — هنا عرض بس.')}</div>}
+      {row && <div className="text-[10px] text-dim">{t('آخر تغيير')}: {dateTime(row.updatedAt)} · {nameOf(row.updatedBy)}<Tech> · <span className="num">{row.source}</span></Tech></div>}
+      {reacts && <div className="text-[11px]"><span className="text-dim">{t('هتلاحظ التغيير في')}: </span>{reacts}</div>}
+      {value !== undefined && <PolicyCompare p={p} current={value} inherited={!row} ctx={ctx} />}
+      <div className="flex items-center gap-3 flex-wrap text-[11px] text-dim"><span>{appliesToText(p.appliesTo)}</span><ScopesLine p={p} /></div>
+      {question && <div className="text-[11px] rounded-lg bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] border border-[color-mix(in_srgb,var(--warning)_30%,transparent)] px-2 py-1 flex gap-1"><HelpCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[var(--warning)]" /><span><b>{t('سؤال للخبير')}:</b> {question}</span></div>}
+      {!scopeAllowed && <div className="text-[11px] text-[var(--warning)]">{t('الإعداد ده مينفعش يتظبط لفرع لوحده — اختار «المطعم كله» من فوق.')}</div>}
       <div className="flex items-center gap-2 flex-wrap">
         {editing ? (
           <>
-            <Button size="sm" variant="primary" data-fb={`settings:save:${p.id}`} onClick={() => setConfirm({ state: 'SET' })}>{t('حفظ…')}</Button>
+            <Button size="sm" variant="primary" data-fb={`settings:save:${p.id}`} onClick={() => setConfirm({ state: 'SET' })}>{t('احفظ…')}</Button>
             <Button size="sm" variant="ghost" onClick={() => setDraft(undefined)}>{t('إلغاء')}</Button>
           </>
         ) : (
-          editable && <Button size="sm" variant="outline" data-fb={`settings:edit:${p.id}`} disabled={!perm.ok || !scopeAllowed || value === undefined} title={perm.title} onClick={() => setDraft(structuredClone(value ?? (p.editor.kind === 'object' ? {} : value)))}><Pencil className="w-3.5 h-3.5" />{t('تعديل')}</Button>
+          editable && <Button size="sm" variant="outline" data-fb={`settings:edit:${p.id}`} disabled={!perm.ok || !scopeAllowed || value === undefined} title={perm.ok ? undefined : t('الحساب ده مش مسموح له يغيّر الإعدادات')} onClick={() => setDraft(structuredClone(value ?? (p.editor.kind === 'object' ? {} : value)))}><Pencil className="w-3.5 h-3.5" />{t('غيّر')}</Button>
         )}
-        {!editing && row && scopeType === 'BRANCH' && <Button size="sm" variant="ghost" disabled={!perm.ok} onClick={() => setConfirm({ state: 'INHERIT' })} data-fb={`settings:inherit:${p.id}`}><Undo2 className="w-3.5 h-3.5" />{t('ارجع للموروث')}</Button>}
-        <button className="text-[11px] text-dim flex items-center gap-1 hover:text-[var(--primary)] ms-auto" onClick={() => setHist(!hist)} data-fb={`settings:history:${p.id}`}><History className="w-3 h-3" />{t('السجل')}</button>
+        {!editing && row && scopeType === 'BRANCH' && <Button size="sm" variant="ghost" disabled={!perm.ok} onClick={() => setConfirm({ state: 'INHERIT' })} data-fb={`settings:inherit:${p.id}`}><Undo2 className="w-3.5 h-3.5" />{t('رجّعه زي المطعم كله')}</Button>}
+        <button className="text-[11px] text-dim flex items-center gap-1 hover:text-[var(--primary)] ms-auto" onClick={() => setHist(!hist)} data-fb={`settings:history:${p.id}`}><History className="w-3 h-3" />{t('اتغيّر إمتى')}</button>
       </div>
-      {hist && <PolicyHistory policyId={p.id} nameOf={nameOf} />}
-      {confirm && <SaveModal p={p} scopeType={scopeType} scopeId={scopeId} row={row} oldValue={value} newValue={confirm.state === 'INHERIT' ? undefined : draft} state={confirm.state} onClose={(ok) => { setConfirm(null); if (ok) setDraft(undefined); }} />}
+      {hist && <PolicyHistory p={p} nameOf={nameOf} ctx={ctx} />}
+      {confirm && <SaveModal p={p} scopeType={scopeType} scopeId={scopeId} scopeName={scopeName} row={row} oldValue={value} newValue={confirm.state === 'INHERIT' ? undefined : draft} state={confirm.state} ctx={ctx} onClose={(ok) => { setConfirm(null); if (ok) setDraft(undefined); }} />}
     </div>
   );
 }
 
-function ValueView({ p, value }: { p: PolicyMeta; value: any }) {
-  if (p.editor.kind === 'approvals') {
-    return (
-      <div className="space-y-1">
-        <Table head={[t('العملية'), t('القاعدة'), '']} rows={APPROVAL_ACTIONS.map((a) => [
-          <span className="text-xs">{a.title} <span className="num text-dim text-[10px]">{a.id}</span></span>,
-          <span className="num text-xs">{ruleText(value?.[a.id] ?? a.defaultRule)}</span>,
-          a.state !== 'CANONICAL' ? <Pill tone={a.state === 'CORE' ? 'info' : 'violet'}>{a.state === 'CORE' ? 'CORE' : t('مقترح')}</Pill> : null,
-        ])} />
-        <div className="text-[11px] text-dim">{t('تعديل قواعد الموافقة من لوحة الإعدادات (Policy Panel). تخفيض قاعدة SENSITIVE_POLICY_CHANGE نفسه بيحتاج موافقة تحت القاعدة القديمة.')}</div>
-      </div>
-    );
-  }
-  if (p.editor.kind === 'selfApproval') {
-    const allowed = Object.entries(value ?? {}).filter(([, v]: any) => v?.mode === 'ALLOW').map(([k]) => k);
-    return <div className="text-xs">{allowed.length ? <>{t('مسموح يوافق على طلبه في:')} <span className="num">{allowed.join('، ')}</span></> : t('ممنوع في كل العمليات (SELF_APPROVAL_DENIED)')}</div>;
-  }
-  if (p.editor.kind === 'object') {
-    return <KV className="text-xs" rows={p.editor.fields.map((f) => [f.label, <span className="num">{show(getPath(value, f.key))}</span>] as [React.ReactNode, React.ReactNode])} />;
-  }
-  return <div className="text-sm num font-bold break-all">{show(value)}</div>;
-}
-
-function Editor({ p, value, onChange }: { p: PolicyMeta; value: any; onChange: (v: unknown) => void }) {
-  const e = p.editor;
-  if (e.kind === 'enum') return <div className="flex flex-wrap gap-1">{e.options.map((o) => <button key={o} type="button" onClick={() => onChange(o)} className={cn('px-2 h-7 rounded-lg text-[11px] num border', value === o ? 'bg-[var(--primary)] text-[var(--primary-foreground)] border-transparent font-bold' : 'surface-2 border-[var(--glass-border)]')}>{o}</button>)}</div>;
-  if (e.kind === 'bool') return <Switch checked={!!value} onChange={(v) => onChange(v)} label={value ? 'true' : 'false'} />;
-  if (e.kind === 'object') return <div className="grid grid-cols-2 gap-2">{e.fields.map((f) => <FieldEditor key={f.key} f={f} value={getPath(value, f.key)} onChange={(v) => onChange(setPath(value, f.key, v))} />)}</div>;
-  return <ValueView p={p} value={value} />;
-}
-
-function FieldEditor({ f, value, onChange }: { f: PField; value: any; onChange: (v: any) => void }) {
-  return (
-    <label className="flex flex-col gap-1 min-w-0">
-      <span className="text-[10px] text-dim">{f.label}</span>
-      {f.kind === 'enum' && <Select value={value ?? ''} onChange={(e) => onChange(e.target.value || undefined)} options={[{ value: '', label: '—' }, ...f.options.map((o) => ({ value: o, label: o }))]} className="!py-1 text-xs num" />}
-      {f.kind === 'bool' && <Switch checked={!!value} onChange={onChange} />}
-      {f.kind === 'multi' && <div className="flex flex-wrap gap-1">{f.options.map((o) => { const arr: string[] = value ?? []; const on = arr.includes(o); return <button key={o} type="button" onClick={() => onChange(on ? arr.filter((x) => x !== o) : [...arr, o])} className={cn('px-1.5 h-6 rounded text-[10px] num border', on ? 'bg-[var(--primary)] text-[var(--primary-foreground)] border-transparent font-bold' : 'surface-2 border-[var(--glass-border)]')}>{o}</button>; })}</div>}
-      {f.kind === 'number' && <Input type="number" value={value ?? ''} min={f.min} max={f.max} onChange={(e) => onChange(e.target.value === '' ? undefined : Number(e.target.value))} className="!py-1 text-xs" />}
-      {(f.kind === 'money' || f.kind === 'percent' || f.kind === 'percentOrNone') && (
-        <div className="flex gap-1 items-center">
-          {/* decimals travel as strings, never floats (docs/24 §3) */}
-          <Input inputMode="decimal" value={value ?? ''} onChange={(e) => onChange(e.target.value === '' ? undefined : e.target.value.replace(/[^\d.]/g, ''))} className="!py-1 text-xs" placeholder={f.kind === 'percentOrNone' ? t('مش متفعلة') : ''} />
-          {f.kind === 'percentOrNone' && value !== undefined && <button type="button" className="text-[10px] text-dim px-1" onClick={() => onChange(undefined)}>✕</button>}
-        </div>
-      )}
-      {(f.kind === 'text' || f.kind === 'time') && <Input type={f.kind === 'time' ? 'time' : 'text'} value={value ?? ''} onChange={(e) => onChange(e.target.value)} className="!py-1 text-xs" dir="ltr" />}
-    </label>
-  );
-}
-
-function SaveModal({ p, scopeType, scopeId, row, oldValue, newValue, state, onClose }: { p: PolicyMeta; scopeType: string; scopeId: string; row: any | null; oldValue: any; newValue: any; state: 'SET' | 'INHERIT'; onClose: (ok: boolean) => void }) {
+function SaveModal({ p, scopeType, scopeId, scopeName, row, oldValue, newValue, state, ctx, onClose }: { p: PolicyMeta; scopeType: string; scopeId: string; scopeName?: string; row: any | null; oldValue: any; newValue: any; state: 'SET' | 'INHERIT'; ctx: Ctx; onClose: (ok: boolean) => void }) {
   const { run, busy } = useCommand();
   const [note, setNote] = useState('');
   const save = async () => {
     const body: any = { scopeType, scopeId, changeNote: note.trim() || undefined, state };
     if (state === 'SET') body.value = newValue;
     if (row) body.expectedVersion = row.version;
-    const r = await run('Settings.UpdatePolicy', { params: { policyId: p.id }, body }, { success: t('اتحفظت {p} — بتطبق على العمليات الجديدة بس', { p: p.title }) });
+    const r = await run('Settings.UpdatePolicy', { params: { policyId: p.id }, body }, { success: t('اتحفظ «{p}» — هيطبق على اللي جاي بس', { p: policyTitle(p) }) });
     if (r) onClose(true);
   };
   return (
@@ -184,32 +149,38 @@ function SaveModal({ p, scopeType, scopeId, row, oldValue, newValue, state, onCl
       footer={<><Button variant="ghost" onClick={() => onClose(false)}>{t('إلغاء')}</Button><Button variant="primary" loading={busy} onClick={save} data-fb="settings:confirm-save">{t('ابعت التغيير')}</Button></>}>
       <div className="space-y-3">
         <KV className="text-sm" rows={[
-          [t('السياسة'), <span>{p.title} <span className="num text-dim text-xs">{p.id}</span></span>],
-          [t('النطاق'), <span className="num">{scopeType}:{scopeId}</span>],
-          [t('القيمة الحالية'), <span className="num text-xs break-all">{show(oldValue)}</span>],
-          [t('القيمة الجديدة'), state === 'INHERIT' ? <Pill tone="info">INHERIT — {t('يرجع للنطاق الأعلى')}</Pill> : <span className="num text-xs break-all font-bold">{show(newValue)}</span>],
-          ['expectedVersion', <span className="num">{row ? row.version : t('مفيش صف في النطاق ده (أول قيمة)')}</span>],
+          [t('الإعداد'), <b>{policyTitle(p)}</b>],
+          [t('على'), scopeText(scopeType, scopeName)],
+          [t('دلوقتي'), <span className="text-xs">{valueSummary(p, oldValue, ctx)}</span>],
+          [t('هيبقى'), state === 'INHERIT' ? <Pill tone="info">{t('يرجع زي المطعم كله')}</Pill> : <span className="text-xs font-bold">{valueSummary(p, newValue, ctx)}</span>],
         ]} />
-        <Field label={t('ملاحظة التغيير (بتتسجل في السجل)')}><Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('مثلاً: صاحب المطعم وافق على ...')} data-fb="settings:change-note" /></Field>
-        <div className="flex items-center gap-2 flex-wrap"><RulePill action="SENSITIVE_POLICY_CHANGE" /></div>
-        <Banner tone="warning">{t('لو القاعدة بتطلب موافقة هتظهر شاشة موافقة المدير. نفس الشخص مينفعش يوافق على طلبه (SELF_APPROVAL_DENIED) — اختار مدير تاني زي demo-manager-2. الموافقة مربوطة بالقيمة القديمة والجديدة بالظبط.')}</Banner>
+        <Tech>
+          <div className="rounded-lg bg-black/20 p-2 num text-[10px] break-all space-y-0.5" dir="ltr" style={{ textAlign: 'left' }}>
+            <div>{p.id} · {scopeType}:{scopeId} · state {state} · expectedVersion {row ? row.version : '— (first row)'}</div>
+            <div>old: {rawJson(oldValue)}</div><div>new: {rawJson(newValue)}</div>
+          </div>
+        </Tech>
+        <Field label={t('ملاحظة (بتتسجل في السجل)')}><Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('مثلًا: صاحب المطعم وافق على ...')} data-fb="settings:change-note" /></Field>
+        <div className="flex items-center gap-2 flex-wrap"><SensitiveRulePill /></div>
+        <Banner tone="warning">{t('لو التغيير محتاج موافقة، هتظهر شاشة «موافقة مدير». نفس الشخص مينفعش يوافق على طلبه — اختار مدير تاني (مثلًا هبة — مديرة الفرع). الموافقة بتبقى على التغيير ده بالظبط.')}</Banner>
       </div>
     </Modal>
   );
 }
 
-function PolicyHistory({ policyId, nameOf }: { policyId: string; nameOf: (id: string) => string }) {
-  const h = useList<any>('Policy.History', { params: { policyId }, query: { limit: 20 } });
+function PolicyHistory({ p, nameOf, ctx }: { p: PolicyMeta; nameOf: (id: string) => string; ctx: Ctx }) {
+  const h = useList<any>('Policy.History', { params: { policyId: p.id }, query: { limit: 20 } });
   return (
     <div className="rounded-lg surface-1 p-2 space-y-1">
-      <div className="flex items-center gap-2"><span className="text-[11px] font-bold">{t('السجل')}</span><StateBadge ops={['Policy.History']} /></div>
+      <div className="flex items-center gap-2"><span className="text-[11px] font-bold">{t('اتغيّر إمتى')}</span><StateBadge ops={['Policy.History']} /></div>
       <Refused error={h.error} />
-      {h.items.length === 0 && !h.error && <div className="text-[11px] text-dim">{t('مفيش تغييرات متسجلة')}</div>}
+      {h.items.length === 0 && !h.error && <div className="text-[11px] text-dim">{t('ما اتغيّرش لسه')}</div>}
       {h.items.map((x) => (
-        <div key={x.id} className="text-[10px] num text-dim break-all border-t line pt-1">
-          <span className="text-soft">{dateTime(x.at)}</span> · <Pill tone={x.via === 'SETTINGS' ? 'success' : x.via === 'PANEL' ? 'violet' : 'neutral'}>{x.via}</Pill> · {x.scopeType}:{x.scopeId} · {nameOf(x.by)}
-          <div>{show(x.oldValue)} → <span className="text-[var(--foreground)]">{show(x.newValue)}</span></div>
-          {x.note && <div className="font-sans">“{x.note}”</div>}
+        <div key={x.id} className="text-[11px] border-t line pt-1">
+          <span className="text-soft">{dateTime(x.at)}</span> · <Pill tone={x.via === 'SETTINGS' ? 'success' : x.via === 'PANEL' ? 'violet' : 'neutral'}>{viaText(x.via)}</Pill> · {scopeText(x.scopeType)} · {nameOf(x.by)}
+          <div>{historyValueText(p, x.oldValue, ctx)} ← <b>{historyValueText(p, x.newValue, ctx)}</b></div>
+          {x.note && <div>“{x.note}”</div>}
+          <Tech><div className="num text-[10px] text-dim break-all" dir="ltr">{x.via} · {x.scopeType}:{x.scopeId} · {rawJson(x.oldValue)} → {rawJson(x.newValue)}</div></Tech>
         </div>
       ))}
     </div>
@@ -226,11 +197,12 @@ function ReasonsTab() {
   const { run, busy } = useCommand();
   const kinds = useMemo(() => [...new Set([...REASON_KINDS, ...codes.items.map((c) => c.kind)])], [codes.items]);
   const mode = (k: string) => pol.data?.value?.[k] ?? null;
-  const toggle = (c: any) => run('ReasonCode.Configure', { params: { reasonCodeId: c.id }, body: { active: !c.active, label: c.label, requiresNote: c.requiresNote, sortOrder: c.sortOrder, expectedVersion: c.version } }, { success: c.active ? t('اتوقف السبب {c}', { c: c.code }) : t('اتفعّل السبب {c}', { c: c.code }) });
+  const toggle = (c: any) => run('ReasonCode.Configure', { params: { reasonCodeId: c.id }, body: { active: !c.active, label: c.label, requiresNote: c.requiresNote, sortOrder: c.sortOrder, expectedVersion: c.version } }, { success: c.active ? t('اتوقف السبب «{c}»', { c: c.label?.ar ?? c.code }) : t('اتفعّل السبب «{c}»', { c: c.label?.ar ?? c.code }) });
+  const permTitle = perm.ok ? undefined : t('الحساب ده مش مسموح له يعدّل الأسباب');
   return (
     <div className="space-y-3">
-      <Banner tone="info">{t('لكل نوع: MANAGED = الموظف يختار من القايمة دي بس (والملاحظة إجبارية لو السبب محتاجها)، FREE_TEXT = نص حر. التحويل لـ MANAGED بيتعمل من تبويب السياسات (ReasonCodePolicy) وبيترفض لو النوع مفيهوش سبب شغال، وآخر سبب شغال في نوع MANAGED مينفعش يتوقف. الكود والنوع ثابتين بعد الإنشاء.')}</Banner>
-      <div className="flex justify-end"><Button size="sm" variant="primary" data-fb="reasons:new" disabled={!perm.ok} title={perm.title} onClick={() => setCreate('LINE_VOID')}><Plus className="w-4 h-4" />{t('سبب جديد')}</Button></div>
+      <Banner tone="info">{t('لكل نوع حركة: «من قايمة ثابتة» يعني الموظف يختار سبب من القايمة دي بس (ولو السبب محتاج ملاحظة لازم يكتبها)، و«كتابة حرة» يعني يكتب السبب بإيده. التحويل بيتعمل من تبويب «إعدادات المطعم» (الأسباب: من قايمة ولا كتابة حرة). نوع «من قايمة» لازم يفضل فيه سبب واحد شغال على الأقل، وكود السبب ونوعه مش بيتغيروا بعد ما يتعمل.')}</Banner>
+      <div className="flex justify-end"><Button size="sm" variant="primary" data-fb="reasons:new" disabled={!perm.ok} title={permTitle} onClick={() => setCreate('LINE_VOID')}><Plus className="w-4 h-4" />{t('سبب جديد')}</Button></div>
       <Refused error={codes.error} />
       <div className="grid xl:grid-cols-2 gap-3">
         {kinds.map((k) => {
@@ -238,18 +210,18 @@ function ReasonsTab() {
           const m = mode(k);
           const active = list.filter((c) => c.active).length;
           return (
-            <Card key={k} title={<span>{reasonKindLabel(k)} <span className="num text-xs text-dim font-normal">{k}</span></span>}
-              badge={<>{m ? <Pill tone={m === 'MANAGED' ? 'success' : 'neutral'}>{m}</Pill> : <Pill tone="neutral" title={t('مش في ReasonCodePolicy — الافتراضي نص حر')}>FREE_TEXT · {t('افتراضي')}</Pill>}{k === 'VARIANCE' && <StateBadge state="SPECIFIED" />}{k === 'REPRINT' && <StateBadge state="PROPOSED" />}</>}
-              actions={<Button size="sm" variant="ghost" disabled={!perm.ok} title={perm.title} onClick={() => setCreate(k)} data-fb={`reasons:new:${k}`}><Plus className="w-3.5 h-3.5" /></Button>}>
-              {m === 'MANAGED' && active === 0 && <Banner tone="error">{t('النوع ده MANAGED ومفيهوش سبب شغال!')}</Banner>}
-              <Table head={[t('الكود'), t('عربي'), 'English', t('ملاحظة'), t('ترتيب'), t('الحالة'), '']}
+            <Card key={k} title={<span>{reasonKindText(k)}<Tech><span className="num text-xs text-dim font-normal ms-1">{k}</span></Tech></span>}
+              badge={<>{m ? <Pill tone={m === 'MANAGED' ? 'success' : 'neutral'}>{optionText('ReasonCodePolicy', k, m).label}</Pill> : <Pill tone="neutral">{t('كتابة حرة (الافتراضي)')}</Pill>}{k === 'VARIANCE' && <StateBadge state="SPECIFIED" />}{k === 'REPRINT' && <StateBadge state="PROPOSED" />}</>}
+              actions={<Button size="sm" variant="ghost" disabled={!perm.ok} title={permTitle ?? t('سبب جديد')} onClick={() => setCreate(k)} data-fb={`reasons:new:${k}`}><Plus className="w-3.5 h-3.5" /></Button>}>
+              {m === 'MANAGED' && active === 0 && <Banner tone="error">{t('النوع ده بيختار من قايمة، ومفيش ولا سبب شغال فيها! فعّل سبب.')}</Banner>}
+              <Table head={[t('السبب'), 'English', t('ملاحظة'), t('الترتيب'), t('الحالة'), '']}
                 rows={list.map((c) => [
-                  <span className="num font-bold text-xs">{c.code}</span>, c.label?.ar, <span dir="ltr">{c.label?.en}</span>,
+                  <span>{c.label?.ar}<Tech><span className="num text-[10px] text-dim ms-1" dir="ltr">{c.code}</span></Tech></span>, <span dir="ltr">{c.label?.en}</span>,
                   c.requiresNote ? <Pill tone="warning">{t('إجبارية')}</Pill> : <span className="text-dim">—</span>,
                   <span className="num">{c.sortOrder}</span>,
                   c.active ? <Pill tone="success">{t('شغال')}</Pill> : <Pill tone="neutral">{t('موقوف')}</Pill>,
                   <div className="flex gap-1 justify-end">
-                    <Button size="sm" variant="ghost" disabled={!perm.ok} title={perm.title} onClick={() => setEdit(c)} data-fb={`reasons:edit:${k}:${c.code}`}><Pencil className="w-3.5 h-3.5" /></Button>
+                    <Button size="sm" variant="ghost" disabled={!perm.ok} title={permTitle ?? t('تعديل')} onClick={() => setEdit(c)} data-fb={`reasons:edit:${k}:${c.code}`}><Pencil className="w-3.5 h-3.5" /></Button>
                     <Button size="sm" variant="ghost" disabled={!perm.ok || busy} title={c.active ? t('إيقاف') : t('تفعيل')} onClick={() => toggle(c)} data-fb={`reasons:toggle:${k}:${c.code}`}><Power className={cn('w-3.5 h-3.5', c.active ? 'text-[var(--error)]' : 'text-[var(--success)]')} /></Button>
                   </div>,
                 ])} empty={t('مفيش أسباب للنوع ده')} />
@@ -277,25 +249,24 @@ function ReasonModal({ kinds, kind, code, onClose }: { kinds: string[]; kind?: s
     const label = { ar: ar.trim(), en: en.trim() };
     const r = code
       ? await run('ReasonCode.Configure', { params: { reasonCodeId: code.id }, body: { label, requiresNote, sortOrder: Number(sortOrder), active, expectedVersion: code.version } }, { success: t('اتحفظ السبب') })
-      : await run('ReasonCode.Create', { body: { kind: k, code: c, label, requiresNote, sortOrder: Number(sortOrder) } }, { success: t('اتعمل السبب {c}', { c }) });
+      : await run('ReasonCode.Create', { body: { kind: k, code: c, label, requiresNote, sortOrder: Number(sortOrder) } }, { success: t('اتعمل السبب «{c}»', { c: label.ar }) });
     if (r) onClose();
   };
   return (
-    <Modal open onClose={onClose} title={code ? t('تعديل السبب {c}', { c: code.code }) : t('سبب جديد')} badge={<StateBadge ops={[code ? 'ReasonCode.Configure' : 'ReasonCode.Create']} />}
+    <Modal open onClose={onClose} title={code ? t('تعديل السبب «{c}»', { c: code.label?.ar ?? code.code }) : t('سبب جديد')} badge={<StateBadge ops={[code ? 'ReasonCode.Configure' : 'ReasonCode.Create']} />}
       footer={<><Button variant="ghost" onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" loading={busy} disabled={!ar.trim() || !en.trim() || (!code && !codeOk)} onClick={save} data-fb="reasons:save">{t('حفظ')}</Button></>}>
       <div className="grid grid-cols-2 gap-3">
-        <Field label={t('النوع')}><Select value={k} disabled={!!code} onChange={(e) => setK(e.target.value)} options={kinds.map((x) => ({ value: x, label: `${reasonKindLabel(x)} (${x})` }))} data-fb="reasons:kind" /></Field>
-        <Field label={t('الكود')} hint={t('حروف إنجليزي كبيرة وأرقام و _ (لحد 32). تكراره في نفس النوع بيرجع REASON_CODE_TAKEN')} error={c && !codeOk ? t('شكل الكود غلط') : null}>
+        <Field label={t('نوع الحركة')}><Select value={k} disabled={!!code} onChange={(e) => setK(e.target.value)} options={kinds.map((x) => ({ value: x, label: reasonKindText(x) }))} data-fb="reasons:kind" /></Field>
+        <Field label={t('كود قصير بالإنجليزي')} hint={t('حروف إنجليزي كبيرة وأرقام و _ — مثلًا WRONG_ITEM. مينفعش يتكرر في نفس النوع.')} error={c && !codeOk ? t('الكود لازم يبقى حروف إنجليزي كبيرة وأرقام و _ بس') : null}>
           <Input value={c} disabled={!!code} onChange={(e) => setC(e.target.value.toUpperCase().replace(/[\s-]+/g, '_'))} dir="ltr" data-fb="reasons:code" />
         </Field>
-        <Field label={t('الاسم بالعربي')}><Input value={ar} maxLength={80} onChange={(e) => setAr(e.target.value)} data-fb="reasons:label-ar" /></Field>
-        <Field label="English"><Input value={en} maxLength={80} onChange={(e) => setEn(e.target.value)} dir="ltr" data-fb="reasons:label-en" /></Field>
-        <Field label={t('الترتيب')}><Input type="number" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} /></Field>
-        <Field label={t('الملاحظة')}><Switch checked={requiresNote} onChange={setRequiresNote} label={requiresNote ? t('إجبارية') : t('اختيارية')} /></Field>
+        <Field label={t('السبب بالعربي')}><Input value={ar} maxLength={80} onChange={(e) => setAr(e.target.value)} data-fb="reasons:label-ar" /></Field>
+        <Field label={t('السبب بالإنجليزي')}><Input value={en} maxLength={80} onChange={(e) => setEn(e.target.value)} dir="ltr" data-fb="reasons:label-en" /></Field>
+        <Field label={t('الترتيب في القايمة')}><Input type="number" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} /></Field>
+        <Field label={t('الملاحظة')}><Switch checked={requiresNote} onChange={setRequiresNote} label={requiresNote ? t('لازم الموظف يكتب ملاحظة') : t('اختيارية')} /></Field>
         {code && <Field label={t('الحالة')}><Switch checked={active} onChange={setActive} label={active ? t('شغال') : t('موقوف')} /></Field>}
       </div>
-      {code && <div className="text-[11px] text-dim mt-3">{t('تغيير الاسم مش بيعدّل اللي اتسجل قبل كده: كل عملية محتفظة بنسخة السبب وقت ما اتعملت. expectedVersion = {v}', { v: code.version })}</div>}
+      {code && <div className="text-[11px] text-dim mt-3">{t('تغيير الاسم مش بيغيّر اللي اتسجل قبل كده: كل حركة محتفظة بالسبب زي ما كان وقتها.')}<Tech> <span className="num">expectedVersion = {code.version}</span></Tech></div>}
     </Modal>
   );
 }
-

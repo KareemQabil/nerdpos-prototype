@@ -1,7 +1,8 @@
 // D2 Find and reopen checks: by number, table, status, business date. After a lost response or a restart,
 // the check is re-read from the server (the same command never runs twice).
 import React, { useState } from 'react';
-import { Search, History, Wallet, Receipt, ClipboardList } from 'lucide-react';
+import { Search, History, Wallet, Receipt, ClipboardList, ArrowRightLeft } from 'lucide-react';
+import { TransferSessionDialog } from './ops/TransferSessionDialog';
 import { useDev, useQuery } from '../app/hooks';
 import { Section, StateBadge, Input, Select, Table, Money, Button, Field } from '../ui';
 import { t } from '../i18n';
@@ -15,6 +16,7 @@ export default function Checks() {
   const [lifecycle, setLifecycle] = useState('');
   const [bd, setBd] = useState('');
   const [hist, setHist] = useState<any>(null);
+  const [move, setMove] = useState<any>(null);
   const q = useQuery<any>('Order.Find', { query: { number: number || undefined, lifecycle: lifecycle || undefined, businessDate: bd || undefined, limit: 200 } });
   const rows = (q.data?.items ?? []).map((o: any) => [
     <span className="num font-bold">#{o.number}</span>,
@@ -28,6 +30,7 @@ export default function Checks() {
       {(o.status === 'DRAFT' || o.status === 'CONFIRMED') && <Button size="sm" onClick={() => nav(o.visitId ? 'order' : kind === 'CASH' ? 'counter' : 'order', { orderId: o.id, back: 'checks' })}><ClipboardList className="w-3.5 h-3.5" />{t('افتح')}</Button>}
       {(o.status === 'DRAFT' || o.status === 'CONFIRMED') && can('payment:capture') && kind !== 'FLOOR' && <Button size="sm" variant="success" onClick={() => nav('pay', { orderId: o.id, back: 'checks' })}><Wallet className="w-3.5 h-3.5" /></Button>}
       {o.status !== 'DRAFT' && <Button size="sm" onClick={() => nav('receipt', { orderId: o.id })}><Receipt className="w-3.5 h-3.5" /></Button>}
+      {(o.status === 'DRAFT' || o.status === 'CONFIRMED') && o.sessionId && can('session:close') && <Button size="sm" variant="ghost" title={t('نقل لوردية تانية')} onClick={() => setMove(o)} data-fb={`check-transfer:${o.number}`}><ArrowRightLeft className="w-3.5 h-3.5" /></Button>}
       <Button size="sm" variant="ghost" onClick={() => setHist(o)}><History className="w-3.5 h-3.5" /></Button>
     </div>,
   ]);
@@ -42,6 +45,7 @@ export default function Checks() {
       </div>
       <Table head={['#', t('المكان'), t('الحالة'), t('اليوم التجاري'), t('الوقت'), t('الويتر'), t('الإجمالي'), '']} rows={rows} empty={t('مفيش شيكات')} />
       {hist && <HistoryDialog order={hist} onClose={() => setHist(null)} />}
+      {move && <TransferSessionDialog orders={[move]} onClose={() => setMove(null)} />}
     </div>
   );
 }

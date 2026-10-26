@@ -7,6 +7,10 @@ import { D, m4, isMoney } from '../money';
 import { checkVersion, need, page, requireFields } from './util';
 import type { Channel, Product, PriceRule, DB } from '../types';
 import { zonedParts } from '../clock';
+import { promotionLive } from '../promo-engine';
+import { upsertPromotion, promotionView, findByCode } from './promotions';
+import { effectiveAvailability, menuCheck, menuState, optionSoldOut, branchBusinessDate, activeVariants } from '../menu-engine';
+import { planPriceWindow, applyPriceWindow } from '../menu-prices';
 
 /** nextId, skipping ids the seed already uses (seed price rules are pr_1…pr_N and promotions promo_1, promo_2). */
 function freshId(db: DB, prefix: string): string {
@@ -18,9 +22,24 @@ function freshId(db: DB, prefix: string): string {
 
 const showDirection = () => policy<boolean>('DirectionCatalogDemo') !== false;
 
-function productView(db: DB, p: Product, branchId: string | null) {
-  const av = branchId ? availabilityOf(db, p.id, branchId) : null;
-  return { ...p, availability: av ? { state: av.state, reason: av.reason } : { state: 'NOT_ON_BRANCH_MENU', reason: null }, taxPolicyName: db.taxPolicies.find((t) => t.id === p.taxPolicyId)?.name ?? null, fiscalItemCode: db.itemMappings.find((m) => m.productId === p.id)?.itemCode ?? null };
+function productView(db: DB, p: Product, branchId: string | null, opts: { channel?: Channel; now?: number } = {}) {
+  // menu area: "sold out today" rows from an earlier business day read as AVAILABLE; menuNow = on the menu right now
+  const now = opts.now ?? Date.now();
+  const av = branchId ? effectiveAvailability(db, p.id, branchId, now) : null;
+  const mc = branchId && opts.channel ? menuCheck(db, p, branchId, opts.channel, now) : null;
+  const menuNow = mc ? (mc.onMenu ? { onMenu: true, restricted: mc.restricted, endsAt: mc.endsAt ? new Date(mc.endsAt).toISOString() : null, menus: mc.menus } : { onMenu: false, reason: mc.reason, nextStart: mc.nextStart ? new Date(mc.nextStart).toISOString() : null, dayparts: mc.dayparts, reasonAr: mc.reasonAr, reasonEn: mc.reasonEn }) : null;
+  return { ...p, availability: av ? { state: av.state, reason: av.reason, soldOutFor: av.state === 'SOLD_OUT' ? av.soldOutFor ?? null : null, updatedAt: av.updatedAt, updatedBy: av.updatedBy } : { state: 'NOT_ON_BRANCH_MENU', reason: null }, menuNow, taxPolicyName: db.taxPolicies.find((t) => t.id === p.taxPolicyId)?.name ?? null, taxPolicy: (() => { const t = db.taxPolicies.find((x) => x.id === p.taxPolicyId); return t ? { id: t.id, rate: t.rate, mode: t.calculationMode, exemption: t.exemption ?? 'NONE' } : null; })(), fiscalItemCode: db.itemMappings.find((m) => m.productId === p.id)?.itemCode ?? null };
+}
+const IMAGE_MAX_CHARS = 400_000; // ~300 KB image as a data URL (the editor downsizes before upload)
+function checkImage(v: unknown) {
+  if (v === undefined || v === null || v === '') return;
+  const s = String(v);
+  need(/^(https?:\/\/|data:image\/(png|jpeg|jpg|webp|gif|svg\+xml)[;,])/.test(s), 'VALIDATION_FAILED', { field: 'imageUrl', rule: 'http(s) URL or data:image/…', reasonAr: 'الصورة لازم تبقى ملف صورة (PNG أو JPG أو WEBP)' });
+  need(s.length <= IMAGE_MAX_CHARS, 'VALIDATION_FAILED', { field: 'imageUrl', rule: `at most ${IMAGE_MAX_CHARS} characters`, reasonAr: 'الصورة كبيرة — الحد 300 كيلوبايت' });
+}
+function checkCalories(v: unknown) {
+  if (v === undefined || v === null || v === '') return;
+  need(Number.isInteger(Number(v)) && Number(v) >= 0 && Number(v) <= 5000, 'VALIDATION_FAILED', { field: 'calories', rule: 'integer 0..5000', reasonAr: 'السعرات رقم صحيح من 0 لـ 5000' });
 }
 
 function nextSku(db: DB, categoryId: string) {
@@ -77,12 +96,7 @@ function inHappyHour(ms: number, schedule: { days: number[]; start: string; end:
   return (schedule.days.includes(p.weekday) && t >= s) || (schedule.days.includes((p.weekday + 6) % 7) && t < e);
 }
 export function promotionActive(ctx: Ctx, pr: DB['promotions'][number], channel: Channel) {
-  if (!pr.active) return false;
-  if (ctx.branchId && pr.branchIds.length && !pr.branchIds.includes(ctx.branchId)) return false; // empty = all branches (doc 26 §3)
-  if (!pr.channels.includes(channel)) return false;
-  if (pr.validFrom && ctx.now < pr.validFrom) return false;
-  if (pr.validTo && ctx.now >= pr.validTo) return false;
-  return inHappyHour(ctx.now, pr.schedule);
+  return promotionLive(ctx.db, pr, ctx.branchId, channel, ctx.now); // promo-engine.ts (dayparts, dates, branch, channel)
 }
 
 export const catalogHandlers: Record<string, Handler> = {
@@ -121,12 +135,14 @@ export const catalogHandlers: Record<string, Handler> = {
     u!.version++;
     return u;
   },
-  'ModifierGroup.List': (ctx) => page(ctx.db.modifierGroups.filter((g) => ctx.query.active === undefined || String(g.active) === ctx.query.active), ctx.query),
+  // menu area: options in display order, each with soldOut (today, this branch)
+  'ModifierGroup.List': (ctx) => page(ctx.db.modifierGroups.filter((g) => ctx.query.active === undefined || String(g.active) === ctx.query.active).map((g) => ({ ...g, options: [...g.options].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)).map((o) => { const so = optionSoldOut(ctx.db, o.id, ctx.branchId, ctx.now); return { ...o, soldOut: !!so, soldOutReason: so?.reason ?? null }; }) })), ctx.query),
   'ModifierGroup.Create': (ctx) => {
     requireFields(ctx, 'name', 'selectionRule');
     const min = Number(ctx.body.min ?? 0), max = Number(ctx.body.max ?? 1);
     need(min >= 0 && max >= min && max >= 1, 'VALIDATION_FAILED', { rule: '0 <= min <= max, max >= 1' });
-    const g = { id: freshId(ctx.db, 'mg'), name: ctx.body.name, selectionRule: ctx.body.selectionRule, min, max, active: true, options: [], version: 1 };
+    need(!ctx.body.kind || ['STANDARD', 'INGREDIENTS'].includes(ctx.body.kind), 'VALIDATION_FAILED', { field: 'kind' });
+    const g = { id: freshId(ctx.db, 'mg'), name: ctx.body.name, selectionRule: ctx.body.selectionRule, min, max, active: true, options: [], version: 1, kind: ctx.body.kind ?? 'STANDARD', scalesWithSize: ctx.body.scalesWithSize ?? true, allowHalfPlacement: !!ctx.body.allowHalfPlacement };
     ctx.db.modifierGroups.push(g);
     return g;
   },
@@ -134,7 +150,9 @@ export const catalogHandlers: Record<string, Handler> = {
     const g = ctx.db.modifierGroups.find((x) => x.id === ctx.params.groupId);
     need(g, 'MODIFIER_DEFINITION_NOT_FOUND');
     checkVersion(g!, ctx.body.expectedVersion);
-    Object.assign(g!, { name: ctx.body.name ?? g!.name, selectionRule: ctx.body.selectionRule ?? g!.selectionRule, min: ctx.body.min ?? g!.min, max: ctx.body.max ?? g!.max, active: ctx.body.active ?? g!.active });
+    const nmin = Number(ctx.body.min ?? g!.min), nmax = Number(ctx.body.max ?? g!.max);
+    need(nmin >= 0 && nmax >= nmin && nmax >= 1, 'VALIDATION_FAILED', { rule: '0 <= min <= max, max >= 1', reasonAr: 'أقل عدد لازم يبقى أصغر من أو يساوي أكتر عدد' });
+    Object.assign(g!, { name: ctx.body.name ?? g!.name, selectionRule: ctx.body.selectionRule ?? g!.selectionRule, min: nmin, max: nmax, active: ctx.body.active ?? g!.active, kind: ctx.body.kind ?? g!.kind, scalesWithSize: ctx.body.scalesWithSize ?? g!.scalesWithSize, allowHalfPlacement: ctx.body.allowHalfPlacement ?? g!.allowHalfPlacement });
     g!.version++;
     return g;
   },
@@ -143,7 +161,9 @@ export const catalogHandlers: Record<string, Handler> = {
     need(g, 'MODIFIER_DEFINITION_NOT_FOUND');
     requireFields(ctx, 'name');
     need(isMoney(ctx.body.priceDelta ?? '0'), 'VALIDATION_FAILED', { field: 'priceDelta' });
-    const o = { id: freshId(ctx.db, 'opt'), name: ctx.body.name, priceDelta: m4(ctx.body.priceDelta ?? '0'), active: true, version: 1 };
+    if (ctx.body.nestedGroupId) need(ctx.db.modifierGroups.some((x) => x.id === ctx.body.nestedGroupId && x.id !== g!.id), 'MODIFIER_DEFINITION_NOT_FOUND', { groupId: ctx.body.nestedGroupId });
+    if (ctx.body.extraPriceDelta) need(isMoney(ctx.body.extraPriceDelta), 'VALIDATION_FAILED', { field: 'extraPriceDelta' });
+    const o = { id: freshId(ctx.db, 'opt'), name: ctx.body.name, priceDelta: m4(ctx.body.priceDelta ?? '0'), active: true, version: 1, isDefault: !!ctx.body.isDefault, sortOrder: ctx.body.sortOrder ?? (g!.options.length + 1) * 10, nestedGroupId: ctx.body.nestedGroupId || null, extraPriceDelta: ctx.body.extraPriceDelta ? m4(ctx.body.extraPriceDelta) : null, allergens: ctx.body.allergens };
     g!.options.push(o);
     g!.version++;
     return o;
@@ -153,20 +173,29 @@ export const catalogHandlers: Record<string, Handler> = {
     const o = g?.options.find((x) => x.id === ctx.params.optionId);
     need(o, 'MODIFIER_OPTION_NOT_FOUND');
     checkVersion(o!, ctx.body.expectedVersion);
-    Object.assign(o!, { name: ctx.body.name ?? o!.name, priceDelta: ctx.body.priceDelta !== undefined ? m4(ctx.body.priceDelta) : o!.priceDelta, active: ctx.body.active ?? o!.active });
+    if (ctx.body.nestedGroupId) need(ctx.db.modifierGroups.some((x) => x.id === ctx.body.nestedGroupId && x.id !== g!.id), 'MODIFIER_DEFINITION_NOT_FOUND', { groupId: ctx.body.nestedGroupId });
+    if (ctx.body.extraPriceDelta) need(isMoney(ctx.body.extraPriceDelta), 'VALIDATION_FAILED', { field: 'extraPriceDelta' });
+    Object.assign(o!, { name: ctx.body.name ?? o!.name, priceDelta: ctx.body.priceDelta !== undefined ? m4(ctx.body.priceDelta) : o!.priceDelta, active: ctx.body.active ?? o!.active,
+      isDefault: ctx.body.isDefault ?? o!.isDefault, nestedGroupId: ctx.body.nestedGroupId !== undefined ? ctx.body.nestedGroupId || null : o!.nestedGroupId, extraPriceDelta: ctx.body.extraPriceDelta !== undefined ? (ctx.body.extraPriceDelta ? m4(ctx.body.extraPriceDelta) : null) : o!.extraPriceDelta, allergens: ctx.body.allergens ?? o!.allergens });
+    // a single-choice group keeps one default
+    if (ctx.body.isDefault && g!.selectionRule === 'SINGLE') for (const x of g!.options) if (x.id !== o!.id) x.isDefault = false;
     o!.version++;
     return o;
   },
   'Catalog.Search': (ctx) => {
+    // menu area (proposed query fields): channel → menuNow per product (dayparts, channel and branch menus); q → name/sku/barcode search
+    const qq = (ctx.query.q ?? '').trim().toLowerCase();
+    const channel = (['DINE_IN', 'TAKEAWAY', 'DELIVERY'].includes(ctx.query.channel) ? ctx.query.channel : undefined) as Channel | undefined;
     const items = ctx.db.products
       .filter((p) => (!ctx.query.categoryId || p.categoryId === ctx.query.categoryId) && (ctx.query.active === undefined || String(p.active) === ctx.query.active) && (showDirection() || !p.direction))
-      .map((p) => productView(ctx.db, p, ctx.branchId));
+      .filter((p) => !qq || p.name.ar.toLowerCase().includes(qq) || p.name.en.toLowerCase().includes(qq) || p.sku.toLowerCase().includes(qq) || (p.variants ?? []).some((v) => (v.sku ?? '').toLowerCase() === qq || (v.barcode ?? '') === qq))
+      .map((p) => productView(ctx.db, p, ctx.branchId, { channel, now: ctx.now }));
     return page(items, ctx.query);
   },
   'Product.Get': (ctx) => {
     const p = ctx.db.products.find((x) => x.id === ctx.params.productId);
     need(p, 'CATALOG_PRODUCT_NOT_FOUND');
-    return productView(ctx.db, p!, ctx.branchId);
+    return productView(ctx.db, p!, ctx.branchId, { now: ctx.now });
   },
   'Product.NameCheck': (ctx) => {
     const rule = policy<{ default: string }>('ProductNameUniquenessPolicy')?.default ?? 'BLOCK';
@@ -189,6 +218,7 @@ export const catalogHandlers: Record<string, Handler> = {
       need(tp!.active, 'TAX_POLICY_ARCHIVED');
     }
     const warn = checkName(db, ctx.body.name);
+    checkImage(ctx.body.imageUrl); checkCalories(ctx.body.calories);
     let sku = (ctx.body.sku ?? '').trim();
     const sp = policy<{ mode: string }>('SkuGenerationPolicy')?.mode ?? 'MANUAL';
     if (!sku) {
@@ -196,7 +226,7 @@ export const catalogHandlers: Record<string, Handler> = {
       sku = nextSku(db, ctx.body.categoryId);
     }
     need(!db.products.some((p) => p.sku === sku), 'CATALOG_SKU_TAKEN', { sku });
-    const p: Product = { id: freshId(ctx.db, 'prod'), sku, name: ctx.body.name, categoryId: ctx.body.categoryId, unitId: ctx.body.unitId, taxPolicyId: taxId, modifierGroupIds: [], imageUrl: ctx.body.imageUrl, colorCode: ctx.body.colorCode, description: ctx.body.description, active: true, version: 1, createdAt: ctx.nowIso, createdBranchId: ctx.branchId ?? undefined, allergens: ctx.body.allergens, chargeTags: ctx.body.chargeTags };
+    const p: Product = { id: freshId(ctx.db, 'prod'), sku, name: ctx.body.name, categoryId: ctx.body.categoryId, unitId: ctx.body.unitId, taxPolicyId: taxId, modifierGroupIds: [], imageUrl: ctx.body.imageUrl, colorCode: ctx.body.colorCode, description: ctx.body.description, active: true, version: 1, createdAt: ctx.nowIso, createdBranchId: ctx.branchId ?? undefined, allergens: ctx.body.allergens, chargeTags: ctx.body.chargeTags, calories: ctx.body.calories !== undefined && ctx.body.calories !== '' ? Number(ctx.body.calories) : null };
     db.products.push(p);
     unit!.used = true;
     const nap = policy<string>('NewProductAvailabilityPolicy') ?? 'EXPLICIT_PER_BRANCH';
@@ -212,6 +242,8 @@ export const catalogHandlers: Record<string, Handler> = {
     if (ctx.body.name) checkName(db, ctx.body.name, p!.id);
     if (ctx.body.unitId && ctx.body.unitId !== p!.unitId) throw new ApiError('VALIDATION_FAILED', { field: 'unitId', rule: "a product's unit is fixed" });
     if (ctx.body.sku && ctx.body.sku !== p!.sku) need(!db.products.some((x) => x.sku === ctx.body.sku), 'CATALOG_SKU_TAKEN');
+    checkImage(ctx.body.imageUrl); checkCalories(ctx.body.calories);
+    if (ctx.body.calories !== undefined) p!.calories = ctx.body.calories === '' || ctx.body.calories === null ? null : Number(ctx.body.calories);
     Object.assign(p!, { name: ctx.body.name ?? p!.name, categoryId: ctx.body.categoryId ?? p!.categoryId, sku: ctx.body.sku ?? p!.sku, imageUrl: ctx.body.imageUrl ?? p!.imageUrl, colorCode: ctx.body.colorCode ?? p!.colorCode, description: ctx.body.description ?? p!.description, active: ctx.body.active ?? p!.active, allergens: ctx.body.allergens ?? p!.allergens, chargeTags: ctx.body.chargeTags ?? p!.chargeTags });
     p!.version++;
     return productView(db, p!, ctx.branchId);
@@ -228,7 +260,9 @@ export const catalogHandlers: Record<string, Handler> = {
     need(branchId, 'CONTEXT_REQUIRED');
     let av = availabilityOf(db, p!.id, branchId);
     if (!av) { av = { productId: p!.id, branchId, state, reason: null, updatedAt: ctx.nowIso, updatedBy: ctx.user!.id }; db.availability.push(av); }
-    Object.assign(av, { state, reason: state === 'AVAILABLE' ? null : ctx.body.reason ?? null, updatedAt: ctx.nowIso, updatedBy: ctx.user!.id });
+    // menu area (proposed field until): END_OF_BUSINESS_DAY = "sold out today", back automatically on the next business day
+    const today = state === 'SOLD_OUT' && ctx.body.until === 'END_OF_BUSINESS_DAY' ? branchBusinessDate(db, branchId, ctx.now) : null;
+    Object.assign(av, { state, reason: state === 'AVAILABLE' ? null : ctx.body.reason ?? null, updatedAt: ctx.nowIso, updatedBy: ctx.user!.id, soldOutFor: today });
     ctx.audit(`availability ${p!.sku} → ${state}`, p!.id);
     return av;
   },
@@ -259,14 +293,42 @@ export const catalogHandlers: Record<string, Handler> = {
     return productView(db, p!, ctx.branchId);
   },
   'Variant.Upsert': (ctx) => {
-    const p = ctx.db.products.find((x) => x.id === ctx.params.productId);
+    // contract: attributes + barcode (unique among active variants). Proposed fields (menu area): name, priceDelta,
+    // modifierMultiplier, sku, calories, isDefault, sortOrder. A size's own price per branch/channel is Catalog.SetPrice + variantId.
+    const db = ctx.db;
+    const p = db.products.find((x) => x.id === ctx.params.productId);
     need(p, 'CATALOG_PRODUCT_NOT_FOUND');
+    if (ctx.body.expectedVersion !== undefined) checkVersion(p!, ctx.body.expectedVersion);
+    const b = ctx.body;
+    const vid = String(ctx.params.variantId);
+    need(/^[A-Za-z0-9_-]{1,40}$/.test(vid), 'VALIDATION_FAILED', { field: 'variantId' });
     p!.variants = p!.variants ?? [];
-    const v = p!.variants.find((x) => x.id === ctx.params.variantId);
-    const data = { id: ctx.params.variantId, name: ctx.body.name, priceDelta: m4(ctx.body.priceDelta ?? '0'), modifierMultiplier: String(ctx.body.modifierMultiplier ?? '1'), active: ctx.body.active ?? true };
+    const v = p!.variants.find((x) => x.id === vid);
+    const name = b.name ?? v?.name ?? (b.attributes?.[0] ? { ar: String(b.attributes[0].value), en: String(b.attributes[0].value) } : null);
+    need(name && (name.ar || '').trim(), 'VALIDATION_FAILED', { field: 'name', reasonAr: 'اسم الحجم مطلوب' });
+    const delta = b.priceDelta ?? v?.priceDelta ?? '0';
+    need(isMoney(String(delta)), 'VALIDATION_FAILED', { field: 'priceDelta', reasonAr: 'فرق السعر لازم يبقى رقم' });
+    const mult = String(b.modifierMultiplier ?? v?.modifierMultiplier ?? '1');
+    need(/^\d+(\.\d{1,4})?$/.test(mult) && D(mult).gt(0) && D(mult).lte(5), 'VALIDATION_FAILED', { field: 'modifierMultiplier', rule: '0 < x <= 5', reasonAr: 'مضاعف الإضافات من 0.25 لـ 5' });
+    const sku = b.sku !== undefined ? (String(b.sku ?? '').trim() || null) : v?.sku ?? null;
+    if (sku) need(!db.products.some((x) => x.sku === sku) && !db.products.some((x) => (x.variants ?? []).some((y) => y.sku === sku && !(x.id === p!.id && y.id === vid))), 'CATALOG_SKU_TAKEN', { sku, reasonAr: `الكود ${sku} مستخدم` });
+    const barcode = b.barcode !== undefined ? (String(b.barcode ?? '').trim() || null) : v?.barcode ?? null;
+    if (barcode) need(!db.products.some((x) => (x.variants ?? []).some((y) => y.active && y.barcode === barcode && !(x.id === p!.id && y.id === vid))), 'VALIDATION_FAILED', { field: 'barcode', rule: 'barcode unique among active variants', reasonAr: `الباركود ${barcode} مستخدم في حجم تاني` });
+    if (b.calories !== undefined && b.calories !== null && b.calories !== '') need(Number.isInteger(Number(b.calories)) && Number(b.calories) >= 0, 'VALIDATION_FAILED', { field: 'calories' });
+    const active = b.active ?? v?.active ?? true;
+    if (!active && v?.isDefault) need(p!.variants.some((x) => x.id !== vid && x.active), 'VALIDATION_FAILED', { reasonAr: 'لازم يفضل حجم واحد شغال على الأقل' });
+    const data = {
+      id: vid, name, priceDelta: m4(delta), modifierMultiplier: mult, active, sku, barcode,
+      attributes: b.attributes ?? v?.attributes ?? [{ name: 'size', value: name.en || name.ar }],
+      calories: b.calories !== undefined ? (b.calories === '' || b.calories === null ? null : Number(b.calories)) : v?.calories ?? null,
+      isDefault: b.isDefault ?? v?.isDefault ?? !p!.variants.some((x) => x.isDefault),
+      sortOrder: b.sortOrder ?? v?.sortOrder ?? (p!.variants.length + 1) * 10, version: (v?.version ?? 0) + 1,
+    };
     if (v) Object.assign(v, data); else p!.variants.push(data);
+    if (data.isDefault) for (const x of p!.variants) if (x.id !== vid) x.isDefault = false;
     p!.version++;
-    return productView(ctx.db, p!, ctx.branchId);
+    ctx.audit(`variant ${p!.sku}/${vid} ${v ? 'updated' : 'created'}`, p!.id);
+    return productView(db, p!, ctx.branchId, { now: ctx.now });
   },
 
   // ───────── prices
@@ -275,7 +337,7 @@ export const catalogHandlers: Record<string, Handler> = {
     const branchId = b.branchId ?? ctx.branchId;
     need(branchId, 'CONTEXT_REQUIRED');
     if (ctx.branchId && branchId !== ctx.branchId) throw new ApiError('PERMISSION_DENIED', { reason: 'other branch' });
-    return quoteItem(ctx.db, { branchId, channel: b.channel ?? 'DINE_IN', productId: ctx.params.productId, quantity: String(b.quantity ?? '1'), modifierOptionIds: b.modifierOptionIds ?? [], variantId: b.variantId, halfProductId: b.halfProductId, comboSelections: b.comboSelections, at: ctx.now });
+    return quoteItem(ctx.db, { branchId, channel: b.channel ?? 'DINE_IN', productId: ctx.params.productId, quantity: String(b.quantity ?? '1'), modifierOptionIds: b.modifierOptionIds ?? [], variantId: b.variantId, halfProductId: b.halfProductId, comboSelections: b.comboSelections, at: ctx.now, modifierLevels: b.modifierLevels, modifierPlacement: b.modifierPlacement, nestedOptionIds: b.nestedOptionIds });
   },
   'Catalog.SetPrice': (ctx) => {
     const db = ctx.db;
@@ -286,6 +348,9 @@ export const catalogHandlers: Record<string, Handler> = {
     need(['DINE_IN', 'TAKEAWAY', 'DELIVERY'].includes(b.channel), 'VALIDATION_FAILED', { field: 'channel' });
     need(isMoney(b.amount) && D(b.amount).gte(0), 'VALIDATION_FAILED', { field: 'amount' });
     if (b.currency && b.currency !== 'EGP') throw new ApiError('VALIDATION_FAILED', { field: 'currency', rule: 'branch currency EGP' });
+    // menu area (proposed field): variantId = the own price of one size
+    const variantId = b.variantId ? String(b.variantId) : null;
+    if (variantId) need((p!.variants ?? []).some((v) => v.id === variantId), 'VALIDATION_FAILED', { field: 'variantId', reasonAr: 'الحجم ده مش موجود' });
     const amount = m4(b.amount);
     if (D(amount).isZero() && policy<string>('ZeroPricePolicy') === 'DENY') throw new ApiError('PRICE_ZERO_NOT_ALLOWED');
     const from = b.effectiveFrom ? Date.parse(b.effectiveFrom) : ctx.now;
@@ -294,48 +359,21 @@ export const catalogHandlers: Record<string, Handler> = {
     if (from < ctx.now - 60_000) throw new ApiError('VALIDATION_FAILED', { field: 'effectiveFrom', rule: 'no backdating; a started window is never re-priced' });
     if (from > ctx.now + 366 * 86_400_000) throw new ApiError('VALIDATION_FAILED', { field: 'effectiveFrom', rule: 'at most 366 days ahead' });
     if (from > ctx.now + 60_000 && policy<string>('PriceSchedulingPolicy') === 'IMMEDIATE_ONLY') throw new ApiError('PRICE_SCHEDULING_NOT_ALLOWED');
-    // doc 22 §3 over the rows of scope S = (product, branch, channel):
-    // E = window starting exactly at F, C = window containing F, N = next window starting after F.
-    const rules = db.priceRules.filter((r) => r.productId === p!.id && r.branchId === b.branchId && r.channel === b.channel);
-    const E = rules.find((r) => r.effectiveFrom === from) ?? null;
-    const C = E ? null : rules.find((r) => r.effectiveFrom < from && (r.effectiveTo === null || r.effectiveTo > from)) ?? null;
-    const N = rules.filter((r) => r.effectiveFrom > from).sort((x, y) => x.effectiveFrom - y.effectiveFrom)[0] ?? null;
-    let changeKind: 'FIRST_PRICE' | 'CHANGE' | 'CORRECTION';
-    let end: number | null = null;
-    if (E) {
-      // a started window is never corrected; a scheduled one may be, if its end stays the same
-      if (E.effectiveFrom <= ctx.now || (to !== null && to !== E.effectiveTo)) throw new ApiError('PRICE_SCHEDULE_CONFLICT', { conflictingRuleIds: [E.id] });
-      changeKind = 'CORRECTION';
-    } else {
-      end = to ?? N?.effectiveFrom ?? null;
-      if (N && (end === null || end > N.effectiveFrom)) throw new ApiError('PRICE_SCHEDULE_CONFLICT', { conflictingRuleIds: [N.id] });
-      changeKind = rules.some((r) => r.effectiveFrom < from) || C ? 'CHANGE' : 'FIRST_PRICE';
-    }
-    const basis = E ?? C;
-    const old = basis?.amount ?? null;
-    const firstPrice = changeKind === 'FIRST_PRICE';
-    const changePercent = old && !D(old).isZero() ? D(amount).minus(old).abs().dividedBy(old).times(100).toDecimalPlaces(2).toString() : null;
-    ctx.requireApproval({ action: 'PRICE_CHANGE', targetType: 'catalog.Product', targetId: p!.id, context: { productId: p!.id, branchId: b.branchId, channel: b.channel, effectiveFrom: new Date(from).toISOString(), changeKind, basisRuleId: basis?.id ?? null, basisRuleVersion: basis?.version ?? null, oldAmount: old, newAmount: amount, changePercent, firstPrice, decrease: !!old && D(amount).lessThan(old) }, grantId: b.approvalGrantId });
-    let rule: PriceRule;
-    let closedRule: PriceRule | null = null;
-    if (E) {
-      E.amount = amount; // CORRECTION of a window that has not started: nothing else changes
-      E.version++;
-      rule = E;
-    } else {
-      if (C) { C.effectiveTo = from; C.version++; closedRule = C; } // the started window ends; a new window starts
-      rule = { id: freshId(ctx.db, 'pr'), productId: p!.id, branchId: b.branchId, channel: b.channel, amount, currency: 'EGP', effectiveFrom: from, effectiveTo: end, createdAt: ctx.nowIso, createdBy: ctx.user!.id, version: 1, replacesRuleId: C?.id ?? null };
-      // an explicit end leaves a gap (PRICE_NOT_FOUND after it): temporary prices belong to promotions (doc 22 case 7)
-      db.priceRules.push(rule);
-    }
-    ctx.audit(`price ${p!.sku} ${b.branchId}/${b.channel} ${changeKind} ${old ?? '—'} → ${amount}`, p!.id, true, b.approvalGrantId);
-    return { rule, closedRule, changeKind, replacedRuleId: closedRule?.id ?? null, firstPrice, changePercent };
+    // doc 22 §3 over the rows of scope S = (product[, size], branch, channel) — menu-prices.ts
+    const plan = planPriceWindow(db, ctx.now, { productId: p!.id, variantId, branchId: b.branchId, channel: b.channel, amount, from, to });
+    const basis = plan.E ?? plan.C;
+    ctx.requireApproval({ action: 'PRICE_CHANGE', targetType: 'catalog.Product', targetId: p!.id, context: { productId: p!.id, branchId: b.branchId, channel: b.channel, effectiveFrom: new Date(from).toISOString(), changeKind: plan.changeKind, basisRuleId: basis?.id ?? null, basisRuleVersion: basis?.version ?? null, oldAmount: plan.old, newAmount: amount, changePercent: plan.changePercent, firstPrice: plan.firstPrice, decrease: !!plan.old && D(amount).lessThan(plan.old), ...(variantId ? { variantId } : {}) }, grantId: b.approvalGrantId });
+    const { rule, closedRule } = applyPriceWindow(db, plan, ctx.user!.id, ctx.nowIso, (prefix) => freshId(ctx.db, prefix));
+    ctx.audit(`price ${p!.sku}${variantId ? '/' + variantId : ''} ${b.branchId}/${b.channel} ${plan.changeKind} ${plan.old ?? '—'} → ${amount}`, p!.id, true, b.approvalGrantId);
+    return { rule, closedRule, changeKind: plan.changeKind, replacedRuleId: closedRule?.id ?? null, firstPrice: plan.firstPrice, changePercent: plan.changePercent };
   },
   'Product.PriceHistory': (ctx) => {
+    // menu area: rows carry variantId (null = the product price); ?variantId= filters one size, ?variantId=BASE the product price only
+    const vq = ctx.query.variantId;
     const rows = ctx.db.priceRules
-      .filter((r) => r.productId === ctx.params.productId && (!ctx.query.branchId || r.branchId === ctx.query.branchId) && (!ctx.query.channel || r.channel === ctx.query.channel))
+      .filter((r) => r.productId === ctx.params.productId && (!ctx.query.branchId || r.branchId === ctx.query.branchId) && (!ctx.query.channel || r.channel === ctx.query.channel) && (!vq || (vq === 'BASE' ? !r.variantId : r.variantId === vq)))
       .sort((a, b) => b.effectiveFrom - a.effectiveFrom)
-      .map((r) => ({ ...r, effectiveFromIso: new Date(r.effectiveFrom).toISOString(), effectiveToIso: r.effectiveTo ? new Date(r.effectiveTo).toISOString() : null, state: r.effectiveFrom > ctx.now ? 'SCHEDULED' : r.effectiveTo !== null && r.effectiveTo <= ctx.now ? 'ENDED' : 'CURRENT' }));
+      .map((r) => ({ ...r, variantId: r.variantId ?? null, effectiveFromIso: new Date(r.effectiveFrom).toISOString(), effectiveToIso: r.effectiveTo ? new Date(r.effectiveTo).toISOString() : null, state: r.effectiveFrom > ctx.now ? 'SCHEDULED' : r.effectiveTo !== null && r.effectiveTo <= ctx.now ? 'ENDED' : 'CURRENT' }));
     return page(rows, ctx.query);
   },
 
@@ -384,7 +422,12 @@ export const catalogHandlers: Record<string, Handler> = {
   },
 
   // ───────── promotions
-  'Promotion.Find': (ctx) => page(ctx.db.promotions.map((p) => ({ ...p, liveNow: ['DINE_IN', 'TAKEAWAY'].some((c) => promotionActive(ctx, p, c as Channel)) })), ctx.query),
+  'Promotion.Find': (ctx) => {
+    const ch = ctx.query.validFor as Channel | undefined;
+    const list = ctx.db.promotions.filter((p) => (ctx.query.includeInactive === 'true' || p.active) && (!ch || promotionActive(ctx, p, ch)));
+    return page(list.map((p) => promotionView(ctx, p)), ctx.query);
+  },
+  'Promotion.Upsert': (ctx) => upsertPromotion(ctx),
   'Promotion.Create': (ctx) => {
     requireFields(ctx, 'name', 'kind', 'benefitType', 'benefitValue', 'channels', 'branchIds');
     if (ctx.body.kind === 'CODED') {
@@ -419,7 +462,7 @@ export const catalogHandlers: Record<string, Handler> = {
     return pr;
   },
   'Promotion.ValidateCode': (ctx) => {
-    const pr = ctx.db.promotions.find((p) => p.kind === 'CODED' && p.code === ctx.body.code);
+    const pr = findByCode(ctx.db, ctx.body.code);
     if (!pr) throw new ApiError('PROMOTION_CODE_INVALID');
     if (!promotionActive(ctx, pr, ctx.body.channel ?? 'DINE_IN')) throw new ApiError('PROMOTION_NOT_APPLICABLE');
     return pr;

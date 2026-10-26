@@ -12,10 +12,14 @@ export interface SimState {
   offlineNext: boolean;
   /** Next N requests of this op are delayed (to race two devices). */
   slowOp: { op: string; ms: number } | null;
+  /** Devices whose network is cut (by device id: t_cash, t_floor, …). Requests never leave the device. */
+  offlineDevices: string[];
+  /** Outside systems that receive webhooks (accounting, delivery apps). */
+  webhooks: 'UP' | 'DOWN';
 }
 
 const KEY = 'nerdpos.sim.v1';
-const defaults: SimState = { latencyMs: 120, printers: {}, kds: 'UP', eta: 'UP', cardTerminal: 'UP', dropNextResponse: null, offlineNext: false, slowOp: null };
+const defaults: SimState = { latencyMs: 120, printers: {}, kds: 'UP', eta: 'UP', cardTerminal: 'UP', dropNextResponse: null, offlineNext: false, slowOp: null, offlineDevices: [], webhooks: 'UP' };
 let state: SimState = (() => {
   try { return { ...defaults, ...JSON.parse(localStorage.getItem(KEY) ?? '{}') }; } catch { return { ...defaults }; }
 })();
@@ -32,7 +36,15 @@ export const sim = {
     return state.printers[terminalId] ?? 'UP';
   },
   reset() {
-    sim.set({ ...defaults, printers: {} });
+    sim.set({ ...defaults, printers: {}, offlineDevices: [] });
+  },
+  isOffline(deviceId: string | null | undefined) {
+    return !!deviceId && (state.offlineDevices ?? []).includes(deviceId);
+  },
+  setOffline(deviceId: string, offline: boolean) {
+    const cur = new Set(state.offlineDevices ?? []);
+    if (offline) cur.add(deviceId); else cur.delete(deviceId);
+    sim.set({ offlineDevices: [...cur] });
   },
   subscribe(fn: () => void) {
     listeners.add(fn);

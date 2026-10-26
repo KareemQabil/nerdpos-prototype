@@ -8,7 +8,11 @@ import { D, m4, allocate, q6, isMoney } from '../money';
 import { checkVersion, getOrder, need, openSessionOn, orderView, page, reasonCheck, requireBranch, requireFields, settlementOf } from './util';
 import { openVisitOn, closeVisit } from './floor';
 import { promotionActive } from './catalog';
+import { setOrderCustomer } from './customers'; // crm area
+import { onOrderCompleted } from './loyalty'; // crm area
+import { autoApplyPromotions, findByCode, promotionForOrder } from './promotions';
 import type { Channel, Order, OrderLine } from '../types';
+import { inventoryOnOrderChange } from './inventory'; // inventory area: sales consumption
 
 const OPEN = (o: Order) => o.status === 'DRAFT' || o.status === 'CONFIRMED';
 
@@ -36,6 +40,7 @@ function assertEditable(ctx: Ctx, o: Order) {
 function bump(ctx: Ctx, o: Order, kind: string, text: { ar: string; en: string }, data?: unknown) {
   o.version++;
   o.history.push(hist(ctx.user!.id, kind, text, data, ctx.terminal?.code));
+  inventoryOnOrderChange(ctx, o); // consumes recipes on confirm, reverses/wastes on void (idempotent)
 }
 
 function newLine(ctx: Ctx, o: Order, input: any): OrderLine {
@@ -43,7 +48,7 @@ function newLine(ctx: Ctx, o: Order, input: any): OrderLine {
   const modIds: string[] = input.modifierOptionIds ?? (input.modifiers ?? []).map((m: any) => m.optionId ?? m.modifierOptionId);
   const qty = String(input.quantity ?? '1');
   if (!isMoney(qty) || D(qty).lte(0)) throw new ApiError('VALIDATION_FAILED', { field: 'quantity' });
-  const qt = quoteItem(db, { branchId: o.branchId, channel: o.channel, productId: input.productId, quantity: qty, modifierOptionIds: modIds, variantId: input.variantId, halfProductId: input.halfProductId, comboSelections: input.comboSelections, at: ctx.now });
+  const qt = quoteItem(db, { branchId: o.branchId, channel: o.channel, productId: input.productId, quantity: qty, modifierOptionIds: modIds, variantId: input.variantId, halfProductId: input.halfProductId, comboSelections: input.comboSelections, at: ctx.now, modifierLevels: input.modifierLevels, modifierPlacement: input.modifierPlacement, nestedOptionIds: input.nestedOptionIds });
   const product = db.products.find((p) => p.id === input.productId)!;
   const tax = db.taxPolicies.find((t) => t.id === qt.tax.taxPolicyId)!;
   db.units.find((u) => u.id === product.unitId)!.used = true;
@@ -53,7 +58,7 @@ function newLine(ctx: Ctx, o: Order, input: any): OrderLine {
     quantity: q6(qty), unitPrice: qt.unitPrice, modifiers: qt.modifiers, unitTotal: qt.unitTotal, lineTotal: qt.lineTotal,
     taxPolicy: { id: tax.id, rate: tax.rate, mode: tax.calculationMode, version: tax.version, name: tax.name, roundingMode: tax.roundingMode, roundingScale: tax.roundingScale, exemption: tax.exemption },
     priceRuleId: qt.priceRuleId, status: 'ACTIVE', version: 1, note: input.note || undefined, fireRound: null, firedAt: null, addedAt: ctx.nowIso, addedBy: ctx.user!.id,
-    seat: seatsOn && input.seat ? Number(input.seat) : null, variant: qt.variant, children: qt.children, allergens: product.allergens, chargeTags: product.chargeTags, kitchenMods: [],
+    seat: seatsOn && input.seat ? Number(input.seat) : null, variant: qt.variant, children: qt.children, allergens: product.allergens, chargeTags: product.chargeTags, kitchenMods: [], taxSplit: qt.taxSplit,
   };
 }
 
@@ -62,12 +67,7 @@ function ensureService(ctx: Ctx, o: Order) {
 }
 
 function maybeAutoPromotion(ctx: Ctx, o: Order) {
-  const st = policy<{ mode: string; autoApply: boolean }>('DiscountStackingPolicy') ?? { mode: 'NO_STACKING', autoApply: false };
-  if (!st.autoApply || o.discounts.some((d) => d.active)) return;
-  const pr = ctx.db.promotions.find((p) => p.kind === 'AUTOMATIC' && promotionActive(ctx, p, o.channel));
-  if (!pr) return;
-  o.discounts.push({ id: nextId('disc'), type: pr.benefitType, value: pr.benefitValue, reasonCode: 'PROMOTION', appliedAt: ctx.nowIso, appliedBy: 'system', active: true, promotionId: pr.id, label: pr.name });
-  o.history.push(hist('system', 'PROMOTION', { ar: `اتطبق عرض أوتوماتيك: ${pr.name.ar}`, en: `auto promotion: ${pr.name.en}` }));
+  autoApplyPromotions(ctx, o); // promotions.ts: order / item / buy-X-get-Y, limits and stacking
 }
 
 /** VisitAutoClosePolicy: free the table when its last check completes, is cancelled or voided. */
@@ -124,7 +124,7 @@ export const orderHandlers: Record<string, Handler> = {
     const db = ctx.db;
     const branchId = requireBranch(ctx);
     const channel = ctx.body.channel as Channel;
-    need(['DINE_IN', 'TAKEAWAY'].includes(channel), 'ORDER_CHANNEL_UNAVAILABLE', { channel });
+    need(['DINE_IN', 'TAKEAWAY', 'DELIVERY'].includes(channel), 'ORDER_CHANNEL_UNAVAILABLE', { channel });
     let visitId: string | null = null, tableId: string | null = null, guestCount: number | undefined;
     if (ctx.body.tableId) {
       if (channel !== 'DINE_IN') throw new ApiError('VALIDATION_FAILED', { field: 'tableId', rule: 'only DINE_IN checks sit on a table' });
@@ -148,9 +148,10 @@ export const orderHandlers: Record<string, Handler> = {
       createdAt: ctx.nowIso, createdAtMs: ctx.now, businessDate: ctx.businessDate(branchId), createdBy: ctx.user!.id, confirmedAt: null, confirmedBy: null, completedAt: null, completedAtMs: null, completedBusinessDate: null, completedSessionId: null,
       version: 1, label: ctx.body.label, note: ctx.body.note, checkNo: visitId ? db.orders.filter((x) => x.visitId === visitId).length + 1 : 1,
       fireMode: null, rounds: [], lines: [], discounts: [], comp: null, policy: capturePolicySnapshot(branchId, channel, ctx.nowIso), service: null, confirmation: null,
-      history: [hist(ctx.user!.id, 'CREATED', { ar: `اتفتح شيك ${channel === 'DINE_IN' ? (visitId ? 'صالة على ترابيزة' : 'صالة كاونتر') : 'تيك أواي'}${sessionId ? ' على وردية الدرج' : ' من غير درج (شيك صالة)'}`, en: `created ${channel}${sessionId ? ' on drawer session' : ' floor check (no drawer)'}` }, null, ctx.terminal?.code)],
+      history: [hist(ctx.user!.id, 'CREATED', { ar: `اتفتح شيك ${channel === 'DINE_IN' ? (visitId ? 'صالة على ترابيزة' : 'صالة كاونتر') : channel === 'DELIVERY' ? 'دليفري' : 'تيك أواي'}${sessionId ? ' على وردية الدرج' : ' من غير درج (شيك صالة)'}`, en: `created ${channel}${sessionId ? ' on drawer session' : ' floor check (no drawer)'}` }, null, ctx.terminal?.code)],
       guestCount, customerName: ctx.body.customerName,
     };
+    if (ctx.body.customerId) setOrderCustomer(ctx, o, ctx.body.customerId); // crm area: customer snapshot
     db.orders.push(o);
     ctx.audit(`order ${o.number} created`, o.id);
     return { status: 201, body: orderView(db, o) };
@@ -268,6 +269,7 @@ export const orderHandlers: Record<string, Handler> = {
     const rp = policy<Record<string, string>>('ReceiptPrintPolicy', { channel: o.channel, terminalId: ctx.terminal?.id }) ?? {};
     if ((rp[o.channel] ?? 'AUTO') === 'AUTO' && o.kind !== 'STAFF_MEAL' && ctx.terminal) enqueuePrint(ctx.db, { documentType: 'RECEIPT', documentId: o.id, copyKind: 'ORIGINAL', terminalId: ctx.terminal.id, createdBy: ctx.user!.id, label: `إيصال ${o.number}` });
     issueFiscal(ctx.db, o);
+    onOrderCompleted(ctx, o); // crm area: loyalty points on a completed check
     afterEnd(ctx, o);
     event('OrderCompleted', o.id, `${o.number} payable ${computeTotals(o).payable}`);
     return orderView(ctx.db, o);
@@ -358,6 +360,14 @@ export const orderHandlers: Record<string, Handler> = {
     checkVersion(o, ctx.body.expectedVersion);
     if (!activeLines(o).length) throw new ApiError('ORDER_EMPTY');
     let d = ctx.body.discount ?? {};
+    if (d.promotionCode || d.promotionId) {
+      // promotions.ts: the full promotion model (codes, item scope, buy X get Y, limits, stacking)
+      const pr = d.promotionId ? (ctx.db.promotions.find((p) => p.id === d.promotionId) as any) : findByCode(ctx.db, d.promotionCode);
+      if (!pr || (pr.kind === 'CODED' && !d.promotionCode)) throw new ApiError('PROMOTION_CODE_INVALID');
+      o.discounts.push(promotionForOrder(ctx, o, pr, ctx.user!.id));
+      bump(ctx, o, 'DISCOUNT', { ar: `عرض: ${pr.name.ar}`, en: `promotion: ${pr.name.en}` });
+      return orderView(ctx.db, o);
+    }
     let promo = null as any;
     if (d.promotionCode) {
       promo = ctx.db.promotions.find((p) => p.kind === 'CODED' && p.code === d.promotionCode);
@@ -415,8 +425,12 @@ export const orderHandlers: Record<string, Handler> = {
   },
   'Order.SetCustomer': (ctx) => {
     const o = getOrder(ctx, ctx.params.orderId);
-    o.customerName = ctx.body.customerName ?? ctx.body.customerId ?? null;
-    bump(ctx, o, 'CUSTOMER', { ar: `العميل: ${o.customerName ?? '—'}`, en: `customer: ${o.customerName}` });
+    // crm area: non-terminal checks only; the customer (name, phone) is snapshotted on the check
+    if (!OPEN(o)) throw new ApiError('ORDER_NOT_EDITABLE', { status: o.status });
+    if (ctx.body.expectedVersion !== undefined) checkVersion(o, ctx.body.expectedVersion);
+    if (ctx.body.customerId !== undefined) setOrderCustomer(ctx, o, ctx.body.customerId || null);
+    else o.customerName = ctx.body.customerName ?? undefined;
+    bump(ctx, o, 'CUSTOMER', { ar: o.customerName ? `العميل: ${o.customerName}${o.customerPhone ? ` (${o.customerPhone})` : ''}` : 'العميل اتشال من الشيك', en: `customer: ${o.customerName ?? '—'}` });
     return orderView(ctx.db, o);
   },
   // Direction D8: channel change, keeping the lines and the fired facts.
@@ -425,7 +439,8 @@ export const orderHandlers: Record<string, Handler> = {
     if (o.status !== 'DRAFT') throw new ApiError('ORDER_NOT_EDITABLE');
     checkVersion(o, ctx.body.expectedVersion);
     const to = ctx.body.channel as Channel;
-    need(['DINE_IN', 'TAKEAWAY'].includes(to) && to !== o.channel, 'VALIDATION_FAILED', { field: 'channel' });
+    need(['DINE_IN', 'TAKEAWAY', 'DELIVERY'].includes(to) && to !== o.channel, 'VALIDATION_FAILED', { field: 'channel' });
+    if (o.deliveryId && (ctx.db.deliveries ?? []).some((d) => d.id === o.deliveryId && d.state !== 'CANCELLED')) throw new ApiError('VALIDATION_FAILED', { field: 'channel', rule: 'cancel the delivery first' }); // crm area
     if (to === 'DINE_IN') {
       need(ctx.body.tableId, 'VALIDATION_FAILED', { field: 'tableId' });
       const v = openVisitOn(ctx, ctx.body.tableId);

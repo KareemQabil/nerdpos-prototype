@@ -2,6 +2,7 @@
 // the English UI comes from the single file ./en.ts. Missing English falls back to Arabic.
 import { useSyncExternalStore } from 'react';
 import { en } from './en';
+import { techMode } from '../app/tech';
 
 export type Lang = 'ar' | 'en';
 const KEY = 'nerdpos.lang';
@@ -25,7 +26,17 @@ export function useLang(): Lang {
 export function t(ar: string, vars?: Record<string, string | number>): string {
   let s = lang === 'en' ? en[ar] ?? ar : ar;
   if (vars) for (const [k, v] of Object.entries(vars)) s = s.split(`{${k}}`).join(String(v));
-  return s;
+  return techMode.get() ? s : stripTech(s);
+}
+
+// Safety net for demo users: when technical details are off, drop parenthesised technical tokens such as
+// " (PRICE_NOT_FOUND)", " (FloorIntakePolicy)", " (Order.Fire)", " (dryRun: true)", " (Idempotent-Replayed)".
+// Only parentheses whose WHOLE content is such tokens are removed, so normal text and numbers are never touched.
+const TOKEN = String.raw`(?:[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+(?:\s+\d{3})?|[A-Z][A-Za-z]*Policy(?:\[[A-Z_]+\])?|[A-Z][a-z]+(?:[A-Z][a-z]+)*\.[A-Z][A-Za-z]+(?:@\d+)?|[a-z][A-Za-z]*:\s*(?:true|false|null|\d+)|[A-Z][a-z]+(?:-[A-Z][a-z]+)+(?::\s*\w+)?|[A-Z]{1,6}:[A-Za-z0-9_:.-]+)`;
+const TECH_PAREN = new RegExp(String.raw`\s?\((?:${TOKEN})(?:\s*[,،·/|]\s*(?:${TOKEN}))*\)`, 'g');
+export function stripTech(s: string): string {
+  if (!s || s.indexOf('(') < 0) return s;
+  return s.replace(TECH_PAREN, '');
 }
 
 /** Pick a localized server value {ar, en}. */

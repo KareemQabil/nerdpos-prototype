@@ -14,14 +14,14 @@ export function ClockControl() {
   const off = clock.offset();
   const go = (fn: () => void) => { fn(); demo.tick(); };
   return (
-    <Popover title={t('ساعة السيرفر التجريبية')} width={340} button={(o) => (
-      <button className={cn('h-8 px-2 rounded-lg border flex items-center gap-1.5 text-xs', off ? 'border-[var(--warning)] text-[var(--warning)]' : 'border-[var(--glass-border)] surface-1 text-soft', o && 'bg-[var(--primary-container)]')}>
-        <Clock className="w-4 h-4" /><span className="num">{localTime(now)}</span><span className="num text-dim hidden lg:inline">{businessDate(now)}</span>
+    <Popover title={t('ساعة التجربة: قدّم الوقت عشان تشوف اليوم التجاري، الأسعار المجدولة، الهابي أور، وتنبيهات الإيصال الإلكتروني')} width={340} button={(o) => (
+      <button data-fb="chrome:clock" className={cn('h-8 px-2 rounded-lg border flex items-center gap-1.5 text-xs', off ? 'border-[var(--warning)] text-[var(--warning)]' : 'border-[var(--glass-border)] surface-1 text-soft', o && 'bg-[var(--primary-container)]')}>
+        <Clock className="w-4 h-4" /><span className="num">{localTime(now)}</span>{off ? <span className="text-[10px] hidden lg:inline">{t('متقدمة')}</span> : null}<span className="num text-dim hidden min-[2200px]:inline">{businessDate(now)}</span>
       </button>
     )}>
       <div className="space-y-3 text-sm">
-        <div className="font-bold">{t('ساعة السيرفر التجريبية')}</div>
-        <div className="text-xs text-dim">{t('اليوم التجاري بيتحسب من السيرفر حسب الفرع (Africa/Cairo، بداية اليوم 04:00) — مش من ساعة الجهاز. البيع الساعة 2 بالليل تبع اليوم اللي قبله.')}</div>
+        <div className="font-bold">{t('ساعة التجربة')}</div>
+        <div className="text-xs text-dim">{t('السيستم ليه ساعة لوحده تقدر تقدّمها. اليوم التجاري بيبدأ الساعة 4 الفجر بتوقيت القاهرة: البيع الساعة 2 بالليل بيتحسب على اليوم اللي قبله.')}</div>
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div className="surface-1 rounded-lg p-2"><div className="text-dim">{t('القاهرة')}</div><div className="num font-bold text-lg">{localTime(now)}</div></div>
           <div className="surface-1 rounded-lg p-2"><div className="text-dim">{t('اليوم التجاري')}</div><div className="num font-bold text-lg">{businessDate(now)}</div></div>
@@ -30,9 +30,9 @@ export function ClockControl() {
           <Button size="sm" onClick={() => go(() => clock.advance(15 * 60_000))}>+15 {t('دقيقة')}</Button>
           <Button size="sm" onClick={() => go(() => clock.advance(60 * 60_000))}>+1 {t('ساعة')}</Button>
           <Button size="sm" onClick={() => go(() => clock.advance(12 * 3_600_000))}>+12 {t('ساعة')}</Button>
-          <Button size="sm" onClick={() => go(() => clock.setCairoTime(3, 55))}>03:55</Button>
-          <Button size="sm" onClick={() => go(() => clock.setCairoTime(4, 5))}>04:05</Button>
-          <Button size="sm" onClick={() => go(() => clock.setCairoTime(2, 0))}>02:00</Button>
+          <Button size="sm" title={t('قبل بداية اليوم الجديد بـ 5 دقايق')} onClick={() => go(() => clock.setCairoTime(3, 55))}>03:55</Button>
+          <Button size="sm" title={t('بعد بداية اليوم الجديد بـ 5 دقايق')} onClick={() => go(() => clock.setCairoTime(4, 5))}>04:05</Button>
+          <Button size="sm" title={t('2 بالليل — لسه على اليوم اللي فات')} onClick={() => go(() => clock.setCairoTime(2, 0))}>02:00</Button>
           <Button size="sm" onClick={() => go(() => clock.setCairoTime(16, 0))}>{t('هابي أور')} 16:00</Button>
           <Button size="sm" onClick={() => go(() => clock.setCairoTime(13, 0))}>13:00</Button>
           <Button size="sm" onClick={() => go(() => clock.advance(86_400_000))}>+1 {t('يوم')}</Button>

@@ -1,44 +1,117 @@
-// C1 Floor plan: areas and tables; free, occupied, inactive; guests, time seated, server; joined tables (direction).
-import React, { useState } from 'react';
-import { Users, Clock, Plus, ArrowRightLeft, Link2, Unlink, DoorClosed, Wallet, ClipboardList, UserCog, CalendarClock, Minus } from 'lucide-react';
+// C1 Floor: the real floor plan per section (main hall, terrace, upper floor) with live table states —
+// free, occupied (guests, time seated, server, check total), needs cleaning, reserved, inactive — and a list view.
+// Joined tables (direction), table turn (clean after the visit closes; TableTurnPolicy).
+import React, { useMemo, useState } from 'react';
+import { Users, Clock, Plus, ArrowRightLeft, Link2, Unlink, DoorClosed, Wallet, ClipboardList, UserCog, CalendarClock, Minus, Sparkles, Map as MapIcon, LayoutGrid, Brush } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../app/hooks';
-import { Section, StateBadge, Pill, Modal, Button, Field, Select, Banner, Money, Empty, Tabs, KV } from '../ui';
+import { Section, StateBadge, Pill, Modal, Button, Field, Select, Banner, Money, Empty, Tabs, KV, useNow } from '../ui';
 import { t, L } from '../i18n';
 import { cn, money, time } from '../lib/format';
 import { StatusPill } from './order/CheckPanel';
+import { FloorCanvas, Seats, shapeClass } from './ops/FloorCanvas';
+
+const AREA_AR: Record<string, string> = { Hall: 'الصالة الرئيسية', Terrace: 'التراس' };
+type TState = 'FREE' | 'OCCUPIED' | 'DIRTY' | 'RESERVED' | 'INACTIVE';
+const stateOf = (tb: any): TState => (tb.occupancy ? 'OCCUPIED' : !tb.active ? 'INACTIVE' : tb.turn?.state === 'DIRTY' ? 'DIRTY' : tb.reservation ? 'RESERVED' : 'FREE');
+const LONG_SEATED = 90; // minutes: a long visit is highlighted for the floor manager
 
 export default function Floor() {
-  const { kind } = useDev();
+  const { kind, can } = useDev();
+  useNow(30000);
   const tables = useQuery<any>('Table.List', { query: {} });
-  const visits = useQuery<any>('TableVisit.List', { query: { state: 'OPEN' } });
-  const [area, setArea] = useState<string>('ALL');
+  const floors = useQuery<any>('Floor.List');
+  const [floorId, setFloorId] = useState<string>('');
+  const [view, setView] = useState<'map' | 'list'>('map');
   const [sel, setSel] = useState<any>(null);
   const items: any[] = tables.data?.items ?? [];
-  const areas = [...new Set(items.map((x) => x.area || '—'))];
-  const shown = items.filter((x) => area === 'ALL' || (x.area || '—') === area);
-  const occupied = items.filter((x) => x.occupancy).length;
+  const fl: any[] = floors.data?.items ?? [];
+  const current = fl.find((f) => f.id === floorId) ?? fl[0];
+  const onFloor = (tb: any) => !current || tb.floorId === current.id;
+  const shown = view === 'map' ? items.filter((tb) => tb.layout && onFloor(tb)) : items.filter((tb) => onFloor(tb) || !tb.floorId);
+  const count = (st: TState, list = items) => list.filter((x) => stateOf(x) === st).length;
+  const guests = items.reduce((a, x) => a + (x.occupancy?.primary ? x.occupancy.guestCount : 0), 0);
+  const open = (tb: any) => setSel(tb);
   return (
-    <div data-screen="C1">
-      <Section title={t('الصالة')} badge={<StateBadge ops={['Table.List', 'TableVisit.Open', 'TableVisit.Transfer', 'TableVisit.Close', 'TableVisit.List']} />} sub={`${occupied} / ${items.length} ${t('ترابيزة مشغولة')}${kind === 'CASH' ? ' · ' + t('اختار ترابيزة عشان تحصّل شيكاتها') : ''}`}
-        actions={<Tabs value={area} onChange={setArea} tabs={[{ id: 'ALL', label: t('الكل') }, ...areas.map((a) => ({ id: a, label: a === 'Hall' ? t('الصالة الرئيسية') : a === 'Terrace' ? t('التراس') : a }))]} />} />
-      {tables.error && <Banner tone="error">{tables.error.code}</Banner>}
-      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}>
-        {shown.map((tb) => <TableCard key={tb.id} tb={tb} onClick={() => setSel(tb)} />)}
+    <div data-screen="C1" className="space-y-3">
+      <Section title={t('الصالة')} badge={<StateBadge ops={['Table.List', 'Floor.List', 'TableVisit.Open', 'TableVisit.Transfer', 'TableVisit.Close', 'Table.MarkClean']} />}
+        sub={`${count('OCCUPIED')} / ${items.filter((x) => x.active).length} ${t('ترابيزة مشغولة')} · ${guests} ${t('ضيف')}${kind === 'CASH' ? ' · ' + t('اختار ترابيزة عشان تحصّل شيكاتها') : ''}`}
+        actions={<Tabs value={view} onChange={setView} tabs={[{ id: 'map', label: <span className="flex items-center gap-1.5"><MapIcon className="w-4 h-4" />{t('الخريطة')}</span> }, { id: 'list', label: <span className="flex items-center gap-1.5"><LayoutGrid className="w-4 h-4" />{t('قائمة')}</span> }]} />} />
+      <div className="flex items-center gap-2 flex-wrap">
+        {fl.length > 0 && <Tabs value={current?.id ?? ''} onChange={setFloorId} tabs={fl.map((f) => ({ id: f.id, label: <span data-fb={`floor-tab:${f.name.ar}`}>{L(f.name)} <span className="num text-xs opacity-70">{items.filter((x) => x.floorId === f.id && x.occupancy).length}/{items.filter((x) => x.floorId === f.id).length}</span></span> }))} />}
+        <div className="flex-1" />
+        <Legend c={{ FREE: count('FREE'), OCCUPIED: count('OCCUPIED'), DIRTY: count('DIRTY'), RESERVED: count('RESERVED') }} />
       </div>
-      {!items.length && !tables.loading && <Empty text={t('مفيش ترابيزات — ضيفها من "المحطات والتوجيه" في الباك أوفيس')} />}
-      {sel && (sel.occupancy ? <VisitSheet tableId={sel.id} visitId={sel.occupancy.visitId} onClose={() => setSel(null)} tables={items} /> : <OpenTable tb={sel} onClose={() => setSel(null)} />)}
+      {tables.error && <Banner tone="error">{tables.error.code}</Banner>}
+      {view === 'map' && current ? (
+        <FloorCanvas width={current.width} height={current.height} decor={current.decor ?? []} tables={shown.map((tb) => ({ id: tb.id, name: tb.name, ...tb.layout }))}
+          renderTable={(ct) => { const tb = items.find((x) => x.id === ct.id); return tb ? <MapTable tb={tb} onClick={() => open(tb)} /> : null; }} />
+      ) : (
+        <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}>
+          {shown.map((tb) => <TableCard key={tb.id} tb={tb} onClick={() => open(tb)} />)}
+        </div>
+      )}
+      {view === 'map' && !current && !floors.loading && <Empty text={t('مفيش خريطة للصالة لسه — المدير يرسمها من "خريطة الصالة" في الإعداد')} />}
+      {!items.length && !tables.loading && <Empty text={t('مفيش ترابيزات — ضيفها من "خريطة الصالة" في الإعداد')} />}
+      {view === 'map' && current && items.some((x) => x.floorId === current.id && x.layout?.auto) && can('table:upsert') && <div className="text-[11px] text-dim">{t('فيه ترابيزات لسه ما اتحطتش في مكانها على الخريطة (ظاهرة تحت). رتّبها من "خريطة الصالة".')}</div>}
+      {sel && (sel.occupancy ? <VisitSheet tableId={sel.id} visitId={sel.occupancy.visitId} onClose={() => setSel(null)} tables={items} />
+        : sel.turn?.state === 'DIRTY' && sel.active ? <CleanSheet tb={sel} onClose={() => setSel(null)} onOpen={() => setSel({ ...sel, turn: null })} />
+          : <OpenTable tb={sel} onClose={() => setSel(null)} />)}
     </div>
+  );
+}
+
+function Legend({ c }: { c: Record<string, number> }) {
+  const it = (cls: string, label: string, n: number) => <span className="flex items-center gap-1.5 text-xs text-soft"><span className={cn('w-3 h-3 rounded', cls)} />{label} <span className="num font-bold">{n}</span></span>;
+  return (
+    <div className="flex items-center gap-3 flex-wrap" data-fb="floor-legend">
+      {it('border-2 border-emerald-400/70 bg-emerald-500/10', t('فاضية'), c.FREE)}
+      {it('bg-gradient-to-br from-pink-500/60 to-rose-600/50', t('مشغولة'), c.OCCUPIED)}
+      {it('bg-[repeating-linear-gradient(45deg,rgba(245,158,11,.5)_0_3px,transparent_3px_6px)] border border-amber-400/60', t('محتاجة تنضيف'), c.DIRTY)}
+      {it('border-2 border-violet-400/70 bg-violet-500/10', t('محجوزة'), c.RESERVED)}
+    </div>
+  );
+}
+
+function MapTable({ tb, onClick }: { tb: any; onClick: () => void }) {
+  const st = stateOf(tb);
+  const o = tb.occupancy;
+  const shape = tb.layout?.shape ?? 'SQUARE';
+  const long = o && o.minutesSeated >= LONG_SEATED;
+  const small = (tb.layout?.w ?? 100) < 100;
+  return (
+    <button data-fb={`table:${tb.name}`} data-table-state={st} onClick={onClick} disabled={st === 'INACTIVE'}
+      className={cn('relative w-full h-full flex flex-col items-center justify-center text-center border-2 transition-all active:scale-[.97] p-1', shapeClass(shape),
+        st === 'OCCUPIED' ? 'bg-gradient-to-br from-pink-500/40 to-rose-600/30 border-pink-400/70 shadow-[0_0_24px_rgba(236,72,153,0.18)]' :
+          st === 'DIRTY' ? 'bg-[repeating-linear-gradient(45deg,rgba(245,158,11,.22)_0_8px,rgba(245,158,11,.08)_8px_16px)] border-amber-400/70' :
+            st === 'RESERVED' ? 'bg-violet-500/10 border-violet-400/70 hover:bg-violet-500/20' :
+              st === 'INACTIVE' ? 'opacity-40 border-dashed border-white/25' : 'bg-emerald-500/[0.07] border-emerald-400/50 hover:bg-emerald-500/15')}>
+      <Seats n={tb.layout?.seats ?? tb.capacity} shape={shape} />
+      <span className={cn('font-extrabold num leading-none', small ? 'text-lg' : 'text-2xl')}>{tb.name}</span>
+      {st === 'OCCUPIED' && (
+        <div className="text-[10px] leading-tight mt-0.5 space-y-0.5 w-full">
+          <div className="flex items-center justify-center gap-1"><Users className="w-3 h-3" />{o.guestCount}<span className={cn('flex items-center gap-0.5 num', long && 'text-amber-300 font-bold')}><Clock className="w-3 h-3" />{o.minutesSeated}{t('د')}</span></div>
+          {!small && <div className="truncate text-white/70">{o.serverName?.split(' — ')[0]}</div>}
+          {!small && o.primary && <div className="num font-bold">{money(o.payable, false)}</div>}
+          {!o.primary && <div className="text-violet-300">{t('منضمة')}</div>}
+        </div>
+      )}
+      {st === 'DIRTY' && <div className="text-[10px] text-amber-200 flex items-center gap-0.5 mt-0.5"><Brush className="w-3 h-3" />{small ? `${tb.turn.minutes}${t('د')}` : `${t('تنضيف')} · ${tb.turn.minutes}${t('د')}`}</div>}
+      {st === 'RESERVED' && <div className="text-[10px] text-violet-200 flex items-center gap-0.5 mt-0.5"><CalendarClock className="w-3 h-3" />{time(tb.reservation.at)}</div>}
+      {st === 'FREE' && !small && <div className="text-[10px] text-emerald-300/80 mt-0.5 flex items-center gap-0.5"><Users className="w-3 h-3" />{tb.capacity}</div>}
+    </button>
   );
 }
 
 function TableCard({ tb, onClick }: { tb: any; onClick: () => void }) {
   const o = tb.occupancy;
+  const st = stateOf(tb);
   return (
-    <button data-fb={`table:${tb.name}`} onClick={onClick} disabled={!tb.active && !o} className={cn('relative rounded-2xl p-3 text-start border transition-all active:scale-[.97] min-h-[120px] flex flex-col', !tb.active ? 'opacity-40 border-dashed border-white/20 surface-1' : o ? 'bg-gradient-to-br from-pink-500/30 to-rose-600/20 border-pink-400/50 shadow-[0_0_24px_rgba(236,72,153,0.15)]' : 'surface-1 border-emerald-400/30 hover:border-emerald-400/70')}>
+    <button data-fb={`table:${tb.name}`} data-table-state={st} onClick={onClick} disabled={!tb.active && !o} className={cn('relative rounded-2xl p-3 text-start border transition-all active:scale-[.97] min-h-[120px] flex flex-col', !tb.active ? 'opacity-40 border-dashed border-white/20 surface-1' : o ? 'bg-gradient-to-br from-pink-500/30 to-rose-600/20 border-pink-400/50 shadow-[0_0_24px_rgba(236,72,153,0.15)]' : st === 'DIRTY' ? 'surface-1 border-amber-400/60 bg-[repeating-linear-gradient(45deg,rgba(245,158,11,.12)_0_8px,transparent_8px_16px)]' : 'surface-1 border-emerald-400/30 hover:border-emerald-400/70')}>
       <div className="flex items-center justify-between">
         <span className="text-2xl font-extrabold num">{tb.name}</span>
         <span className="text-[10px] text-dim flex items-center gap-1"><Users className="w-3 h-3" />{tb.capacity}</span>
       </div>
+      <div className="text-[10px] text-dim truncate">{tb.floorName ? L(tb.floorName) : AREA_AR[tb.area] ?? tb.area}</div>
       {!tb.active ? <Pill tone="neutral" className="mt-auto self-start">{t('موقوفة')}</Pill> : o ? (
         <div className="mt-auto space-y-0.5 text-xs">
           <div className="flex items-center gap-1"><Users className="w-3 h-3" />{o.guestCount} · <Clock className="w-3 h-3" /><span className="num">{o.minutesSeated}</span>{t('د')}</div>
@@ -46,10 +119,26 @@ function TableCard({ tb, onClick }: { tb: any; onClick: () => void }) {
           <div className="flex items-center justify-between"><span>{o.checks} {t('شيك')}</span><span className="num font-bold">{money(o.payable, false)}</span></div>
           {!o.primary && <Pill tone="violet">{t('منضمة')}</Pill>}
         </div>
+      ) : st === 'DIRTY' ? (
+        <Pill tone="warning" className="mt-auto self-start"><Brush className="w-3 h-3" />{t('محتاجة تنضيف')} · {tb.turn.minutes}{t('د')}</Pill>
       ) : (
         <div className="mt-auto flex items-center justify-between"><Pill tone="success">{t('فاضية')}</Pill>{tb.reservation && <Pill tone="violet"><CalendarClock className="w-3 h-3" />{time(tb.reservation.at)}</Pill>}</div>
       )}
     </button>
+  );
+}
+
+function CleanSheet({ tb, onClose, onOpen }: { tb: any; onClose: () => void; onOpen: () => void }) {
+  const { run, busy } = useCommand();
+  const clean = async () => { if (await run('Table.MarkClean', { params: { tableId: tb.id }, body: { state: 'CLEAN' } }, { success: t('ترابيزة {n} نضيفة وجاهزة', { n: tb.name }) })) onClose(); };
+  return (
+    <Modal open onClose={onClose} title={<span className="flex items-center gap-2"><Brush className="w-5 h-5 text-[var(--warning)]" />{t('ترابيزة')} {tb.name} — {t('محتاجة تنضيف')}</span>} badge={<StateBadge ops={['Table.MarkClean']} />}
+      footer={<><Button variant="ghost" onClick={onOpen}>{t('اقعد ضيوف عليها على طول')}</Button><Button variant="success" loading={busy} onClick={clean} data-fb="table-mark-clean"><Sparkles className="w-4 h-4" />{t('اتنضفت — جاهزة')}</Button></>}>
+      <div className="space-y-3">
+        <KV rows={[[t('من'), `${time(tb.turn.since)} (${tb.turn.minutes} ${t('دقيقة')})`], [t('السعة'), tb.capacity], [t('المكان'), tb.floorName ? L(tb.floorName) : AREA_AR[tb.area] ?? tb.area]]} />
+        <Banner tone="info">{t('الترابيزة بتتعلم "محتاجة تنضيف" أول ما القعدة تتقفل. لما الرانر ينضفها يدوس "اتنضفت" فترجع خضرا للويترز.')}</Banner>
+      </div>
+    </Modal>
   );
 }
 
@@ -69,7 +158,7 @@ function OpenTable({ tb, onClose }: { tb: any; onClose: () => void }) {
   return (
     <Modal open onClose={onClose} title={`${t('ترابيزة')} ${tb.name}`} badge={<StateBadge ops={['TableVisit.Open']} />} footer={<><Button variant="ghost" onClick={onClose}>{t('رجوع')}</Button><Button loading={busy} onClick={() => open(false)} data-fb="open-table">{t('افتح الترابيزة')}</Button><Button variant="primary" loading={busy} onClick={() => open(true)}>{t('افتح + شيك جديد')}</Button></>}>
       <div className="space-y-4">
-        <KV rows={[[t('المنطقة'), tb.area || '—'], [t('السعة'), tb.capacity]]} />
+        <KV rows={[[t('المكان'), tb.floorName ? L(tb.floorName) : AREA_AR[tb.area] ?? (tb.area || '—')], [t('السعة'), tb.capacity]]} />
         {tb.reservation && <Banner tone="info">{t('محجوزة لـ')} {tb.reservation.customer} · {time(tb.reservation.at)} · {tb.reservation.partySize} {t('أفراد')}</Banner>}
         <Field label={t('عدد الضيوف')}>
           <div className="flex items-center gap-3">
@@ -78,7 +167,7 @@ function OpenTable({ tb, onClose }: { tb: any; onClose: () => void }) {
             <Button size="lg" onClick={() => setGuests(guests + 1)}><Plus className="w-4 h-4" /></Button>
           </div>
         </Field>
-        <div className="text-[11px] text-dim">{t('ترابيزة واحدة = قعدة واحدة مفتوحة. فتحها مرتين بيترفض TABLE_OCCUPIED.')}</div>
+        <div className="flex items-center justify-between gap-2"><div className="text-[11px] text-dim">{t('ترابيزة واحدة = قعدة واحدة مفتوحة.')}</div><Button size="sm" variant="ghost" onClick={async () => { if (await run('Table.MarkClean', { params: { tableId: tb.id }, body: { state: 'DIRTY' } }, { success: t('اتعلمت محتاجة تنضيف') })) onClose(); }} data-fb="table-mark-dirty"><Brush className="w-3.5 h-3.5" />{t('محتاجة تنضيف')}</Button></div>
       </div>
     </Modal>
   );
@@ -129,7 +218,7 @@ function VisitSheet({ tableId, visitId, onClose, tables }: { tableId: string; vi
             </div>
           ))}
         </div>
-        <div className="text-[11px] text-dim">{t('الترابيزة مينفعش تتقفل وعليها شيك مفتوح (TABLE_HAS_OPEN_CHECKS). مع VisitAutoClosePolicy ON_LAST_CHECK_COMPLETED بتفضى لوحدها لما آخر شيك يخلص.')}</div>
+        <div className="text-[11px] text-dim">{t('الترابيزة مينفعش تتقفل وعليها شيك مفتوح. لما تتقفل بتتعلم "محتاجة تنضيف" لحد ما حد ينضفها.')}</div>
       </div>
     </Modal>
   );

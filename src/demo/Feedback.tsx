@@ -7,7 +7,23 @@ import { Modal, Button, Field, Input, Select, Textarea, Pill, Empty, toast } fro
 import { POLICIES } from '../mock/policyRegistry';
 import { demo } from '../mock/demo';
 import { clock } from '../mock/clock';
-import { t } from '../i18n';
+import { t, L } from '../i18n';
+import { SCREENS } from '../app/registry';
+import { Tech, useTech } from '../app/tech';
+import { deviceName } from './people';
+
+// Plain names for the screen tags the feedback layer reads from the DOM (data-screen).
+const DEMO_SCREENS: Record<string, string> = { POLICY_PANEL: 'إعدادات المطعم', WALKTHROUGH: 'رحلات بالخطوة', SCENARIOS: 'سيناريوهات الفشل', FEEDBACK: 'الملاحظات', SITUATIONS: 'المواقف', A1: 'شاشة الدخول', C5: 'موافقة المدير', WELCOME: 'شاشة الترحيب', DEMO: 'شريط التجربة', APP: 'التطبيق' };
+export function screenName(code: string): string {
+  if (DEMO_SCREENS[code]) return t(DEMO_SCREENS[code]);
+  const s = SCREENS.find((x) => x.code === code || x.id === code);
+  return s ? L({ ar: s.title, en: s.titleEn }) : code;
+}
+/** The visible text part of an element descriptor ("tag › button: \"ابعت\"" → "ابعت"). */
+export function elementText(el: string): string {
+  const m = el.match(/"([^"]+)"/);
+  return m ? m[1] : el.split(' › ').at(-1)?.replace(/^[a-z0-9]+:?\s*/, '') || el;
+}
 
 export interface FeedbackItem { id: string; screen: string; element: string; type: 'wrong' | 'missing' | 'unclear' | 'extra'; text: string; expert: string; role: string; device?: string; policy_snapshot: Record<string, unknown>; at: string; mockClock?: string }
 const KEY = 'nerdpos.feedback.v1';
@@ -40,19 +56,22 @@ function describe(el: HTMLElement): string {
 export function FeedbackLayer() {
   const s = useFeedback();
   const [target, setTarget] = useState<{ screen: string; element: string; device: string } | null>(null);
+  // The comment box is a portaled modal (outside the [data-fb-dialog] wrapper): while it is open, clicks inside any dialog belong to it.
+  const open = React.useRef(false);
+  open.current = !!target;
   useEffect(() => {
     if (!s.mode) return;
     let last: HTMLElement | null = null;
     const over = (e: MouseEvent) => {
       const el = e.target as HTMLElement;
-      if (el.closest('[data-chrome]') || el.closest('[data-fb-dialog]')) return;
+      if (el.closest('[data-chrome]') || el.closest('[data-fb-dialog]') || (open.current && el.closest('[role="dialog"]'))) return;
       last?.removeAttribute('data-fb-hover');
       el.setAttribute('data-fb-hover', '');
       last = el;
     };
     const click = (e: MouseEvent) => {
       const el = e.target as HTMLElement;
-      if (el.closest('[data-chrome]') || el.closest('[data-fb-dialog]')) return;
+      if (el.closest('[data-chrome]') || el.closest('[data-fb-dialog]') || (open.current && el.closest('[role="dialog"]'))) return;
       e.preventDefault();
       e.stopPropagation();
       const screen = (el.closest('[data-screen]') as HTMLElement | null)?.dataset.screen ?? (el.closest('[data-demo-chrome]') ? 'DEMO' : 'APP');
@@ -73,6 +92,7 @@ function CommentBox({ target, onClose }: { target: { screen: string; element: st
   const [expert, setExpert] = useState(saved.expert ?? '');
   const [role, setRole] = useState(saved.role ?? '');
   const [element, setElement] = useState(target.element);
+  const tech = useTech();
   const save = () => {
     try { localStorage.setItem(PKEY, JSON.stringify({ expert, role })); } catch { /* ignore */ }
     feedback.add({ id: `fb_${Date.now()}`, screen: target.screen, element, type, text, expert, role, device: target.device, policy_snapshot: policySnapshot(), at: new Date().toISOString(), mockClock: clock.iso() });
@@ -83,17 +103,17 @@ function CommentBox({ target, onClose }: { target: { screen: string; element: st
     <div data-fb-dialog>
       <Modal open onClose={onClose} title={<span className="flex items-center gap-2"><MessageSquarePlus className="w-5 h-5 text-pink-400" />{t('ملاحظة جديدة')}</span>} footer={<><Button variant="ghost" onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" disabled={!text.trim()} onClick={save}>{t('حفظ')}</Button></>}>
         <div className="space-y-3">
-          <div className="flex gap-2 flex-wrap"><Pill tone="primary">{t('الشاشة')}: {target.screen}</Pill>{target.device && <Pill tone="neutral">{t('الجهاز')}: {target.device}</Pill>}</div>
-          <Field label={t('العنصر')}><Input value={element} onChange={(e) => setElement(e.target.value)} /></Field>
-          <Field label={t('النوع')}>
+          <div className="flex gap-2 flex-wrap"><Pill tone="primary">{t('الشاشة')}: {screenName(target.screen)}</Pill>{target.device && <Pill tone="neutral">{t('الجهاز')}: {deviceName(target.device)}</Pill>}</div>
+          {tech ? <Field label={t('العنصر (للفريق)')}><Input value={element} onChange={(e) => setElement(e.target.value)} dir="ltr" /></Field> : <div className="text-sm"><span className="text-dim text-xs">{t('على')}: </span><b>«{elementText(element)}»</b></div>}
+          <Field label={t('نوعها إيه')}>
             <div className="flex gap-1 flex-wrap">{(['wrong', 'missing', 'unclear', 'extra'] as const).map((k) => <Button key={k} size="sm" variant={type === k ? 'primary' : 'secondary'} onClick={() => setType(k)}>{{ wrong: t('غلط'), missing: t('ناقص'), unclear: t('مش واضح'), extra: t('زيادة') }[k]}</Button>)}</div>
           </Field>
-          <Field label={t('الملاحظة')}><Textarea value={text} onChange={(e) => setText(e.target.value)} autoFocus placeholder={t('اكتب اللي شايفه…')} /></Field>
+          <Field label={t('ملاحظتك')}><Textarea value={text} onChange={(e) => setText(e.target.value)} autoFocus placeholder={t('اكتب اللي شايفه… مثلًا: الزرار ده المفروض يطلب موافقة مدير')} /></Field>
           <div className="grid grid-cols-2 gap-2">
             <Field label={t('اسمك')}><Input value={expert} onChange={(e) => setExpert(e.target.value)} /></Field>
             <Field label={t('دورك')}><Input value={role} onChange={(e) => setRole(e.target.value)} placeholder={t('مثلًا: مدير مطعم، محاسب ضرايب')} /></Field>
           </div>
-          <div className="text-[11px] text-dim">{t('هيتسجل معاها لقطة من كل الإعدادات الحالية (policy_snapshot).')}</div>
+          <div className="text-[11px] text-dim">{t('هنحفظ معاها الشاشة والجهاز وإعدادات المطعم وقتها، عشان الفريق يفهم السياق.')}</div>
         </div>
       </Modal>
     </div>
@@ -106,19 +126,19 @@ export function FeedbackPanel() {
   const items = s.items.filter((i) => !filter || i.type === filter);
   const json = () => JSON.stringify(s.items.map(({ id, device, mockClock, ...rest }) => ({ ...rest, device, mockClock })), null, 2);
   const download = () => {
-    saveFile('feedback.json', json(), 'application/json').then((ok) => ok && toast('success', t('feedback.json اتحفظ'))).catch(() => copy());
+    saveFile('feedback.json', json(), 'application/json').then((ok) => ok && toast('success', t('ملف الملاحظات اتحفظ'))).catch(() => copy());
   };
-  const copy = async () => { try { await navigator.clipboard.writeText(json()); toast('success', t('اتنسخ JSON')); } catch { toast('error', t('النسخ مش متاح في المتصفح ده')); } };
+  const copy = async () => { try { await navigator.clipboard.writeText(json()); toast('success', t('الملاحظات اتنسخت — الصقها في رسالة')); } catch { toast('error', t('النسخ مش متاح في المتصفح ده')); } };
   const importFile = (f: File) => f.text().then((txt) => { const arr = JSON.parse(txt); if (Array.isArray(arr)) { feedback.replace([...arr.map((x: any, i: number) => ({ id: `fb_i_${i}_${Date.now()}`, ...x })), ...s.items]); toast('success', t('اتضافت {n} ملاحظة', { n: arr.length })); } }).catch(() => toast('error', t('ملف مش صالح')));
   return (
     <div className="flex flex-col h-full" data-screen="FEEDBACK">
       <div className="px-4 py-3 border-b line">
-        <div className="font-bold">{t('الملاحظات')} <span className="text-dim font-normal">({s.items.length})</span></div>
-        <div className="text-[11px] text-dim">{t('شغّل "وضع الملاحظات" واضغط على أي حاجة في الشاشة.')}</div>
+        <div className="font-bold">{t('ملاحظاتي')} <span className="text-dim font-normal">({s.items.length})</span></div>
+        <div className="text-[11px] text-dim">{t('شغّل «ملاحظة» من الشريط اللي فوق واضغط على أي حاجة في الشاشة. لما تخلص، نزّل الملف وابعته للفريق.')}</div>
         <div className="flex gap-2 mt-2 flex-wrap">
-          <Button size="sm" variant="primary" onClick={download} disabled={!s.items.length}><Download className="w-4 h-4" />feedback.json</Button>
+          <Button size="sm" variant="primary" onClick={download} disabled={!s.items.length}><Download className="w-4 h-4" />{t('نزّل الملاحظات')}<Tech><span className="num text-[10px] opacity-70">feedback.json</span></Tech></Button>
           <Button size="sm" onClick={copy} disabled={!s.items.length}><Copy className="w-4 h-4" />{t('نسخ')}</Button>
-          <label className="h-8 px-3 rounded-xl surface-2 border border-[var(--glass-border)] text-xs flex items-center gap-1 cursor-pointer"><Upload className="w-4 h-4" />{t('استيراد')}<input type="file" accept="application/json" className="hidden" onChange={(e) => e.target.files?.[0] && importFile(e.target.files[0])} /></label>
+          <label className="h-8 px-3 rounded-xl surface-2 border border-[var(--glass-border)] text-xs flex items-center gap-1 cursor-pointer"><Upload className="w-4 h-4" />{t('افتح ملف ملاحظات')}<input type="file" accept="application/json" className="hidden" onChange={(e) => e.target.files?.[0] && importFile(e.target.files[0])} /></label>
           <Select value={filter} onChange={(e) => setFilter(e.target.value)} options={[{ value: '', label: t('الكل') }, { value: 'wrong', label: t('غلط') }, { value: 'missing', label: t('ناقص') }, { value: 'unclear', label: t('مش واضح') }, { value: 'extra', label: t('زيادة') }]} className="max-w-[120px] !py-1 text-xs" />
         </div>
       </div>
@@ -126,10 +146,11 @@ export function FeedbackPanel() {
         {items.length === 0 && <Empty text={t('مفيش ملاحظات لسه')} />}
         {items.map((i) => (
           <div key={i.id} className="rounded-xl surface-1 border line p-3 text-sm space-y-1">
-            <div className="flex items-center justify-between gap-2"><div className="flex gap-1 flex-wrap"><Pill tone={i.type === 'wrong' ? 'error' : i.type === 'missing' ? 'warning' : i.type === 'unclear' ? 'info' : 'neutral'}>{{ wrong: t('غلط'), missing: t('ناقص'), unclear: t('مش واضح'), extra: t('زيادة') }[i.type]}</Pill><Pill tone="primary">{i.screen}</Pill></div><button onClick={() => feedback.remove(i.id)} className="text-dim hover:text-[var(--error)]"><Trash2 className="w-4 h-4" /></button></div>
-            <div className="text-[11px] text-dim break-words">{i.element}</div>
+            <div className="flex items-center justify-between gap-2"><div className="flex gap-1 flex-wrap"><Pill tone={i.type === 'wrong' ? 'error' : i.type === 'missing' ? 'warning' : i.type === 'unclear' ? 'info' : 'neutral'}>{{ wrong: t('غلط'), missing: t('ناقص'), unclear: t('مش واضح'), extra: t('زيادة') }[i.type]}</Pill><Pill tone="primary">{screenName(i.screen)}</Pill></div><button onClick={() => feedback.remove(i.id)} className="text-dim hover:text-[var(--error)]"><Trash2 className="w-4 h-4" /></button></div>
+            <div className="text-[11px] text-dim break-words">{t('على')}: «{elementText(i.element)}»{i.device ? ` · ${deviceName(i.device)}` : ''}</div>
+            <Tech><div className="text-[10px] text-dim break-words num" dir="ltr">{i.element}</div></Tech>
             <div>{i.text}</div>
-            <div className="text-[11px] text-dim">{i.expert}{i.role ? ` · ${i.role}` : ''} · {new Date(i.at).toLocaleString()}</div>
+            <div className="text-[11px] text-dim">{i.expert}{i.role ? ` · ${i.role}` : ''} · {new Date(i.at).toLocaleString('ar-EG-u-nu-latn')}</div>
           </div>
         ))}
       </div>

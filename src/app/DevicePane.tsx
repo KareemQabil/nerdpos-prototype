@@ -13,6 +13,11 @@ import { t, L, useLang } from '../i18n';
 import { cn, money, dateTime } from '../lib/format';
 import { clock, businessDate, localTime } from '../mock/clock';
 import { APPROVAL_ACTIONS } from '../mock/policyRegistry';
+import { Tech } from './tech';
+import { personName, deviceName, roleLabel, branchLabel } from '../demo/people'; // plain names (demo layer)
+import { capabilityHiding, pendingApprovalCount } from '../screens/ops/capabilities-ui'; // operations & system area
+import { OfflineBar } from '../screens/ops/OfflineBar';
+import { RemoteApproval } from '../screens/ops/RemoteApproval';
 
 export function DevicePane({ id, compact }: { id: string; compact?: boolean }) {
   const ds = useDevicesState();
@@ -43,6 +48,7 @@ function Authed({ compact }: { compact?: boolean }) {
         <Sidebar compact={compact} />
         <div className="flex-1 flex flex-col min-w-0">
           <Header />
+          <OfflineBar />
           <main className="flex-1 overflow-auto p-4 relative" data-screen={screenById.get(ctx.screen)?.code ?? ctx.screen}>
             <ScreenHost />
           </main>
@@ -55,23 +61,26 @@ function Authed({ compact }: { compact?: boolean }) {
 }
 
 function ScreenHost() {
-  const { screen, kind, can } = useDev();
-  const def = screenById.get(screen) ?? visibleScreens(kind as Kind, can)[0];
+  const { screen, kind, can, auth, terminal } = useDev();
+  const def = screenById.get(screen) ?? visibleScreens(kind as Kind, can, auth.branchId ?? terminal?.branchId ?? null)[0];
   if (!def) return <Empty text={t('مفيش شاشات متاحة للمستخدم ده على الجهاز ده')} />;
   const allowed = def.perm ? can(def.perm) : def.anyPerm ? def.anyPerm.some(can) : true;
-  if (!allowed) return <Banner tone="error">{t('مالكش صلاحية على الشاشة دي')} <span className="num text-xs">({def.perm ?? def.anyPerm?.join(' | ')})</span></Banner>;
+  if (!allowed) return <Banner tone="error">{t('الحساب ده مش مسموح له يفتح الشاشة دي. ادخل بحساب تاني (مثلًا مدير).')}<Tech> <span className="num text-xs">({def.perm ?? def.anyPerm?.join(' | ')})</span></Tech></Banner>;
+  const off = capabilityHiding(def, auth.branchId ?? terminal?.branchId ?? null);
+  if (off) return <Banner tone="warning"><b>{t('الإمكانية دي مقفولة')}: {off.title}</b><div className="text-xs mt-1">{off.offEffect} {t('تتفتح من "إمكانيات النظام".')}</div></Banner>;
   const C = def.component;
   return <Suspense fallback={<Spinner />}><C key={screen} /></Suspense>;
 }
 
-export function visibleScreens(kind: Kind, can: (p: string) => boolean) {
-  return SCREENS.filter((s) => !s.hidden && s.kinds.includes(kind) && (s.perm ? can(s.perm) : s.anyPerm ? s.anyPerm.some(can) : true));
+export function visibleScreens(kind: Kind, can: (p: string) => boolean, branchId: string | null = null) {
+  return SCREENS.filter((s) => !s.hidden && s.kinds.includes(kind) && (s.perm ? can(s.perm) : s.anyPerm ? s.anyPerm.some(can) : true) && !capabilityHiding(s, branchId));
 }
 
 function Sidebar({ compact }: { compact?: boolean }) {
   const { kind, can, screen, nav, me, id } = useDev();
   const lang = useLang();
-  const items = visibleScreens(kind as Kind, can);
+  const items = visibleScreens(kind as Kind, can, me?.branchId ?? devices.auth(id).branchId ?? null);
+  const approvalsWaiting = pendingApprovalCount(me?.branchId ?? devices.auth(id).branchId ?? null);
   const [hover, setHover] = useState<string | null>(null);
   const alerts = store.db.alerts.filter((a) => !a.ack).length;
   return (
@@ -88,11 +97,12 @@ function Sidebar({ compact }: { compact?: boolean }) {
                 <span className="text-[9px] font-bold leading-tight text-center px-0.5 line-clamp-2">{lang === 'ar' ? s.title : s.titleEn}</span>
                 {active && <span className="absolute end-0 top-1/2 -translate-y-1/2 w-1 h-7 bg-cyan-400 rounded-s-full" />}
                 {s.id === 'ereceipts' && alerts > 0 && <span className="absolute -top-1 -end-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">{alerts}</span>}
+                {s.id === 'approvals-inbox' && approvalsWaiting > 0 && <span className="absolute -top-1 -end-1 min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-black text-[10px] font-bold flex items-center justify-center animate-pulse">{approvalsWaiting}</span>}
               </button>
               {hover === s.id && !compact && (
                 <div className="absolute end-full me-2 top-1/2 -translate-y-1/2 z-50 pointer-events-none">
                   <div className="bg-slate-900 border border-white/10 rounded-lg px-3 py-2 shadow-xl whitespace-nowrap text-white">
-                    <p className="text-xs font-bold">{s.title} <span className="text-white/40">· {s.code}</span></p>
+                    <p className="text-xs font-bold">{s.title}<Tech> <span className="text-white/40">· {s.code}</span></Tech></p>
                     <p className="text-[10px] text-white/50">{s.titleEn}</p>
                   </div>
                 </div>
@@ -104,7 +114,7 @@ function Sidebar({ compact }: { compact?: boolean }) {
       <div className="border-t border-white/[0.08] p-1.5 space-y-1.5">
         <div className="flex flex-col items-center">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 border-2 border-cyan-400 flex items-center justify-center text-slate-900 font-bold">{(me?.user?.displayName ?? '?').replace('Demo ', '').charAt(0)}</div>
-          <span className="text-[8px] text-white/50 mt-1 truncate max-w-full">{me?.user?.username}</span>
+          <span className="text-[8px] text-white/50 mt-1 truncate max-w-full">{personName(me?.user?.username, me?.user?.displayName)}</span>
         </div>
         <button data-fb="logout" title={t('خروج')} onClick={async () => { try { await call(devices.auth(id), 'Auth.Logout', { body: {} }); } catch { /* ignore */ } devices.logout(id); }} className="w-full h-10 rounded-lg flex items-center justify-center bg-red-500/10 border border-red-500/50 text-red-400 hover:bg-red-500/20"><LogOut className="w-4 h-4" /></button>
       </div>
@@ -112,6 +122,7 @@ function Sidebar({ compact }: { compact?: boolean }) {
   );
 }
 
+const dayName = (bd: string) => { try { return new Date(bd + 'T12:00:00Z').toLocaleDateString(L({ ar: 'ar-EG-u-nu-latn', en: 'en-GB' }), { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }); } catch { return bd; } };
 function Header() {
   const { me, terminal, auth, id, nav } = useDev();
   useNow(15000);
@@ -125,24 +136,29 @@ function Header() {
       <div className="flex items-center gap-2 min-w-0">
         <Monitor className="w-4 h-4 text-[var(--primary)] shrink-0" />
         <div className="leading-tight min-w-0">
-          <div className="text-sm font-bold truncate">{me?.user?.displayName} <span className="text-dim font-normal">· {me?.user?.roleAssignments?.map((r: any) => r.roleName).join('، ')}</span></div>
-          <div className="text-[11px] text-dim truncate"><span className="num">{lbl.code}</span> · {terminal?.name ?? t('من غير جهاز')} · {branch?.name ?? '—'}</div>
+          <div className="text-sm font-bold truncate">{me?.user?.displayName}{!String(me?.user?.displayName ?? '').includes(' — ') && <span className="text-dim font-normal"> · {me?.user?.roleAssignments?.map((r: any) => roleLabel(r.roleName)).join('، ')}</span>}<Tech><span className="num text-[10px] text-dim font-normal ms-1">{me?.user?.username}</span></Tech></div>
+          <div className="text-[11px] text-dim truncate">{deviceName(id, terminal?.kind, terminal?.name)} · {branchLabel(branch) || t('من غير فرع')}<Tech> · <span className="num">{lbl.code}</span></Tech></div>
         </div>
       </div>
       <div className="flex-1" />
-      {terminal?.drawer && (session.data ? <Pill tone="success" title={session.data.id}>{t('وردية مفتوحة')} · {store.db.users.find((u) => u.id === session.data.userId)?.displayName}</Pill> : <button onClick={() => nav('shift')}><Pill tone="warning">{t('مفيش وردية — افتح وردية')}</Pill></button>)}
+      {terminal?.drawer && (session.data ? <Pill tone="success" title={t('الوردية المفتوحة على الجهاز ده')}>{t('الوردية مفتوحة')} · {(() => { const u = store.db.users.find((x) => x.id === session.data.userId); return personName(u?.username, u?.displayName); })()}</Pill> : <button onClick={() => nav('shift')} title={t('اضغط عشان تفتح وردية')}><Pill tone="warning">{t('مفيش وردية مفتوحة — افتح وردية')}</Pill></button>)}
       {terminal && !terminal.drawer && <Pill tone="neutral">{t('جهاز من غير درج')}</Pill>}
-      <Pill tone="primary" title={t('اليوم التجاري من السيرفر (Africa/Cairo، بداية اليوم 04:00)')}>{t('اليوم التجاري')} <span className="num">{bd}</span></Pill>
+      <Pill tone="primary" title={t('اليوم التجاري بيبدأ الساعة 4 الفجر بتوقيت القاهرة — البيع بعد نص الليل بيتحسب على اليوم اللي قبله')}>{t('اليوم التجاري')} <span>{dayName(bd)}</span><Tech><span className="num ms-1">{bd}</span></Tech></Pill>
       <span className="num text-sm text-soft">{localTime(clock.now(), branch?.timezone)}</span>
     </header>
   );
 }
 
 // ───────── A1 login and PIN
+// Plain wording for demo users: "اختار اسمك", device and branch names, personas; usernames/codes only in <Tech>.
+const FITS: Record<string, string[]> = { CASH: ['cashier', 'manager'], FLOOR: ['waiter'], KDS: ['chef'], ADMIN: ['manager', 'owner'], BO: ['owner', 'bootstrap', 'manager'] };
+const fitsDevice = (kind: string, roles: string[]) => roles.some((r) => (FITS[kind] ?? []).some((k) => r.toLowerCase().includes(k)));
 function LoginScreen() {
   const { id, auth, terminal } = useDev();
   const lang = useLang();
   const users = demo.directory(terminal?.id ?? null);
+  const kind = terminal?.kind ?? 'BO';
+  const sorted = [...users].sort((a, b) => Number(b.scoped) - Number(a.scoped) || Number(fitsDevice(kind, b.roles)) - Number(fitsDevice(kind, a.roles)));
   const [userId, setUserId] = useState<string | null>(null);
   const [pin, setPin] = useState('');
   const [err, setErr] = useState<{ text: string; code: string; details?: any } | null>(null);
@@ -150,6 +166,7 @@ function LoginScreen() {
   const branch = store.db.branches.find((b) => b.id === (terminal?.branchId ?? auth.branchId));
   const [boBranch, setBoBranch] = useState(auth.branchId ?? store.db.branches[0]?.id ?? '');
   const lbl = deviceLabel(id, lang);
+  const chosen = users.find((u) => u.id === userId);
   const submit = async (secret: string) => {
     if (!userId) return;
     setBusy(true); setErr(null);
@@ -157,7 +174,7 @@ function LoginScreen() {
       const a = { ...auth, branchId: terminal ? terminal.branchId : boBranch || null };
       const r = await call(a, 'Auth.Login', { body: { method: 'PIN', userId, secret } });
       devices.update(id, { token: r.data.token, userName: r.data.user.displayName, branchId: r.data.branchId ?? a.branchId });
-      toast('success', t('أهلًا {name}', { name: r.data.user.displayName }), `Auth.Login 200 · ${lbl.code}`, lbl.short);
+      toast('success', t('أهلًا يا {name}', { name: personName(r.data.user.username, r.data.user.displayName).replace(/^ال/, '') }), `Auth.Login 200 · ${lbl.code}`, lbl.short);
     } catch (e) {
       const f = e as ApiFailure;
       setErr({ text: errorText(e), code: `${f.code} · ${f.status}`, details: f.details });
@@ -174,31 +191,40 @@ function LoginScreen() {
     <div className="flex-1 overflow-auto flex items-start justify-center p-6" data-screen="A1">
       <div className="w-full max-w-3xl grid md:grid-cols-2 gap-5">
         <div className="glass rounded-2xl p-5 space-y-4">
-          <div className="flex items-center justify-between"><h2 className="text-xl font-bold">{t('تسجيل الدخول')}</h2><StateBadge ops={['Auth.Login', 'Access.Me']} /></div>
-          <KV rows={[[t('الجهاز'), <span className="num">{lbl.code}</span>], [t('الاسم'), terminal?.name ?? t('باك أوفيس (من غير جهاز)')], [t('الفرع'), terminal ? branch?.name ?? '—' : <Select value={boBranch} onChange={(e) => setBoBranch(e.target.value)} options={[{ value: '', label: t('من غير فرع') }, ...store.db.branches.map((b) => ({ value: b.id, label: b.name }))]} />], [t('الدرج'), terminal?.drawer ? t('فيه درج') : t('مفيش درج')]]} />
+          <div className="flex items-center justify-between gap-2"><h2 className="text-xl font-bold">{t('مين هيشتغل على الجهاز ده؟')}</h2><StateBadge ops={['Auth.Login', 'Access.Me']} /></div>
+          <KV rows={[
+            [t('الجهاز'), <span>{deviceName(id, terminal?.kind, terminal?.name)}<Tech><span className="num text-[10px] text-dim ms-1">{lbl.code}</span></Tech></span>],
+            [t('الفرع'), terminal ? branchLabel(branch) || '—' : <Select value={boBranch} onChange={(e) => setBoBranch(e.target.value)} options={[{ value: '', label: t('من غير فرع') }, ...store.db.branches.map((b) => ({ value: b.id, label: branchLabel(b) }))]} />],
+            [t('درج الفلوس'), terminal?.drawer ? t('عليه درج') : t('من غير درج')],
+          ]} />
           <div className="text-xs font-bold text-soft">{t('اختار اسمك')}</div>
           <div className="grid grid-cols-1 gap-1.5 max-h-[300px] overflow-auto pe-1">
-            {users.map((u) => (
-              <button key={u.id} data-fb={`login-user:${u.username}`} onClick={() => { setUserId(u.id); setPin(''); setErr(null); }} className={cn('flex items-center justify-between gap-2 px-3 py-2 rounded-xl border text-start transition-colors', userId === u.id ? 'border-[var(--primary)] bg-[var(--primary-container)]' : 'border-[var(--glass-border)] surface-1 hover:surface-2')}>
-                <div className="min-w-0"><div className="text-sm font-bold truncate">{u.displayName}</div><div className="text-[11px] text-dim num truncate">{u.username}</div></div>
-                <div className="flex items-center gap-1 flex-wrap justify-end">{u.roles.map((r) => <Pill key={r} tone="neutral">{r.replace('Demo ', '')}</Pill>)}{!u.scoped && <Pill tone="warning">{t('مش على الفرع ده')}</Pill>}{u.locked && <Pill tone="error"><Lock className="w-3 h-3" /></Pill>}</div>
+            {sorted.map((u) => (
+              <button key={u.id} data-fb={`login-user:${u.username}`} onClick={() => { setUserId(u.id); setPin(''); setErr(null); }} className={cn('flex items-center justify-between gap-2 px-3 py-2 rounded-xl border text-start transition-colors', userId === u.id ? 'border-[var(--primary)] bg-[var(--primary-container)]' : 'border-[var(--glass-border)] surface-1 hover:surface-2', !u.scoped && 'opacity-60')}>
+                <div className="min-w-0"><div className="text-sm font-bold truncate">{u.displayName}</div><Tech><div className="text-[11px] text-dim num truncate">{u.username}</div></Tech></div>
+                <div className="flex items-center gap-1 flex-wrap justify-end">
+                  {!String(u.displayName).includes(' — ') && u.roles.map((r) => <Pill key={r} tone="neutral">{roleLabel(r)}</Pill>)}
+                  {u.scoped && fitsDevice(kind, u.roles) && <Pill tone="primary">{t('مناسب للجهاز ده')}</Pill>}
+                  {!u.scoped && <Pill tone="warning">{t('مش شغال في الفرع ده')}</Pill>}
+                  {u.locked && <Pill tone="error"><Lock className="w-3 h-3" />{t('مقفول مؤقتًا')}</Pill>}
+                </div>
               </button>
             ))}
-            {users.length === 0 && <Empty text={t('مفيش مستخدمين')} />}
+            {users.length === 0 && <Empty text={t('مفيش حد متسجل لسه')} />}
           </div>
         </div>
         <div className="glass rounded-2xl p-5 flex flex-col items-center gap-4">
           <KeyRound className="w-8 h-8 text-[var(--primary)]" />
-          <div className="text-sm text-soft">{userId ? t('اكتب الرقم السري (PIN)') : t('اختار المستخدم الأول')}</div>
+          <div className="text-sm text-soft text-center">{chosen ? t('{n}، اكتب رقمك السري', { n: personName(chosen.username, chosen.displayName) }) : t('اختار اسمك الأول')}</div>
           <div className="flex gap-2 num" dir="ltr">{Array.from({ length: 6 }, (_, i) => <span key={i} className={cn('w-9 h-11 rounded-lg border flex items-center justify-center text-xl', i < pin.length ? 'border-[var(--primary)] bg-[var(--primary-container)]' : 'border-[var(--glass-border)] surface-1')}>{i < pin.length ? '•' : ''}</span>)}</div>
-          {err && <Banner tone="error"><div>{err.text}</div><div className="text-[11px] num text-dim">{err.code}{err.details?.attemptsLeft !== undefined ? ` · ${t('محاولات باقية')}: ${err.details.attemptsLeft}` : ''}</div></Banner>}
+          {err && <Banner tone="error"><div>{err.text}</div>{err.details?.attemptsLeft !== undefined && <div className="text-[11px] text-dim">{t('فاضل {n} محاولات قبل ما الحساب يتقفل', { n: err.details.attemptsLeft })}</div>}<Tech><div className="text-[11px] num text-dim">{err.code}</div></Tech></Banner>}
           <div className="grid grid-cols-3 gap-2 num" dir="ltr">
             {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'].map((k) => (
               <button key={k} disabled={!userId || busy || (k === 'ok' && pin.length === 0)} onClick={() => (k === 'ok' ? submit(pin) : press(k))} className="w-16 h-14 rounded-xl surface-2 border border-[var(--glass-border)] text-xl font-bold hover:border-[var(--primary)] disabled:opacity-30 flex items-center justify-center">{k === 'del' ? <Delete className="w-5 h-5" /> : k === 'ok' ? '✓' : k}</button>
             ))}
           </div>
-          <div className="text-[11px] text-dim text-center">{t('بيانات عرض: الرقم السري لكل المستخدمين')} <span className="num font-bold text-soft">{demo.pin}</span> — {t('غلط 5 مرات يقفل الحساب 15 دقيقة (LoginLockoutPolicy)')}</div>
-          {userId && <Button size="sm" variant="ghost" onClick={() => submit(demo.pin)}>{t('دخول سريع (عرض)')}</Button>}
+          <div className="text-[11px] text-dim text-center">{t('تجربة: الرقم السري لكل الناس')} <span className="num font-bold text-soft">{demo.pin}</span> — {t('لو غلطت 5 مرات الحساب بيتقفل 15 دقيقة.')}</div>
+          {userId && <Button size="sm" variant="ghost" onClick={() => submit(demo.pin)} data-fb="login-quick">{t('دخول سريع (تجربة)')}</Button>}
         </div>
       </div>
     </div>
@@ -258,6 +284,7 @@ function ApprovalDialog({ req }: { req: ReturnType<typeof useApprovals>[number] 
           <div className="space-y-1.5"><div className="text-xs font-bold text-soft">PIN</div><Input type="password" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="••••••" onKeyDown={(e) => e.key === 'Enter' && grant()} /></div>
         </div>
         {err && <Banner tone="error">{err}</Banner>}
+        <RemoteApproval req={req} />
         <div className="text-[11px] text-dim">{t('بيانات عرض: الرقم السري')} <span className="num">{demo.pin}</span></div>
       </div>
     </Modal>

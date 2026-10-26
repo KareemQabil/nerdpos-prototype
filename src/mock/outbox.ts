@@ -7,6 +7,8 @@ import { policy } from './policies';
 import { computeTotals } from './pricing';
 import type { DB, KitchenDelivery, KitchenTicket, Order, PrintJob, FiscalDocument } from './types';
 import { hashOf } from './kernel';
+import { runOpsBackground } from './handlers/ops';
+import { comboRoute, kitchenItem, type ComboPart } from './menu-kitchen';
 
 const BACKOFF = [5, 15, 45, 120, 300]; // seconds, printing.maxAttempts = 5
 
@@ -14,23 +16,26 @@ const BACKOFF = [5, 15, 45, 120, 300]; // seconds, printing.maxAttempts = 5
 export function routeLines(db: DB, order: Order, lineIds: string[]) {
   const byStation = new Map<string, string[]>();
   const suppressed: string[] = [];
+  const parts = new Map<string, ComboPart>(); // menu area: combo components routed to their own stations (menu-kitchen.ts)
   const rules = db.routingRules.filter((r) => r.active && r.branchId === order.branchId).sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id));
+  const ruleFor = (productId: string | undefined, categoryId: string | undefined) => rules.find((r) => {
+    const st = db.stations.find((s) => s.id === r.stationId);
+    if (r.destination === 'STATION' && (!st || !st.active)) return false;
+    if (r.match.productId && r.match.productId !== productId) return false;
+    if (r.match.categoryId && r.match.categoryId !== categoryId) return false;
+    if (r.match.channel && r.match.channel !== order.channel) return false;
+    return true;
+  });
   for (const lid of lineIds) {
     const line = order.lines.find((l) => l.id === lid);
     if (!line) continue;
-    const rule = rules.find((r) => {
-      const st = db.stations.find((s) => s.id === r.stationId);
-      if (r.destination === 'STATION' && (!st || !st.active)) return false;
-      if (r.match.productId && r.match.productId !== line.productId) return false;
-      if (r.match.categoryId && r.match.categoryId !== line.categoryId) return false;
-      if (r.match.channel && r.match.channel !== order.channel) return false;
-      return true;
-    });
+    const rule = ruleFor(line.productId, line.categoryId);
+    if (comboRoute(line, rule, ruleFor, byStation, parts)) continue;
     if (!rule) continue; // unmatched: no implicit default station
     if (rule.destination === 'NO_TICKET') { suppressed.push(lid); continue; }
     byStation.set(rule.stationId, [...(byStation.get(rule.stationId) ?? []), lid]);
   }
-  return { byStation, suppressed };
+  return { byStation, suppressed, parts };
 }
 
 /** The kitchen.fire-round consumer: one ticket set per (order, round, station); never duplicated. */
@@ -43,7 +48,7 @@ function deliverRound(db: DB, d: KitchenDelivery) {
   d.attempts++;
   if (mode === 'DOWN') { d.state = 'FAILED'; d.lastError = 'KITCHEN_DELIVERY_FAILED (simulated: kitchen screen down)'; return; }
   if (mode === 'SLOW' && clock.now() < d.nextAt) { d.state = 'PENDING'; return; }
-  const { byStation } = routeLines(db, order, round.lineIds);
+  const { byStation, parts } = routeLines(db, order, round.lineIds);
   const table = order.tableId ? db.tables.find((t) => t.id === order.tableId)?.name ?? null : null;
   const server = db.users.find((u) => u.id === order.serverUserId)?.displayName ?? '';
   for (const [stationId, lids] of byStation) {
@@ -51,10 +56,7 @@ function deliverRound(db: DB, d: KitchenDelivery) {
     if (exists) continue; // dedupe: (order, round, station)
     const t: KitchenTicket = {
       id: nextId('kt'), orderId: order.id, orderNumber: order.number, tableName: table, channel: order.channel, round: d.round, stationId, state: 'NEW',
-      items: lids.map((lid) => {
-        const l = order.lines.find((x) => x.id === lid)!;
-        return { lineId: l.id, name: l.name, quantity: l.quantity, modifiers: [...(l.variant ? [l.variant.name] : []), ...l.modifiers.map((m) => m.name)], note: l.note, status: l.status === 'VOIDED' ? 'CANCELLED' : 'ACTIVE', allergens: l.allergens, children: l.children?.map((c) => `${c.name.ar}${c.detail ? ' (' + c.detail.ar + ')' : ''}`), seat: l.seat ?? null };
-      }),
+      items: lids.map((lid) => kitchenItem(order.lines.find((x) => x.id === lid)!, stationId, parts)),
       createdAt: clock.iso(), createdAtMs: clock.now(), startedAt: null, readyAt: null, doneAt: null, version: 1, serverName: server,
     };
     db.tickets.push(t);
@@ -182,6 +184,7 @@ export function runOutbox(): boolean {
       }
     }
   }
+  if (runOpsBackground(db)) changed = true; // webhooks, report schedules, table-cleaning alerts, approval request expiry
   if (changed) store.commit();
   return changed;
 }

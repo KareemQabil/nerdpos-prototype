@@ -7,6 +7,7 @@ import { enqueuePrint } from '../outbox';
 import { D, m4, add, sub, allocate, isMoney, round } from '../money';
 import { checkVersion, getOrder, need, openSessionOn, page, reasonCheck, requireFields, settlementOf, userName } from './util';
 import type { Capture, CashEntry, Session, ZReport, Order, TenderMethod } from '../types';
+import { authorizationForCapture } from './extpay'; // crm area: external authorizations
 
 function cashEntry(ctx: Ctx, sessionId: string, kind: CashEntry['kind'], amount: string, extra: Partial<CashEntry> = {}) {
   const e: CashEntry = { id: nextId('ce'), sessionId, kind, amount: m4(amount), at: ctx.nowIso, by: ctx.user!.id, ...extra };
@@ -97,7 +98,8 @@ export const moneyHandlers: Record<string, Handler> = {
     for (const t of tenders) {
       const method = t.method as TenderMethod;
       if (method !== 'DEPOSIT' && !enabled.includes(method)) throw new ApiError('TENDER_METHOD_DISABLED', { method, enabled });
-      const reference = (t.reference ?? ctx.body.tenderReference ?? '').trim() || null;
+      const auth = t.authorizationId ? authorizationForCapture(ctx, o, t) : null; // crm area: approved card/wallet authorization
+      const reference = (t.reference ?? auth?.reference ?? ctx.body.tenderReference ?? '').trim() || null;
       if ((method === 'CARD' || method === 'DIGITAL_WALLET') && !reference) throw new ApiError('TENDER_REFERENCE_REQUIRED', { method });
       if (!isMoney(t.amount ?? t.tendered)) throw new ApiError('VALIDATION_FAILED', { field: 'amount' });
       let applied: any, change = D(0), tendered: string | null = null, roundingAdj = D(0);
@@ -117,6 +119,7 @@ export const moneyHandlers: Record<string, Handler> = {
       const tip = tipOn && t.tip && D(t.tip).gt(0) ? m4(t.tip) : '0.0000';
       const c: Capture = { id: nextId('cap'), orderId: o.id, method, amount: m4(applied), tendered, change: m4(change), reference, walletProvider: t.walletProvider ?? null, sessionId: session.id, terminalId: ctx.terminal!.id, branchId: o.branchId, at: ctx.nowIso, atMs: ctx.now, businessDate: ctx.businessDate(o.branchId), by: ctx.user!.id, commandId: ctx.commandId ?? '', tip, rounding: m4(roundingAdj) };
       db.captures.push(c);
+      if (auth) { auth.state = 'CAPTURED'; auth.captureId = c.id; }
       created.push(c);
       if (method === 'CASH') cashEntry(ctx, session.id, 'TENDER_IN', c.amount, { ref: o.number });
       if (D(tip).gt(0)) {
