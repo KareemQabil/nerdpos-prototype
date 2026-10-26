@@ -48,10 +48,10 @@ export function MenusAdmin() {
   const toggleMenu = (m: any, v: boolean) => run('Menu.Upsert', { params: { menuId: m.id }, body: { name: m.name, channels: m.channels, active: v, expectedVersion: m.version } }, { success: v ? t('المنيو اشتغل') : t('المنيو اتقفل') });
   const content = (m: any) => {
     const parts: string[] = [];
-    if (m.allCategories) parts.push(t('كل الأقسام') + (m.excludedCategoryIds?.length ? ` ${t('ما عدا')} ${m.excludedCategoryIds.map(catName).join('، ')}` : ''));
-    else if (m.categoryIds?.length) parts.push(m.categoryIds.map(catName).join('، '));
-    if (m.productIds?.length) parts.push(`+ ${m.productIds.map(prodName).join('، ')}`);
-    if (m.excludedProductIds?.length) parts.push(`${t('من غير')}: ${m.excludedProductIds.map(prodName).join('، ')}`);
+    if (m.allCategories) parts.push(t('كل الأقسام') + (m.excludedCategoryIds?.length ? ` ${t('ما عدا')} ${m.excludedCategoryIds.map(catName).join(t('، '))}` : ''));
+    else if (m.categoryIds?.length) parts.push(m.categoryIds.map(catName).join(t('، ')));
+    if (m.productIds?.length) parts.push(`+ ${m.productIds.map(prodName).join(t('، '))}`);
+    if (m.excludedProductIds?.length) parts.push(`${t('من غير')}: ${m.excludedProductIds.map(prodName).join(t('، '))}`);
     return parts.join(' · ');
   };
   return (
@@ -91,8 +91,8 @@ export function MenusAdmin() {
                 <Button size="sm" variant="ghost" data-fb={`menu:edit:${m.id}`} onClick={() => setMenu({ id: m.id, name: m.name, channels: m.channels, branchIds: m.branchIds, daypartIds: m.daypartIds, allCategories: m.allCategories, categoryIds: m.categoryIds, excludedCategoryIds: m.excludedCategoryIds ?? [], productIds: m.productIds, excludedProductIds: m.excludedProductIds, active: m.active, version: m.version })}><Pencil className="w-3.5 h-3.5" /></Button>
               </div>
               <div className="flex flex-wrap gap-1">{m.channels.map((c: string) => <Pill key={c} tone="primary">{channelLabel(c)}</Pill>)}</div>
-              <div className="text-xs text-soft flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-dim" />{m.daypartIds.length ? m.daypartIds.map(dpName).join('، ') : t('طول اليوم')}</div>
-              <div className="text-xs text-soft flex items-center gap-1.5"><Store className="w-3.5 h-3.5 text-dim" />{m.branchIds.length ? m.branchIds.map((b: string) => branchLabel(branches.items.find((x) => x.id === b)) || b).join('، ') : t('كل الفروع')}</div>
+              <div className="text-xs text-soft flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-dim" />{m.daypartIds.length ? m.daypartIds.map(dpName).join(t('، ')) : t('طول اليوم')}</div>
+              <div className="text-xs text-soft flex items-center gap-1.5"><Store className="w-3.5 h-3.5 text-dim" />{m.branchIds.length ? m.branchIds.map((b: string) => branchLabel(branches.items.find((x) => x.id === b)) || b).join(t('، ')) : t('كل الفروع')}</div>
               <div className="text-xs text-dim">{content(m)}</div>
             </div>
           ))}
@@ -184,7 +184,7 @@ function NowPreview({ now }: { now?: any }) {
   const off = q.items.filter((p) => p.menuNow && !p.menuNow.onMenu);
   const byReason = useMemo(() => {
     const m = new Map<string, any[]>();
-    for (const p of off) m.set(p.menuNow.reasonAr, [...(m.get(p.menuNow.reasonAr) ?? []), p]);
+    for (const p of off) { const k = L({ ar: p.menuNow.reasonAr, en: p.menuNow.reasonEn }); m.set(k, [...(m.get(k) ?? []), p]); }
     return [...m.entries()];
   }, [off]);
   return (

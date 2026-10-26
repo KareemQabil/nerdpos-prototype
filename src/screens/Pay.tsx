@@ -50,7 +50,7 @@ export function PayPanel({ orderId, onBack }: { orderId: string; onBack: () => v
           <div className="space-y-1.5 text-sm max-h-[38vh] overflow-y-auto pe-1">
             {order.lines.filter((l: any) => l.status === 'ACTIVE' || l.status === 'VOIDED').map((l: any) => (
               <div key={l.id} className={cn('flex justify-between gap-3', l.status === 'VOIDED' && 'line-through opacity-50')}>
-                <span className="min-w-0"><span className="num font-bold text-[var(--primary)]">{qty(l.quantity)}×</span> {L(l.name)}{l.variant ? ` (${L(l.variant.name)})` : ''}{l.modifiers.length ? <span className="text-dim text-xs"> — {l.modifiers.map((m: any) => L(m.name)).join('، ')}</span> : ''}</span>
+                <span className="min-w-0"><span className="num font-bold text-[var(--primary)]">{qty(l.quantity)}×</span> {L(l.name)}{l.variant ? ` (${L(l.variant.name)})` : ''}{l.modifiers.length ? <span className="text-dim text-xs"> — {l.modifiers.map((m: any) => L(m.name)).join(t('، '))}</span> : ''}</span>
                 <span className="num shrink-0">{money(l.lineTotal)}</span>
               </div>
             ))}

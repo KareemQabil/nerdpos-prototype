@@ -8,7 +8,7 @@ import { t, L } from '../../i18n';
 import { Tech } from '../../app/tech';
 import { money, dateTime, cn } from '../../lib/format';
 import { store } from '../../mock/store';
-import { deviceName } from '../../demo/people';
+import { deviceName, personText } from '../../demo/people';
 
 const FIELD: Record<string, string> = {
   amount: 'المبلغ', lineAmount: 'قيمة الصنف', payable: 'إجمالي الشيك', discountPercent: 'نسبة الخصم', absVariance: 'الفرق', countedCash: 'المعدود', expectedCash: 'المتوقع',
@@ -60,13 +60,13 @@ function RequestCard({ r }: { r: any }) {
       <div className="space-y-3" data-fb={`approval-request:${r.id}`}>
         {r.summary?.ar && <div className="text-lg font-bold">{L(r.summary)}</div>}
         <div className="flex flex-wrap gap-2 text-xs text-soft">
-          <span className="flex items-center gap-1"><User className="w-3.5 h-3.5" />{r.requesterName}</span>
+          <span className="flex items-center gap-1"><User className="w-3.5 h-3.5" />{personText(r.requesterName)}</span>
           <span className="flex items-center gap-1"><Monitor className="w-3.5 h-3.5" />{r.terminalId ? deviceName(r.terminalId, null, r.terminalName) : t('من غير جهاز')}</span>
           <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{dateTime(r.createdAt)}{pending ? ` · ${r.minutesWaiting ? t('مستني من {n} دقيقة', { n: r.minutesWaiting }) : t('لسه واصل')}` : ''}</span>
         </div>
         {ctxRows.length > 0 && <KV rows={ctxRows} />}
         <Tech><KV className="num text-[11px]" rows={[['action', r.action], ['target', `${r.targetType} ${r.targetId}`], ['op', r.opId], ['X-Command-Id', r.commandId ?? '—'], ['grant', r.grantId ?? '—']]} /></Tech>
-        {!pending && r.decidedByName && <div className="text-xs text-dim">{r.state === 'APPROVED' ? t('وافق') : t('رفض')}: {r.decidedByName} · {dateTime(r.decidedAt)}{r.decisionNote ? ` — "${r.decisionNote}"` : ''}</div>}
+        {!pending && personText(r.decidedByName) && <div className="text-xs text-dim">{r.state === 'APPROVED' ? t('وافق') : t('رفض')}: {personText(r.decidedByName)} · {dateTime(r.decidedAt)}{r.decisionNote ? ` — "${r.decisionNote}"` : ''}</div>}
         {pending && (rejecting ? (
           <div className="flex gap-2 items-center">
             <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('سبب الرفض (اختياري) — هيظهر للي طلب')} data-fb="approval-reject-note" />
@@ -79,7 +79,7 @@ function RequestCard({ r }: { r: any }) {
             <Button variant="danger" onClick={() => setRejecting(true)} data-fb="approval-reject"><X className="w-4 h-4" />{t('ارفض')}</Button>
           </div>
         ))}
-        {pending && r.requesterName && <Banner tone="info">{t('لو وافقت، {n} مش هيحتاج يعمل حاجة — العملية هتكمل لوحدها على جهازه.', { n: r.requesterName })}</Banner>}
+        {pending && personText(r.requesterName) && <Banner tone="info">{t('لو وافقت، {n} مش هيحتاج يعمل حاجة — العملية هتكمل لوحدها على جهازه.', { n: personText(r.requesterName) })}</Banner>}
       </div>
     </Card>
   );

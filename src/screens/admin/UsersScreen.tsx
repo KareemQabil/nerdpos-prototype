@@ -7,7 +7,7 @@ import { Avatar, Banner, Button, Card, Drawer, EmptyState, Field, FilterChips, I
 import { t } from '../../i18n';
 import { Tech } from '../../app/tech';
 import { cn } from '../../lib/format';
-import { branchLabel, personName, roleLabel } from '../../demo/people';
+import { branchLabel, personName, roleLabel, personLabel, userLabel } from '../../demo/people';
 import { useList, usePerm, RulePill, Refused, Modal } from './org/common';
 import { permText, moduleText } from './org/permText';
 
@@ -98,9 +98,9 @@ function UsersTab({ users, roles, creating, setCreating }: { users: ReturnType<t
           rows={list.map((u) => [
             <div className="flex items-center gap-2.5 min-w-0">
               <Avatar name={personName(u.username, u.displayName)} size="sm" />
-              <div className="min-w-0"><div className="font-bold truncate">{u.displayName}</div><Tech><div className="num text-[11px] text-dim" dir="ltr">{u.username}</div></Tech></div>
+              <div className="min-w-0"><div className="font-bold truncate">{userLabel(u.username, u.displayName)}</div><Tech><div className="num text-[11px] text-dim" dir="ltr">{u.username}</div></Tech></div>
             </div>,
-            <div className="flex flex-wrap gap-1">{u.roleAssignments.map((r: any, i: number) => <Pill key={i} tone="primary">{roleName(r)} · {r.branchIds.map(bName).join('، ')}</Pill>)}</div>,
+            <div className="flex flex-wrap gap-1">{u.roleAssignments.map((r: any, i: number) => <Pill key={i} tone="primary">{roleName(r)} · {r.branchIds.map(bName).join(t('، '))}</Pill>)}</div>,
             <div className="flex flex-wrap gap-1">
               {u.active ? <Pill tone="success" dot>{t('شغال')}</Pill> : <Pill tone="neutral" dot>{t('موقوف')}</Pill>}
               {u.locked && <Pill tone="error"><Lock className="w-3 h-3" />{t('مقفول')}</Pill>}
@@ -211,7 +211,7 @@ function AccessDrawer({ user, roles, branches, onClose }: { user: any; roles: an
     if (r) onClose();
   };
   return (
-    <Drawer open width="lg" onClose={onClose} icon={<ShieldCheck />} title={t('صلاحيات {n}', { n: user.displayName })} badge={<StateBadge ops={['User.ManageAccess']} />}
+    <Drawer open width="lg" onClose={onClose} icon={<ShieldCheck />} title={t('صلاحيات {n}', { n: userLabel(user.username, user.displayName) })} badge={<StateBadge ops={['User.ManageAccess']} />}
       description={t('غيّر الدور أو الفروع، أو أوقف الحساب. التغيير بيتطبق من أول حركة جاية.')}
       footer={<><Button variant="ghost" onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" loading={busy} disabled={!validRA(ras)} onClick={save} data-fb="users:access-save">{t('حفظ')}</Button></>}>
       <div className="space-y-5">
@@ -243,7 +243,7 @@ function ResetModal({ user, onClose }: { user: any; onClose: () => void }) {
     }
   };
   return (
-    <Modal open onClose={onClose} title={t('رقم سري جديد لـ {n}', { n: user.displayName })} badge={<StateBadge ops={['Credential.Reset']} />}
+    <Modal open onClose={onClose} title={t('رقم سري جديد لـ {n}', { n: userLabel(user.username, user.displayName) })} badge={<StateBadge ops={['Credential.Reset']} />}
       footer={<><Button variant="ghost" onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" loading={busy} disabled={!secret || !ok} onClick={save} data-fb="users:reset-save">{t('إعادة تعيين')}</Button></>}>
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-2 flex-wrap">

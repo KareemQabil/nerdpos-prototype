@@ -30,9 +30,9 @@ export function PolicyCard({ policyId, title, explain }: { policyId: string; tit
       actions={can('settings:updatepolicy') && <Button size="sm" variant="ghost" onClick={() => setEdit(true)} data-fb={`edit-policy:${policyId}`}><Pencil className="w-3.5 h-3.5" />{t('تعديل')}</Button>}>
       {!q.data ? <Spinner /> : (
         <div className="space-y-3">
-          {meta?.description && <div className="text-xs text-dim">{meta.description}</div>}
+          {meta?.description && <div className="text-xs text-dim">{t(meta.description)}</div>}
           <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
-            {fields.map((f) => <div key={f.key} className="flex justify-between gap-3 border-b line py-1"><span className="text-dim">{f.label}</span><b className="num">{show(f)}</b></div>)}
+            {fields.map((f) => <div key={f.key} className="flex justify-between gap-3 border-b line py-1"><span className="text-dim">{t(f.label)}</span><b className="num">{show(f)}</b></div>)}
           </div>
           {explain && <div className="text-xs rounded-lg surface-1 px-3 py-2">{explain(value)}</div>}
           <Tech><div className="text-[10px] text-dim num">{policyId} · {JSON.stringify(value)}</div></Tech>
@@ -61,8 +61,8 @@ function PolicyDialog({ policyId, fields, value, rows, onClose }: { policyId: st
         <Banner tone="info">{t('تغيير الإعداد ده محتاج موافقة مدير، وبيطبق على الحركات الجديدة بس.')}</Banner>
         {fields.map((f) => (
           f.kind === 'bool'
-            ? <div key={f.key}><Switch checked={!!v[f.key]} onChange={(x) => setV({ ...v, [f.key]: x })} label={f.label} /></div>
-            : <Field key={f.key} label={f.label}><Input value={v[f.key] ?? ''} onChange={(e) => setV({ ...v, [f.key]: e.target.value.replace(/[^0-9.]/g, '') })} inputMode="decimal" className="num" /></Field>
+            ? <div key={f.key}><Switch checked={!!v[f.key]} onChange={(x) => setV({ ...v, [f.key]: x })} label={t(f.label)} /></div>
+            : <Field key={f.key} label={t(f.label)}><Input value={v[f.key] ?? ''} onChange={(e) => setV({ ...v, [f.key]: e.target.value.replace(/[^0-9.]/g, '') })} inputMode="decimal" className="num" /></Field>
         ))}
         <Field label={t('سبب التغيير')}><Input value={note} onChange={(e) => setNote(e.target.value)} /></Field>
       </div>

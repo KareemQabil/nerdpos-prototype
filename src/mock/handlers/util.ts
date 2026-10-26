@@ -4,6 +4,7 @@ import { policy } from '../policies';
 import { computeTotals, activeLines } from '../pricing';
 import { D, m4, sub, add, ZERO, gt } from '../money';
 import type { Order, DB, Session, Loc } from '../types';
+import { userLabel } from '../../demo/people';
 
 export const need = (cond: unknown, code: string, details?: Record<string, unknown>) => {
   if (!cond) throw new ApiError(code, details);
@@ -49,7 +50,8 @@ export function reasonCheck(ctx: Ctx, kind: string, code: string | undefined, no
   return rc;
 }
 
-export const userName = (db: DB, id: string | null | undefined) => db.users.find((u) => u.id === id)?.displayName ?? id ?? '';
+// Display name in the UI language (the demo personas have English names; Arabic mode returns the stored displayName).
+export const userName = (db: DB, id: string | null | undefined) => { const u = db.users.find((x) => x.id === id); return u ? userLabel(u.username, u.displayName) : id ?? ''; };
 
 export function settlementOf(db: DB, order: Order) {
   const totals = computeTotals(order);

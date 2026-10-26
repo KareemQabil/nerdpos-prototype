@@ -89,7 +89,7 @@ export function customerView(db: DB, c: Customer, full = false) {
 
 function orderBrief(db: DB, o: Order) {
   const tt = computeTotals(o);
-  return { id: o.id, number: o.number, channel: o.channel, status: o.status, createdAt: o.createdAt, payable: tt.payable, items: o.lines.filter((l) => l.status === 'ACTIVE').map((l) => `${l.name.ar} ×${l.quantity}`).join('، '), deliveryId: o.deliveryId ?? null };
+  return { id: o.id, number: o.number, channel: o.channel, status: o.status, createdAt: o.createdAt, payable: tt.payable, items: o.lines.filter((l) => l.status === 'ACTIVE').map((l) => `${l.name.ar} ×${l.quantity}`).join('، '), itemsEn: o.lines.filter((l) => l.status === 'ACTIVE').map((l) => `${l.name.en || l.name.ar} ×${l.quantity}`).join(', '), deliveryId: o.deliveryId ?? null };
 }
 
 /** Order.SetCustomer / Order.Create: the customer is snapshotted on the check (name and phone). */

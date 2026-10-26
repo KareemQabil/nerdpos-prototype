@@ -5,7 +5,7 @@ import { Pizza, Save } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../../app/hooks';
 import { Banner, Button, Card, Field, Input, Money, Pill, StateBadge, Switch, Table } from '../../../ui';
 import { Tech } from '../../../app/tech';
-import { t, L } from '../../../i18n';
+import { t, L, tv } from '../../../i18n';
 import { useItems, usePolicy } from './common';
 import { halfModeLabel } from '../../menu/parts';
 
@@ -65,6 +65,6 @@ function PartnerPrice({ productId }: { productId: string }) {
 function HalfPrice({ productId, other }: { productId: string; other: string }) {
   const { auth } = useDev();
   const q = useQuery<any>('Pricing.QuoteItem', { params: { productId }, body: { branchId: auth.branchId, channel: 'DINE_IN', productId, quantity: '1', modifierOptionIds: [], halfProductId: other } } as any);
-  return q.data ? <Money v={q.data.unitTotal} tone="primary" /> : <span className="text-dim text-xs">{q.error?.details?.reasonAr ?? '—'}</span>;
+  return q.data ? <Money v={q.data.unitTotal} tone="primary" /> : <span className="text-dim text-xs">{tv(q.error?.details?.reasonAr) ?? '—'}</span>;
 }
 

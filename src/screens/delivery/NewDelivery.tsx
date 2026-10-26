@@ -8,7 +8,7 @@ import { ProductDialog, type LineDraft } from '../order/ProductDialog';
 import { needsDialog } from '../OrderScreen';
 import { Button, Card, Pill, Banner, Money, Field, Input, Textarea, Spinner, Empty, StateBadge, Modal, Switch, Stepper, toast } from '../../ui';
 import { Tech } from '../../app/tech';
-import { t, L } from '../../i18n';
+import { t, L, tv } from '../../i18n';
 import { cn, money, qty, time, dateTime } from '../../lib/format';
 import { CustomerRow, CustomerPicker, TierBadge, TagPills, AllergyWarning, AddressForm, EMPTY_ADDRESS, cleanAddress, addressText, useZones } from '../customers/common';
 import { PAYMENT_MODE } from './common';
@@ -164,14 +164,14 @@ function CustomerStep({ cust, loading, locked, onPick }: { cust: any; loading: b
           </div>
         </div>
         <AllergyWarning allergies={cust.allergies} />
-        {cust.notes && <div className="text-xs rounded-lg surface-1 px-2.5 py-1.5">✎ {cust.notes}</div>}
+        {tv(cust.notes) && <div className="text-xs rounded-lg surface-1 px-2.5 py-1.5">✎ {tv(cust.notes)}</div>}
         <div className="grid grid-cols-3 gap-1.5 text-center">
           <div className="rounded-lg surface-1 py-1.5"><div className="text-[10px] text-dim">{t('طلبات')}</div><div className="font-bold num">{cust.stats.orders}</div></div>
           <div className="rounded-lg surface-1 py-1.5"><div className="text-[10px] text-dim">{t('النقاط')}</div><div className="font-bold num text-[var(--primary)]">{cust.loyalty.balance}</div></div>
           <div className="rounded-lg surface-1 py-1.5"><div className="text-[10px] text-dim">{t('آخر طلب')}</div><div className="font-bold text-[11px]">{cust.stats.lastOrderAt ? dateTime(cust.stats.lastOrderAt) : '—'}</div></div>
         </div>
         {cust.stats.favourite && <div className="text-[11px] text-dim">{t('بيطلب غالبًا')}: <b className="text-soft">{cust.stats.favourite}</b></div>}
-        {cust.orders?.length > 0 && <div className="text-[11px] text-dim truncate">{t('آخر طلب')}: {cust.orders[0].items}</div>}
+        {cust.orders?.length > 0 && <div className="text-[11px] text-dim truncate">{t('آخر طلب')}: {L({ ar: cust.orders[0].items, en: cust.orders[0].itemsEn })}</div>}
       </div>
       <CustomerPicker open={creating} onClose={() => setCreating(false)} onPick={(c) => { setCreating(false); onPick(c); }} />
     </Card>
@@ -246,7 +246,7 @@ function OrderSide({ order, zone, delivery, busy, onReview, onSend, cust }: { or
         {lines.map((l) => (
           <div key={l.id} className="rounded-xl surface-1 px-3 py-2 text-sm" data-fb={`dline:${l.sku}`}>
             <div className="flex items-start gap-2">
-              <div className="flex-1 min-w-0"><div className="font-bold leading-tight">{L(l.name)}</div>{(l.modifiers.length > 0 || l.variant) && <div className="text-[11px] text-[var(--warning-text)]">{[l.variant ? L(l.variant.name) : null, ...l.modifiers.map((m: any) => L(m.name))].filter(Boolean).join('، ')}</div>}{l.note && <div className="text-[11px] text-[var(--warning-text)]">✎ {l.note}</div>}</div>
+              <div className="flex-1 min-w-0"><div className="font-bold leading-tight">{L(l.name)}</div>{(l.modifiers.length > 0 || l.variant) && <div className="text-[11px] text-[var(--warning-text)]">{[l.variant ? L(l.variant.name) : null, ...l.modifiers.map((m: any) => L(m.name))].filter(Boolean).join(t('، '))}</div>}{tv(l.note) && <div className="text-[11px] text-[var(--warning-text)]">✎ {tv(l.note)}</div>}</div>
               <span className="num font-bold">{money(l.lineTotal)}</span>
             </div>
             {order.status === 'DRAFT' && (

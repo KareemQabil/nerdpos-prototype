@@ -5,9 +5,10 @@ import { Plus, ArrowLeftRight, Truck, PackageCheck, XCircle, Trash2, ArrowLeft }
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
 import { Banner, Button, Empty, Field, Input, KV, Modal, Money, Section, Select, Spinner, StateBadge, Table, Textarea, EmptyState } from '../../ui';
-import { t, L } from '../../i18n';
+import { t, L, tv } from '../../i18n';
 import { dateTime } from '../../lib/format';
 import { BranchScope, ItemPicker, Qty, StatePill, TRANSFER_STATE, WarehouseSelect, fmtQty, unitOptions, useBranchScope, useList, useWarehouses, Inp, Sel } from './common';
+import { personText } from '../../demo/people';
 
 const OPS = ['Transfer.Create', 'Stock.Transfer', 'Transfer.Receive', 'Transfer.Cancel', 'Transfer.Find', 'Transfer.Get'];
 
@@ -26,10 +27,10 @@ export default function Transfers() {
       <div className="flex gap-2 mb-3"><Sel className="w-52" value={state} onChange={(e) => setState(e.target.value)} options={[{ value: '', label: t('كل الحالات') }, ...Object.entries(TRANSFER_STATE).map(([k, v]) => ({ value: k, label: t(v.ar) }))]} /></div>
       <Table loading={list.loading && !list.raw} empty={<EmptyState compact icon={<ArrowLeftRight />} title={t('مفيش تحويلات')} />} head={[t('الرقم'), t('من'), t('إلى'), t('الحالة'), t('الأصناف'), t('القيمة'), t('آخر تحديث'), '']} rows={list.items.map((tr) => [
           <button className="num font-bold hover:text-[var(--primary)]" data-fb={`transfers:open:${tr.id}`} onClick={() => setOpen(tr.id)}>{tr.number}</button>,
-          <span>{tr.from.name} <span className="text-[11px] text-dim">{tr.from.branchName}</span></span>,
-          <span>{tr.to.name} <span className="text-[11px] text-dim">{tr.to.branchName}</span></span>,
+          <span>{tv(tr.from.name)} <span className="text-[11px] text-dim">{tv(tr.from.branchName)}</span></span>,
+          <span>{tv(tr.to.name)} <span className="text-[11px] text-dim">{tv(tr.to.branchName)}</span></span>,
           <StatePill map={TRANSFER_STATE} state={tr.state} />,
-          <span className="text-xs">{tr.lines.map((l: any) => L(l.item?.name)).slice(0, 3).join('، ')}{tr.lines.length > 3 ? ` +${tr.lines.length - 3}` : ''}</span>,
+          <span className="text-xs">{tr.lines.map((l: any) => L(l.item?.name)).slice(0, 3).join(t('، '))}{tr.lines.length > 3 ? ` +${tr.lines.length - 3}` : ''}</span>,
           <Money v={tr.value} className="text-xs" />,
           <span className="text-xs text-dim">{dateTime(tr.receivedAt ?? tr.dispatchedAt ?? tr.cancelledAt ?? tr.createdAt)}</span>,
           <Button size="sm" onClick={() => setOpen(tr.id)}>{tr.state === 'DRAFT' ? t('ابعت') : tr.state === 'DISPATCHED' ? t('استلم') : t('اعرض')}</Button>,
@@ -111,21 +112,21 @@ function TransferView({ id, onClose }: { id: string | null; onClose: () => void 
       {!tr ? <Spinner /> : (
         <div className="space-y-3">
           <KV rows={[
-            [t('من'), `${tr.from.name} — ${tr.from.branchName}`], [t('إلى'), `${tr.to.name} — ${tr.to.branchName}`],
-            [t('اتعمل'), `${dateTime(tr.createdAt)} · ${tr.createdByName}`],
-            ...(tr.dispatchedAt ? [[t('اتبعت'), `${dateTime(tr.dispatchedAt)} · ${tr.dispatchedByName}`] as [string, string]] : []),
-            ...(tr.receivedAt ? [[t('اتستلم'), `${dateTime(tr.receivedAt)} · ${tr.receivedByName}`] as [string, string]] : []),
-            [t('ملاحظة'), tr.note ?? '—'],
+            [t('من'), `${tv(tr.from.name)} — ${tv(tr.from.branchName)}`], [t('إلى'), `${tv(tr.to.name)} — ${tv(tr.to.branchName)}`],
+            [t('اتعمل'), `${dateTime(tr.createdAt)} · ${personText(tr.createdByName)}`],
+            ...(tr.dispatchedAt ? [[t('اتبعت'), `${dateTime(tr.dispatchedAt)} · ${personText(tr.dispatchedByName)}`] as [string, string]] : []),
+            ...(tr.receivedAt ? [[t('اتستلم'), `${dateTime(tr.receivedAt)} · ${personText(tr.receivedByName)}`] as [string, string]] : []),
+            [t('ملاحظة'), tv(tr.note) ?? '—'],
           ]} />
-          {tr.state === 'DISPATCHED' && <Banner tone="info">{t('البضاعة في الطريق: طلعت من {f} ولسه ما دخلتش {t}. لو وصل أقل، اكتب اللي وصل فعلًا — الفرق بيتسجل عجز تحويل.', { f: tr.from.name, t: tr.to.name })}</Banner>}
+          {tr.state === 'DISPATCHED' && <Banner tone="info">{t('البضاعة في الطريق: طلعت من {f} ولسه ما دخلتش {t}. لو وصل أقل، اكتب اللي وصل فعلًا — الفرق بيتسجل عجز تحويل.', { f: tv(tr.from.name), t: tv(tr.to.name) })}</Banner>}
           {tr.state === 'RECEIVED' && Number(tr.shortValue) > 0 && <Banner tone="warning">{t('وصل ناقص — قيمة العجز')} <b className="num"><Money v={tr.shortValue} /></b></Banner>}
-          {tr.state === 'CANCELLED' && <Banner tone="error">{t('اتلغى')}: {tr.cancelReason}</Banner>}
+          {tr.state === 'CANCELLED' && <Banner tone="error">{t('اتلغى')}: {tv(tr.cancelReason)}</Banner>}
           <Table head={[t('الصنف'), t('اتبعت'), ...(tr.state === 'DISPATCHED' ? [t('وصل فعلًا')] : tr.state === 'RECEIVED' ? [t('وصل'), t('العجز')] : []), t('التكلفة'), t('الدفعات')]} rows={tr.lines.map((l: any) => [
             <span className="font-bold">{L(l.item?.name)}</span>,
             <Qty v={l.quantity} unit={l.item?.unit} />,
             ...(tr.state === 'DISPATCHED' ? [<Inp data-fb={`transfer:recv:${l.itemId}`} className="w-28" inputMode="decimal" value={recv[l.itemId] ?? l.quantity} onChange={(e) => setRecv({ ...recv, [l.itemId]: e.target.value.replace(/[^\d.]/g, '') })} />] : tr.state === 'RECEIVED' ? [<Qty v={l.receivedQuantity} unit={l.item?.unit} />, Number(l.shortQuantity) > 0 ? <Qty v={l.shortQuantity} unit={l.item?.unit} className="text-[var(--error)]" /> : '—'] : []),
             l.value ? <Money v={l.value} className="text-xs" /> : <span className="text-xs text-dim">{t('بتتحدد وقت البعت')}</span>,
-            <span className="text-[11px] text-dim">{l.lots?.map((x: any) => `${x.lotCode}${x.expiryDate ? ' (' + x.expiryDate + ')' : ''}`).join('، ') || '—'}</span>,
+            <span className="text-[11px] text-dim">{l.lots?.map((x: any) => `${x.lotCode}${x.expiryDate ? ' (' + x.expiryDate + ')' : ''}`).join(t('، ')) || '—'}</span>,
           ])} />
           <Tech><div className="text-[11px] num text-dim">{tr.id} · v{tr.version}</div></Tech>
         </div>

@@ -5,9 +5,10 @@ import { ChefHat, Factory, CheckCircle2 } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
 import { Banner, Button, Card, Empty, Field, Input, Money, Pill, Section, Select, Spinner, StateBadge, Table, EmptyState } from '../../ui';
-import { t, L } from '../../i18n';
+import { t, L, tv } from '../../i18n';
 import { dateTime, money } from '../../lib/format';
 import { BranchScope, Qty, WarehouseSelect, fmtQty, unitLabel, useBranchScope, useList, useWarehouses, Inp } from './common';
+import { personText } from '../../demo/people';
 
 const OPS = ['Production.Preview', 'Production.Post', 'Production.Find', 'Recipe.Find'];
 
@@ -25,9 +26,9 @@ export default function Production() {
               {hist.items.map((p) => (
                 <div key={p.id} className="rounded-xl surface-1 p-3">
                   <div className="flex justify-between gap-2"><span className="font-bold">{L(p.output?.name)} <Qty v={p.actualOutput} unit={p.output?.unit} /></span><span className="num text-xs text-dim">{p.number}</span></div>
-                  <div className="text-xs text-dim mt-0.5">{dateTime(p.at)} · {p.userName} · {p.warehouse.name}</div>
+                  <div className="text-xs text-dim mt-0.5">{dateTime(p.at)} · {personText(p.userName)} · {tv(p.warehouse.name)}</div>
                   <div className="text-xs mt-1">{t('التكلفة')}: <b className="num">{money(p.totalCost)}</b> · {t('الوحدة')}: <b className="num">{money(p.unitCost)}</b>{p.expiryDate && <> · {t('صلاحية')} <span className="num">{p.expiryDate}</span></>}</div>
-                  <div className="text-[11px] text-dim mt-1">{p.inputs.map((i: any) => `${L(i.name)} ${fmtQty(i.actual)} ${unitLabel(i.unit)}`).join('، ')}</div>
+                  <div className="text-[11px] text-dim mt-1">{p.inputs.map((i: any) => `${L(i.name)} ${fmtQty(i.actual)} ${unitLabel(i.unit)}`).join(t('، '))}</div>
                 </div>
               ))}
             </div>

@@ -5,9 +5,10 @@ import { Plus, PackageCheck, Undo2, RotateCcw, Trash2, Save } from 'lucide-react
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
 import { Banner, Button, Empty, Field, Input, KV, Modal, Drawer, Money, Pill, Section, Select, Spinner, StateBadge, Table, Tabs, Textarea, EmptyState } from '../../ui';
-import { t, L } from '../../i18n';
+import { t, L, tv, tLabel } from '../../i18n';
 import { dateTime, money } from '../../lib/format';
 import { BranchScope, ItemPicker, Qty, WarehouseSelect, fmtQty, unitLabel, useBranchScope, useItemsCatalog, useList, useWarehouses, Inp, Sel } from './common';
+import { personText } from '../../demo/people';
 
 const OPS = ['GoodsReceipt.Post', 'GoodsReceipt.Find', 'GoodsReceipt.Get', 'GoodsReceipt.Reverse', 'SupplierReturn.Post', 'SupplierReturn.Find'];
 
@@ -36,7 +37,7 @@ function ReceiptList({ branchId, autoNew }: { branchId?: string; autoNew: boolea
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2 items-end">
-        <Field label={t('المورد')} className="w-60"><Select value={supplier} onChange={(e) => setSupplier(e.target.value)} options={[{ value: '', label: t('كل الموردين') }, ...suppliers.items.map((s) => ({ value: s.id, label: s.name }))]} /></Field>
+        <Field label={t('المورد')} className="w-60"><Select value={supplier} onChange={(e) => setSupplier(e.target.value)} options={[{ value: '', label: t('كل الموردين') }, ...suppliers.items.map((s) => ({ value: s.id, label: tv(s.name) }))]} /></Field>
         <Field label={t('من يوم')} className="w-40"><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
         <Field label={t('لحد يوم')} className="w-40"><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
         <div className="flex-1" />
@@ -44,8 +45,8 @@ function ReceiptList({ branchId, autoNew }: { branchId?: string; autoNew: boolea
       </div>
       <Table loading={q.loading && !q.raw} empty={<EmptyState compact icon={<PackageCheck />} title={t('مفيش استلامات')} />} head={[t('الإذن'), t('المورد'), t('أمر الشراء'), t('فاتورة المورد'), t('المخزن'), t('القيمة'), t('إمتى'), '']} rows={q.items.map((r) => [
           <button className="num font-bold hover:text-[var(--primary)]" data-fb={`receipts:open:${r.id}`} onClick={() => setOpen(r.id)}>{r.number}</button>,
-          <span className="font-bold">{r.supplierName}</span>, <span className="num text-xs">{r.purchaseOrderNumber ?? t('من غير أمر')}</span>, <span className="num text-xs">{r.supplierInvoiceNo ?? '—'}</span>,
-          <span className="text-xs">{r.warehouse.name}</span>, <Money v={r.total} className="text-xs" />, <span className="text-xs">{dateTime(r.at)} · {r.userName}</span>,
+          <span className="font-bold">{tv(r.supplierName)}</span>, <span className="num text-xs">{r.purchaseOrderNumber ?? t('من غير أمر')}</span>, <span className="num text-xs">{tLabel(r.supplierInvoiceNo) || '—'}</span>,
+          <span className="text-xs">{tv(r.warehouse.name)}</span>, <Money v={r.total} className="text-xs" />, <span className="text-xs">{dateTime(r.at)} · {personText(r.userName)}</span>,
           r.state === 'REVERSED' ? <Pill tone="error">{t('اتلغى')}</Pill> : Number(r.returnedValue) > 0 ? <Pill tone="warning">{t('فيه مرتجع')}</Pill> : <Pill tone="success">{t('متسجل')}</Pill>,
         ])} />
       {creating && <ReceiveDialog onClose={() => setCreating(false)} onDone={(id) => { setCreating(false); setOpen(id); }} />}
@@ -85,8 +86,8 @@ export function ReceiveDialog({ po, onClose, onDone }: { po?: any; onClose: () =
       footer={<><span className="text-sm me-auto">{t('قيمة الإذن')}: <b className="num">{money(total.toFixed(4))}</b></span><Button onClick={onClose}>{t('إلغاء')}</Button><Button variant="success" data-fb="receive:post" loading={busy} disabled={!valid} onClick={post}><PackageCheck className="w-4 h-4" />{t('سجّل الاستلام')}</Button></>}>
       <div className="space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-          {!po && <Field label={t('على أمر شراء؟')}><Select data-fb="receive:po" value={poId} onChange={(e) => setPoId(e.target.value)} options={[{ value: '', label: t('لأ — استلام من غير أمر') }, ...openPos.items.map((p) => ({ value: p.id, label: `${p.number} — ${p.supplierName}` }))]} /></Field>}
-          <Field label={t('المورد')}><Select data-fb="receive:supplier" disabled={!!selPo} value={supplierId} onChange={(e) => setSupplierId(e.target.value)} options={[{ value: '', label: t('اختار') }, ...suppliers.items.map((s) => ({ value: s.id, label: s.name }))]} /></Field>
+          {!po && <Field label={t('على أمر شراء؟')}><Select data-fb="receive:po" value={poId} onChange={(e) => setPoId(e.target.value)} options={[{ value: '', label: t('لأ — استلام من غير أمر') }, ...openPos.items.map((p) => ({ value: p.id, label: `${p.number} — ${tv(p.supplierName)}` }))]} /></Field>}
+          <Field label={t('المورد')}><Select data-fb="receive:supplier" disabled={!!selPo} value={supplierId} onChange={(e) => setSupplierId(e.target.value)} options={[{ value: '', label: t('اختار') }, ...suppliers.items.map((s) => ({ value: s.id, label: tv(s.name) }))]} /></Field>
           <Field label={t('يدخل مخزن')}><WarehouseSelect fb="receive:warehouse" value={wh} onChange={setWh} warehouses={whs.items} /></Field>
           <Field label={t('رقم فاتورة المورد')}><Input data-fb="receive:invoice" value={invoice} onChange={(e) => setInvoice(e.target.value)} /></Field>
         </div>
@@ -121,7 +122,7 @@ function ReceiptView({ id, onClose }: { id: string | null; onClose: () => void }
   const [ret, setRet] = useState(false);
   if (!id) return null;
   return (
-    <Drawer width="xl" open onClose={onClose} title={r ? <span className="flex items-center gap-2">{t('إذن استلام')} <span className="num">{r.number}</span> — {r.supplierName}</span> : t('إذن استلام')} badge={r ? <>{r.state === 'REVERSED' ? <Pill tone="error">{t('اتلغى')}</Pill> : <Pill tone="success">{t('متسجل')}</Pill>}<StateBadge ops={['GoodsReceipt.Get', 'GoodsReceipt.Reverse']} /></> : undefined}
+    <Drawer width="xl" open onClose={onClose} title={r ? <span className="flex items-center gap-2">{t('إذن استلام')} <span className="num">{r.number}</span> — {tv(r.supplierName)}</span> : t('إذن استلام')} badge={r ? <>{r.state === 'REVERSED' ? <Pill tone="error">{t('اتلغى')}</Pill> : <Pill tone="success">{t('متسجل')}</Pill>}<StateBadge ops={['GoodsReceipt.Get', 'GoodsReceipt.Reverse']} /></> : undefined}
       footer={r && r.state === 'POSTED' && <>
         <Button variant="danger" data-fb="receipt:reverse" onClick={() => setRev('')}><RotateCcw className="w-4 h-4" />{t('الغي الإذن ده')}</Button>
         <div className="flex-1" />
@@ -129,7 +130,7 @@ function ReceiptView({ id, onClose }: { id: string | null; onClose: () => void }
       </>}>
       {!r ? <Spinner /> : (
         <div className="space-y-3">
-          <KV rows={[[t('المخزن'), `${r.warehouse.name} — ${r.warehouse.branchName}`], [t('أمر الشراء'), r.purchaseOrderNumber ?? t('من غير أمر')], [t('فاتورة المورد'), r.supplierInvoiceNo ?? '—'], [t('إمتى'), `${dateTime(r.at)} · ${r.userName}`], [t('ملاحظة'), r.note ?? '—']]} />
+          <KV rows={[[t('المخزن'), `${tv(r.warehouse.name)} — ${tv(r.warehouse.branchName)}`], [t('أمر الشراء'), r.purchaseOrderNumber ?? t('من غير أمر')], [t('فاتورة المورد'), tLabel(r.supplierInvoiceNo) || '—'], [t('إمتى'), `${dateTime(r.at)} · ${personText(r.userName)}`], [t('ملاحظة'), tv(r.note) ?? '—']]} />
           {r.reversal && <Banner tone="error">{t('الإذن اتلغى')} {dateTime(r.reversal.at)}: {r.reversal.reason}</Banner>}
           <Table head={[t('الصنف'), t('الكمية'), t('بالوحدة'), t('السعر'), t('تكلفة الوحدة'), t('القيمة'), t('الدفعة / الصلاحية')]} rows={r.lines.map((l: any) => [
             <span className="font-bold">{L(l.item?.name)}</span>,
@@ -162,8 +163,8 @@ function ReturnList({ branchId }: { branchId?: string }) {
     <div className="space-y-3">
       <div className="flex justify-end"><Button variant="primary" data-fb="supplier-returns:new" onClick={() => setOpen(true)}><Undo2 className="w-4 h-4" />{t('مرتجع جديد')}</Button></div>
       <Table loading={q.loading && !q.raw} empty={<EmptyState compact icon={<Undo2 />} title={t('مفيش مرتجعات للموردين')} />} head={[t('الرقم'), t('المورد'), t('من إذن'), t('الأصناف'), t('السبب'), t('القيمة'), t('إمتى')]} rows={q.items.map((r) => [
-          <span className="num font-bold">{r.number}</span>, <span className="font-bold">{r.supplierName}</span>, <span className="num text-xs">{r.receiptNumber ?? '—'}</span>,
-          <span className="text-xs">{r.lines.map((l: any) => `${L(l.name)} ${fmtQty(l.quantity)} ${unitLabel(l.unit)}`).join('، ')}</span>, <span className="text-xs">{r.reason}</span>, <Money v={r.total} className="text-xs" />, <span className="text-xs">{dateTime(r.at)} · {r.userName}</span>,
+          <span className="num font-bold">{r.number}</span>, <span className="font-bold">{tv(r.supplierName)}</span>, <span className="num text-xs">{r.receiptNumber ?? '—'}</span>,
+          <span className="text-xs">{r.lines.map((l: any) => `${L(l.name)} ${fmtQty(l.quantity)} ${unitLabel(l.unit)}`).join(t('، '))}</span>, <span className="text-xs">{tv(r.reason)}</span>, <Money v={r.total} className="text-xs" />, <span className="text-xs">{dateTime(r.at)} · {personText(r.userName)}</span>,
         ])} />
       {open && <SupplierReturnDialog onClose={() => setOpen(false)} />}
     </div>
@@ -196,7 +197,7 @@ function SupplierReturnDialog({ receipt, onClose }: { receipt?: any; onClose: ()
       footer={<><span className="text-sm me-auto">{t('القيمة')}: <b className="num">{money(total.toFixed(4))}</b></span><Button onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" data-fb="supplier-return:save" loading={busy} disabled={!supplierId || !wh || !reason.trim() || !lines.some((l) => l.itemId && Number(l.quantity) > 0)} onClick={save}><Save className="w-4 h-4" />{t('سجّل المرتجع')}</Button></>}>
       <div className="space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Field label={t('المورد')}><Select data-fb="supplier-return:supplier" disabled={!!receipt} value={supplierId} onChange={(e) => { setSupplierId(e.target.value); setReceiptId(''); }} options={[{ value: '', label: t('اختار') }, ...suppliers.items.map((s) => ({ value: s.id, label: s.name }))]} /></Field>
+          <Field label={t('المورد')}><Select data-fb="supplier-return:supplier" disabled={!!receipt} value={supplierId} onChange={(e) => { setSupplierId(e.target.value); setReceiptId(''); }} options={[{ value: '', label: t('اختار') }, ...suppliers.items.map((s) => ({ value: s.id, label: tv(s.name) }))]} /></Field>
           {!receipt && <Field label={t('من إذن استلام (اختياري)')}><Select data-fb="supplier-return:receipt" value={receiptId} onChange={(e) => setReceiptId(e.target.value)} options={[{ value: '', label: t('من غير إذن') }, ...receipts.items.filter((r) => r.state === 'POSTED').map((r) => ({ value: r.id, label: `${r.number} — ${dateTime(r.at)}` }))]} /></Field>}
           <Field label={t('يخرج من مخزن')}><WarehouseSelect value={wh} onChange={setWh} warehouses={whs.items} /></Field>
         </div>

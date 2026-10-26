@@ -123,7 +123,7 @@ function DevicesCard({ terminals, devices }: { terminals: any[]; devices: any[] 
           <Button size="sm" variant={d.state === 'ACTIVE' ? 'danger' : 'success'} data-fb={`fiscal:device:state:${d.id}`} onClick={() => setStateFor(d)}>{d.state === 'ACTIVE' ? <><Pause className="w-3.5 h-3.5" />{t('إيقاف')}</> : <><Play className="w-3.5 h-3.5" />{t('تنشيط')}</>}</Button>,
         ])} />
       {terminals.filter((x) => x.drawer && !rows.some((d) => d.terminalId === x.id && d.state === 'ACTIVE')).length > 0 && (
-        <Banner tone="warning"><span className="flex items-center gap-1 flex-wrap"><AlertTriangle className="w-4 h-4" />{t('كاشير من غير جهاز ضريبي نشط')}: {terminals.filter((x) => x.drawer && !rows.some((d) => d.terminalId === x.id && d.state === 'ACTIVE')).map((x) => deviceName(x.code, x.kind, x.name)).join('، ')} — {t('إيصالاته هتستنى لحد ما يتسجل جهاز')}<Tech> (NO_ACTIVE_DEVICE)</Tech></span></Banner>
+        <Banner tone="warning"><span className="flex items-center gap-1 flex-wrap"><AlertTriangle className="w-4 h-4" />{t('كاشير من غير جهاز ضريبي نشط')}: {terminals.filter((x) => x.drawer && !rows.some((d) => d.terminalId === x.id && d.state === 'ACTIVE')).map((x) => deviceName(x.code, x.kind, x.name)).join(t('، '))} — {t('إيصالاته هتستنى لحد ما يتسجل جهاز')}<Tech> (NO_ACTIVE_DEVICE)</Tech></span></Banner>
       )}
       <div className="mt-4 rounded-xl surface-1 p-3 space-y-3">
         <div className="font-bold text-sm">{t('تسجيل جهاز جديد')}</div>

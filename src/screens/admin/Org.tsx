@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Building2, GitBranch, MonitorSmartphone, Plus, Pencil, Power, Wrench, Landmark, Info, Clock3 } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Banner, Button, Card, EmptyState, Field, Input, KV, PageHeader, Pill, Select, StatCard, StatGrid, StateBadge, Switch, Table, Textarea, toast } from '../../ui';
-import { t } from '../../i18n';
+import { t, getLang } from '../../i18n';
 import { Tech } from '../../app/tech';
 import { demo } from '../../mock/demo';
 import { egProfile } from '../../mock/contracts';
@@ -29,7 +29,7 @@ export default function Org() {
         description={t('أول خطوة في التجهيز: اسم المطعم، الفروع ومواعيد اليوم التجاري، والأجهزة اللي في كل فرع.')}
       />
       <StatGrid>
-        <StatCard label={t('اسم المطعم')} value={<span className="text-lg">{biz.data?.nameAr || biz.data?.name || '—'}</span>} icon={<Building2 />} loading={biz.loading && !biz.data} />
+        <StatCard label={t('اسم المطعم')} value={<span className="text-lg">{(getLang() === 'en' ? biz.data?.name || biz.data?.nameAr : biz.data?.nameAr || biz.data?.name) || '—'}</span>} icon={<Building2 />} loading={biz.loading && !biz.data} />
         <StatCard label={t('فروع شغالة')} value={branches.items.filter((b) => b.active).length} icon={<GitBranch />} loading={loading} hint={t('كل فرع ليه يوم تجاري لوحده')} />
         <StatCard label={t('أجهزة شغالة')} value={active.length} icon={<MonitorSmartphone />} tone={kinds.size === 4 ? 'success' : 'warning'} loading={loading} hint={kinds.size === 4 ? t('كل الأنواع موجودة') : t('{k} من 4 أنواع — كمّل الباقي', { k: kinds.size })} />
         <StatCard label={t('ورديات مفتوحة دلوقتي')} value={open} icon={<Clock3 />} loading={loading} hint={t('على أجهزة الكاشير')} />

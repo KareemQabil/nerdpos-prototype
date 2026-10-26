@@ -5,12 +5,12 @@ import { ChefHat, Minus, Plus, Trash2, Ban, ArrowRightLeft, Send, Lock, Tag, Gif
 import { useDev, useQuery, useCommand } from '../../app/hooks';
 import { Button, Pill, Modal, Field, Select, Input, Textarea, Money, StateBadge, Banner, EmptyState, Tabs, Timeline, Skeleton } from '../../ui';
 import { Tech } from '../../app/tech';
-import { t, L } from '../../i18n';
+import { t, L, tLabel } from '../../i18n';
 import { cn, money, qty, time } from '../../lib/format';
 import { ALLERGEN_AR } from './MenuGrid';
 import { CustomerChip } from '../customers/common'; // crm area: customer on the check
 import { optionText, ruleSentence } from '../../demo/policyText';
-import { personName, deviceName } from '../../demo/people';
+import { personName, deviceName, personText } from '../../demo/people';
 
 export function useReasons(kind: string) {
   const r = useQuery<any>('ReasonCode.List', { query: { kind, active: true } });
@@ -24,7 +24,7 @@ function ReasonText({ kind, code }: { kind: string; code?: string | null }) {
   const plain = r ? L(r.label) : code === 'PROMOTION' ? t('عرض') : t('سبب مسجّل');
   return <>{plain}<Tech><span className="num text-[10px] opacity-70 ms-1">{code}</span></Tech></>;
 }
-const firstName = (s?: string | null) => (s ?? '').split(' — ')[0];
+const firstName = (s?: string | null) => (s ? personName(null, s) : '');
 
 export function CheckPanel({ order, refetch, mode, onCheckSwitch }: { order: any; refetch: () => void; mode: 'FLOOR' | 'COUNTER'; onCheckSwitch?: (id: string) => void }) {
   const { nav, can, auth, kind } = useDev();
@@ -114,7 +114,7 @@ export function CheckPanel({ order, refetch, mode, onCheckSwitch }: { order: any
             <div className="divide-y divide-[var(--line)]">{unfired.map((l: any) => <LineRow key={l.id} l={l} draft={draft} onQty={(d) => qtyChange(l, d)} onRemove={() => qtyChange(l, -999)} onSeat={() => setDlg({ k: 'seat', line: l })} seats={seats} busy={busy} />)}</div>
           </div>
         )}
-        {removed.length > 0 && <div className="text-[11px] text-dim px-1">{t('اتشالوا قبل الإرسال')}: {removed.map((l: any) => L(l.name)).join('، ')}</div>}
+        {removed.length > 0 && <div className="text-[11px] text-dim px-1">{t('اتشالوا قبل الإرسال')}: {removed.map((l: any) => L(l.name)).join(t('، '))}</div>}
         {order.discounts.filter((d: any) => d.active).map((d: any) => (
           <div key={d.id} className="flex items-center justify-between gap-2 text-xs rounded-xl px-3 py-2 border border-[color-mix(in_srgb,var(--error)_30%,transparent)] bg-[color-mix(in_srgb,var(--error)_8%,transparent)]">
             <span className="flex items-center gap-1.5 min-w-0"><Tag className="w-3.5 h-3.5 text-[var(--error)] shrink-0" /><b>{d.label ? L(d.label) : t('خصم')} {d.type === 'PERCENTAGE' ? <span className="num">{d.value}%</span> : <span className="num">{money(d.value)}</span>}</b><span className="text-dim truncate">· <ReasonText kind="DISCOUNT" code={d.reasonCode} />{d.approvalGrantId ? ` · ${t('بموافقة مدير')}` : ''}</span></span>
@@ -232,7 +232,7 @@ function LineRow({ l, locked, draft, onQty, onRemove, onVoid, onMod, onSeat, sea
             </div>
           )}
           {l.note && <div className="text-[11px] text-[var(--warning-text)] mt-0.5 flex items-center gap-1"><StickyNote className="w-3 h-3" />{l.note}</div>}
-          {l.allergens?.length ? <div className="text-[11px] text-[var(--warning-text)] font-bold flex items-center gap-1"><AlertTriangle className="w-3 h-3" />{l.allergens.map((a: string) => t(ALLERGEN_AR[a] ?? a)).join('، ')}</div> : null}
+          {l.allergens?.length ? <div className="text-[11px] text-[var(--warning-text)] font-bold flex items-center gap-1"><AlertTriangle className="w-3 h-3" />{l.allergens.map((a: string) => t(ALLERGEN_AR[a] ?? a)).join(t('، '))}</div> : null}
           {l.kitchenMods?.map((m: any) => <div key={m.id} className="text-[11px] text-[var(--info)]">{t('ملاحظة للمطبخ')}: {m.text}</div>)}
           {voided && <div className="text-[11px] text-[var(--error)]">{t('اتلغى')} · <ReasonText kind="LINE_VOID" code={l.voided.reasonCode} /> · {l.voided.disposition === 'WASTE' ? t('اتعمل واترمى (هالك)') : l.voided.disposition === 'NOT_PREPARED' ? t('ما اتعملش') : '—'}</div>}
           {l.movedFrom && <div className="text-[10px] text-dim">{t('اتنقل من شيك تاني')}</div>}
@@ -346,7 +346,7 @@ function DiscountDialog({ order, onClose }: { order: any; onClose: () => void })
           <Field label={t('الكود')} hint={t('مثلًا WELCOME50')}><Input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} className="num" /></Field>
         )}
         <div className="text-[11px] text-dim leading-relaxed">{t('الخصم بيتوزع على الأصناف والخدمة بالتناسب. خصمين على نفس الشيك مش مسموح.')}</div>
-        {live.length > 0 && <Banner tone="success">{t('عرض شغال دلوقتي')}: {live.map((p: any) => L(p.name)).join('، ')} — {t('مش بيتطبق لوحده، اختاره من «كود عرض».')}</Banner>}
+        {live.length > 0 && <Banner tone="success">{t('عرض شغال دلوقتي')}: {live.map((p: any) => L(p.name)).join(t('، '))} — {t('مش بيتطبق لوحده، اختاره من «كود عرض».')}</Banner>}
       </div>
     </Modal>
   );
@@ -429,9 +429,9 @@ export function HistoryDialog({ order, onClose }: { order: any; onClose: () => v
   const tl = useQuery<any>('Order.Timeline', { params: { orderId: order.id } });
   const items = (tl.data?.items ?? []).map((h: any, i: number) => ({
     id: i,
-    title: typeof h.text === 'string' ? h.text : L(h.text),
+    title: typeof h.text === 'string' ? tLabel(h.text) : L(h.text),
     time: time(h.at),
-    text: [h.byName ? personName(null, h.byName) : h.by ? personName(h.by) : '', h.terminal ? deviceName(h.terminal) : ''].filter(Boolean).join(' · '),
+    text: [personText(h.byName) ? personName(null, personText(h.byName)) : h.by ? personName(h.by) : '', h.terminal ? deviceName(h.terminal) : ''].filter(Boolean).join(' · '),
     meta: <Tech><span className="num text-[10px] text-dim">{h.by ?? ''} {h.terminal ?? ''}</span></Tech>,
   }));
   return (

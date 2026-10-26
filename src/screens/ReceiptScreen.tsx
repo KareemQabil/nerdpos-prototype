@@ -99,8 +99,8 @@ export default function ReceiptScreen() {
                     <span className={cn('num whitespace-nowrap', l.voided && 'line-through')}>{money(l.lineTotal, false)}</span>
                   </div>
                   {l.voided && <div className="text-[11px] font-bold">— {t('ملغي')}</div>}
-                  {(l.modifiers ?? []).length > 0 && <div className="text-[11px] ps-3">+ {l.modifiers.map((m: any) => L(m)).join('، ')}</div>}
-                  {(l.children ?? []).length > 0 && <div className="text-[11px] ps-3">{l.children.map((c: any) => `${L(c.name)}${c.detail ? ' (' + L(c.detail) + ')' : ''}`).join('، ')}</div>}
+                  {(l.modifiers ?? []).length > 0 && <div className="text-[11px] ps-3">+ {l.modifiers.map((m: any) => L(m)).join(t('، '))}</div>}
+                  {(l.children ?? []).length > 0 && <div className="text-[11px] ps-3">{l.children.map((c: any) => `${L(c.name)}${c.detail ? ' (' + L(c.detail) + ')' : ''}`).join(t('، '))}</div>}
                   {qty(l.quantity) !== '1' && !l.voided && <div className="text-[10px] ps-3 num">@ {money(l.unitTotal, false)}</div>}
                 </div>
               ))}

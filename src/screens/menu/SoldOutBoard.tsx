@@ -5,7 +5,8 @@ import { Ban, RotateCcw, Search, CircleSlash, Clock, PackageX } from 'lucide-rea
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Banner, Button, Card, Empty, Field, Input, Modal, Pill, Section, StateBadge, Switch, Tabs, Textarea } from '../../ui';
 import { Tech } from '../../app/tech';
-import { t, L } from '../../i18n';
+import { t, L, tv } from '../../i18n';
+import { personText } from '../../demo/people';
 import { cn, dateTime } from '../../lib/format';
 import { timeText } from './parts';
 
@@ -24,7 +25,7 @@ export default function SoldOutScreen() {
 type Target = { kind: 'product'; id: string; name: any } | { kind: 'option'; id: string; groupId: string; name: any };
 
 /** Who marked it, in words (the seed's system user is «من الإعداد»). */
-const byText = (n?: string | null) => (!n ? '' : /^[a-z0-9_-]+$/i.test(n) ? ` · ${t('من الإعداد')}` : ` · ${n}`);
+const byText = (n?: string | null) => (!n ? '' : /^[a-z0-9_-]+$/i.test(n) ? ` · ${t('من الإعداد')}` : ` · ${personText(n)}`);
 
 export function SoldOutBoard({ compact }: { compact?: boolean }) {
   const { can } = useDev();
@@ -75,7 +76,7 @@ export function SoldOutBoard({ compact }: { compact?: boolean }) {
               <div key={x.productId} className="flex items-center gap-2 rounded-xl border border-[color-mix(in_srgb,var(--error)_35%,transparent)] bg-[color-mix(in_srgb,var(--error)_8%,transparent)] ps-3 pe-1 py-1" data-fb={`soldout:out:${x.productId}`}>
                 <div className="leading-tight">
                   <div className="text-sm font-bold">{L(x.name)} {x.state === 'BLOCKED' && <Pill tone="error">{t('متوقف')}</Pill>}</div>
-                  <div className="text-[11px] text-dim">{x.reason ?? '—'} · {x.today ? t('النهارده بس') : x.state === 'BLOCKED' ? t('لحد ما يتشغل') : t('لحد ما حد يرجّعه')} {byText(x.updatedByName)}</div>
+                  <div className="text-[11px] text-dim">{tv(x.reason) || '—'} · {x.today ? t('النهارده بس') : x.state === 'BLOCKED' ? t('لحد ما يتشغل') : t('لحد ما حد يرجّعه')} {byText(x.updatedByName)}</div>
                 </div>
                 {allowed && x.state === 'SOLD_OUT' && <Button size="sm" variant="ghost" data-fb={`soldout:back:${x.productId}`} disabled={busy} onClick={() => back('product', x.productId, undefined, x.name)}><RotateCcw className="w-3.5 h-3.5" />{t('رجّعه')}</Button>}
               </div>
@@ -84,7 +85,7 @@ export function SoldOutBoard({ compact }: { compact?: boolean }) {
               <div key={x.optionId} className="flex items-center gap-2 rounded-xl border border-[color-mix(in_srgb,var(--warning)_35%,transparent)] bg-[color-mix(in_srgb,var(--warning)_8%,transparent)] ps-3 pe-1 py-1" data-fb={`soldout:out:${x.optionId}`}>
                 <div className="leading-tight">
                   <div className="text-sm font-bold">{L(x.name)} <span className="text-[11px] text-dim font-normal">({t('إضافة')} · {L(x.groupName)})</span></div>
-                  <div className="text-[11px] text-dim">{x.reason ?? '—'} · {x.today ? t('النهارده بس') : t('لحد ما حد يرجّعه')} {byText(x.updatedByName)}</div>
+                  <div className="text-[11px] text-dim">{tv(x.reason) || '—'} · {x.today ? t('النهارده بس') : t('لحد ما حد يرجّعه')} {byText(x.updatedByName)}</div>
                 </div>
                 {allowed && <Button size="sm" variant="ghost" data-fb={`soldout:back:${x.optionId}`} disabled={busy} onClick={() => back('option', x.optionId, x.groupId, x.name)}><RotateCcw className="w-3.5 h-3.5" />{t('رجّعها')}</Button>}
               </div>

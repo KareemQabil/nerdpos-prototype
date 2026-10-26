@@ -38,7 +38,7 @@ export function AllergyWarning({ allergies, notes }: { allergies: string[]; note
   return (
     <div className="flex items-start gap-2 rounded-xl px-3 py-2 text-sm font-bold border border-amber-400/50 bg-amber-400/10 text-amber-300">
       <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-      <span>{t('حساسية')}: {allergies.map((a) => t(ALLERGEN_AR[a] ?? a)).join('، ')}{notes ? <span className="block text-[11px] font-normal text-amber-200/80">{notes}</span> : null}</span>
+      <span>{t('حساسية')}: {allergies.map((a) => t(ALLERGEN_AR[a] ?? a)).join(t('، '))}{notes ? <span className="block text-[11px] font-normal text-amber-200/80">{notes}</span> : null}</span>
     </div>
   );
 }
@@ -47,7 +47,7 @@ export function AllergyWarning({ allergies, notes }: { allergies: string[]; note
 export function addressText(a: any, withLandmark = true) {
   if (!a) return '';
   const parts = [a.area, a.street, a.building ? `${t('عمارة')} ${a.building}` : null, a.floor ? `${t('الدور')} ${a.floor}` : null, a.apartment ? `${t('شقة')} ${a.apartment}` : null].filter(Boolean);
-  return parts.join('، ') + (withLandmark && a.landmark ? ` — ${a.landmark}` : '');
+  return parts.join(t('، ')) + (withLandmark && a.landmark ? ` — ${a.landmark}` : '');
 }
 
 export function useZones() {
@@ -205,7 +205,7 @@ export function CustomerChip({ order, editable = true, compact }: { order: any; 
         <div className="flex-1 min-w-0 text-xs">
           <div className="font-bold flex items-center gap-1.5 flex-wrap truncate">{cust?.name ?? order.customerName}{cust && <TierBadge tier={cust.loyalty?.tier} />}{cust?.tags?.includes('VIP') && <Pill tone="violet">VIP</Pill>}</div>
           <div className="text-dim truncate"><span className="num" dir="ltr">{cust?.phone ?? order.customerPhone ?? ''}</span>{cust ? <> · <Star className="w-3 h-3 inline -mt-0.5" /> <span className="num">{cust.loyalty?.balance ?? 0}</span> {t('نقطة')}</> : null}{!compact && cust?.stats ? ` · ${cust.stats.orders} ${t('طلب')}` : ''}</div>
-          {cust?.allergies?.length ? <div className="text-amber-300 font-bold truncate">⚠ {cust.allergies.map((a: string) => t(ALLERGEN_AR[a] ?? a)).join('، ')}</div> : null}
+          {cust?.allergies?.length ? <div className="text-amber-300 font-bold truncate">⚠ {cust.allergies.map((a: string) => t(ALLERGEN_AR[a] ?? a)).join(t('، '))}</div> : null}
         </div>
         {canSet && <button onClick={() => setOpen(true)} className="text-[11px] text-[var(--primary)] font-bold shrink-0">{t('تغيير')}</button>}
         {canSet && <button title={t('شيل العميل')} disabled={busy} onClick={() => set(null)} className="text-dim hover:text-[var(--error)]"><X className="w-3.5 h-3.5" /></button>}

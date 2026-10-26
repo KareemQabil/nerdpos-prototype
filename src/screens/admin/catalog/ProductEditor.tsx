@@ -373,7 +373,7 @@ function AvailabilityTab({ p }: { p: any }) {
             {menus.map((m: any) => (
               <div key={m.id} className="surface-1 rounded-lg px-3 py-2 text-sm">
                 <div className="font-bold">{L(m.name)} {m.runningNow && <Pill tone="success">{t('شغال دلوقتي')}</Pill>}</div>
-                <div className="text-xs text-dim">{m.channels.map(channelLabel).join('، ')} · {m.daypartIds.length ? m.daypartIds.map(dpName).join('، ') : t('طول اليوم')}</div>
+                <div className="text-xs text-dim">{m.channels.map(channelLabel).join(t('، '))} · {m.daypartIds.length ? m.daypartIds.map(dpName).join(t('، ')) : t('طول اليوم')}</div>
               </div>
             ))}
           </div>

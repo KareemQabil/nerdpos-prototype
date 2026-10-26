@@ -5,7 +5,7 @@ import { Plus, Pencil, Star, Warehouse as WhIcon, Eye, Save } from 'lucide-react
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
 import { Banner, Button, Card, Empty, Field, Input, KV, Modal, Money, Pill, Section, Select, Spinner, StateBadge, Switch, Table } from '../../ui';
-import { t, L } from '../../i18n';
+import { t, L, tv } from '../../i18n';
 import { dateTime } from '../../lib/format';
 import { LevelPill, Qty, WH_KIND, fmtQty, newKey, useList } from './common';
 import { ItemDrawer } from './ItemDrawer';
@@ -34,11 +34,11 @@ export default function Warehouses() {
         <div className="space-y-5">
           {branchList.map((b: any) => (
             <div key={b.id}>
-              <div className="flex items-center gap-2 mb-2"><h2 className="font-bold">{b.name}</h2>{!(byBranch.get(b.id) ?? []).some((w) => w.salesDefault && w.active) && <Pill tone="error">{t('مفيش مخزن بيع')}</Pill>}</div>
+              <div className="flex items-center gap-2 mb-2"><h2 className="font-bold">{tv(b.name)}</h2>{!(byBranch.get(b.id) ?? []).some((w) => w.salesDefault && w.active) && <Pill tone="error">{t('مفيش مخزن بيع')}</Pill>}</div>
               {(byBranch.get(b.id) ?? []).length === 0 ? <div className="text-sm text-dim">{t('مفيش مخازن في الفرع ده')}</div> : (
                 <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-3">
                   {(byBranch.get(b.id) ?? []).map((w) => (
-                    <Card key={w.id} className={w.active ? '' : 'opacity-60'} title={<span className="flex items-center gap-2">{w.salesDefault && <Star className="w-4 h-4 text-[var(--warning)] fill-[var(--warning)]" />}{w.name}</span>}
+                    <Card key={w.id} className={w.active ? '' : 'opacity-60'} title={<span className="flex items-center gap-2">{w.salesDefault && <Star className="w-4 h-4 text-[var(--warning)] fill-[var(--warning)]" />}{tv(w.name)}</span>}
                       badge={<>{<Pill tone="neutral">{t(WH_KIND[w.kind] ?? w.kind)}</Pill>}{w.salesDefault && <Pill tone="primary">{t('مخزن البيع')}</Pill>}{!w.active && <Pill tone="neutral">{t('موقوف')}</Pill>}</>}
                       actions={<>
                         <Button size="sm" data-fb={`wh:view:${w.id}`} onClick={() => setView(w.id)}><Eye className="w-3.5 h-3.5" />{t('الرصيد')}</Button>
@@ -80,7 +80,7 @@ function WarehouseForm({ w, branches, onClose }: { w: any; branches: any[]; onCl
       <div className="space-y-3">
         <Field label={t('اسم المخزن')}><Input data-fb="wh-form:name" value={d.name} onChange={(e) => setD({ ...d, name: e.target.value })} placeholder={t('مثال: مخزن الدور الأرضي')} /></Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label={t('الفرع')}><Select data-fb="wh-form:branch" value={d.branchId} onChange={(e) => setD({ ...d, branchId: e.target.value })} options={branches.map((b: any) => ({ value: b.id, label: b.name }))} /></Field>
+          <Field label={t('الفرع')}><Select data-fb="wh-form:branch" value={d.branchId} onChange={(e) => setD({ ...d, branchId: e.target.value })} options={branches.map((b: any) => ({ value: b.id, label: tv(b.name) }))} /></Field>
           <Field label={t('النوع')}><Select data-fb="wh-form:kind" value={d.kind} onChange={(e) => setD({ ...d, kind: e.target.value })} options={Object.entries(WH_KIND).map(([k, v]) => ({ value: k, label: t(v) }))} /></Field>
         </div>
         <Switch checked={d.active} onChange={(v) => setD({ ...d, active: v })} label={t('المخزن شغال')} />
@@ -101,7 +101,7 @@ function WarehouseView({ id, onClose }: { id: string | null; onClose: () => void
   const [item, setItem] = useState<string | null>(null);
   const w = q.data;
   return (
-    <Modal open={!!id} onClose={onClose} xwide title={w ? `${w.name} — ${w.branchName}` : t('المخزن')} badge={<StateBadge ops={['Warehouse.Get']} />}>
+    <Modal open={!!id} onClose={onClose} xwide title={w ? `${tv(w.name)} — ${tv(w.branchName)}` : t('المخزن')} badge={<StateBadge ops={['Warehouse.Get']} />}>
       {!w ? <Spinner /> : (
         <div className="space-y-3">
           <KV rows={[[t('النوع'), t(WH_KIND[w.kind] ?? w.kind)], [t('قيمة الرصيد'), <Money v={w.stockValue} />], [t('عدد الأصناف'), w.itemCount], [t('مخزن البيع'), w.salesDefault ? t('أيوه') : t('لأ')]]} />

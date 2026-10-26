@@ -4,7 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { ChefHat, Route, Plus, Pencil, Power, Armchair, AlertTriangle, Users } from 'lucide-react';
 import { useCommand, useDev } from '../../app/hooks';
 import { Banner, Button, Card, EmptyState, Field, Input, PageHeader, Pill, Select, StatCard, StatGrid, StateBadge, Switch, Table, Tabs } from '../../ui';
-import { t, L } from '../../i18n';
+import { t, L, tv } from '../../i18n';
 import { Tech } from '../../app/tech';
 import { stationName } from '../../demo/humanLog';
 import { cn } from '../../lib/format';
@@ -196,7 +196,7 @@ function TablesTab() {
       <div className="space-y-4">
         {areas.map((a) => (
           <div key={a}>
-            <div className="text-sm font-bold mb-2">{a} <span className="text-dim font-normal text-xs">({tables.items.filter((x) => (x.area || t('من غير منطقة')) === a).length})</span></div>
+            <div className="text-sm font-bold mb-2">{tv(a)} <span className="text-dim font-normal text-xs">({tables.items.filter((x) => (x.area || t('من غير منطقة')) === a).length})</span></div>
             <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-2">
               {tables.items.filter((x) => (x.area || t('من غير منطقة')) === a).map((x) => (
                 <div key={x.id} className={cn('rounded-xl border line p-2 space-y-1', x.occupancy ? 'bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]' : 'surface-1', !x.active && 'opacity-50')} data-fb={`tables:table:${x.name}`}>

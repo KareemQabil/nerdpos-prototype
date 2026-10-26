@@ -5,9 +5,10 @@ import { Plus, ClipboardCheck, Send, CheckCheck, XCircle, Eye, EyeOff, Save } fr
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
 import { Banner, Button, Card, Empty, Field, Input, KV, Modal, Drawer, Money, Pill, Section, Select, Spinner, StateBadge, Switch, Table, Textarea, EmptyState } from '../../ui';
-import { t, L } from '../../i18n';
+import { t, L, tv } from '../../i18n';
 import { cn, dateTime, money } from '../../lib/format';
 import { BranchScope, COUNT_STATE, Qty, StatePill, WarehouseSelect, fmtQty, unitLabel, unitOptions, useBranchScope, useItemsCatalog, useList, useWarehouses, Inp, Sel } from './common';
+import { personText } from '../../demo/people';
 
 const OPS = ['StockCount.Start', 'StockCount.RecordObservations', 'StockCount.Submit', 'Stock.Count', 'StockCount.Cancel', 'StockCount.Find', 'StockCount.Get'];
 
@@ -26,8 +27,8 @@ export default function Counts() {
       <div className="flex gap-2 mb-3"><Sel className="w-52" value={state} onChange={(e) => setState(e.target.value)} options={[{ value: '', label: t('كل الحالات') }, ...Object.entries(COUNT_STATE).map(([k, v]) => ({ value: k, label: t(v.ar) }))]} /></div>
       <Table loading={list.loading && !list.raw} empty={<EmptyState compact icon={<ClipboardCheck />} title={t('مفيش جرد لسه. ابدأ أول جرد.')} />} head={[t('رقم الجرد'), t('المخزن'), t('بدأ'), t('الحالة'), t('اتعد'), t('الفروقات'), '']} rows={list.items.map((c) => [
           <button className="num font-bold hover:text-[var(--primary)]" data-fb={`counts:open:${c.id}`} onClick={() => setOpen(c.id)}>{c.number}</button>,
-          <span>{c.warehouse.name} <span className="text-xs text-dim">{c.warehouse.branchName}</span></span>,
-          <span className="text-xs">{dateTime(c.startedAt)} · {c.startedByName}</span>,
+          <span>{tv(c.warehouse.name)} <span className="text-xs text-dim">{tv(c.warehouse.branchName)}</span></span>,
+          <span className="text-xs">{dateTime(c.startedAt)} · {personText(c.startedByName)}</span>,
           <StatePill map={COUNT_STATE} state={c.state} />,
           <span className="num text-xs">{c.countedCount} / {c.lineCount}</span>,
           c.state === 'POSTED' ? <Money v={c.varianceValue} tone={Number(c.varianceValue) < 0 ? 'error' : 'success'} className="text-sm" /> : c.previewVarianceValue !== null && c.state !== 'CANCELLED' ? <span className="text-xs text-dim">{t('متوقع')} <Money v={c.previewVarianceValue} className="text-xs" /></span> : '—',
@@ -117,13 +118,13 @@ function CountSheet({ id, onClose }: { id: string | null; onClose: () => void })
         <div className="space-y-3">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             <Box l={t('اتعد')} v={<span className="num">{c.countedCount} / {c.lineCount}</span>} />
-            <Box l={t('بدأه')} v={`${c.startedByName} · ${dateTime(c.startedAt)}`} />
-            <Box l={t('اللي عدّوا')} v={(c.lines.map((l: any) => l.countedByName).filter(Boolean) as string[]).filter((x, i, a) => a.indexOf(x) === i).join('، ') || '—'} />
+            <Box l={t('بدأه')} v={`${personText(c.startedByName)} · ${dateTime(c.startedAt)}`} />
+            <Box l={t('اللي عدّوا')} v={(c.lines.map((l: any) => personText(l.countedByName)).filter(Boolean) as string[]).filter((x, i, a) => a.indexOf(x) === i).join(t('، ')) || '—'} />
             <Box l={c.state === 'POSTED' ? t('الفروقات المعتمدة') : t('الفروقات لحد دلوقتي')} v={<Money v={c.state === 'POSTED' ? c.varianceValue : c.previewVarianceValue} tone={Number(c.state === 'POSTED' ? c.varianceValue : c.previewVarianceValue) < 0 ? 'error' : 'success'} />} />
           </div>
           <div className="h-2 rounded-full surface-2 overflow-hidden"><div className="h-full bg-[var(--primary)]" style={{ width: `${(c.countedCount / Math.max(1, c.lineCount)) * 100}%` }} /></div>
-          {c.note && <div className="text-sm text-dim">{c.note}</div>}
-          {c.state === 'CANCELLED' && <Banner tone="error">{t('الجرد اتلغى')}: {c.cancelReason}</Banner>}
+          {tv(c.note) && <div className="text-sm text-dim">{tv(c.note)}</div>}
+          {c.state === 'CANCELLED' && <Banner tone="error">{t('الجرد اتلغى')}: {tv(c.cancelReason)}</Banner>}
           {c.state === 'SUBMITTED' && <Banner tone="warning">{t('راجع الفروقات: بالأحمر عجز، بالأخضر زيادة. الاعتماد بيعمل حركة "فرق جرد" لكل صنف بقيمته بالتكلفة، وبيحتاج موافقة مدير لو فيه أي فرق.')}</Banner>}
           <div className="flex flex-wrap gap-2 items-center">
             <Inp className="w-60" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={t('دوّر في الورقة')} />
@@ -135,7 +136,7 @@ function CountSheet({ id, onClose }: { id: string | null; onClose: () => void })
             const v = vals[l.itemId];
             const opts = unitOptions(l.item);
             return [
-              <div><div className="font-bold">{L(l.item?.name)}</div><div className="text-[11px] text-dim">{l.item?.category}</div></div>,
+              <div><div className="font-bold">{L(l.item?.name)}</div><div className="text-[11px] text-dim">{tv(l.item?.category)}</div></div>,
               ...(draft && blind ? [] : [<Qty v={l.expectedQty} unit={unit} hint={false} />]),
               draft ? (
                 <div className="flex gap-1 items-center">
@@ -147,7 +148,7 @@ function CountSheet({ id, onClose }: { id: string | null; onClose: () => void })
                 </div>
               ) : <Qty v={l.countedQty} unit={unit} hint={false} />,
               ...(draft ? [] : [<Qty v={l.varianceQty} unit={unit} signed hint={false} />, <Money v={l.varianceValue} tone={Number(l.varianceValue) < 0 ? 'error' : Number(l.varianceValue) > 0 ? 'success' : 'dim'} className="text-xs" />]),
-              <span className="text-xs text-dim">{l.countedByName ?? '—'}</span>,
+              <span className="text-xs text-dim">{personText(l.countedByName) ?? '—'}</span>,
             ];
           })} />
           <Tech><div className="text-[11px] num text-dim">{c.id} · v{c.version} · baselineSeq {c.lines[0]?.baselineSeq}</div></Tech>
@@ -169,7 +170,7 @@ function SubmitDialog({ c, onClose }: { c: any; onClose: () => void }) {
       footer={<><Button onClick={onClose}>{t('رجوع')}</Button><Button variant="primary" data-fb="count-submit:go" loading={busy} disabled={missing.length > 0 && !zero} onClick={async () => { const r = await run('StockCount.Submit', { params: { countId: c.id }, body: { expectedVersion: c.version, zeroUncounted: zero } }, { success: t('الجرد اتسلم — راجع الفروقات') }); if (r) onClose(); }}><Send className="w-4 h-4" />{t('سلّم')}</Button></>}>
       <div className="space-y-3">
         {missing.length ? (<>
-          <Banner tone="warning">{t('فيه {n} صنف لسه ما اتعدش:', { n: missing.length })} {missing.slice(0, 8).map((l: any) => L(l.item?.name)).join('، ')}{missing.length > 8 ? '…' : ''}</Banner>
+          <Banner tone="warning">{t('فيه {n} صنف لسه ما اتعدش:', { n: missing.length })} {missing.slice(0, 8).map((l: any) => L(l.item?.name)).join(t('، '))}{missing.length > 8 ? '…' : ''}</Banner>
           <Switch checked={zero} onChange={setZero} label={t('اللي ما اتعدش يتحسب صفر (مش موجود)')} />
         </>) : <Banner tone="success">{t('كل الأصناف اتعدت.')}</Banner>}
         <div className="text-sm text-dim">{t('بعد التسليم مفيش تعديل في العد. لو فيه غلط، الغي الجرد وابدأ جرد جديد.')}</div>

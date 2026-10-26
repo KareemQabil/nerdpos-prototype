@@ -76,7 +76,7 @@ export const levelLabel = (l: string) => ({ NO: t('بدون'), LESS: t('خفيف
 export const placementLabel = (p: string) => ({ WHOLE: t('كلها'), LEFT: t('النص الأول'), RIGHT: t('النص التاني') } as Record<string, string>)[p] ?? p;
 export const halfModeLabel = (m?: string) => ({ HIGHER_HALF: t('سعر النص الأغلى'), AVERAGE: t('متوسط سعر النصين'), SUM_OF_HALVES: t('مجموع سعر النصين (كل نص بنسبته)') } as Record<string, string>)[m ?? 'HIGHER_HALF'] ?? m ?? '';
 export const dayName = (d: number) => [t('الحد'), t('الاتنين'), t('التلات'), t('الأربع'), t('الخميس'), t('الجمعة'), t('السبت')][d] ?? String(d);
-export const daysText = (days: number[]) => (days.length === 7 ? t('كل يوم') : days.map(dayName).join('، '));
+export const daysText = (days: number[]) => (days.length === 7 ? t('كل يوم') : days.map(dayName).join(t('، ')));
 export const timeText = (iso?: string | null) => {
   if (!iso) return '';
   const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(iso));

@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import { Armchair, ShoppingCart, ChefHat, Briefcase, Crown, Wrench, MonitorSmartphone, Columns2, Clock, Radio, MessageSquarePlus, RotateCcw, SlidersHorizontal, PlayCircle, FlaskConical, Code2, KeyRound, ArrowLeft } from 'lucide-react';
 import { Modal, Button, Tabs, toast, confirmDialog } from '../ui';
-import { t } from '../i18n';
+import { t, getLang } from '../i18n';
 import { cn } from '../lib/format';
 import { devices } from '../app/devices';
 import { store } from '../mock/store';
@@ -13,7 +13,7 @@ import { apiLog } from '../mock/kernel';
 import { errorText } from '../app/hooks';
 import { as } from './runner';
 import { openJourney } from './Walkthrough';
-import { PERSONAS, DEVICE_NAMES } from './people';
+import { PERSONAS, DEVICE_NAMES, deviceName } from './people';
 
 const SEEN = 'nerdpos.welcome.v1';
 export const welcomeSeen = () => { try { return localStorage.getItem(SEEN) === '1'; } catch { return true; } };
@@ -59,7 +59,7 @@ export function Welcome({ open, onClose, onOpenPanel, startTab = 'start' }: { op
       const p = PERSONAS[r.user];
       if (withJourney && r.journey) { openJourney(r.journey); onOpenPanel('walk'); }
       close();
-      toast('success', t('دخلت كـ {n} على {d}', { n: p ? `${p.name} (${p.role})` : r.title, d: DEVICE_NAMES[r.device]?.name ?? '' }));
+      toast('success', t('دخلت كـ {n} على {d}', { n: p ? (getLang() === 'en' ? `${p.en} (${p.roleEn})` : `${p.name} (${p.role})`) : t(r.title), d: DEVICE_NAMES[r.device] ? deviceName(r.device) : '' }));
     } catch (e) { toast('error', errorText(e)); } finally { setBusy(null); }
   };
   return (

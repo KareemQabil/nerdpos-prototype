@@ -11,6 +11,7 @@ import { ALLERGEN_AR } from './order/MenuGrid';
 import { Tech } from '../app/tech';
 
 import { stationName } from '../demo/humanLog';
+import { personName } from '../demo/people';
 export const stationLabel = (n?: string | null) => stationName(n);
 const OPS = ['Kitchen.Board', 'Kitchen.AdvanceTicket', 'TicketItem.Bump', 'Ticket.SetPriority', 'Ticket.Refire', 'Ticket.TransferStation', 'Ticket.Recall'];
 
@@ -110,7 +111,7 @@ function AllDay({ tickets }: { tickets: any[] }) {
       {rows.map((r) => (
         <span key={r.name.ar} title={[...r.mods.entries()].map(([k, v]) => `${k} ×${v}`).join(' · ')} className="whitespace-nowrap inline-flex items-center gap-2 px-3 h-10 rounded-xl bg-[var(--card-raised)] border border-[var(--glass-border)] text-sm">
           <span className="num font-extrabold text-[var(--primary)] text-xl leading-none">{r.qty}</span><span className="font-bold">{L(r.name)}</span>
-          {r.mods.size > 0 && <span className="text-[11px] text-[var(--warning-text)]">{[...r.mods.entries()].slice(0, 2).map(([k, v]) => `${k} ${v}`).join('، ')}</span>}
+          {r.mods.size > 0 && <span className="text-[11px] text-[var(--warning-text)]">{[...r.mods.entries()].slice(0, 2).map(([k, v]) => `${k} ${v}`).join(t('، '))}</span>}
         </span>
       ))}
     </div>
@@ -138,7 +139,7 @@ function Ticket({ tk, stations, reasons, showStation }: { tk: any; stations: any
             {whereOf(tk)}
             {tk.guestCount ? <span className="text-xs text-soft font-bold inline-flex items-center gap-0.5"><Users className="w-3.5 h-3.5" /><span className="num">{tk.guestCount}</span></span> : null}
           </div>
-          <div className="text-[11px] text-soft"><span className="num">#{tk.orderNumber}</span> · {t('الدفعة')} <span className="num">{tk.round}</span>{showStation ? ` · ${stationLabel(tk.stationName)}` : ''}{tk.serverName ? ` · ${tk.serverName.split(' — ')[0]}` : ''}</div>
+          <div className="text-[11px] text-soft"><span className="num">#{tk.orderNumber}</span> · {t('الدفعة')} <span className="num">{tk.round}</span>{showStation ? ` · ${stationLabel(tk.stationName)}` : ''}{tk.serverName ? ` · ${personName(null, tk.serverName)}` : ''}</div>
         </div>
         <div className="text-center shrink-0 leading-none" title={t('من {a} دقيقة — المستهدف {b}', { a: tk.ageMinutes, b: tk.targetMinutes })}>
           <div className="num font-extrabold text-2xl" style={{ color: tone.color }}>{tk.ageMinutes} <span className="text-xs">{t('د')}</span></div>
@@ -176,7 +177,7 @@ function Ticket({ tk, stations, reasons, showStation }: { tk: any; stations: any
                 {it.modifiers?.length > 0 && <div className="ps-14 text-sm font-bold text-[var(--warning-text)]">{it.modifiers.map((m: any) => L(m)).join(' · ')}</div>}
                 {it.children?.length > 0 && <div className="ps-14 text-sm text-[var(--info)]">{it.children.map((c: string, i: number) => <div key={i}>↳ {c}</div>)}</div>}
                 {it.note && <div className="ps-14 text-sm font-bold text-[var(--warning-text)] flex items-center gap-1">✎ {it.note}</div>}
-                {it.allergens?.length > 0 && <div className="ps-14 text-sm font-extrabold text-[var(--error)] flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" />{it.allergens.map((a: string) => t(ALLERGEN_AR[a] ?? a)).join('، ')}</div>}
+                {it.allergens?.length > 0 && <div className="ps-14 text-sm font-extrabold text-[var(--error)] flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" />{it.allergens.map((a: string) => t(ALLERGEN_AR[a] ?? a)).join(t('، '))}</div>}
                 {it.mods?.map((m: any, i: number) => <div key={i} className="ms-14 mt-0.5 text-sm font-bold text-[var(--info)] bg-[color-mix(in_srgb,var(--info)_12%,transparent)] rounded-md px-1.5">{t('تعديل')}: {m.text} · <span className="num">{time(m.at)}</span></div>)}
               </button>
             );
@@ -302,7 +303,7 @@ function Expo({ tickets }: { tickets: any[] }) {
           <div className="flex items-start justify-between gap-2">
             <div>
               <div className="font-extrabold text-xl flex items-center gap-1.5">{rush && <Flame className="w-4 h-4 text-[var(--error)]" />}{first.tableName ? `${t('ترابيزة')} ${first.tableName}` : first.channel === 'TAKEAWAY' ? t('تيك أواي') : first.channel === 'DELIVERY' ? t('دليفري') : t('كاونتر')}</div>
-              <div className="text-[11px] text-dim"><span className="num">#{first.orderNumber}</span> · {t('الدفعة')} {first.round} · {first.serverName?.split(' — ')[0]}</div>
+              <div className="text-[11px] text-dim"><span className="num">#{first.orderNumber}</span> · {t('الدفعة')} {first.round} · {first.serverName ? personName(null, first.serverName) : ''}</div>
             </div>
             <Pill tone={ready ? 'success' : late ? 'error' : 'neutral'}><Clock className="w-3 h-3" /><span className="num">{oldest}</span>{t('د')}</Pill>
           </div>
@@ -315,7 +316,7 @@ function Expo({ tickets }: { tickets: any[] }) {
             ))}
           </div>
           {ready ? <Button variant="success" size="lg" className="w-full" disabled={busy} onClick={() => serve(list)} data-fb="expo-serve"><Truck className="w-4 h-4" />{t('كله جاهز — سلّم للويتر')}</Button>
-            : <div className="text-xs text-dim text-center">{t('مستني')}: {list.filter((x) => x.state !== 'READY').map((x) => stationLabel(x.stationName)).join('، ')}</div>}
+            : <div className="text-xs text-dim text-center">{t('مستني')}: {list.filter((x) => x.state !== 'READY').map((x) => stationLabel(x.stationName)).join(t('، '))}</div>}
         </div>
       ))}
     </div>

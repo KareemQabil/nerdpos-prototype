@@ -4,8 +4,8 @@ import React, { useState } from 'react';
 import { Boxes, TriangleAlert, CalendarClock, TrendingDown, Trash2, Scale, ShoppingBag, PackageCheck, ClipboardCheck, ArrowLeftRight, ChefHat } from 'lucide-react';
 import { useDev, useQuery } from '../../app/hooks';
 import { Banner, Button, Card, Empty, Field, Input, Money, Pill, Section, Select, Spinner, StateBadge, Table, Tabs } from '../../ui';
-import { t, L } from '../../i18n';
-import { money } from '../../lib/format';
+import { t, L, tv } from '../../i18n';
+import { money, dayShort } from '../../lib/format';
 import { BandPill, BranchScope, ItemPicker, KIND_TEXT, LevelPill, MovementTable, Pct, Qty, Stat, WarehouseSelect, fmtQty, useBranchScope, useItemsCatalog, useList, useWarehouses } from './common';
 import { WasteDialog } from './WasteDialog';
 import { ItemDrawer } from './ItemDrawer';
@@ -39,10 +39,10 @@ function Overview({ branchId }: { branchId?: string }) {
   }
   const maxDay = Math.max(1, ...d.days.map((x: any) => Number(x.sales) + Number(x.waste)), ...d.days.map((x: any) => Number(x.receipts)));
   const maxWh = Math.max(1, ...d.byWarehouse.map((w: any) => Number(w.stockValue)));
-  const dayName = (s: string) => new Intl.DateTimeFormat('ar-EG', { weekday: 'short', timeZone: 'UTC' }).format(new Date(s + 'T12:00:00Z'));
+  const dayName = (s: string) => dayShort(s);
   return (
     <div className="space-y-4">
-      {d.salesWarehouseMissing.length > 0 && <Banner tone="error" action={<Button size="sm" onClick={() => nav('inv-warehouses')}>{t('حدد مخزن البيع')}</Button>}>{t('الفرع ده مالوش مخزن بيع — المبيعات مش هتسحب من المخزن لحد ما تحدده:')} {d.salesWarehouseMissing.map((b: any) => b.name).join('، ')}</Banner>}
+      {d.salesWarehouseMissing.length > 0 && <Banner tone="error" action={<Button size="sm" onClick={() => nav('inv-warehouses')}>{t('حدد مخزن البيع')}</Button>}>{t('الفرع ده مالوش مخزن بيع — المبيعات مش هتسحب من المخزن لحد ما تحدده:')} {d.salesWarehouseMissing.map((b: any) => b.name).join(t('، '))}</Banner>}
       {d.negativeCount > 0 && <Banner tone="warning">{t('فيه {n} صنف رصيده بالسالب: المبيعات سحبت أكتر من المسجل. غالبًا استلام ما اتسجلش أو محتاج جرد.', { n: d.negativeCount })}</Banner>}
       <div className="flex flex-wrap gap-2">
         <Button data-fb="inv-dash:po" variant="primary" onClick={() => nav('inv-po', { fromLowStock: true })}><ShoppingBag className="w-4 h-4" />{t('اطلب النواقص')}</Button>
@@ -81,9 +81,9 @@ function Overview({ branchId }: { branchId?: string }) {
           <div className="space-y-3">
             {d.byWarehouse.map((w: any) => (
               <button key={w.id} className="w-full text-start" onClick={() => nav('inv-warehouses', { open: w.id })}>
-                <div className="flex justify-between text-sm"><span className="font-bold">{w.name}{w.salesDefault && <Pill tone="primary" className="ms-1">{t('البيع')}</Pill>}</span><Money v={w.stockValue} className="text-sm" /></div>
+                <div className="flex justify-between text-sm"><span className="font-bold">{tv(w.name)}{w.salesDefault && <Pill tone="primary" className="ms-1">{t('البيع')}</Pill>}</span><Money v={w.stockValue} className="text-sm" /></div>
                 <div className="h-2 rounded-full surface-2 mt-1 overflow-hidden"><div className="h-full bg-[var(--primary)]" style={{ width: `${(Number(w.stockValue) / maxWh) * 100}%` }} /></div>
-                <div className="text-[11px] text-dim mt-0.5">{t('{n} صنف', { n: w.itemCount })} · {w.branchName}{w.lowCount ? ` · ${t('{n} قرب يخلص', { n: w.lowCount })}` : ''}</div>
+                <div className="text-[11px] text-dim mt-0.5">{t('{n} صنف', { n: w.itemCount })} · {tv(w.branchName)}{w.lowCount ? ` · ${t('{n} قرب يخلص', { n: w.lowCount })}` : ''}</div>
               </button>
             ))}
           </div>
@@ -92,13 +92,13 @@ function Overview({ branchId }: { branchId?: string }) {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <Card title={<span className="flex items-center gap-2"><TriangleAlert className="w-4 h-4 text-[var(--warning)]" />{t('النواقص')}</span>} badge={<StateBadge ops={['Inventory.LowStock']} />} actions={<Button size="sm" variant="primary" data-fb="inv-dash:order-low" onClick={() => nav('inv-po', { fromLowStock: true })}>{t('اعمل أمر شراء')}</Button>}>
           <Table empty={t('مفيش نواقص — كله فوق الحد الأدنى')} head={[t('الصنف'), t('المخزن'), t('الموجود'), t('الحد'), t('نطلب'), '']} rows={low.items.slice(0, 8).map((r) => [
-            <button className="font-bold hover:text-[var(--primary)]" onClick={() => setItem(r.item.id)}>{L(r.item.name)}</button>, <span className="text-xs">{r.warehouse.name}</span>, <Qty v={r.onHand} unit={r.item.unit} />, <span className="num text-xs">{fmtQty(r.min)}</span>,
+            <button className="font-bold hover:text-[var(--primary)]" onClick={() => setItem(r.item.id)}>{L(r.item.name)}</button>, <span className="text-xs">{tv(r.warehouse.name)}</span>, <Qty v={r.onHand} unit={r.item.unit} />, <span className="num text-xs">{fmtQty(r.min)}</span>,
             <span className="text-xs">{r.suggestedPacks ? `${fmtQty(r.suggestedPacks)} × ${L(r.pack.name)}` : <Qty v={r.suggestedQuantity} unit={r.item.unit} />}</span>, <LevelPill state={r.state} />,
           ])} />
         </Card>
         <Card title={<span className="flex items-center gap-2"><CalendarClock className="w-4 h-4 text-[var(--error)]" />{t('الصلاحية قربت أو خلصت')}</span>} badge={<StateBadge ops={['Inventory.Expiring']} />}>
           <Table empty={t('مفيش حاجة صلاحيتها قربت')} head={[t('الصنف'), t('المخزن'), t('الكمية'), t('الصلاحية'), '']} rows={exp.items.slice(0, 8).map((l) => [
-            <button className="font-bold hover:text-[var(--primary)]" onClick={() => setItem(l.item.id)}>{L(l.item.name)}</button>, <span className="text-xs">{l.warehouse.name}</span>, <Qty v={l.remaining} unit={l.item.unit} />,
+            <button className="font-bold hover:text-[var(--primary)]" onClick={() => setItem(l.item.id)}>{L(l.item.name)}</button>, <span className="text-xs">{tv(l.warehouse.name)}</span>, <Qty v={l.remaining} unit={l.item.unit} />,
             l.status === 'EXPIRED' ? <Pill tone="error">{t('انتهت')}</Pill> : l.status === 'TODAY' ? <Pill tone="error">{t('النهارده')}</Pill> : <Pill tone="warning">{t('فاضل {n} يوم', { n: l.daysLeft })}</Pill>,
             <Button size="sm" variant="warning" data-fb={`inv-dash:waste-lot:${l.id}`} onClick={() => setWaste({ itemId: l.item.id, wh: l.warehouse.id })}>{t('هالك')}</Button>,
           ])} />

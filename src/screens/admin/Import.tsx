@@ -195,7 +195,7 @@ export default function Import() {
         w.push(t('الملف {f} مش مقروء: {e}', { f: f.name, e: String((e as Error).message ?? e) }));
       }
     }
-    load(merged, Array.from(files).map((f) => f.name).join('، '), w);
+    load(merged, Array.from(files).map((f) => f.name).join(t('، ')), w);
     if (fileRef.current) fileRef.current.value = '';
   };
   const loadValidSample = () => {

@@ -11,6 +11,7 @@ import { capabilityOn } from '../../mock/ops-registry';
 import { Button, Pill, toast, useNow } from '../../ui';
 import { t } from '../../i18n';
 import { Tech } from '../../app/tech';
+import { personText } from '../../demo/people';
 
 interface Req { id: number; deviceId: string; auth: any; details: any; resolve: (g: string | null) => void }
 /** request id per waiting popup, so the request survives switching between the popup and the small floating card */
@@ -29,7 +30,7 @@ export function RemoteApproval({ req, floating, onExpand, onBackground }: { req:
   useEffect(() => {
     if (r?.state === 'APPROVED' && r.grantId && !resolved.current) {
       resolved.current = true;
-      toast('success', t('{n} وافق — بنكمّل نفس العملية', { n: r.decidedByName ?? t('المدير') }), `grant ${r.grantId}`, req.auth.label);
+      toast('success', t('{n} وافق — بنكمّل نفس العملية', { n: personText(r.decidedByName) ?? t('المدير') }), `grant ${r.grantId}`, req.auth.label);
       sent.delete(req.id);
       req.resolve(r.grantId);
     }
@@ -82,7 +83,7 @@ export function RemoteApproval({ req, floating, onExpand, onBackground }: { req:
       {(r.state === 'REJECTED' || r.state === 'EXPIRED' || r.state === 'CANCELLED') && (
         <div className="flex items-start gap-2">
           <XCircle className="w-5 h-5 text-[var(--error)] shrink-0" />
-          <div className="flex-1 text-sm"><b>{r.state === 'REJECTED' ? t('{n} رفض الطلب', { n: r.decidedByName ?? t('المدير') }) : r.state === 'EXPIRED' ? t('الطلب خلص وقته من غير رد') : t('الطلب اتلغى')}</b>{r.decisionNote && <div className="text-xs text-dim">"{r.decisionNote}"</div>}</div>
+          <div className="flex-1 text-sm"><b>{r.state === 'REJECTED' ? t('{n} رفض الطلب', { n: personText(r.decidedByName) ?? t('المدير') }) : r.state === 'EXPIRED' ? t('الطلب خلص وقته من غير رد') : t('الطلب اتلغى')}</b>{r.decisionNote && <div className="text-xs text-dim">"{r.decisionNote}"</div>}</div>
           <Button size="sm" variant="ghost" onClick={() => { setRequestId(null); }}>{t('ابعت تاني')}</Button>
         </div>
       )}

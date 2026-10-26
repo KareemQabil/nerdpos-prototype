@@ -5,10 +5,11 @@ import { Plus, Pencil, BookOpen, History, Save, Trash2, CookingPot } from 'lucid
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
 import { Banner, Button, Empty, Field, Input, KV, Modal, Drawer, Money, Pill, Section, Select, Spinner, StateBadge, Table, Tabs, Textarea } from '../../ui';
-import { t, L } from '../../i18n';
+import { t, L, tv } from '../../i18n';
 import { dateTime, money } from '../../lib/format';
 import { BandPill, ItemPicker, Pct, fmtQty, newKey, unitIdLabel, unitLabel, unitOptions, useItemsCatalog, useList, Inp, Sel } from './common';
 import { FoodBar } from './Dashboard';
+import { personText } from '../../demo/people';
 
 const OPS = ['Recipe.Define', 'Recipe.Find', 'Recipe.Get', 'Recipe.Cost'];
 type Tab = 'MENU' | 'PREP' | 'MODIFIER' | 'MISSING';
@@ -50,7 +51,7 @@ export default function Recipes() {
       ) : rows.length === 0 ? <Empty icon={<BookOpen className="w-10 h-10" />} text={t('مفيش وصفات هنا')} /> : (
         <Table head={tab === 'MENU' ? [t('الطبق'), t('المكونات'), t('التكلفة'), t('سعر الصالة'), t('نسبة التكلفة'), ''] : tab === 'PREP' ? [t('التحضيرة'), t('المكونات'), t('الدفعة بتطلع'), t('تكلفة الدفعة'), t('تكلفة الوحدة'), ''] : [t('الإضافة'), t('المكونات'), t('التكلفة الزيادة'), '']}
           rows={rows.map((r) => {
-            const ings = <span className="text-xs text-dim">{r.activeVersion.inputsPerBatch.map((i: any) => L(i.name)).slice(0, 4).join('، ')}{r.activeVersion.inputsPerBatch.length > 4 ? ` +${r.activeVersion.inputsPerBatch.length - 4}` : ''}</span>;
+            const ings = <span className="text-xs text-dim">{r.activeVersion.inputsPerBatch.map((i: any) => L(i.name)).slice(0, 4).join(t('، '))}{r.activeVersion.inputsPerBatch.length > 4 ? ` +${r.activeVersion.inputsPerBatch.length - 4}` : ''}</span>;
             const name = <button data-fb={`recipes:open:${r.id}`} className="font-bold hover:text-[var(--primary)] text-start" onClick={() => setOpen(r.id)}>{L(r.name)}{r.versionCount > 1 && <Pill tone="neutral" className="ms-1">{t('نسخة {n}', { n: r.activeVersion.version })}</Pill>}</button>;
             if (tab === 'MENU') return [name, ings, <Money v={r.cost.perUnit} className="text-sm" />, r.cost.prices.find((p: any) => p.channel === 'DINE_IN')?.net ? <Money v={r.cost.prices.find((p: any) => p.channel === 'DINE_IN').net} className="text-xs" /> : <span className="text-dim text-xs">—</span>, <FoodBar pct={r.cost.foodCostPercent} band={r.cost.band} />, <BandPill band={r.cost.band} />];
             if (tab === 'PREP') return [name, ings, <span className="num">{fmtQty(r.activeVersion.outputQuantityPerBatch)} {unitLabel(r.outputUnit)}</span>, <Money v={r.cost.total} className="text-xs" />, <span className="num font-bold">{money(r.cost.perUnit)} <span className="text-[11px] text-dim">/ {unitLabel(r.outputUnit)}</span></span>, ''];
@@ -97,7 +98,7 @@ function RecipeView({ id, onClose, onEdit }: { id: string | null; onClose: () =>
           <div>
             <div className="text-xs font-bold text-soft mb-1 flex items-center gap-1"><History className="w-3.5 h-3.5" />{t('النسخ')}</div>
             <ol className="space-y-1 border-s-2 line ps-3 text-xs">{[...r.versions].reverse().map((v: any) => (
-              <li key={v.id}><b>{t('نسخة {n}', { n: v.version })}</b> · {t('تبدأ')} {dateTime(v.effectiveFrom)} · {v.createdByName} · <span className="num">{money(v.cost)}</span>{v.id === r.activeVersionId && <Pill tone="success" className="ms-1">{t('الشغالة')}</Pill>}{v.note && <div className="text-dim">{v.note}</div>}</li>
+              <li key={v.id}><b>{t('نسخة {n}', { n: v.version })}</b> · {t('تبدأ')} {dateTime(v.effectiveFrom)} · {personText(v.createdByName)} · <span className="num">{money(v.cost)}</span>{v.id === r.activeVersionId && <Pill tone="success" className="ms-1">{t('الشغالة')}</Pill>}{tv(v.note) && <div className="text-dim">{tv(v.note)}</div>}</li>
             ))}</ol>
           </div>
           <Tech><div className="text-[11px] num text-dim">{r.id} · {r.outputProductId} · method {cost.method}</div></Tech>

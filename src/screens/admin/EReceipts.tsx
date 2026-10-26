@@ -85,7 +85,7 @@ export default function EReceipts() {
               : <Banner tone="info">{t('الفحص الكامل على السيرفر لسه مش متاح للحساب ده — ده فحص سريع من الإيصالات اللي في الطابور.')}<Tech> {chain.refused} — Compliance.VerifyChain INTERNAL</Tech></Banner>}
             {(chain.server?.devices ?? chain.local ?? []).length === 0 && <div className="text-sm text-dim">{t('لسه مفيش إيصالات مبنية')}</div>}
             {(chain.server?.devices ?? chain.local ?? []).map((d: any) => (
-              <div key={d.deviceId} className="flex items-center gap-2 text-sm flex-wrap"><span className="font-bold">{t('جهاز ضريبي')}</span><Tech><span className="num">{d.deviceId}</span></Tech><Pill tone={d.ok ? 'success' : 'error'}>{d.ok ? t('سليمة') : t('مكسورة')}</Pill><span className="text-dim">{t('{n} إيصال', { n: d.documents })}</span>{d.breaks?.length > 0 && <span className="text-[var(--error)] num text-xs">{d.breaks.join('، ')}</span>}{d.head && <Tech><span className="num text-[11px] text-dim">head {short(d.head)}</span></Tech>}</div>
+              <div key={d.deviceId} className="flex items-center gap-2 text-sm flex-wrap"><span className="font-bold">{t('جهاز ضريبي')}</span><Tech><span className="num">{d.deviceId}</span></Tech><Pill tone={d.ok ? 'success' : 'error'}>{d.ok ? t('سليمة') : t('مكسورة')}</Pill><span className="text-dim">{t('{n} إيصال', { n: d.documents })}</span>{d.breaks?.length > 0 && <span className="text-[var(--error)] num text-xs">{d.breaks.join(t('، '))}</span>}{d.head && <Tech><span className="num text-[11px] text-dim">head {short(d.head)}</span></Tech>}</div>
             ))}
           </div>
         </Card>
@@ -167,7 +167,7 @@ function ReissueDialog({ d, onClose }: { d: any; onClose: () => void }) {
   const go = async () => {
     const r = await run<any>('Compliance.ReissueDocument', { params: { documentId: d.id }, body: { reason } });
     if (!r) return;
-    if (r.result === 'STILL_PENDING_DATA') toast('warning', t('لسه فيه بيانات ناقصة — الإيصال فاضل مستني'), (r.document?.issues ?? []).map((i: any) => issueLabel(i.code)).join('، '));
+    if (r.result === 'STILL_PENDING_DATA') toast('warning', t('لسه فيه بيانات ناقصة — الإيصال فاضل مستني'), (r.document?.issues ?? []).map((i: any) => issueLabel(i.code)).join(t('، ')));
     else if (r.result === 'BUILT') toast('success', t('الإيصال اتبنى واتربط بالسلسلة — هيتبعت للمنصة أوتوماتيك'));
     else toast('success', t('اتعمل إيصال مصحح بيشاور على الإيصال المرفوض'), r.referenceOldUUID ?? undefined);
     onClose();

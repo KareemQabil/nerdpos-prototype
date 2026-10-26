@@ -24,7 +24,7 @@ export function useLang(): Lang {
 
 /** Translate an Arabic UI string. `{x}` placeholders are filled from vars. */
 export function t(ar: string, vars?: Record<string, string | number>): string {
-  let s = lang === 'en' ? en[ar] ?? ar : ar;
+  let s = lang === 'en' ? en[ar] ?? miss(ar) : ar;
   if (vars) for (const [k, v] of Object.entries(vars)) s = s.split(`{${k}}`).join(String(v));
   return techMode.get() ? s : stripTech(s);
 }
@@ -39,11 +39,40 @@ export function stripTech(s: string): string {
   return s.replace(TECH_PAREN, '');
 }
 
+// QA aid: in English mode, Arabic keys with no English are collected on window.__i18nMiss (read by the scan script).
+const AR_RE = /[\u0600-\u06FF]/;
+function miss(ar: string): string {
+  if (typeof window !== 'undefined' && ar && AR_RE.test(ar)) ((window as unknown as { __i18nMiss?: Set<string> }).__i18nMiss ??= new Set()).add(ar);
+  return ar;
+}
+
+/** Translate a seeded data value (branch, device, supplier, unit, reason… stored in Arabic) when English exists in en.ts. */
+export function tv(v: string | null | undefined): string {
+  if (!v) return v as unknown as string; // keep null/undefined so `tv(x) ?? '—'` still falls back
+  return lang === 'en' ? en[v] ?? miss(v) : v;
+}
+
+// Server-made one-line labels ("إيصال #1042", "#1042 · جولة 2", "إقفال يوم 2026-10-25") → English fragments.
+const LABEL_FRAGMENTS: [RegExp, string][] = [
+  [/إقفال يوم /g, 'Day close '], [/إيصال مرتجع /g, 'Refund receipt '], [/شيك مبدئي /g, 'Pre-bill '], [/إيصال /g, 'Receipt '], [/^نسخة /g, 'Copy '],
+  [/ · جولة /g, ' · round '], [/ · ترابيزة /g, ' · table '], [/ · تيك أواي/g, ' · takeaway'], [/ · دليفري/g, ' · delivery'], [/من غير إيصال/g, 'no receipt'],
+  [/^تسوية /g, 'Settlement '], [/ عملية\)/g, ' transactions)'], [/^درج /g, 'Drawer '], [/^من /g, 'from '], [/(\d) م$/g, '$1 PM'], [/(\d) ص$/g, '$1 AM'],
+  [/^مبيعات يوم (\S+) \(بيانات العرض\)$/g, 'Sales on $1 (demo data)'], [/^خبز-/g, 'BREAD-'],
+];
+/** Translate a server-made label: a whole known string via en.ts, otherwise known fragments. Arabic mode returns it unchanged. */
+export function tLabel(v: string | null | undefined): string {
+  if (!v || lang !== 'en') return v ?? '';
+  if (en[v]) return en[v];
+  let s = v;
+  for (const [re, rep] of LABEL_FRAGMENTS) s = s.replace(re, rep);
+  return AR_RE.test(s) ? miss(s) : s;
+}
+
 /** Pick a localized server value {ar, en}. */
 export function L(v: { ar?: string; en?: string } | string | null | undefined): string {
   if (!v) return '';
   if (typeof v === 'string') return v;
-  return (lang === 'en' ? v.en || v.ar : v.ar || v.en) ?? '';
+  return (lang === 'en' ? v.en || (v.ar && en[v.ar]) || miss(v.ar ?? '') : v.ar || v.en) ?? '';
 }
 
 // initialise document direction

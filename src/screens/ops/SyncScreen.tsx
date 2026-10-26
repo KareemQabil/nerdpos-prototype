@@ -5,13 +5,13 @@ import React, { useMemo, useState } from 'react';
 import { Wifi, WifiOff, RefreshCw, Trash2, Database, ListChecks, AlertTriangle, CheckCircle2, XCircle, Ban, History, Download } from 'lucide-react';
 import { useDev, useQuery, useCommand, useOfflineQueue, replayOffline, dropQueued } from '../../app/hooks';
 import { Section, StateBadge, Card, Button, Pill, Banner, Empty, Tabs, KV, Table, confirmDialog } from '../../ui';
-import { t, L } from '../../i18n';
+import { t, L, tLabel } from '../../i18n';
 import { Tech } from '../../app/tech';
 import { cn, dateTime, time } from '../../lib/format';
 import { sim } from '../../mock/sim';
 import { OFFLINE_ALLOWLIST } from '../../mock/ops-registry';
 import { useSim } from './OfflineBar';
-import { deviceName } from '../../demo/people';
+import { deviceName, personText } from '../../demo/people';
 
 const KIND: Record<string, { ar: string; help: string; actions: string[] }> = {
   SOLD_OUT: { ar: 'صنف خلص وانت أوفلاين', help: 'وانت من غير نت، الصنف ده اتعلم "خلص" من جهاز تاني. تقدر تكمّل باقي الأصناف من غيره.', actions: ['SKIP_UNAVAILABLE', 'RETRY', 'DISCARD'] },
@@ -98,7 +98,7 @@ function OfflineItem({ x }: { x: any }) {
     <div className={cn('rounded-xl border px-3 py-2', x.state === 'CONFLICT' ? 'border-[color-mix(in_srgb,var(--warning)_45%,transparent)] bg-[color-mix(in_srgb,var(--warning)_7%,transparent)]' : 'border-[var(--glass-border)] surface-1')} data-fb={`sync-item:${x.state}`}>
       <div className="flex items-center gap-2 flex-wrap">
         {x.state === 'CONFLICT' ? <AlertTriangle className="w-4 h-4 text-[var(--warning)]" /> : x.state === 'REJECTED' ? <XCircle className="w-4 h-4 text-[var(--error)]" /> : x.state === 'DISCARDED' ? <Ban className="w-4 h-4 text-dim" /> : <CheckCircle2 className="w-4 h-4 text-[var(--success)]" />}
-        <div className="flex-1 min-w-0"><div className="text-sm font-bold">{x.label}</div><div className="text-[11px] text-dim">{deviceName(x.terminalId ?? x.deviceLabel)} · {x.userName} · {t('اتسجلت')} {time(x.queuedAt)} · {t('وصلت')} {time(x.replayedAt)}</div></div>
+        <div className="flex-1 min-w-0"><div className="text-sm font-bold">{tLabel(x.label)}</div><div className="text-[11px] text-dim">{deviceName(x.terminalId ?? x.deviceLabel)} · {personText(x.userName)} · {t('اتسجلت')} {time(x.queuedAt)} · {t('وصلت')} {time(x.replayedAt)}</div></div>
         <Pill tone={tone}>{t(label)}</Pill>
       </div>
       {(x.state === 'CONFLICT' || x.state === 'REJECTED') && (
@@ -132,7 +132,7 @@ function LocalCopy() {
         <div className="text-xs font-bold text-soft flex items-center gap-1"><History className="w-3.5 h-3.5" />{t('اتغير إيه من ساعة النسخة دي')} {list.length > 0 && <Pill tone="info">{list.length}</Pill>}</div>
         {list.length === 0 ? <div className="text-sm text-dim">{t('مفيش تغييرات — النسخة اللي على الجهاز محدثة')}</div> : (
           <div className="space-y-1 max-h-64 overflow-y-auto" data-fb="sync-changes">
-            {list.slice().reverse().map((x) => <div key={x.seq} className="flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg surface-1"><Pill tone="neutral">{L(x.kind)}</Pill><span className="flex-1 truncate">{x.byName}<Tech> · <span className="num">{x.op} {x.target}</span></Tech></span><span className="num text-dim">{time(x.at)}</span></div>)}
+            {list.slice().reverse().map((x) => <div key={x.seq} className="flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg surface-1"><Pill tone="neutral">{L(x.kind)}</Pill><span className="flex-1 truncate">{personText(x.byName)}<Tech> · <span className="num">{x.op} {x.target}</span></Tech></span><span className="num text-dim">{time(x.at)}</span></div>)}
             <Button size="sm" variant="outline" onClick={() => setCursor(changes.data?.nextCursor ?? cur)}>{t('حدّث الجهاز بالتغييرات دي')}</Button>
           </div>
         )}

@@ -3,7 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { RefreshCw, Copy, Eye, AlertTriangle, Printer, Clock3, CheckCircle2, XCircle, Ban } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';
 import { PageHeader, StateBadge, Banner, Button, Pill, Select, Table, Card, useNow, StatGrid, StatCard, Toolbar, EmptyState } from '../../ui';
-import { t } from '../../i18n';
+import { t, tLabel, tv } from '../../i18n';
 import { Tech } from '../../app/tech';
 import { deviceName } from '../../demo/people';
 import { dateTime, time } from '../../lib/format';
@@ -79,7 +79,7 @@ export default function PrintQueue() {
             rows={rows.map((j) => {
               const errs = (j.attempts ?? []).filter((a: any) => a.error);
               return [
-                <div key="l"><div className="font-bold">{j.label}</div><div className="text-[11px] text-dim">{dateTime(j.createdAt)}<Tech> <span className="num">· {j.id}</span></Tech></div>{j.reason && <div className="text-[11px] text-dim">{t('السبب')}: {j.reason}</div>}</div>,
+                <div key="l"><div className="font-bold">{tLabel(j.label)}</div><div className="text-[11px] text-dim">{dateTime(j.createdAt)}<Tech> <span className="num">· {j.id}</span></Tech></div>{j.reason && <div className="text-[11px] text-dim">{t('السبب')}: {tv(j.reason)}</div>}</div>,
                 docTypeLabel(j.documentType),
                 j.copyKind === 'REPRINT' ? <Pill tone="violet" title="REPRINT">{t('نسخة')}</Pill> : <Pill tone="neutral" title="ORIGINAL">{t('أصل')}</Pill>,
                 <span>{deviceName(j.terminalCode ?? j.terminalId)}<Tech><span className="num text-[10px] text-dim block">{j.terminalCode}</span></Tech></span>,

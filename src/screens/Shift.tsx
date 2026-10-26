@@ -9,7 +9,7 @@ import { cn, money, time, dateTime } from '../lib/format';
 import { useReasons } from './order/CheckPanel';
 import { TransferSessionDialog } from './ops/TransferSessionDialog';
 import { METHOD_AR } from './ops/BusinessDay';
-import { deviceName, personName } from '../demo/people';
+import { deviceName, personName, personText } from '../demo/people';
 import { store } from '../mock/store';
 import { Tech } from '../app/tech';
 
@@ -41,7 +41,7 @@ export default function Shift() {
         <Table align={['start', 'start', 'start', 'start', 'start', 'end', 'end']} loading={past.loading} maxHeight={420}
           head={[t('الجهاز'), t('الكاشير'), t('الحالة'), t('فتحت'), t('اتقفلت'), t('فرق العد'), '']}
           rows={(past.data?.items ?? []).map((s: any) => [
-            deviceName(s.terminalId), personName(null, s.cashierName), <Pill tone={s.state === 'OPEN' ? 'success' : 'neutral'} dot>{s.state === 'OPEN' ? t('مفتوحة') : t('مقفولة')}</Pill>, <span className="num text-xs">{dateTime(s.openedAt)}</span>, <span className="num text-xs">{s.closedAt ? dateTime(s.closedAt) : '—'}</span>,
+            deviceName(s.terminalId), personName(null, personText(s.cashierName)), <Pill tone={s.state === 'OPEN' ? 'success' : 'neutral'} dot>{s.state === 'OPEN' ? t('مفتوحة') : t('مقفولة')}</Pill>, <span className="num text-xs">{dateTime(s.openedAt)}</span>, <span className="num text-xs">{s.closedAt ? dateTime(s.closedAt) : '—'}</span>,
             s.close ? <VarianceText v={s.close.variance} short /> : <span className="text-dim">—</span>,
             s.state === 'CLOSED' && canZ ? <Button size="sm" variant="ghost" onClick={() => setZ(s.id)} data-fb={`z-open:${s.id}`}><FileText className="w-3.5 h-3.5" />{t('تقرير القفلة')}</Button> : null,
           ])} empty={<EmptyState compact icon={<Clock />} title={t('لسه مفيش ورديات')} text={t('أول وردية هتظهر هنا بعد ما تتفتح.')} />} />
@@ -84,7 +84,7 @@ function OpenSession({ sid, onZ }: { sid: string; onZ: (id: string) => void }) {
   return (
     <>
       <StatGrid min={170}>
-        <StatCard label={t('الكاشير')} value={<span className="text-lg">{personName(null, ses.cashierName)}</span>} hint={t('من {h} · {n} ساعة', { h: time(ses.openedAt), n: ses.hoursOpen })} icon={<Clock />} />
+        <StatCard label={t('الكاشير')} value={<span className="text-lg">{personName(null, personText(ses.cashierName))}</span>} hint={t('من {h} · {n} ساعة', { h: time(ses.openedAt), n: ses.hoursOpen })} icon={<Clock />} />
         <StatCard label={t('الفكة أول الوردية')} value={<Money v={ses.openingFloat} />} icon={<Wallet />} />
         <StatCard label={t('كاش اتحصّل')} value={<Money v={String(cashIn)} />} tone="success" icon={<Receipt />} hint={t('من الشيكات على الدرج ده')} />
         <StatCard label={t('حركات الدرج')} value={<span className="num">{ses.cashEntries.length}</span>} icon={<ArrowDownToLine />} hint={t('إدخال وصرف وتحصيل')} />
@@ -166,7 +166,7 @@ export function ReportView({ r, z }: { r: any; z?: boolean }) {
   );
   return (
     <div className="space-y-3 text-sm">
-      <KV rows={[[t('الجهاز'), deviceName(r.terminalCode)], [t('الكاشير'), personName(null, r.cashierName)], [t('اليوم'), <span className="num">{r.businessDate}</span>], [t('الفكة أول الوردية'), <Money v={r.openingFloat} />]]} />
+      <KV rows={[[t('الجهاز'), deviceName(r.terminalCode)], [t('الكاشير'), personName(null, personText(r.cashierName))], [t('اليوم'), <span className="num">{r.businessDate}</span>], [t('الفكة أول الوردية'), <Money v={r.openingFloat} />]]} />
       <div className="grid sm:grid-cols-2 gap-2">
         {sec(t('الفلوس حسب طريقة الدفع'), Object.entries(r.tenderBreakdown).map(([k, v]) => [t(METHOD_AR[k] ?? 'طريقة تانية'), <Money v={v as string} />]))}
         {sec(t('حركات الكاش'), Object.entries(r.cashByKind).map(([k, v]) => [kindLabel(k), <Money v={v as string} />]))}

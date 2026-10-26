@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import { Users, Clock, Plus, ArrowRightLeft, Link2, Unlink, DoorClosed, Wallet, ClipboardList, UserCog, CalendarClock, Minus, Sparkles, Map as MapIcon, LayoutGrid, Brush, ZoomIn, ZoomOut, Maximize2, Receipt, ChevronLeft, Armchair } from 'lucide-react';
 import { useDev, useQuery, useCommand, errorText } from '../app/hooks';
 import { PageHeader, StateBadge, Pill, Drawer, Button, Banner, Money, EmptyState, Tabs, SegmentedControl, Skeleton, useNow } from '../ui';
+import { personName, personLabel, userLabel } from '../demo/people';
 import { t, L } from '../i18n';
 import { cn, money, time } from '../lib/format';
 import { StatusPill } from './order/CheckPanel';
@@ -17,7 +18,7 @@ const stateOf = (tb: any): TState => (tb.occupancy ? 'OCCUPIED' : !tb.active ? '
 const LONG_SEATED = 90; // minutes: a long visit is highlighted for the floor manager
 const ZOOMS = [1, 1.25, 1.5, 2];
 const placeName = (tb: any) => (tb.floorName ? L(tb.floorName) : AREA_AR[tb.area] ?? (tb.area || '—'));
-const firstName = (s?: string | null) => (s ?? '').split(' — ')[0];
+const firstName = (s?: string | null) => (s ? personName(null, s) : '');
 
 const mix = (v: string, p: number) => `color-mix(in srgb, var(${v}) ${p}%, transparent)`;
 /** One colour per table state (fill, edge, accent text). Works in dark and light themes. */
@@ -297,7 +298,7 @@ function VisitSheet({ tableId, visitId, onClose, tables, title, sub }: { tableId
             <div className="rounded-2xl border border-[color-mix(in_srgb,var(--primary)_35%,transparent)] bg-[var(--primary-container)] p-3 space-y-2.5">
               <div className="text-sm font-bold">{mode === 'transfer' ? t('انقل القعدة كلها لترابيزة فاضية') : mode === 'join' ? t('ضم ترابيزة فاضية للقعدة دي (قعدة واحدة على كذا ترابيزة)') : t('مين الويتر الجديد؟')}</div>
               {mode === 'waiter' ? (
-                <div className="grid grid-cols-2 gap-1.5">{(users.data?.items ?? []).filter((u: any) => u.active).map((u: any) => <Choice key={u.id} on={target === u.id} onClick={() => setTarget(u.id)}>{u.displayName}</Choice>)}</div>
+                <div className="grid grid-cols-2 gap-1.5">{(users.data?.items ?? []).filter((u: any) => u.active).map((u: any) => <Choice key={u.id} on={target === u.id} onClick={() => setTarget(u.id)}>{userLabel(u.username, u.displayName)}</Choice>)}</div>
               ) : (
                 <div className="grid grid-cols-5 gap-1.5">
                   {tables.filter((x) => x.id !== v.tableId && x.active && !x.occupancy).map((x) => <Choice key={x.id} on={target === x.id} onClick={() => setTarget(x.id)} fb={`visit-target:${x.name}`}><span className="num font-extrabold text-base">{x.name}</span><span className="block text-[10px] text-dim num">{x.capacity} {t('كراسي')}</span></Choice>)}

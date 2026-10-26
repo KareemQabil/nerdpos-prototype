@@ -6,6 +6,7 @@ import { FlaskConical, Play, CheckCircle2, XCircle, Circle, Search, PlayCircle, 
 import negativesJson from '../contracts/negatives.json';
 import situationsJson from '../contracts/situations.json';
 import { NEGATIVE_RUNS, NEGATIVE_PLAIN } from './negatives';
+import { SITUATIONS_EN } from './situationsEn';
 import type { LogLine } from './runner';
 import { Button, Pill, Tabs, Input, Select, toast } from '../ui';
 import { Tech, useTech } from '../app/tech';
@@ -16,6 +17,8 @@ import { feedback, policySnapshot } from './Feedback';
 const NEG = negativesJson as { id: string; title: string; operation: string; precondition: string; steps: string; expected: string; codes: string }[];
 const SIT = situationsJson as { id: string; title: string; items: { id: string; title: string }[] }[];
 const en = () => getLang() === 'en';
+/** A situation or area title in the UI language. */
+const sitTitle = (x: { id: string; title: string }) => (en() ? SITUATIONS_EN[x.id] ?? x.title : x.title);
 
 export function Scenarios() {
   const [tab, setTab] = useState<'neg' | 'sit'>('neg');
@@ -41,7 +44,7 @@ function Negatives() {
     const lines: LogLine[] = [];
     const log = (l: LogLine) => { lines.push(l); setLogs((m) => ({ ...m, [id]: [...lines] })); };
     try { const ok = await NEGATIVE_RUNS[id](log); setRes((r) => ({ ...r, [id]: ok })); }
-    catch (e) { log({ ok: false, text: `${(e as any).code ?? ''} ${errorText(e)}`, plain: `ما نفعش: ${errorText(e)}` }); setRes((r) => ({ ...r, [id]: false })); }
+    catch (e) { log({ ok: false, text: `${(e as any).code ?? ''} ${errorText(e)}`, plain: t('ما نفعش: {e}', { e: errorText(e) }) }); setRes((r) => ({ ...r, [id]: false })); }
     setBusy(null);
     refreshAll();
   };
@@ -105,7 +108,7 @@ function Situations() {
   const groups = SIT.filter((x) => !g || x.id === g);
   const total = SIT.reduce((a, x) => a + x.items.length, 0);
   const save = (grp: { id: string; title: string }, i: { id: string; title: string }) => {
-    feedback.add({ id: `fb_${Date.now()}`, screen: 'SITUATIONS', element: `${grp.id} ${i.id}`, type: 'missing', text: `سيناريو مطلوب: ${i.title}`, expert: '', role: '', policy_snapshot: policySnapshot(), at: new Date().toISOString() });
+    feedback.add({ id: `fb_${Date.now()}`, screen: 'SITUATIONS', element: `${grp.id} ${i.id}`, type: 'missing', text: `${t('سيناريو مطلوب:')} ${sitTitle(i)}`, expert: '', role: '', policy_snapshot: policySnapshot(), at: new Date().toISOString() });
     toast('success', t('اتحفظ في الملاحظات عشان نعمله سيناريو'));
   };
   return (
@@ -113,23 +116,23 @@ function Situations() {
       <div className="text-[11px] text-dim">{t('{n} موقف ممكن يحصل في مطعم، متقسمين على {g} مجال. اختار المواقف اللي عاوز تشوفها في العرض واضغط «عاوز أشوف ده» — بتتحفظ في الملاحظات.', { n: total, g: SIT.length })}</div>
       <div className="flex gap-2">
         <div className="relative flex-1"><Search className="w-4 h-4 absolute top-3 start-3 text-dim" /><Input value={q} onChange={(e) => setQ(e.target.value)} className="ps-9" placeholder={t('دوّر… (مثلًا: مرتجع، طابعة، خصم)')} data-fb="situations:search" /></div>
-        <Select value={g} onChange={(e) => setG(e.target.value)} options={[{ value: '', label: t('كل المجالات') }, ...SIT.map((x) => ({ value: x.id, label: x.title }))]} className="max-w-[220px]" />
+        <Select value={g} onChange={(e) => setG(e.target.value)} options={[{ value: '', label: t('كل المجالات') }, ...SIT.map((x) => ({ value: x.id, label: sitTitle(x) }))]} className="max-w-[220px]" />
       </div>
       {groups.map((grp) => {
-        const items = grp.items.filter((i) => !q || i.title.includes(q) || i.id.includes(q));
+        const items = grp.items.filter((i) => !q || i.title.includes(q) || sitTitle(i).toLowerCase().includes(q.toLowerCase()) || i.id.includes(q));
         if (!items.length) return null;
         const expanded = open[grp.id] || !!q || !!g;
         const list = expanded ? items.slice(0, 200) : items.slice(0, 5);
         return (
           <div key={grp.id} className="rounded-xl border line surface-1 p-2.5">
             <div className="flex items-center justify-between gap-2 mb-1.5">
-              <div className="text-sm font-bold">{grp.title}<Tech><span className="num text-[10px] text-dim font-normal ms-1">{grp.id}</span></Tech></div>
+              <div className="text-sm font-bold">{sitTitle(grp)}<Tech><span className="num text-[10px] text-dim font-normal ms-1">{grp.id}</span></Tech></div>
               <Pill tone="neutral">{t('{n} موقف', { n: items.length })}</Pill>
             </div>
             <div className="space-y-1">{list.map((i) => (
               <div key={i.id} className="flex items-center gap-2 text-xs rounded-lg surface-2 px-2 py-1.5">
                 <Tech><span className="num text-dim text-[10px]">{i.id}</span></Tech>
-                <span className="flex-1">{i.title}</span>
+                <span className="flex-1">{sitTitle(i)}</span>
                 <button className="text-[11px] text-pink-300 hover:underline flex items-center gap-1 shrink-0" onClick={() => save(grp, i)}><Bookmark className="w-3 h-3" />{t('عاوز أشوف ده')}</button>
               </div>
             ))}</div>

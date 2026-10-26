@@ -93,7 +93,7 @@ export function deliveryView(db: DB, d: Delivery, now: number, full = false) {
     ...d, kitchen: k, late, lateMinutes: late ? lateBy : 0, minutesLeft: terminal ? null : -lateBy, readyWaiting, deliveredLate,
     ageMinutes: Math.max(0, Math.floor((now - d.createdAtMs) / 60000)),
     driver: drv ? { id: drv.id, name: drv.name, phone: drv.phone, vehicle: drv.vehicle } : null,
-    order: o ? { id: o.id, number: o.number, status: o.status, version: o.version, payable: computeTotals(o).payable, paid: st?.paid ?? '0.0000', remaining: st ? st.remaining : computeTotals(o).payable, settled: st?.settled ?? false, items: activeLines(o).map((l) => `${l.name.ar} ×${l.quantity}`).join('، '), itemCount: activeLines(o).length } : null,
+    order: o ? { id: o.id, number: o.number, status: o.status, version: o.version, payable: computeTotals(o).payable, paid: st?.paid ?? '0.0000', remaining: st ? st.remaining : computeTotals(o).payable, settled: st?.settled ?? false, items: activeLines(o).map((l) => `${l.name.ar} ×${l.quantity}`).join('، '), itemsEn: activeLines(o).map((l) => `${l.name.en || l.name.ar} ×${l.quantity}`).join(', '), itemCount: activeLines(o).length } : null,
     reasonLabels: d.attempts.map((a) => REASONS[a.reasonCode] ?? { ar: a.reasonCode, en: a.reasonCode }),
   };
   if (full && o) {

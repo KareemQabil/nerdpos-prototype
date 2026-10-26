@@ -4,16 +4,16 @@ import React, { useEffect, useState } from 'react';
 import { Moon, CheckCircle2, XCircle, AlertTriangle, ChevronDown, ArrowLeft, CalendarDays, Lock, Receipt, Users, TrendingUp, Wallet, Ban, Percent, RotateCcw, Scale, HandCoins, Clock } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';
 import { Section, StateBadge, Card, Button, Pill, Banner, Money, Field, Input, Textarea, Table, Empty, Spinner, KV, confirmDialog } from '../../ui';
-import { t, L } from '../../i18n';
+import { t, L, tLabel, tv } from '../../i18n';
 import { Tech } from '../../app/tech';
-import { cn, money, dateTime } from '../../lib/format';
+import { cn, money, dateTime, dayLong } from '../../lib/format';
 import { clock, businessDate } from '../../mock/clock';
 import { store } from '../../mock/store';
-import { branchLabel } from '../../demo/people';
+import { branchLabel, personText } from '../../demo/people';
 
 export const METHOD_AR: Record<string, string> = { CASH: 'كاش', CARD: 'كارت', DIGITAL_WALLET: 'محفظة', DEPOSIT: 'عربون', 'DIGITAL_WALLET:INSTAPAY': 'إنستاباي', 'DIGITAL_WALLET:VODAFONE_CASH': 'فودافون كاش', 'DIGITAL_WALLET:ORANGE_CASH': 'أورنج كاش', 'DIGITAL_WALLET:ETISALAT_CASH': 'اتصالات كاش', LOYALTY: 'نقاط', LOYALTY_POINTS: 'نقاط' };
 const addDays = (iso: string, n: number) => new Date(Date.parse(iso + 'T00:00:00Z') + n * 86_400_000).toISOString().slice(0, 10);
-const dayName = (iso: string) => new Intl.DateTimeFormat('ar-EG-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(iso + 'T12:00:00Z'));
+const dayName = (iso: string) => dayLong(iso);
 
 export default function BusinessDay() {
   const { auth, me, nav } = useDev();
@@ -53,7 +53,7 @@ export default function BusinessDay() {
             <div><div className="font-bold">{dayName(x.date)}</div><div className="num text-[11px] text-dim">{x.date}</div></div>,
             <Money v={x.summary.netSales} />, <span className="num">{x.summary.orders}</span>, <Money v={x.summary.avgCheck} />,
             <Money v={x.summary.cashVariance} tone={Number(x.summary.cashVariance) === 0 ? 'success' : 'error'} />,
-            <div className="text-xs">{x.closedByName}<div className="text-dim num">{dateTime(x.closedAt)}</div></div>,
+            <div className="text-xs">{personText(x.closedByName)}<div className="text-dim num">{dateTime(x.closedAt)}</div></div>,
             x.lateOrders ? <Pill tone="warning">{x.lateOrders} {t('شيك')}</Pill> : <span className="text-dim">—</span>,
             <Button size="sm" variant="ghost" onClick={() => setDate(x.date)}>{t('افتح')}</Button>,
           ])} empty={t('لسه مفيش أيام اتقفلت')} />
@@ -103,7 +103,7 @@ function Readiness({ d, nav }: { d: any; nav: (s: string) => void }) {
               </div>
               {open === c.id && (
                 <div className="mt-2 space-y-1 ps-6">
-                  {c.items.map((it: any) => <div key={it.id} className="flex items-center justify-between text-xs gap-2"><span>{it.label}{it.sub ? <span className="text-dim"> · {it.sub}</span> : null}</span>{it.amount && <Money v={it.amount} />}</div>)}
+                  {c.items.map((it: any) => <div key={it.id} className="flex items-center justify-between text-xs gap-2"><span>{tLabel(it.label)}{it.sub ? <span className="text-dim"> · {tLabel(it.sub)}</span> : null}</span>{it.amount && <Money v={it.amount} />}</div>)}
                 </div>
               )}
             </div>
@@ -178,8 +178,8 @@ function ClosedDay({ rec }: { rec: any }) {
     <div className="grid xl:grid-cols-[1fr_1.1fr] gap-4 items-start">
       <Card title={<span className="flex items-center gap-2"><Lock className="w-4 h-4" />{t('اتقفل')}</span>}>
         <div className="space-y-3" data-fb="eod-closed">
-          <KV rows={[[t('قفله'), rec.closedByName], [t('إمتى'), dateTime(rec.closedAt)], [t('اليوم التجاري الجاي'), <span className="num">{rec.nextBusinessDate}</span>], [t('تحذيرات اتشافت'), rec.warningsAcknowledged?.length ? rec.warningsAcknowledged.length : t('مفيش')]]} />
-          {rec.note && <Banner tone="info">{rec.note}</Banner>}
+          <KV rows={[[t('قفله'), personText(rec.closedByName)], [t('إمتى'), dateTime(rec.closedAt)], [t('اليوم التجاري الجاي'), <span className="num">{rec.nextBusinessDate}</span>], [t('تحذيرات اتشافت'), rec.warningsAcknowledged?.length ? rec.warningsAcknowledged.length : t('مفيش')]]} />
+          {tv(rec.note) && <Banner tone="info">{tv(rec.note)}</Banner>}
           {rec.lateOrders > 0 && <Banner tone="warning">{t('{n} شيك اتقفل بعد قفل اليوم (قبل 4 الفجر) — بيظهروا في تقرير اليوم ده كـ"بعد القفل".', { n: rec.lateOrders })}</Banner>}
           <Tech><div className="num text-[10px] text-dim">{rec.branchId}:{rec.date} · v{rec.version}</div></Tech>
         </div>

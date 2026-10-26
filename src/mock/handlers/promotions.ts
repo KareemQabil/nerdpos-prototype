@@ -102,7 +102,7 @@ export function promotionView(ctx: Ctx, p: PromotionX) {
   return {
     ...p, codes: codesOf(p), mechanic: p.mechanic ?? 'ORDER', dayparts: dayparts(p), stacking: p.stacking ?? 'EXCLUSIVE',
     liveNow: (['DINE_IN', 'TAKEAWAY', 'DELIVERY'] as Channel[]).some((c) => promotionLive(ctx.db, p, ctx.branchId, c, ctx.now)),
-    usage: { total: usageOf(ctx.db, p.id), today: usageOf(ctx.db, p.id, bd) }, summary: promoSummary(p, pn, cn),
+    usage: { total: usageOf(ctx.db, p.id), today: usageOf(ctx.db, p.id, bd) }, summary: promoSummary(p, pn, cn, (id) => ctx.db.products.find((x) => x.id === id)?.name.en ?? pn(id), (id) => ctx.db.categories.find((x) => x.id === id)?.name.en ?? cn(id)),
     exhausted: (p.maxUses ? usageOf(ctx.db, p.id) >= p.maxUses : false) || (p.maxUsesPerDay ? usageOf(ctx.db, p.id, bd) >= p.maxUsesPerDay : false),
   };
 }

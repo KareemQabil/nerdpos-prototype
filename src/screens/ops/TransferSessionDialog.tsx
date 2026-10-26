@@ -5,7 +5,7 @@ import { useQuery, useCommand } from '../../app/hooks';
 import { Modal, Button, Field, Input, StateBadge, Banner, Money, Empty, Switch } from '../../ui';
 import { t } from '../../i18n';
 import { cn, dateTime } from '../../lib/format';
-import { deviceName } from '../../demo/people';
+import { deviceName, personText } from '../../demo/people';
 
 /** orders: one or more open checks of the same drawer session. */
 export function TransferSessionDialog({ orders, onClose }: { orders: any[]; onClose: () => void }) {
@@ -38,13 +38,13 @@ export function TransferSessionDialog({ orders, onClose }: { orders: any[]; onCl
               {targets.map((s: any) => (
                 <button key={s.id} onClick={() => setTo(s.id)} data-fb={`transfer-to:${s.terminalCode}`} className={cn('flex items-center gap-3 px-3 py-2 rounded-xl border text-start', to === s.id ? 'border-[var(--primary)] bg-[var(--primary-container)]' : 'border-[var(--glass-border)] surface-1 hover:surface-2')}>
                   <Monitor className="w-4 h-4 text-dim" />
-                  <div className="flex-1"><div className="font-bold text-sm">{s.cashierName}</div><div className="text-[11px] text-dim">{deviceName(s.terminalId)} · {t('فاتحة من')} {dateTime(s.openedAt)}</div></div>
+                  <div className="flex-1"><div className="font-bold text-sm">{personText(s.cashierName)}</div><div className="text-[11px] text-dim">{deviceName(s.terminalId)} · {t('فاتحة من')} {dateTime(s.openedAt)}</div></div>
                 </button>
               ))}
             </div>
           )}
         </Field>
-        <Switch checked={toServer} onChange={setToServer} label={target ? t('{n} يبقى المسؤول عن الشيك', { n: target.cashierName }) : t('الكاشير الجديد يبقى المسؤول عن الشيك')} />
+        <Switch checked={toServer} onChange={setToServer} label={target ? t('{n} يبقى المسؤول عن الشيك', { n: personText(target.cashierName) }) : t('الكاشير الجديد يبقى المسؤول عن الشيك')} />
         <Field label={t('السبب (اختياري)')}><Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t('مثلاً: تسليم وردية')} data-fb="transfer-reason" /></Field>
         <Banner tone="info">{t('الشيك بيتنقل بكل اللي عليه (الأصناف والدفعات اللي اتعملت). الكاشير الجديد هو اللي هيحصّل الباقي، والنقل بيتسجل في تاريخ الشيك. بعد كده الوردية القديمة تقدر تقفل.')}</Banner>
       </div>

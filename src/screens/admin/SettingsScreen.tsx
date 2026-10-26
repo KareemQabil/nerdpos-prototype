@@ -12,7 +12,7 @@ import { POLICIES, POLICY_GROUPS, type PolicyMeta } from '../../mock/policyRegis
 import { useList, usePerm, Refused, REASON_KINDS, Modal, useApprovalRule } from './org/common';
 import { PolicyEditor, PolicyValueView, PolicyCompare, ScopesLine, rawJson } from '../../demo/PolicyEditors';
 import { policyTitle, policyExplain, policyReacts, policyQuestion, STATE_TEXT, appliesToText, scopeText, valueSummary, viaText, historyValueText, reasonKindText, ruleSentence, optionText, type Ctx } from '../../demo/policyText';
-import { branchLabel } from '../../demo/people';
+import { branchLabel, personLabel, userLabel } from '../../demo/people';
 
 const stateTone = { CANONICAL: 'success', CORE: 'info', PENDING: 'warning', DIRECTION: 'violet' } as const;
 const TENANT_ID = 'biz'; // the business id (Business.Get) is the TENANT scope id
@@ -59,7 +59,8 @@ function PoliciesTab() {
   const branch = branches.items.find((b) => b.id === scope);
   const needle = q.trim().toLowerCase();
   const list = POLICIES.filter((p) => (needle ? (p.id + p.title + p.titleEn + p.description + policyTitle(p) + policyExplain(p)).toLowerCase().includes(needle) : p.group === group));
-  const nameOf = (id: string) => users.items.find((u) => u.id === id)?.displayName ?? (id === 'demo' ? t('لوحة العرض') : id === 'provisioning' ? t('التجهيز') : t('شخص تاني'));
+  const nameOfUser = (id: string) => { const u = users.items.find((x) => x.id === id); return u ? userLabel(u.username, u.displayName) : null; };
+  const nameOf = (id: string) => nameOfUser(id) ?? (id === 'demo' ? t('لوحة العرض') : id === 'provisioning' ? t('التجهيز') : t('شخص تاني'));
   return (
     <div className="space-y-3">
       <Toolbar className="mb-0">

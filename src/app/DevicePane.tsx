@@ -15,7 +15,7 @@ import { cn, money, dateTime } from '../lib/format';
 import { clock, businessDate, localTime } from '../mock/clock';
 import { APPROVAL_ACTIONS } from '../mock/policyRegistry';
 import { Tech } from './tech';
-import { personName, deviceName, roleLabel, branchLabel } from '../demo/people'; // plain names (demo layer)
+import { personName, personLabel, personRole, deviceName, roleLabel, branchLabel, userLabel } from '../demo/people'; // plain names (demo layer)
 import { capabilityHiding } from '../screens/ops/capabilities-ui'; // operations & system area
 import { OfflineBar } from '../screens/ops/OfflineBar';
 import { RemoteApproval } from '../screens/ops/RemoteApproval';
@@ -92,7 +92,7 @@ function ScreenHost() {
   const allowed = def.perm ? can(def.perm) : def.anyPerm ? def.anyPerm.some(can) : true;
   if (!allowed) return <div className="max-w-xl mx-auto mt-10"><EmptyState icon={<Lock />} title={t('الشاشة دي مش متاحة للحساب ده')} text={<>{t('الحساب ده مش مسموح له يفتح الشاشة دي. ادخل بحساب تاني (مثلًا مدير).')}<Tech> <span className="num text-xs">({def.perm ?? def.anyPerm?.join(' | ')})</span></Tech></>} /></div>;
   const off = capabilityHiding(def, auth.branchId ?? terminal?.branchId ?? null);
-  if (off) return <Banner tone="warning" title={`${t('الإمكانية دي مقفولة')}: ${off.title}`}><div className="text-xs">{off.offEffect} {t('تتفتح من "إمكانيات النظام".')}</div></Banner>;
+  if (off) return <Banner tone="warning" title={`${t('الإمكانية دي مقفولة')}: ${L({ ar: off.title, en: (off as any).titleEn })}`}><div className="text-xs">{t(off.offEffect)} {t('تتفتح من "إمكانيات النظام".')}</div></Banner>;
   const C = def.component;
   return <Suspense fallback={<ScreenFallback />}><C key={screen} /></Suspense>;
 }
@@ -116,7 +116,7 @@ function Header() {
   const lbl = deviceLabel(id, lang);
   const KIcon = KIND_ICON[terminal?.kind ?? 'BO'] ?? Monitor;
   const dn = String(me?.user?.displayName ?? '');
-  const roleText = dn.includes(' — ') ? dn.split(' — ')[1] : me?.user?.roleAssignments?.map((r: any) => roleLabel(r.roleName)).join('، ');
+  const roleText = personRole(me?.user?.username, dn) || me?.user?.roleAssignments?.map((r: any) => roleLabel(r.roleName)).join(t('، '));
   const opener = session.data ? (() => { const u = store.db.users.find((x) => x.id === session.data.userId); return personName(u?.username, u?.displayName); })() : null;
   return (
     <header className="@container/hdr h-14 shrink-0 flex items-center gap-3 px-4 border-b line device-header">
@@ -183,14 +183,15 @@ function LoginScreen() {
   const rest = sorted.filter((u) => !(u.scoped && fitsDevice(kind, u.roles)));
   const UserBtn = ({ u }: { u: (typeof users)[number] }) => {
     const on = userId === u.id;
-    const [nm, role] = String(u.displayName).split(' — ');
+    const nm = personName(u.username, u.displayName);
+    const role = personRole(u.username, u.displayName) || undefined;
     return (
       <button data-fb={`login-user:${u.username}`} onClick={() => { setUserId(u.id); setPin(''); setErr(null); }} aria-pressed={on}
         className={cn('flex items-center gap-3 px-3 py-2.5 rounded-xl border text-start transition-all', on ? 'border-[var(--primary)] bg-[var(--primary-container)] shadow-[0_0_0_3px_var(--primary-glow-dim)]' : 'border-[var(--glass-border)] bg-[var(--surface-1)] hover:bg-[var(--surface-2)] hover:border-[color-mix(in_srgb,var(--primary)_35%,var(--glass-border))]', !u.scoped && 'opacity-60')}>
         <Avatar name={nm} size="md" />
         <div className="min-w-0 flex-1">
           <div className="text-sm font-bold truncate">{nm}</div>
-          <div className="text-[11px] text-dim truncate">{role ?? u.roles.map((r) => roleLabel(r)).join('، ')}<Tech><span className="num ms-1">{u.username}</span></Tech></div>
+          <div className="text-[11px] text-dim truncate">{role ?? u.roles.map((r) => roleLabel(r)).join(t('، '))}<Tech><span className="num ms-1">{u.username}</span></Tech></div>
         </div>
         <div className="flex items-center gap-1 flex-wrap justify-end">
           {!u.scoped && <Pill tone="warning" size="sm">{t('مش شغال في الفرع ده')}</Pill>}
@@ -228,7 +229,7 @@ function LoginScreen() {
           </div>
           <div className="glass rounded-2xl p-5 flex flex-col items-center gap-4">
             <div className="flex flex-col items-center gap-2 text-center min-h-[64px] justify-center">
-              {chosen ? <Avatar name={String(chosen.displayName).split(' — ')[0]} size="lg" /> : <span className="w-12 h-12 rounded-full bg-[var(--surface-2)] border border-[var(--glass-border)] flex items-center justify-center text-dim"><KeyRound className="w-5 h-5" /></span>}
+              {chosen ? <Avatar name={personName(chosen.username, chosen.displayName)} size="lg" /> : <span className="w-12 h-12 rounded-full bg-[var(--surface-2)] border border-[var(--glass-border)] flex items-center justify-center text-dim"><KeyRound className="w-5 h-5" /></span>}
               <div className="text-sm text-soft">{chosen ? t('{n}، اكتب رقمك السري', { n: personName(chosen.username, chosen.displayName) }) : t('اختار اسمك الأول')}</div>
             </div>
             <div className="flex gap-2 num" dir="ltr" aria-label={t('الرقم السري')}>{Array.from({ length: 6 }, (_, i) => <span key={i} className={cn('w-9 h-11 rounded-xl border flex items-center justify-center text-xl transition-colors', i < pin.length ? 'border-[var(--primary)] bg-[var(--primary-container)] text-[var(--primary)]' : 'border-[var(--glass-border)] bg-[var(--surface-1)]')}>{i < pin.length ? '•' : ''}</span>)}</div>
@@ -300,7 +301,7 @@ function ApprovalDialog({ req }: { req: ReturnType<typeof useApprovals>[number] 
         <Banner tone="info">{t('الموافقة بتتستخدم مرة واحدة للعملية دي بالظبط، ومن نفس الجهاز، وبتخلص بعد دقيقتين. صاحب الطلب مينفعش يوافق لنفسه.')}</Banner>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5"><div className="text-xs font-bold text-soft">{t('المدير')}</div>
-            <Select value={approver} onChange={(e) => setApprover(e.target.value)} options={[{ value: '', label: t('اختار') }, ...approvers.map((a) => ({ value: a.id, label: `${a.displayName}${a.can ? '' : ' — ' + t('مالوش صلاحية')}` }))]} />
+            <Select value={approver} onChange={(e) => setApprover(e.target.value)} options={[{ value: '', label: t('اختار') }, ...approvers.map((a) => ({ value: a.id, label: `${userLabel(a.username, a.displayName)}${a.can ? '' : ' — ' + t('مالوش صلاحية')}` }))]} />
           </div>
           <div className="space-y-1.5"><div className="text-xs font-bold text-soft">{t('الرقم السري')}</div><Input type="password" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="••••••" onKeyDown={(e) => e.key === 'Enter' && grant()} /></div>
         </div>

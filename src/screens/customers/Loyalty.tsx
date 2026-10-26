@@ -3,10 +3,11 @@ import React, { useState } from 'react';
 import { Award, Crown, Plus, Pencil, Star, Search } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';
 import { PageHeader, StateBadge, Button, Card, Pill, Money, Modal, Field, Input, Switch, Tabs, Table, Spinner, Select, StatGrid, StatCard } from '../../ui';
-import { t, L } from '../../i18n';
+import { t, L, tv } from '../../i18n';
 import { cn, money, dateTime } from '../../lib/format';
 import { PolicyCard } from './PolicyCard';
 import { entryLabel } from './CustomerProfile';
+import { personText } from '../../demo/people';
 
 export default function Loyalty() {
   const [tab, setTab] = useState<'program' | 'tiers' | 'ledger'>('program');
@@ -114,7 +115,7 @@ function Ledger() {
     <Card title={<span className="flex items-center gap-2"><Star className="w-4 h-4" />{t('كل حركات النقاط')}</span>} actions={<div className="w-44"><Select value={kind} onChange={(e) => setKind(e.target.value)} options={[{ value: '', label: t('كل الحركات') }, ...Object.entries(entryLabel).map(([k, v]) => ({ value: k, label: t(v.ar) }))]} /></div>}>
       {q.loading && !items.length ? <Spinner /> : (
         <Table head={[t('الوقت'), t('العميل'), t('الحركة'), t('النقاط'), t('الرصيد بعدها'), t('الطلب'), t('التفاصيل')]} empty={t('مفيش حركات')}
-          rows={items.map((e) => [<span className="text-xs num">{dateTime(e.at)}</span>, <button className="text-start font-bold hover:text-[var(--primary)]" onClick={() => nav('customer', { customerId: e.customerId })}>{e.customerName}<span className="block text-[10px] text-dim num font-normal">{e.customerCode}</span></button>, <Pill tone={entryLabel[e.kind]?.tone}>{t(entryLabel[e.kind]?.ar ?? e.kind)}</Pill>, <b className={cn('num', e.points > 0 ? 'text-[var(--success)]' : 'text-[var(--error)]')}>{e.points > 0 ? '+' : ''}{e.points}</b>, <span className="num">{e.balanceAfter}</span>, e.orderNumber ? <span className="num">#{e.orderNumber}</span> : '—', <span className="text-xs">{e.reason ?? ''}{e.byName ? <span className="text-dim"> · {e.byName}</span> : ''}</span>])} />
+          rows={items.map((e) => [<span className="text-xs num">{dateTime(e.at)}</span>, <button className="text-start font-bold hover:text-[var(--primary)]" onClick={() => nav('customer', { customerId: e.customerId })}>{e.customerName}<span className="block text-[10px] text-dim num font-normal">{e.customerCode}</span></button>, <Pill tone={entryLabel[e.kind]?.tone}>{t(entryLabel[e.kind]?.ar ?? e.kind)}</Pill>, <b className={cn('num', e.points > 0 ? 'text-[var(--success)]' : 'text-[var(--error)]')}>{e.points > 0 ? '+' : ''}{e.points}</b>, <span className="num">{e.balanceAfter}</span>, e.orderNumber ? <span className="num">#{e.orderNumber}</span> : '—', <span className="text-xs">{tv(e.reason) ?? ''}{personText(e.byName) ? <span className="text-dim"> · {personText(e.byName)}</span> : ''}</span>])} />
       )}
     </Card>
   );

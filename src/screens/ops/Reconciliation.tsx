@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Scale, Play, CheckCircle2, AlertTriangle, HelpCircle, MessageSquareText, Banknote, CreditCard, Smartphone, FileCheck2 } from 'lucide-react';
 import { useQuery, useCommand, useDev } from '../../app/hooks';
 import { Section, StateBadge, Card, Button, Pill, Tabs, Table, Modal, Money, Field, Input, Textarea, Banner, Empty, KV } from '../../ui';
-import { t, L } from '../../i18n';
+import { t, L, tv } from '../../i18n';
 import { Tech } from '../../app/tech';
 import { cn, dateTime } from '../../lib/format';
 import { clock, businessDate } from '../../mock/clock';
@@ -62,7 +62,7 @@ export default function Reconciliation() {
             <div><div className="font-bold text-sm">{L(r.title)}</div>{r.note && <div className="text-[11px] text-dim">{L(r.note)}</div>}</div>,
             <span className="num text-xs">{r.businessDate}</span>, <Money v={r.expected} />, <Money v={r.actual} />,
             <Money v={r.difference} tone={Number(r.difference) === 0 ? 'success' : 'error'} />,
-            <div><Pill tone={STATUS[r.status]?.tone}>{t(STATUS[r.status]?.label ?? r.status)}</Pill>{r.status === 'EXPLAINED' && r.ackReason && <div className="text-[11px] text-dim mt-0.5 max-w-[220px] truncate">"{r.ackReason}"</div>}</div>,
+            <div><Pill tone={STATUS[r.status]?.tone}>{t(STATUS[r.status]?.label ?? r.status)}</Pill>{r.status === 'EXPLAINED' && r.ackReason && <div className="text-[11px] text-dim mt-0.5 max-w-[220px] truncate">"{tv(r.ackReason)}"</div>}</div>,
             <Button size="sm" variant={r.status === 'UNEXPLAINED_DIFFERENCE' ? 'warning' : 'ghost'} onClick={() => setOpen(r.id)} data-fb={`recon-open:${r.key}`}>{r.status === 'UNEXPLAINED_DIFFERENCE' ? <><MessageSquareText className="w-3.5 h-3.5" />{t('فسّر')}</> : t('التفاصيل')}</Button>,
           ])} />
         )}
@@ -90,7 +90,7 @@ function ResultDialog({ id, onClose }: { id: string; onClose: () => void }) {
             <div className={cn('rounded-xl p-3', Number(r.difference) === 0 ? 'surface-1' : 'bg-[color-mix(in_srgb,var(--error)_10%,transparent)]')}><div className="text-[11px] text-dim">{t('الفرق')}</div><Money v={r.difference} big tone={Number(r.difference) === 0 ? 'success' : 'error'} /></div>
           </div>
           {r.note && <Banner tone="info">{L(r.note)}</Banner>}
-          <KV rows={[[t('نوع المطابقة'), L(r.rule?.title)], [t('اليوم'), <span className="num">{r.businessDate}</span>], [t('الحالة'), <Pill tone={STATUS[r.status]?.tone}>{t(STATUS[r.status]?.label ?? r.status)}</Pill>], ...(r.ackByName ? [[t('فسّره'), `${r.ackByName} · ${dateTime(r.ackAt)}`] as [string, string], [t('السبب'), r.ackReason] as [string, string]] : [])]} />
+          <KV rows={[[t('نوع المطابقة'), L(r.rule?.title)], [t('اليوم'), <span className="num">{r.businessDate}</span>], [t('الحالة'), <Pill tone={STATUS[r.status]?.tone}>{t(STATUS[r.status]?.label ?? r.status)}</Pill>], ...(r.ackByName ? [[t('فسّره'), `${r.ackByName} · ${dateTime(r.ackAt)}`] as [string, string], [t('السبب'), tv(r.ackReason)] as [string, string]] : [])]} />
           {r.drilldown?.length > 0 && (
             <div>
               <div className="text-xs font-bold text-soft mb-1">{t('التفاصيل')}</div>

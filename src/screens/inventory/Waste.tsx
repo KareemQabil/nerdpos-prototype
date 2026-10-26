@@ -4,11 +4,12 @@ import React, { useState } from 'react';
 import { Plus, Trash2, SlidersHorizontal, Undo2 } from 'lucide-react';
 import { useCommand, useQuery } from '../../app/hooks';
 import { Banner, Button, Empty, Field, Input, Modal, Money, Pill, Section, Select, Spinner, StateBadge, Table, Tabs, EmptyState } from '../../ui';
-import { t, L } from '../../i18n';
+import { t, L, tv } from '../../i18n';
 import { dateTime } from '../../lib/format';
 import { BranchScope, ItemPicker, MovementTable, Qty, WASTE_REASONS, WASTE_REASON_TEXT, WarehouseSelect, reasonText, useBranchScope, useItemsCatalog, useList, useWarehouses } from './common';
 import { WasteDialog } from './WasteDialog';
 import { AdjustDialog } from './ItemDrawer';
+import { personText } from '../../demo/people';
 
 const OPS = ['Stock.RecordWaste', 'Waste.Find', 'Inventory.Adjust', 'Stock.RecordReturn', 'Movement.Find'];
 type Tab = 'waste' | 'adjust' | 'returns';
@@ -47,13 +48,13 @@ function WasteTab({ branchId }: { branchId?: string }) {
       {byReason.size > 0 && <div className="flex flex-wrap gap-1.5">{[...byReason].sort((a, b) => b[1] - a[1]).map(([r, v]) => <Pill key={r} tone="warning">{reasonText(r)} · <span className="num">{v.toFixed(2)}</span></Pill>)}</div>}
       <Table loading={q.loading && !q.raw} empty={<EmptyState compact icon={<Trash2 />} title={t('مفيش هالك متسجل')} />} head={[t('إمتى'), t('الصنف'), t('الكمية'), t('السبب'), t('المخزن'), t('القيمة'), t('مين'), t('وافق')]} rows={q.items.map((w) => [
           <span className="text-xs">{dateTime(w.at)} <span className="num text-dim">{w.number}</span></span>,
-          <div><div className="font-bold">{L(w.name)} {w.itemKind === 'PRODUCT' && <Pill tone="info">{t('طبق')}</Pill>}</div>{w.lines?.length > 0 && <div className="text-[11px] text-dim">{w.lines.map((x: any) => `${L(x.name)} ${x.quantity}`).join('، ')}</div>}{w.note && <div className="text-[11px] text-dim">{w.note}</div>}</div>,
+          <div><div className="font-bold">{L(w.name)} {w.itemKind === 'PRODUCT' && <Pill tone="info">{t('طبق')}</Pill>}</div>{w.lines?.length > 0 && <div className="text-[11px] text-dim">{w.lines.map((x: any) => `${L(x.name)} ${x.quantity}`).join(t('، '))}</div>}{tv(w.note) && <div className="text-[11px] text-dim">{tv(w.note)}</div>}</div>,
           w.itemKind === 'PRODUCT' ? <span className="num">{w.quantity} {t('طبق')}</span> : <Qty v={w.quantity} unit={w.unit} />,
           <Pill tone="warning">{reasonText(w.reason)}</Pill>,
-          <span className="text-xs">{w.warehouse.name}</span>,
+          <span className="text-xs">{tv(w.warehouse.name)}</span>,
           <Money v={w.value} tone="error" className="text-xs" />,
-          <span className="text-xs">{w.userName}</span>,
-          <span className="text-xs text-dim">{w.approverName ?? '—'}</span>,
+          <span className="text-xs">{personText(w.userName)}</span>,
+          <span className="text-xs text-dim">{personText(w.approverName) ?? '—'}</span>,
         ])} />
       <WasteDialog open={open} onClose={() => setOpen(false)} />
     </div>
@@ -105,7 +106,7 @@ function ReturnsTab({ branchId }: { branchId?: string }) {
       </div>
       <Table empty={t('مفيش مرتجعات')} head={[t('إمتى'), t('الشيك'), t('الصنف'), t('الكمية'), t('مصيره'), t('القيمة'), t('مين')]} rows={list.map((r) => [
         <span className="text-xs">{dateTime(r.at)}</span>, <span className="num">{r.orderNumber}</span>, <span className="font-bold">{L(r.name)}</span>, <span className="num">{r.quantity}</span>,
-        r.disposition === 'RESTOCK' ? <Pill tone="success">{t('رجع المخزن')}</Pill> : <Pill tone="warning">{t('اترمى')}</Pill>, <Money v={r.value} className="text-xs" />, <span className="text-xs">{r.userName}</span>,
+        r.disposition === 'RESTOCK' ? <Pill tone="success">{t('رجع المخزن')}</Pill> : <Pill tone="warning">{t('اترمى')}</Pill>, <Money v={r.value} className="text-xs" />, <span className="text-xs">{personText(r.userName)}</span>,
       ])} />
       {open && <ReturnDialog onClose={() => setOpen(false)} />}
     </div>

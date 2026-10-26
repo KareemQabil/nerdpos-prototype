@@ -6,7 +6,7 @@ import { Plus, Pencil, Search, Image as ImageIcon, Save, ArrowUp, ArrowDown, Sta
 import { useCommand } from '../../app/hooks';
 import { Banner, Button, Card, Field, Input, Modal, Money, Pill, Section, Select, StateBadge, Switch, Table, Tabs , EmptyState } from '../../ui';
 import { Tech } from '../../app/tech';
-import { t, L } from '../../i18n';
+import { t, L, tv } from '../../i18n';
 import { LocInputs, PolicyChip, Radio, Swatch, allergenLabel, availabilityLabel, availabilityTone, useItems, usePolicy } from './catalog/common';
 import { ProductCreate, ProductDrawer, type DrawerTab } from './catalog/ProductEditor';
 import { MenusAdmin } from '../menu/MenusAdmin';
@@ -93,7 +93,7 @@ function Products() {
         <span className="num">{p.modifierGroupIds.length}</span>,
         <button data-fb={`products:availability:${p.id}`} onClick={(e) => { e.stopPropagation(); setOpen({ id: p.id, tab: 'availability' }); }} className="text-start">
           <Pill tone={availabilityTone(p.availability.state)}>{availabilityLabel(p.availability.state)}{p.availability.soldOutFor ? ' · ' + t('النهارده') : ''}</Pill>
-          {p.availability.reason && <div className="text-[11px] text-dim mt-0.5 max-w-[140px] truncate" title={p.availability.reason}>{p.availability.reason}</div>}
+          {p.availability.reason && <div className="text-[11px] text-dim mt-0.5 max-w-[140px] truncate" title={tv(p.availability.reason)}>{tv(p.availability.reason)}</div>}
         </button>,
         <Button size="sm" variant="ghost" data-fb={`products:open:${p.id}`} onClick={(e) => { e.stopPropagation(); setOpen({ id: p.id }); }}><Pencil className="w-3.5 h-3.5" />{t('فتح')}</Button>,
       ])} />
@@ -271,7 +271,7 @@ function GroupCard({ g, all, onToggle, onEdit }: { g: any; all: any[]; onToggle:
         <div>
           <div className="inline-flex items-center gap-1.5 font-bold">{L(o.name)} {o.isDefault && <Pill tone="primary"><Star className="w-3 h-3" />{t('افتراضي')}</Pill>}</div>
           {o.nestedGroupId && <div className="text-[11px] text-dim">↳ {t('بيسأل')}: {nestedName(o.nestedGroupId)}</div>}
-          {o.allergens?.length > 0 && <div className="text-[11px] text-[var(--warning)]">{o.allergens.map(allergenLabel).join('، ')}</div>}
+          {o.allergens?.length > 0 && <div className="text-[11px] text-[var(--warning)]">{o.allergens.map(allergenLabel).join(t('، '))}</div>}
         </div>,
         ing ? <Money v={o.extraPriceDelta ?? o.priceDelta} /> : <Money v={o.priceDelta} tone={Number(o.priceDelta) < 0 ? 'error' : undefined} />,
         <button data-fb={`option:soldout:${o.id}`} disabled={busy} onClick={() => soldOut(o, !o.soldOut)} className="text-start">{o.soldOut ? <Pill tone="error"><CircleSlash className="w-3 h-3" />{t('خلصت')} <RotateCcw className="w-3 h-3" /></Pill> : <Pill tone="neutral">{t('متاحة')}</Pill>}</button>,

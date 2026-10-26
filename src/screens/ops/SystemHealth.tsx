@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import { Activity, ChefHat, Printer, FileCheck2, Webhook, RefreshCw, CheckCircle2, Clock, AlertTriangle, XCircle, Info, PlugZap } from 'lucide-react';
 import { useQuery, useCommand } from '../../app/hooks';
 import { Section, StateBadge, Card, Button, Pill, Tabs, Table, Modal, Empty, KV, Switch, Banner } from '../../ui';
-import { t, L } from '../../i18n';
+import { t, L, tLabel } from '../../i18n';
 import { Tech } from '../../app/tech';
 import { cn, dateTime, time } from '../../lib/format';
 import { sim } from '../../mock/sim';
@@ -74,7 +74,7 @@ export default function SystemHealth() {
         {consumer && <div className="mb-2"><Pill tone="primary">{t(CONSUMERS.find((c) => c.id === consumer)?.title ?? '')}</Pill> <Button size="sm" variant="ghost" onClick={() => setConsumer('')}>{t('كل الأنواع')}</Button></div>}
         {items.length === 0 ? <Empty icon={<CheckCircle2 className="w-10 h-10 text-[var(--success)] opacity-60" />} text={tab === 'attention' ? t('كله تمام — مفيش حاجة واقفة') : t('مفيش عمليات')} /> : (
           <Table head={[t('إيه'), t('رايحة لـ'), t('الحالة'), t('المحاولات'), t('آخر مشكلة'), t('إمتى'), '']} rows={items.map((d) => [
-            <div><div className="font-bold text-sm">{d.event.label}</div><div className="text-[11px] text-dim">{t(EVENT[d.event.type] ?? '')}<Tech> <span className="num">{d.event.type}</span></Tech></div></div>,
+            <div><div className="font-bold text-sm">{tLabel(d.event.label)}</div><div className="text-[11px] text-dim">{t(EVENT[d.event.type] ?? '')}<Tech> <span className="num">{d.event.type}</span></Tech></div></div>,
             L(d.consumerName),
             <StatePill s={d.state} />,
             <span className="num">{d.attempts}</span>,
@@ -104,7 +104,7 @@ function DeliveryDialog({ id, onClose }: { id: string; onClose: () => void }) {
   const q = useQuery<any>('OutboxDelivery.Get', { params: { deliveryId: id } });
   const d = q.data;
   return (
-    <Modal open onClose={onClose} title={d ? d.event.label : t('التفاصيل')} badge={<StateBadge ops={['OutboxDelivery.Get']} />} footer={d && <Redrive d={d} />}>
+    <Modal open onClose={onClose} title={d ? tLabel(d.event.label) : t('التفاصيل')} badge={<StateBadge ops={['OutboxDelivery.Get']} />} footer={d && <Redrive d={d} />}>
       {d && (
         <div className="space-y-3">
           <KV rows={[[t('رايحة لـ'), L(d.consumerName)], [t('الحالة'), <StatePill s={d.state} />], [t('المحاولات'), d.attempts], [t('اتعملت'), dateTime(d.createdAt)], ...(d.lastErrorText ? [[t('آخر مشكلة'), L(d.lastErrorText)] as [string, string]] : [])]} />

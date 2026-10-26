@@ -12,16 +12,16 @@ import { screenById } from '../app/registry';
 import { Banner, Button, Card, Money, Pill, StateBadge, PageHeader, StatGrid, StatCard, EmptyState, Skeleton } from '../ui';
 import { t, L, useLang } from '../i18n';
 import { Tech } from '../app/tech';
-import { cn, money } from '../lib/format';
+import { cn, money, dayLong } from '../lib/format';
 import { clock, businessDate } from '../mock/clock';
-import { branchLabel, personName } from '../demo/people';
+import { branchLabel, personName, personText } from '../demo/people';
 import { useList } from './admin/org/common';
 
 type Status = boolean | null; // null = not known (read refused or no simple read)
 const n = (v: unknown) => Number(v ?? 0) || 0;
 const fmt = (v: number) => Math.round(v).toLocaleString('en-US');
 /** «الاتنين، 26 أكتوبر» with Western digits. */
-export const dayLabel = (iso: string | null | undefined) => (iso ? new Intl.DateTimeFormat('ar-EG-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(iso + 'T12:00:00Z')) : '—');
+export const dayLabel = (iso: string | null | undefined) => (iso ? dayLong(iso) : '—');
 // business day runs 04:00 → 03:59: hours in that order
 const DAY_HOURS = [...Array.from({ length: 20 }, (_, i) => i + 4), 0, 1, 2, 3];
 const cairoHour = () => Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', hour: '2-digit', hourCycle: 'h23' }).format(new Date(clock.now())));
@@ -272,7 +272,7 @@ function LiveService() {
             sub={[n(ds?.pending) ? t('{p} مستني طيار', { p: ds.pending }) : null, n(ds?.late) ? t('{l} متأخر', { l: ds.late }) : null, n(ds?.delivered) ? t('{d} اتسلم', { d: ds.delivered }) : null].filter(Boolean).join(' · ') || t('مفيش طلبات دليفري شغالة')} />}
           {sessions.data && <LiveTile fb="home:live:drawers" icon={<Clock3 className="w-4 h-4" />} label={t('الورديات المفتوحة')} onClick={() => nav('shift')} tone={sessions.items.length ? 'success' : 'neutral'}
             value={sessions.items.length}
-            sub={sessions.items.length ? sessions.items.slice(0, 2).map((s) => personName(null, s.cashierName)).join('، ') : t('مفيش درج مفتوح — الكاشير يفتح وردية الأول')} />}
+            sub={sessions.items.length ? sessions.items.slice(0, 2).map((s) => personName(null, personText(s.cashierName))).join(t('، ')) : t('مفيش درج مفتوح — الكاشير يفتح وردية الأول')} />}
         </div>
       )}
     </Card>
@@ -296,7 +296,7 @@ function NeedsAction() {
   const pending = approvals.data?.pending ?? 0;
   if (pending) alerts.push({ id: 'approvals', tone: 'warning', icon: <BellRing className="w-4 h-4" />, title: t('{n} طلب موافقة مستنيك', { n: pending }), text: t('موظفين طالبين موافقة مدير من جهاز تاني.'), screen: 'approvals-inbox', cta: t('راجع') });
   const out = low.items.filter((x) => x.state === 'OUT' || n(x.onHand) <= 0).length;
-  if (low.items.length) alerts.push({ id: 'low', tone: out ? 'error' : 'warning', icon: <PackageMinus className="w-4 h-4" />, title: t('{n} خامة تحت الحد الأدنى', { n: low.items.length }), text: (out ? t('{o} خلصت خالص. ', { o: out }) : '') + low.items.slice(0, 3).map((x) => L(x.item?.name) || x.item?.name).filter(Boolean).join('، '), screen: 'inv-dashboard', cta: t('اطلب') });
+  if (low.items.length) alerts.push({ id: 'low', tone: out ? 'error' : 'warning', icon: <PackageMinus className="w-4 h-4" />, title: t('{n} خامة تحت الحد الأدنى', { n: low.items.length }), text: (out ? t('{o} خلصت خالص. ', { o: out }) : '') + low.items.slice(0, 3).map((x) => L(x.item?.name) || x.item?.name).filter(Boolean).join(t('، ')), screen: 'inv-dashboard', cta: t('اطلب') });
   if (expiring.items.length) alerts.push({ id: 'expiring', tone: 'warning', icon: <Hourglass className="w-4 h-4" />, title: t('{n} دفعة صلاحيتها بتخلص خلال 3 أيام', { n: expiring.items.length }), text: t('استخدمها الأول أو سجلها هالك.'), screen: 'inv-dashboard', cta: t('اعرض') });
   const rejected = fiscal.items.filter((d) => d.state === 'REJECTED' || d.state === 'PENDING_DATA').length;
   const nearDeadline = fiscal.items.filter((d) => d.alert).length;

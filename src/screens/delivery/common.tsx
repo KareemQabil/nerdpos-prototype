@@ -4,10 +4,11 @@ import { Bike, Car, Clock, MapPin, Phone, ChefHat, CheckCircle2, XCircle, AlertT
 import { useDev, useQuery, useCommand } from '../../app/hooks';
 import { Modal, Button, Field, Input, Select, Textarea, Pill, Banner, KV, Money, StateBadge, Spinner, confirmDialog } from '../../ui';
 import { Tech } from '../../app/tech';
-import { t, L } from '../../i18n';
+import { t, L, tv } from '../../i18n';
 import { cn, money, time, dateTime, qty } from '../../lib/format';
 import { clock } from '../../mock/clock';
 import { addressText, AllergyWarning, TierBadge } from '../customers/common';
+import { personText } from '../../demo/people';
 
 export const STATE: Record<string, { ar: string; tone: 'primary' | 'warning' | 'info' | 'success' | 'error' | 'neutral' | 'violet' }> = {
   PENDING: { ar: 'جديد', tone: 'primary' },
@@ -244,12 +245,12 @@ export function DeliveryDetail({ id, onClose }: { id: string; onClose: () => voi
               [t('الدفع'), t(PAYMENT_MODE[d.paymentMode]?.ar ?? d.paymentMode)],
               [t('الطيار'), d.driver ? `${d.driver.name} · ${d.driver.phone}` : '—'],
               [t('الوصول المتوقع'), time(d.promisedAt)],
-              ...(d.note ? [[t('ملاحظة'), d.note] as [string, string]] : []),
+              ...(d.note ? [[t('ملاحظة'), tv(d.note)] as [string, string]] : []),
             ]} />
             {d.customer?.allergies?.length ? <AllergyWarning allergies={d.customer.allergies} /> : null}
             {d.order && (
               <div className="rounded-xl border line p-3 text-sm space-y-1">
-                {(d.lines ?? []).map((l: any) => <div key={l.id} className="flex justify-between gap-2"><span>{qty(l.quantity)} × {L(l.name)}{l.modifiers?.length ? <span className="text-dim text-xs"> — {l.modifiers.map((m: any) => L(m)).join('، ')}</span> : null}{l.note ? <span className="text-[var(--warning-text)] text-xs"> ✎ {l.note}</span> : null}</span><span className="num">{money(l.lineTotal)}</span></div>)}
+                {(d.lines ?? []).map((l: any) => <div key={l.id} className="flex justify-between gap-2"><span>{qty(l.quantity)} × {L(l.name)}{l.modifiers?.length ? <span className="text-dim text-xs"> — {l.modifiers.map((m: any) => L(m)).join(t('، '))}</span> : null}{tv(l.note) ? <span className="text-[var(--warning-text)] text-xs"> ✎ {tv(l.note)}</span> : null}</span><span className="num">{money(l.lineTotal)}</span></div>)}
                 {d.totals && <div className="border-t line pt-2 mt-2 space-y-0.5">
                   {d.totals.charges.map((c: any) => <div key={c.id} className="flex justify-between text-dim"><span>{L(c.label)}</span><span className="num">{money(c.amount)}</span></div>)}
                   <div className="flex justify-between font-bold"><span>{t('الإجمالي')}</span><Money v={d.order.payable} /></div>
@@ -267,7 +268,7 @@ export function DeliveryDetail({ id, onClose }: { id: string; onClose: () => voi
               {d.timeline.map((h: any, i: number) => (
                 <li key={i} className="ms-4">
                   <span className="absolute -start-1.5 w-3 h-3 rounded-full bg-[var(--primary)] border-2 border-[var(--card,#0f172a)]" />
-                  <div className="text-[11px] text-dim num">{time(h.at)} · {h.byName ?? ''}</div>
+                  <div className="text-[11px] text-dim num">{time(h.at)} · {personText(h.byName) ?? ''}</div>
                   <div className="text-sm">{L(h.text)}</div>
                   <Tech><div className="text-[10px] text-dim num">{h.kind}</div></Tech>
                 </li>

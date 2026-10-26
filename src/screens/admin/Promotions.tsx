@@ -31,7 +31,7 @@ const MECH: Record<Mech, { label: string; icon: React.ComponentType<{ className?
 };
 
 const toDraft = (pr: any): Draft => ({
-  id: pr.id, version: pr.version, active: pr.active, name: pr.name, description: pr.description?.ar ?? '', kind: pr.kind, codes: (pr.codes ?? (pr.code ? [pr.code] : [])).join('، '),
+  id: pr.id, version: pr.version, active: pr.active, name: pr.name, description: pr.description?.ar ?? '', kind: pr.kind, codes: (pr.codes ?? (pr.code ? [pr.code] : [])).join(t('، ')),
   mechanic: pr.mechanic ?? 'ORDER', benefitType: pr.benefitType, benefitValue: pr.benefitValue, productIds: pr.productIds ?? [], categoryIds: pr.categoryIds ?? [],
   buyQty: String(pr.buyQty ?? 1), getQty: String(pr.getQty ?? 1), getPercent: String(pr.getPercent ?? '100'), getProductIds: pr.getProductIds ?? [], getCategoryIds: pr.getCategoryIds ?? [], sameGet: !(pr.getProductIds?.length || pr.getCategoryIds?.length),
   channels: pr.channels, branchIds: pr.branchIds, minSubtotal: pr.minSubtotal ? String(Number(pr.minSubtotal)) : '', maxDiscount: pr.maxDiscount ? String(Number(pr.maxDiscount)) : '',
@@ -80,9 +80,9 @@ export default function Promotions() {
       <Table head={[t('العرض'), t('بيدّي إيه'), t('إزاي'), t('إمتى'), t('الاستخدام'), t('شغال دلوقتي'), t('مفعّل'), '']} rows={shown.map((pr) => [
         <div className="max-w-[220px]"><div className="font-bold">{L(pr.name)}</div>{pr.description?.ar && <div className="text-[11px] text-dim truncate">{L(pr.description)}</div>}<Tech><span className="num text-[10px] text-dim">{pr.id} v{pr.version}</span></Tech></div>,
         <div className="text-sm max-w-[260px]">{L(pr.summary)}{pr.minSubtotal && <div className="text-[11px] text-dim">{t('لو الشيك فوق')} <Money v={pr.minSubtotal} /></div>}{pr.maxDiscount && <div className="text-[11px] text-dim">{t('أقصى خصم')} <Money v={pr.maxDiscount} /></div>}</div>,
-        <div className="flex flex-col gap-1 items-start">{pr.kind === 'CODED' ? <Pill tone="primary"><Ticket className="w-3 h-3" />{t('كود')} <span className="num">{(pr.codes ?? []).join('، ')}</span></Pill> : <Pill tone="info"><Timer className="w-3 h-3" />{t('أوتوماتيك')}</Pill>}<div className="flex flex-wrap gap-1">{pr.channels.map((c: string) => <Pill key={c} tone="neutral">{channelLabel(c)}</Pill>)}</div><span className="text-[11px] text-dim">{pr.branchIds.length ? pr.branchIds.map(branchName).join('، ') : t('كل الفروع')}</span>{pr.stacking === 'STACKABLE' && <Pill tone="violet"><Layers className="w-3 h-3" />{t('بيتجمع')}</Pill>}</div>,
+        <div className="flex flex-col gap-1 items-start">{pr.kind === 'CODED' ? <Pill tone="primary"><Ticket className="w-3 h-3" />{t('كود')} <span className="num">{(pr.codes ?? []).join(t('، '))}</span></Pill> : <Pill tone="info"><Timer className="w-3 h-3" />{t('أوتوماتيك')}</Pill>}<div className="flex flex-wrap gap-1">{pr.channels.map((c: string) => <Pill key={c} tone="neutral">{channelLabel(c)}</Pill>)}</div><span className="text-[11px] text-dim">{pr.branchIds.length ? pr.branchIds.map(branchName).join(t('، ')) : t('كل الفروع')}</span>{pr.stacking === 'STACKABLE' && <Pill tone="violet"><Layers className="w-3 h-3" />{t('بيتجمع')}</Pill>}</div>,
         <div className="text-xs">
-          {pr.dayparts?.length ? pr.dayparts.map((dp: Daypart, i: number) => <div key={i}>{dp.days.length === 7 ? t('كل يوم') : dp.days.map(dayLabel).join('، ')} <span className="num">{dp.start}–{dp.end}</span></div>) : <span className="text-dim">{t('طول الوقت')}</span>}
+          {pr.dayparts?.length ? pr.dayparts.map((dp: Daypart, i: number) => <div key={i}>{dp.days.length === 7 ? t('كل يوم') : dp.days.map(dayLabel).join(t('، '))} <span className="num">{dp.start}–{dp.end}</span></div>) : <span className="text-dim">{t('طول الوقت')}</span>}
           {(pr.validFrom || pr.validTo) && <div className="text-dim">{pr.validFrom ? dateTime(new Date(pr.validFrom).toISOString()) : '…'} ← {pr.validTo ? dateTime(new Date(pr.validTo).toISOString()) : '…'}</div>}
         </div>,
         <div className="text-xs"><div>{t('النهارده')}: <b className="num">{pr.usage?.today ?? 0}</b>{pr.maxUsesPerDay ? <span className="text-dim"> / {pr.maxUsesPerDay}</span> : null}</div><div>{t('الإجمالي')}: <b className="num">{pr.usage?.total ?? 0}</b>{pr.maxUses ? <span className="text-dim"> / {pr.maxUses}</span> : null}</div>{pr.exhausted && <Pill tone="warning">{t('خلص')}</Pill>}</div>,
@@ -107,7 +107,7 @@ function Picker({ products, categories, pIds, cIds, onChange, fb }: { products: 
       <div className="flex flex-wrap gap-1.5">{categories.filter((c) => c.active).map((c) => <Check key={c.id} fb={`${fb}:cat:${c.id}`} checked={cIds.includes(c.id)} onChange={(on) => onChange(pIds, on ? [...cIds, c.id] : cIds.filter((x) => x !== c.id))}>{t('قسم')}: {L(c.name)}</Check>)}</div>
       <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('دوّر على صنف…')} />
       <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">{shownP.map((p) => <Check key={p.id} fb={`${fb}:p:${p.sku}`} checked={pIds.includes(p.id)} onChange={(on) => onChange(on ? [...pIds, p.id] : pIds.filter((x) => x !== p.id), cIds)}>{L(p.name)}</Check>)}</div>
-      {(pIds.length > 0 || cIds.length > 0) && <div className="text-[11px] text-dim">{t('اخترت')}: {[...cIds.map((id) => L(categories.find((c) => c.id === id)?.name)), ...pIds.map((id) => L(products.find((p) => p.id === id)?.name))].join('، ')}</div>}
+      {(pIds.length > 0 || cIds.length > 0) && <div className="text-[11px] text-dim">{t('اخترت')}: {[...cIds.map((id) => L(categories.find((c) => c.id === id)?.name)), ...pIds.map((id) => L(products.find((p) => p.id === id)?.name))].join(t('، '))}</div>}
     </div>
   );
 }
@@ -116,11 +116,11 @@ function PromoForm({ d, set, branches, products, categories }: { d: Draft; set: 
   const toggleIn = <T,>(arr: T[], v: T, on: boolean) => (on ? [...arr, v] : arr.filter((x) => x !== v));
   const editing = !!d.id;
   const preview = useMemo(() => {
-    const scope = [...d.categoryIds.map((id) => L(categories.find((c) => c.id === id)?.name)), ...d.productIds.map((id) => L(products.find((p) => p.id === id)?.name))].join('، ');
+    const scope = [...d.categoryIds.map((id) => L(categories.find((c) => c.id === id)?.name)), ...d.productIds.map((id) => L(products.find((p) => p.id === id)?.name))].join(t('، '));
     const ben = d.benefitType === 'PERCENTAGE' ? `${d.benefitValue || '?'}%` : `${d.benefitValue || '?'} ${t('جنيه')}`;
     if (d.mechanic === 'ORDER') return t('خصم {b} على الشيك كله', { b: ben });
     if (d.mechanic === 'ITEMS') return t('خصم {b} على {s}', { b: ben, s: scope || '…' });
-    const get = d.sameGet ? scope : [...d.getCategoryIds.map((id) => L(categories.find((c) => c.id === id)?.name)), ...d.getProductIds.map((id) => L(products.find((p) => p.id === id)?.name))].join('، ');
+    const get = d.sameGet ? scope : [...d.getCategoryIds.map((id) => L(categories.find((c) => c.id === id)?.name)), ...d.getProductIds.map((id) => L(products.find((p) => p.id === id)?.name))].join(t('، '));
     return t('اشتري {x} من {s} وخد {y} من {g} {o}', { x: d.buyQty, s: scope || '…', y: d.getQty, g: get || '…', o: Number(d.getPercent) >= 100 ? t('ببلاش') : t('بخصم {p}%', { p: d.getPercent }) });
   }, [d, products, categories]);
   return (

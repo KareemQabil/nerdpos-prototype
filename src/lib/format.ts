@@ -41,3 +41,17 @@ export function dateTime(iso: string | null | undefined): string {
   return clock(new Date(iso), true);
 }
 export const cn = (...xs: (string | false | null | undefined)[]) => xs.filter(Boolean).join(' ');
+
+/** Locale for dates in the UI language (Arabic with Western digits, or English). */
+export const dateLocale = () => (getLang() === 'ar' ? 'ar-EG-u-nu-latn' : 'en-GB');
+/** A business date "2026-10-26" → "الاثنين، 26 أكتوبر" / "Monday 26 October". */
+export function dayLong(iso: string | null | undefined): string {
+  if (!iso) return '';
+  try { return new Intl.DateTimeFormat(dateLocale(), { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(iso.slice(0, 10) + 'T12:00:00Z')); } catch { return iso; }
+}
+/** A business date → short weekday ("الاثنين" / "Mon"). */
+export function dayShort(iso: string): string {
+  try { return new Intl.DateTimeFormat(getLang() === 'ar' ? 'ar-EG' : 'en-GB', { weekday: 'short', timeZone: 'UTC' }).format(new Date(iso.slice(0, 10) + 'T12:00:00Z')); } catch { return iso; }
+}
+/** A full timestamp in the UI language (for lists like feedback notes). */
+export const dateTimeLong = (iso: string | number | Date) => new Date(iso).toLocaleString(dateLocale());

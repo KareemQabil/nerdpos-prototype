@@ -17,7 +17,7 @@ import { ResetMenu } from './demo/ResetMenu';
 import { Walkthrough } from './demo/Walkthrough';
 import { Scenarios } from './demo/Scenarios';
 import { Welcome, welcomeSeen } from './demo/Welcome';
-import { DEVICE_NAMES, deviceName, personName } from './demo/people';
+import { DEVICE_NAMES, deviceName, deviceHint, personName } from './demo/people';
 import { Popover } from './demo/Popover';
 import { sim } from './mock/sim';
 
@@ -124,10 +124,10 @@ function deviceInfo(id: string, lang: 'ar' | 'en', tech: boolean) {
   const term = store.db.terminals.find((x) => x.id === id);
   const kind = term?.kind ?? 'BO';
   const Icon = KIND_ICON[kind] ?? Monitor;
-  const name = (lang === 'en' ? DEVICE_NAMES[id]?.en : DEVICE_NAMES[id]?.short) ?? deviceName(id, kind, term?.name);
+  const name = (lang === 'en' ? DEVICE_NAMES[id]?.shortEn ?? DEVICE_NAMES[id]?.en : DEVICE_NAMES[id]?.short) ?? deviceName(id, kind, term?.name);
   const who = d?.token ? personName(null, d.userName) : null;
   const offline = sim.isOffline(id);
-  const tip = [DEVICE_NAMES[id]?.hint ?? deviceName(id, kind, term?.name), who ? t('داخل عليه: {n}', { n: who }) : t('محدش داخل عليه'), offline ? t('النت مقطوع عن الجهاز ده (محاكاة)') : '', t('كليك: افتحه — كليك يمين: افتحه في الشاشة التانية'), tech ? `${l.short} · ${l.code}` : ''].filter(Boolean).join('\n');
+  const tip = [deviceHint(id) || deviceName(id, kind, term?.name), who ? t('داخل عليه: {n}', { n: who }) : t('محدش داخل عليه'), offline ? t('النت مقطوع عن الجهاز ده (محاكاة)') : '', t('كليك: افتحه — كليك يمين: افتحه في الشاشة التانية'), tech ? `${l.short} · ${l.code}` : ''].filter(Boolean).join('\n');
   return { l, Icon, name, who, tip, offline, logged: !!d?.token };
 }
 

@@ -4,6 +4,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { DoorOpen, Sprout, Wine, Type, PanelTop, Square } from 'lucide-react';
 import { cn } from '../../lib/format';
+import { tv } from '../../i18n';
 
 export interface CanvasTable { id: string; name: string; x: number; y: number; w: number; h: number; shape: string; seats: number; rotation?: number }
 export interface CanvasDecor { id: string; kind: string; x: number; y: number; w: number; h: number; label?: string }
@@ -58,7 +59,7 @@ export function FloorCanvas({ width, height, decor, tables, renderTable, onPoint
           <div key={d.id} onPointerDown={editing ? (e) => onPointerDownDecor?.(e, d, 'move') : undefined}
             className={cn('absolute border rounded-lg flex items-center justify-center gap-1 text-[11px] font-bold overflow-hidden', editing && 'cursor-move hover:ring-2 hover:ring-[var(--primary)]')}
             style={{ ...st, left: pct(d.x, width), top: pct(d.y, height), width: pct(d.w, width), height: pct(d.h, height) }} data-decor={d.kind}>
-            <Icon className="w-3.5 h-3.5 shrink-0 opacity-70" />{d.label && d.w > 50 && <span className="truncate">{d.label}</span>}
+            <Icon className="w-3.5 h-3.5 shrink-0 opacity-70" />{d.label && d.w > 50 && <span className="truncate">{tv(d.label)}</span>}
             {editing && <span onPointerDown={(e) => { e.stopPropagation(); onPointerDownDecor?.(e, d, 'resize'); }} className="absolute bottom-0 end-0 w-3 h-3 cursor-nwse-resize bg-[var(--primary)]/60 rounded-ss" />}
           </div>
         );

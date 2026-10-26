@@ -5,11 +5,12 @@ import { Plus, ShoppingBag, Send, XCircle, Lock, PackageCheck, Pencil, Trash2, S
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
 import { Banner, Button, Card, Empty, EmptyState, Field, Input, KV, Modal, Drawer, Money, PageHeader, Pill, Section, Select, Spinner, StatCard, StatGrid, StateBadge, Table, Textarea, Toolbar } from '../../ui';
-import { t, L } from '../../i18n';
+import { t, L, tv } from '../../i18n';
 import { dateTime, money } from '../../lib/format';
 import { BranchScope, ItemPicker, PO_STATE, Qty, StatePill, WarehouseSelect, fmtQty, unitLabel, useBranchScope, useItemsCatalog, useList, useWarehouses, Inp, Sel } from './common';
 import { ReceiveDialog } from './Receipts';
 import { clock } from '../../mock/clock';
+import { personText } from '../../demo/people';
 
 const OPS = ['PurchaseOrder.Create', 'PurchaseOrder.Update', 'PurchaseOrder.Issue', 'PurchaseOrder.Find', 'PurchaseOrder.Get', 'PurchaseOrder.Close', 'PurchaseOrder.Cancel', 'Inventory.LowStock'];
 
@@ -38,18 +39,18 @@ export default function PurchaseOrders() {
         <StatCard label={t('أوامر مفتوحة')} value={openPos.length} icon={<ShoppingBag />} loading={loading} hint={t('بقيمة {m}', { m: money(String(openPos.reduce((a, p) => a + Number(p.total), 0))) })} onClick={() => setState(state === 'DRAFT,ISSUED,PARTIALLY_RECEIVED' ? '' : 'DRAFT,ISSUED,PARTIALLY_RECEIVED')} />
         <StatCard label={t('مسودات لسه ما اتبعتتش')} value={all.items.filter((p) => p.state === 'DRAFT').length} icon={<Pencil />} loading={loading} onClick={() => setState(state === 'DRAFT' ? '' : 'DRAFT')} />
         <StatCard label={t('مستنيين الاستلام')} value={waiting.length} icon={<PackageCheck />} tone={waiting.length ? 'info' : 'neutral'} loading={loading} onClick={() => setState(state === 'ISSUED,PARTIALLY_RECEIVED' ? '' : 'ISSUED,PARTIALLY_RECEIVED')} />
-        <StatCard label={t('متأخرين عن ميعاد التوريد')} value={late.length} icon={<XCircle />} tone={late.length ? 'error' : 'neutral'} loading={loading} hint={late.length ? late.map((p) => p.supplierName).slice(0, 2).join('، ') : t('كله في ميعاده')} />
+        <StatCard label={t('متأخرين عن ميعاد التوريد')} value={late.length} icon={<XCircle />} tone={late.length ? 'error' : 'neutral'} loading={loading} hint={late.length ? late.map((p) => tv(p.supplierName)).slice(0, 2).join(t('، ')) : t('كله في ميعاده')} />
       </StatGrid>
       <Card padding="sm">
         <Toolbar>
           <Sel className="w-52" data-fb="po:state" value={state} onChange={(e) => setState(e.target.value)} options={[{ value: '', label: t('كل الحالات') }, { value: 'DRAFT,ISSUED,PARTIALLY_RECEIVED', label: t('المفتوحة بس') }, { value: 'ISSUED,PARTIALLY_RECEIVED', label: t('مستنية الاستلام') }, ...Object.entries(PO_STATE).map(([k, v]) => ({ value: k, label: t(v.ar) }))]} />
-          <Sel className="w-60" value={supplier} onChange={(e) => setSupplier(e.target.value)} options={[{ value: '', label: t('كل الموردين') }, ...suppliers.items.map((s) => ({ value: s.id, label: s.name }))]} />
+          <Sel className="w-60" value={supplier} onChange={(e) => setSupplier(e.target.value)} options={[{ value: '', label: t('كل الموردين') }, ...suppliers.items.map((s) => ({ value: s.id, label: tv(s.name) }))]} />
         </Toolbar>
         <Table loading={q.loading && !q.raw} onRowClick={(i) => setOpen(q.items[i].id)} align={[undefined, undefined, undefined, undefined, 'end', 'end', undefined, 'end']}
           empty={<EmptyState compact icon={<ShoppingBag />} title={t('مفيش أوامر شراء')} text={t('اعمل أمر شراء جديد، أو خلّي السيستم يجهّزه من النواقص.')} action={<Button variant="primary" onClick={() => setSuggest(true)}><Wand2 className="w-4 h-4" />{t('من النواقص')}</Button>} />}
           head={[t('الرقم'), t('المورد'), t('يستلم في'), t('الحالة'), t('القيمة'), t('اتستلم'), t('ميعاد التوريد'), '']} rows={q.items.map((p) => [
           <span className="num font-bold" data-fb={`po:open:${p.id}`}>{p.number}</span>,
-          <span className="font-bold">{p.supplierName}</span>, <span className="text-xs">{p.warehouse.name}</span>, <StatePill map={PO_STATE} state={p.state} />,
+          <span className="font-bold">{tv(p.supplierName)}</span>, <span className="text-xs">{tv(p.warehouse.name)}</span>, <StatePill map={PO_STATE} state={p.state} />,
           <Money v={p.total} className="text-xs" />, Number(p.receivedValue) > 0 ? <Money v={p.receivedValue} className="text-xs" tone="success" /> : <span className="text-dim text-xs">—</span>,
           <span className={`num text-xs ${p.expectedDate && p.expectedDate < today && ['ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state) ? 'text-[var(--error)] font-bold' : ''}`}>{p.expectedDate ?? '—'}</span>,
           <Button size="sm" variant={p.state === 'DRAFT' || ['ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state) ? 'outline' : 'ghost'} onClick={(e) => { e.stopPropagation(); setOpen(p.id); }}>{p.state === 'DRAFT' ? t('راجع وابعت') : ['ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state) ? t('استلم') : t('اعرض')}</Button>,
@@ -106,15 +107,15 @@ function Suggestions({ branchId, onClose, onDone }: { branchId?: string; onClose
             const set = (patch: Partial<typeof p>) => setPick({ ...pick, [key]: { ...p, ...patch } });
             return [
               <input type="checkbox" data-fb={`po-suggest:on:${r.item.id}`} checked={p.on} onChange={(e) => set({ on: e.target.checked })} />,
-              <span className="font-bold">{L(r.item.name)}</span>, <span className="text-xs">{r.warehouse.name}</span>,
+              <span className="font-bold">{L(r.item.name)}</span>, <span className="text-xs">{tv(r.warehouse.name)}</span>,
               <span className="text-xs"><Qty v={r.onHand} unit={r.item.unit} hint={false} /> / <span className="num">{fmtQty(r.min)}</span></span>,
-              <Sel className="w-44" value={p.supplier} onChange={(e) => set({ supplier: e.target.value })} options={[{ value: '', label: t('اختار') }, ...suppliers.items.map((s) => ({ value: s.id, label: s.name }))]} />,
+              <Sel className="w-44" value={p.supplier} onChange={(e) => set({ supplier: e.target.value })} options={[{ value: '', label: t('اختار') }, ...suppliers.items.map((s) => ({ value: s.id, label: tv(s.name) }))]} />,
               <div className="flex items-center gap-1"><Inp className="w-20" inputMode="decimal" value={p.packs} onChange={(e) => set({ packs: e.target.value })} /><span className="text-[11px] text-dim">{r.pack ? L(r.pack.name) : unitLabel(r.item.unit)}</span></div>,
               <Inp className="w-24" inputMode="decimal" value={p.cost} onChange={(e) => set({ cost: e.target.value })} />,
               <span className="num text-xs">{money((Number(p.packs) * Number(p.cost)).toFixed(4))}</span>,
             ];
           })} />
-          {already.length > 0 && <div className="text-xs text-dim">{t('عليهم أوامر مفتوحة')}: {already.map((r) => `${L(r.item.name)} (${r.openPurchaseOrders.map((o: any) => o.number).join('، ')})`).join(' · ')}</div>}
+          {already.length > 0 && <div className="text-xs text-dim">{t('عليهم أوامر مفتوحة')}: {already.map((r) => `${L(r.item.name)} (${r.openPurchaseOrders.map((o: any) => o.number).join(t('، '))})`).join(' · ')}</div>}
         </div>
       )}
     </Modal>
@@ -150,7 +151,7 @@ function PoEditor({ init, onClose, onSaved }: { init: any; onClose: () => void; 
       footer={<><span className="text-sm me-auto">{t('الإجمالي')}: <b className="num">{money(total.toFixed(4))}</b></span><Button onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" data-fb="po-edit:save" loading={busy} disabled={!supplierId || !wh || !lines.some((l) => l.itemId && Number(l.orderedQuantity) > 0)} onClick={save}><Save className="w-4 h-4" />{t('احفظ مسودة')}</Button></>}>
       <div className="space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-          <Field label={t('المورد')}><Select data-fb="po-edit:supplier" disabled={!!po} value={supplierId} onChange={(e) => setSupplierId(e.target.value)} options={[{ value: '', label: t('اختار') }, ...suppliers.items.map((s) => ({ value: s.id, label: s.name }))]} /></Field>
+          <Field label={t('المورد')}><Select data-fb="po-edit:supplier" disabled={!!po} value={supplierId} onChange={(e) => setSupplierId(e.target.value)} options={[{ value: '', label: t('اختار') }, ...suppliers.items.map((s) => ({ value: s.id, label: tv(s.name) }))]} /></Field>
           <Field label={t('يستلم في')}><WarehouseSelect fb="po-edit:warehouse" value={wh} onChange={setWh} warehouses={whs.items} /></Field>
           <Field label={t('ميعاد التوريد')}><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
           <Field label={t('ملاحظة')}><Input value={note} onChange={(e) => setNote(e.target.value)} /></Field>
@@ -186,7 +187,7 @@ function PoView({ id, onClose, onEdit }: { id: string | null; onClose: () => voi
   const open = po && ['ISSUED', 'PARTIALLY_RECEIVED'].includes(po.state);
   const message = po ? `${t('السلام عليكم')} ${po.supplierName}،\n${t('طلبية رقم')} ${po.number}${po.expectedDate ? ` — ${t('التوريد يوم')} ${po.expectedDate}` : ''}:\n${po.lines.map((l: any) => `• ${L(l.item?.name)}: ${fmtQty(l.orderedQuantity)} ${l.packId ? L(l.item?.packs?.find((p: any) => p.id === l.packId)?.name) : unitLabel(l.item?.unit)}`).join('\n')}\n${t('الإجمالي التقريبي')}: ${money(po.total)}\n${t('شكرًا')}` : '';
   return (
-    <Drawer width="xl" open onClose={onClose} title={po ? <span className="flex items-center gap-2">{t('أمر شراء')} <span className="num">{po.number}</span> — {po.supplierName}</span> : t('أمر شراء')} badge={po ? <><StatePill map={PO_STATE} state={po.state} /><StateBadge ops={OPS} /></> : undefined}
+    <Drawer width="xl" open onClose={onClose} title={po ? <span className="flex items-center gap-2">{t('أمر شراء')} <span className="num">{po.number}</span> — {tv(po.supplierName)}</span> : t('أمر شراء')} badge={po ? <><StatePill map={PO_STATE} state={po.state} /><StateBadge ops={OPS} /></> : undefined}
       footer={po && <>
         {['DRAFT', 'ISSUED'].includes(po.state) && <Button variant="danger" data-fb="po-view:cancel" onClick={() => { setReason(''); setAsk('cancel'); }}><XCircle className="w-4 h-4" />{t('الغي')}</Button>}
         {open && <Button data-fb="po-view:close" onClick={() => { setReason(''); setAsk('close'); }}><Lock className="w-4 h-4" />{t('اقفل الأمر (الباقي مش جاي)')}</Button>}
@@ -198,7 +199,7 @@ function PoView({ id, onClose, onEdit }: { id: string | null; onClose: () => voi
       </>}>
       {!po ? <Spinner /> : (
         <div className="space-y-3">
-          <KV rows={[[t('يستلم في'), `${po.warehouse.name} — ${po.warehouse.branchName}`], [t('ميعاد التوريد'), po.expectedDate ?? '—'], [t('اتعمل'), `${dateTime(po.createdAt)} · ${po.createdByName}`], [t('ملاحظة'), po.note ?? '—'], ...(po.closeReason ? [[t('سبب القفل'), po.closeReason] as [string, string]] : []), ...(po.cancelReason ? [[t('سبب الإلغاء'), po.cancelReason] as [string, string]] : [])]} />
+          <KV rows={[[t('يستلم في'), `${tv(po.warehouse.name)} — ${tv(po.warehouse.branchName)}`], [t('ميعاد التوريد'), po.expectedDate ?? '—'], [t('اتعمل'), `${dateTime(po.createdAt)} · ${personText(po.createdByName)}`], [t('ملاحظة'), tv(po.note) ?? '—'], ...(po.closeReason ? [[t('سبب القفل'), po.closeReason] as [string, string]] : []), ...(po.cancelReason ? [[t('سبب الإلغاء'), tv(po.cancelReason)] as [string, string]] : [])]} />
           {msg && <Textarea readOnly className="min-h-[140px] text-sm" value={message} onFocus={(e) => e.currentTarget.select()} />}
           <Table head={[t('الصنف'), t('المطلوب'), t('سعر العبوة'), t('الإجمالي'), t('اتستلم'), t('باقي')]} rows={po.lines.map((l: any) => [
             <span className="font-bold">{L(l.item?.name)}</span>,

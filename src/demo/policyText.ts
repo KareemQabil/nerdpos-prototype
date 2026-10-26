@@ -77,8 +77,8 @@ const PLAIN: Record<string, Plain> = {
 
 export const policyTitle = (p: PolicyMeta) => t(PLAIN[p.id]?.title ?? p.title);
 export const policyExplain = (p: PolicyMeta) => t(PLAIN[p.id]?.explain ?? p.description);
-export const policyReacts = (p: PolicyMeta) => (PLAIN[p.id]?.reacts ? t(PLAIN[p.id].reacts!) : p.reacts && !/[A-Z]{3,}/.test(p.reacts) ? p.reacts : undefined);
-export const policyQuestion = (p: PolicyMeta) => (PLAIN[p.id]?.question ? t(PLAIN[p.id].question!) : p.question && /[؀-ۿ]/.test(p.question) ? p.question : undefined);
+export const policyReacts = (p: PolicyMeta) => (PLAIN[p.id]?.reacts ? t(PLAIN[p.id].reacts!) : p.reacts && !/[A-Z]{3,}/.test(p.reacts) ? t(p.reacts) : undefined);
+export const policyQuestion = (p: PolicyMeta) => (PLAIN[p.id]?.question ? t(PLAIN[p.id].question!) : p.question && /[؀-ۿ]/.test(p.question) ? t(p.question) : undefined);
 
 // ───────── option labels (every enum option of every policy)
 const O = (label: string, help?: string): OptText => ({ label, help });
@@ -290,7 +290,7 @@ export function fieldValueText(policyId: string, f: Field, v: unknown, ctx?: Ctx
   switch (f.kind) {
     case 'enum': return v === undefined || v === null || v === '' ? t('مش متحدد') : optionText(policyId, f.key, v).label;
     case 'bool': return v === undefined ? t('مش متحدد') : v ? yes() : no();
-    case 'multi': { const arr = (v as string[] | undefined) ?? []; return arr.length ? arr.map((x) => optionText(policyId, f.key, x).label).join('، ') : t('ولا حاجة'); }
+    case 'multi': { const arr = (v as string[] | undefined) ?? []; return arr.length ? arr.map((x) => optionText(policyId, f.key, x).label).join(t('، ')) : t('ولا حاجة'); }
     case 'money': return egp(v);
     case 'percent': return v === undefined || v === null || v === '' ? t('مش متحدد') : pct(v);
     case 'percentOrNone': return v === undefined || v === null || v === '' ? (policyId === 'ServiceChargePolicy' ? t('مفيش خدمة') : t('مفيش')) : pct(v);
@@ -313,7 +313,7 @@ export function valueRows(p: PolicyMeta, value: unknown, ctx?: Ctx): Row[] {
   if (e.kind === 'approvals') return APPROVAL_ACTIONS.map((a) => ({ label: t(a.title), value: ruleSentence(a.id, (value as any)?.[a.id] ?? a.defaultRule) }));
   if (e.kind === 'selfApproval') {
     const allowed = Object.entries((value as any) ?? {}).filter(([, v]: any) => v?.mode === 'ALLOW').map(([k]) => actionTitle(k));
-    return [{ label: '', value: allowed.length ? t('مسموح يوافق على طلبه في: {a}', { a: allowed.join('، ') }) : t('ممنوع في كل الحركات — لازم مدير تاني') }];
+    return [{ label: '', value: allowed.length ? t('مسموح يوافق على طلبه في: {a}', { a: allowed.join(t('، ')) }) : t('ممنوع في كل الحركات — لازم مدير تاني') }];
   }
   if (e.kind === 'readonly') {
     if (p.id === 'BusinessDatePolicy') { const v: any = value; return [{ label: '', value: t('توقيت القاهرة، واليوم بيبدأ الساعة {c}', { c: cutoffText(v?.cutoff ?? '04:00') }) }]; }

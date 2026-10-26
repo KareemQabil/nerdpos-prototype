@@ -5,7 +5,7 @@ import { Globe, Inbox as InboxIcon, Check, X, Link2, Clock, AlertTriangle, MapPi
 import { useDev, useQuery, useCommand } from '../../app/hooks';
 import { Section, StateBadge, Button, Card, Pill, Money, Modal, Field, Input, Select, Banner, Empty, Tabs, Spinner, useNow } from '../../ui';
 import { Tech } from '../../app/tech';
-import { t, L } from '../../i18n';
+import { t, L, tv } from '../../i18n';
 import { cn, money, qty, time } from '../../lib/format';
 import { addressText } from '../customers/common';
 
@@ -72,7 +72,7 @@ function ExternalCard({ e }: { e: any }) {
           <div className="font-bold flex items-center gap-2">{e.customer.name}<span className="num text-xs text-dim font-normal" dir="ltr">{e.customer.phone}</span></div>
           {e.customer.address && <div className="text-xs text-soft mt-0.5 flex items-start gap-1"><MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />{addressText(e.customer.address)}</div>}
           {e.fulfillment === 'DELIVERY' && (e.zone ? <div className="text-[11px] text-dim mt-0.5">{t('منطقة')} {L(e.zone.name)} · {t('حوالي')} {e.zone.etaMinutes} {t('د')}</div> : <div className="text-[11px] text-[var(--error)] mt-0.5">{t('العنوان برة مناطق التوصيل')}</div>)}
-          {e.note && <div className="text-xs text-[var(--warning-text)] mt-1">✎ {e.note}</div>}
+          {tv(e.note) && <div className="text-xs text-[var(--warning-text)] mt-1">✎ {tv(e.note)}</div>}
         </div>
         <div className="space-y-1.5">
           {e.items.map((it: any) => <ItemRow key={it.code} e={e} it={it} />)}
@@ -106,10 +106,10 @@ function ItemRow({ e, it }: { e: any; it: any }) {
   return (
     <div className={cn('rounded-lg px-3 py-1.5 text-sm border', it.productId ? 'surface-1 border-transparent' : 'border-amber-400/50 bg-amber-400/5')}>
       <div className="flex items-center justify-between gap-2">
-        <span><b className="num">{qty(it.quantity)}×</b> {it.name}{it.productId && L(it.productName) !== it.name && <span className="text-xs text-dim"> ← {L(it.productName)}</span>}</span>
+        <span><b className="num">{qty(it.quantity)}×</b> {tv(it.name)}{it.productId && L(it.productName) !== tv(it.name) && <span className="text-xs text-dim"> ← {L(it.productName)}</span>}</span>
         <span className="text-xs num">{money(it.unitPrice)}{diff && <span className="block text-[10px] text-dim">{t('سعرنا')} {money(it.ourPrice)}</span>}</span>
       </div>
-      {it.note && <div className="text-[11px] text-[var(--warning-text)]">✎ {it.note}</div>}
+      {tv(it.note) && <div className="text-[11px] text-[var(--warning-text)]">✎ {tv(it.note)}</div>}
       {!it.productId && e.state === 'NEW' && (
         <div className="flex items-center gap-2 mt-1.5">
           <span className="text-[11px] text-[var(--warning)] flex items-center gap-1 shrink-0"><AlertTriangle className="w-3.5 h-3.5" />{t('مش متعرف')}</span>

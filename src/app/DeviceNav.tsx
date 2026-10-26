@@ -16,7 +16,7 @@ import { Avatar, Kbd } from '../ui';
 import { t, L, useLang } from '../i18n';
 import { cn } from '../lib/format';
 import { Tech } from './tech';
-import { personName, roleLabel } from '../demo/people';
+import { personName, personRole, roleLabel } from '../demo/people';
 import { capabilityHiding, pendingApprovalCount } from '../screens/ops/capabilities-ui';
 
 export function visibleScreens(kind: Kind, can: (p: string) => boolean, branchId: string | null = null) {
@@ -113,7 +113,7 @@ export function Sidebar({ paneWidth, compact }: { paneWidth: number; compact?: b
   }, [id]);
   const logout = async () => { try { await call(devices.auth(id), 'Auth.Logout', { body: {} }); } catch { /* ignore */ } devices.logout(id); };
   const name = personName(me?.user?.username, me?.user?.displayName);
-  const role = String(me?.user?.displayName ?? '').split(' — ')[1] ?? me?.user?.roleAssignments?.map((r: any) => roleLabel(r.roleName)).join('، ');
+  const role = personRole(me?.user?.username, me?.user?.displayName) || me?.user?.roleAssignments?.map((r: any) => roleLabel(r.roleName)).join(t('، '));
   const activeGroup = sections.find((s) => s.items.some((i) => isActiveItem(i.id, screen)))?.group;
   const toggleMode = () => setPrefs({ mode: wide ? 'rail' : 'wide' });
   const title = (s: ScreenDef) => (lang === 'ar' ? s.title : s.titleEn);

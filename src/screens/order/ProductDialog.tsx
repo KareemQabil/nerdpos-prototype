@@ -8,7 +8,7 @@ import { useDev, useQuery, errorText } from '../../app/hooks';
 import { call, ApiFailure } from '../../api/client';
 import { Modal, Button, Pill, StateBadge, Input, Textarea, Spinner, Banner } from '../../ui';
 import { Tech } from '../../app/tech';
-import { t, L } from '../../i18n';
+import { t, L, tv } from '../../i18n';
 import { cn, money } from '../../lib/format';
 import { ALLERGEN_AR, defaultPicks } from './MenuGrid';
 import { halfModeLabel, levelLabel, placementLabel } from '../menu/parts';
@@ -120,7 +120,7 @@ export function ProductDialog({ product, channel, onClose, onAdd, seatsEnabled, 
   const q = quote.data;
   const curVariant = variants.find((v) => v.id === variant);
   const mult = curVariant ? Number(curVariant.modifierMultiplier || 1) : 1;
-  const reasonAr = quote.error?.details?.reasonAr as string | undefined;
+  const reasonAr = tv(quote.error?.details?.reasonAr as string | undefined) as string | undefined;
   const missing = groups.filter((g) => g.kind !== 'INGREDIENTS' && (sel[g.id]?.length ?? 0) < g.min);
 
   return (
@@ -149,7 +149,7 @@ export function ProductDialog({ product, channel, onClose, onAdd, seatsEnabled, 
             </div>
           </div>
         )}
-        {product.allergens?.length ? <Banner tone="warning"><span className="font-bold">{t('مسببات حساسية')}:</span> {product.allergens.map((a: string) => t(ALLERGEN_AR[a] ?? a)).join('، ')}</Banner> : null}
+        {product.allergens?.length ? <Banner tone="warning"><span className="font-bold">{t('مسببات حساسية')}:</span> {product.allergens.map((a: string) => t(ALLERGEN_AR[a] ?? a)).join(t('، '))}</Banner> : null}
         {quote.error && !['MODIFIER_SELECTION_INVALID'].includes(quote.error.code) && <Banner tone="error">{reasonAr ?? errorText(quote.error)} <Tech><span className="num text-xs">({quote.error.code})</span></Tech></Banner>}
 
         {variants.length > 0 && (
@@ -230,7 +230,7 @@ export function ProductDialog({ product, channel, onClose, onAdd, seatsEnabled, 
           </Block>
         ) : (
           <Block key={g.id} title={L(g.name)} badge={<Pill tone={g.min > 0 ? 'warning' : 'neutral'}>{g.min > 0 ? t('إجباري') : t('اختياري')}</Pill>} hint={g.selectionRule === 'SINGLE' || g.max === 1 ? t('اختار واحد') : g.min > 0 ? t('اختار من {a} لـ {b}', { a: g.min, b: g.max }) : t('لحد {b}', { b: g.max })} warn={(sel[g.id]?.length ?? 0) < g.min}>
-            <div className="flex gap-2 flex-wrap" data-fb={`dialog:group:${g.id}`}>{g.options.filter((o: any) => o.active).map((o: any) => <Opt key={o.id} fb={`dialog:opt:${o.id}`} disabled={o.soldOut} on={(sel[g.id] ?? []).includes(o.id)} onClick={() => toggle(g, o.id)} label={L(o.name)} delta={o.priceDelta} sub={o.soldOut ? t('خلص النهارده') : o.allergens?.length ? o.allergens.map((a: string) => t(ALLERGEN_AR[a] ?? a)).join('، ') : undefined} soldOut={o.soldOut} />)}</div>
+            <div className="flex gap-2 flex-wrap" data-fb={`dialog:group:${g.id}`}>{g.options.filter((o: any) => o.active).map((o: any) => <Opt key={o.id} fb={`dialog:opt:${o.id}`} disabled={o.soldOut} on={(sel[g.id] ?? []).includes(o.id)} onClick={() => toggle(g, o.id)} label={L(o.name)} delta={o.priceDelta} sub={o.soldOut ? t('خلص النهارده') : o.allergens?.length ? o.allergens.map((a: string) => t(ALLERGEN_AR[a] ?? a)).join(t('، ')) : undefined} soldOut={o.soldOut} />)}</div>
             {(sel[g.id] ?? []).map((oid) => {
               const o = g.options.find((x: any) => x.id === oid);
               const ng = nestedGroupOf(g, oid);
@@ -261,7 +261,7 @@ export function ProductDialog({ product, channel, onClose, onAdd, seatsEnabled, 
             })}
           </Block>
         ))}
-        {missing.length > 0 && <div className="text-xs text-[var(--warning)] inline-flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" />{t('لسه لازم تختار: {g}', { g: missing.map((g) => L(g.name)).join('، ') })}</div>}
+        {missing.length > 0 && <div className="text-xs text-[var(--warning)] inline-flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" />{t('لسه لازم تختار: {g}', { g: missing.map((g) => L(g.name)).join(t('، ')) })}</div>}
         <div className="grid sm:grid-cols-3 gap-3">
           <Block title={t('الكمية')} hint={t('ينفع كسور للأصناف الموزونة')}>
             <div className="flex items-center gap-2">

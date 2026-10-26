@@ -5,7 +5,7 @@ import { Save, Plus, Trash2, SlidersHorizontal, Scale, PackagePlus } from 'lucid
 import { useCommand, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
 import { Banner, Button, Field, Input, KV, Modal, Drawer, Money, Pill, Select, Spinner, StateBadge, Switch, Table, Tabs, Textarea } from '../../ui';
-import { t, L } from '../../i18n';
+import { t, L, tv } from '../../i18n';
 import { dateTime, money } from '../../lib/format';
 import { ADJUST_REASONS, ADJUST_REASON_TEXT, LevelPill, MovementTable, Qty, WH_KIND, fmtQty, unitLabel, useList, Inp } from './common';
 import { WasteDialog } from './WasteDialog';
@@ -21,7 +21,7 @@ export function ItemDrawer({ itemId, onClose, initialTab = 'stock' }: { itemId: 
   useEffect(() => setTab(initialTab), [itemId, initialTab]);
   const it = q.data;
   return (
-    <Drawer width="xl" open={!!itemId} onClose={onClose} title={it ? <span className="flex items-center gap-2">{L(it.name)} <span className="text-sm text-dim">{it.category}</span></span> : t('صنف مخزن')}
+    <Drawer width="xl" open={!!itemId} onClose={onClose} title={it ? <span className="flex items-center gap-2">{L(it.name)} <span className="text-sm text-dim">{tv(it.category)}</span></span> : t('صنف مخزن')}
       badge={<>{it && !it.active && <Pill tone="neutral">{t('موقوف')}</Pill>}{it?.kind === 'PREP' && <Pill tone="violet">{t('تجهيزة مطبخ')}</Pill>}{it?.kind === 'RESALE' && <Pill tone="info">{t('بيتباع زي ما هو')}</Pill>}<StateBadge ops={OPS} /></>}>
       {!it ? <Spinner /> : (
         <div className="space-y-4">
@@ -37,7 +37,7 @@ export function ItemDrawer({ itemId, onClose, initialTab = 'stock' }: { itemId: 
           ]} />
           {tab === 'stock' && (
             <Table head={[t('المخزن'), t('الرصيد'), t('الحد الأدنى / المستهدف'), t('الحالة'), t('القيمة'), '']} rows={it.balances.filter((b: any) => b.active || Number(b.quantity) !== 0).map((b: any) => [
-              <span><span className="font-bold">{b.warehouse.name}</span> <span className="text-xs text-dim">{b.warehouse.branchName}</span>{b.salesDefault && <Pill tone="primary" className="ms-1">{t('مخزن البيع')}</Pill>}</span>,
+              <span><span className="font-bold">{tv(b.warehouse.name)}</span> <span className="text-xs text-dim">{tv(b.warehouse.branchName)}</span>{b.salesDefault && <Pill tone="primary" className="ms-1">{t('مخزن البيع')}</Pill>}</span>,
               <Qty v={b.quantity} unit={it.unit} />,
               b.level ? <span className="num text-xs">{fmtQty(b.level.min)} / {fmtQty(b.level.par)}</span> : <span className="text-dim text-xs">—</span>,
               <LevelPill state={b.state} />,
@@ -53,7 +53,7 @@ export function ItemDrawer({ itemId, onClose, initialTab = 'stock' }: { itemId: 
           {tab === 'lots' && (
             <Table empty={it.trackLots ? t('مفيش دفعات فيها رصيد') : t('الصنف ده مش متتبع بالصلاحية — فعّلها من "البيانات والعبوات"')} head={[t('الدفعة'), t('المخزن'), t('اتستلمت'), t('تاريخ الصلاحية'), t('الباقي')]} rows={it.lots.map((l: any) => {
               const days = l.expiryDate ? Math.round((Date.parse(l.expiryDate) - Date.parse(new Date().toISOString().slice(0, 10))) / 86_400_000) : null;
-              return [<span className="num text-xs">{l.lotCode}</span>, l.warehouse.name, <span className="text-xs">{dateTime(l.receivedAt)}</span>,
+              return [<span className="num text-xs">{l.lotCode}</span>, tv(l.warehouse.name), <span className="text-xs">{dateTime(l.receivedAt)}</span>,
                 l.expiryDate ? <span className="inline-flex items-center gap-1.5"><span className="num">{l.expiryDate}</span>{days !== null && days < 0 ? <Pill tone="error">{t('انتهت')}</Pill> : days !== null && days <= 2 ? <Pill tone="warning">{days === 0 ? t('النهارده') : t('فاضل {n} يوم', { n: days })}</Pill> : null}</span> : '—',
                 <Qty v={l.remaining} unit={it.unit} />];
             })} />
@@ -138,7 +138,7 @@ function SetupTab({ it }: { it: any }) {
         <Field label={t('المجموعة')}><Input value={d.category} onChange={(e) => setD({ ...d, category: e.target.value })} /></Field>
         <Field label={t('نوع الصنف')}><Select value={d.kind} onChange={(e) => setD({ ...d, kind: e.target.value })} options={[{ value: 'RAW', label: t('خامة') }, { value: 'PREP', label: t('تجهيزة بتتعمل في المطبخ') }, { value: 'RESALE', label: t('بيتباع زي ما هو (كانز، مياه)') }]} /></Field>
         <Field label={t('وحدة المخزن')} hint={t('ثابتة بعد أول حركة')}><Input disabled value={unitLabel(it.unit)} /></Field>
-        <Field label={t('المورد المعتاد')}><Select value={d.defaultSupplierId} onChange={(e) => setD({ ...d, defaultSupplierId: e.target.value })} options={[{ value: '', label: t('مفيش') }, ...suppliers.items.map((s) => ({ value: s.id, label: s.name }))]} /></Field>
+        <Field label={t('المورد المعتاد')}><Select value={d.defaultSupplierId} onChange={(e) => setD({ ...d, defaultSupplierId: e.target.value })} options={[{ value: '', label: t('مفيش') }, ...suppliers.items.map((s) => ({ value: s.id, label: tv(s.name) }))]} /></Field>
         <Field label={t('الرصيد بالسالب')}><Select value={d.allowNegative} onChange={(e) => setD({ ...d, allowNegative: e.target.value })} options={[{ value: '', label: t('حسب إعداد المطعم') }, { value: 'true', label: t('مسموح للصنف ده') }, { value: 'false', label: t('ممنوع للصنف ده') }]} /></Field>
         <div className="flex flex-col gap-2 justify-end"><Switch checked={d.active} onChange={(v) => setD({ ...d, active: v })} label={t('الصنف شغال')} /></div>
       </div>
@@ -171,7 +171,7 @@ function LevelsTab({ it }: { it: any }) {
     <div className="space-y-3">
       <Banner tone="info">{t('الحد الأدنى: لو الرصيد وصله أو قل عنه، الصنف بيظهر في "النواقص". المستهدف: الكمية اللي بنكمّل لها لما نطلب من المورد.')}</Banner>
       <Table head={[t('المخزن'), t('الرصيد'), t('الحد الأدنى'), t('المستهدف')]} rows={rows.map((r: any, i: number) => [
-        <span><span className="font-bold">{r.name}</span> <span className="text-xs text-dim">{t(WH_KIND[r.kind] ?? r.kind)} · {r.branch}</span></span>,
+        <span><span className="font-bold">{tv(r.name)}</span> <span className="text-xs text-dim">{t(WH_KIND[r.kind] ?? r.kind)} · {tv(r.branch)}</span></span>,
         <Qty v={r.qty} unit={it.unit} />,
         <Inp data-fb={`levels:min:${r.warehouseId}`} className="w-28" inputMode="decimal" value={r.min} placeholder={t('مفيش')} onChange={(e) => setRows(rows.map((x: any, j: number) => (j === i ? { ...x, min: e.target.value } : x)))} />,
         <Inp data-fb={`levels:par:${r.warehouseId}`} className="w-28" inputMode="decimal" value={r.par} onChange={(e) => setRows(rows.map((x: any, j: number) => (j === i ? { ...x, par: e.target.value } : x)))} />,
@@ -208,7 +208,7 @@ export function NewItemDialog({ open, onClose, onCreated }: { open: boolean; onC
         <Field label={t('وحدة المخزن')}><Select data-fb="new-item:unit" value={d.unit} onChange={(e) => setD({ ...d, unit: e.target.value })} options={stockUnits.map((u) => ({ value: u.id, label: unitLabel(u.code) }))} /></Field>
         <Field label={t('عبوة الشراء (اختياري)')}><Input value={d.packName} onChange={(e) => setD({ ...d, packName: e.target.value })} placeholder={t('شيكارة 10 كجم')} /></Field>
         <Field label={t('العبوة فيها كام وحدة')}><Input inputMode="decimal" value={d.packFactor} onChange={(e) => setD({ ...d, packFactor: e.target.value })} placeholder="10" /></Field>
-        <Field label={t('المورد المعتاد')}><Select value={d.supplier} onChange={(e) => setD({ ...d, supplier: e.target.value })} options={[{ value: '', label: t('مفيش') }, ...suppliers.items.map((s) => ({ value: s.id, label: s.name }))]} /></Field>
+        <Field label={t('المورد المعتاد')}><Select value={d.supplier} onChange={(e) => setD({ ...d, supplier: e.target.value })} options={[{ value: '', label: t('مفيش') }, ...suppliers.items.map((s) => ({ value: s.id, label: tv(s.name) }))]} /></Field>
         <Field label={t('تكلفة مبدئية للوحدة')} hint={t('لحد أول استلام')}><Input inputMode="decimal" value={d.cost} onChange={(e) => setD({ ...d, cost: e.target.value })} /></Field>
         <div className="flex items-end"><Switch checked={d.trackLots} onChange={(v) => setD({ ...d, trackLots: v })} label={t('متابعة الصلاحية')} /></div>
         {d.trackLots && <Field label={t('مدة الصلاحية (أيام)')}><Input inputMode="numeric" value={d.shelf} onChange={(e) => setD({ ...d, shelf: e.target.value })} /></Field>}

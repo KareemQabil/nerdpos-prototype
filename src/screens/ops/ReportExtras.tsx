@@ -5,14 +5,15 @@ import { TrendingUp, TrendingDown, Minus, Receipt, Users, Wallet, Download, Cale
 import { useDev, useQuery, useCommand, errorText } from '../../app/hooks';
 import { call } from '../../api/client';
 import { Card, Button, Pill, Modal, Field, Input, Select, Tabs, Table, Empty, StateBadge, Banner, toast, Money } from '../../ui';
-import { t, L } from '../../i18n';
+import { t, L, tv } from '../../i18n';
 import { Tech } from '../../app/tech';
-import { cn, money, dateTime } from '../../lib/format';
+import { cn, money, dateTime, dayShort as fmtDayShort } from '../../lib/format';
 import { saveFile } from '../../lib/files';
 import { metricLabel, isMetricId, SECTION_COLUMNS, codeLabel } from '../admin/output/labels';
 import { METHOD_AR } from './BusinessDay';
+import { personLabel, personText, userLabel } from '../../demo/people';
 
-const dayShort = (iso: string) => new Intl.DateTimeFormat('ar-EG', { weekday: 'short', timeZone: 'UTC' }).format(new Date(iso + 'T12:00:00Z'));
+const dayShort = (iso: string) => fmtDayShort(iso);
 const dayNum = (iso: string) => String(Number(iso.slice(8, 10)));
 const n = (v: unknown) => Number(v ?? 0);
 const fmt = (v: number) => Math.round(v).toLocaleString('en-US');
@@ -172,7 +173,7 @@ export function Schedules({ reports }: { reports: any[] }) {
         <Table head={[t('التقرير'), t('إمتى'), t('لمين'), t('الشكل'), t('المرة الجاية'), t('آخر مرة'), '']} rows={items.map((s) => [
           <span className="font-bold">{L(s.reportTitle)}</span>,
           <span className="text-sm">{s.frequency === 'DAILY' ? t('كل يوم') : t('كل {d}', { d: wd(s.weekday) })} <span className="num">{s.time}</span></span>,
-          <div className="flex flex-wrap gap-1">{s.recipients.map((r: string) => <Pill key={r} tone="neutral">{r}</Pill>)}</div>,
+          <div className="flex flex-wrap gap-1">{s.recipients.map((r: string) => <Pill key={r} tone="neutral">{tv(personText(r))}</Pill>)}</div>,
           s.format === 'XLSX' ? t('إكسل') : 'CSV',
           s.active ? <span className="num text-xs">{dateTime(s.nextRunAt)}</span> : <Pill tone="neutral">{t('متوقف')}</Pill>,
           s.runs?.[0] ? <span className="text-xs"><Send className="w-3 h-3 inline" /> {dateTime(s.runs[0].at)}</span> : <span className="text-dim">—</span>,
@@ -197,7 +198,7 @@ function ScheduleDialog({ reports, onClose }: { reports: any[]; onClose: () => v
   const [format, setFormat] = useState<'XLSX' | 'CSV'>('XLSX');
   const [recipients, setRecipients] = useState<string[]>([]);
   const [extra, setExtra] = useState('');
-  const people: string[] = (users.data?.items ?? []).filter((u: any) => u.active).map((u: any) => u.displayName);
+  const people: string[] = (users.data?.items ?? []).filter((u: any) => u.active).map((u: any) => userLabel(u.username, u.displayName));
   const toggle = (r: string) => setRecipients(recipients.includes(r) ? recipients.filter((x) => x !== r) : [...recipients, r]);
   const submit = async () => { const all = [...recipients, ...extra.split(/[،,]/).map((x) => x.trim()).filter(Boolean)]; if (await run('Report.Schedule', { body: { reportId, frequency, weekday: frequency === 'WEEKLY' ? weekday : undefined, time, format, recipients: all } }, { success: t('التقرير اتجدول') })) onClose(); };
   return (

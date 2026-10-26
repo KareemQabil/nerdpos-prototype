@@ -90,18 +90,21 @@ export function discountFor(pr: PromotionX, by: string, nowIso: string, id: stri
   return base;
 }
 
-/** Plain-Arabic one-liner of what a promotion gives. */
-export function promoSummary(pr: PromotionX, productName: (id: string) => string, categoryName: (id: string) => string): Loc {
+/** Plain one-liner of what a promotion gives ({ar, en}; English names come from the optional en callbacks). */
+export function promoSummary(pr: PromotionX, productName: (id: string) => string, categoryName: (id: string) => string, productNameEn: (id: string) => string = productName, categoryNameEn: (id: string) => string = categoryName): Loc {
   const r = ruleOf(pr);
   const scope = (p: string[], c: string[]) => [...p.map(productName), ...c.map(categoryName)].join('، ');
+  const scopeEn = (p: string[], c: string[]) => [...p.map(productNameEn), ...c.map(categoryNameEn)].join(', ');
   const benefit = r.benefitType === 'PERCENTAGE' ? `${Number(r.benefitValue)}%` : `${Number(r.benefitValue)} ج.م`;
-  if (r.mechanic === 'ITEMS') return { ar: `خصم ${benefit} على ${scope(r.productIds, r.categoryIds) || 'كل الأصناف'}`, en: `${benefit} off ${scope(r.productIds, r.categoryIds) || 'all items'}` };
+  const benefitEn = r.benefitType === 'PERCENTAGE' ? `${Number(r.benefitValue)}%` : `${Number(r.benefitValue)} EGP`;
+  if (r.mechanic === 'ITEMS') return { ar: `خصم ${benefit} على ${scope(r.productIds, r.categoryIds) || 'كل الأصناف'}`, en: `${benefitEn} off ${scopeEn(r.productIds, r.categoryIds) || 'all items'}` };
   if (r.mechanic === 'BUY_X_GET_Y') {
     const get = r.getProductIds.length || r.getCategoryIds.length ? scope(r.getProductIds, r.getCategoryIds) : scope(r.productIds, r.categoryIds) || 'أي صنف';
+    const getEn = r.getProductIds.length || r.getCategoryIds.length ? scopeEn(r.getProductIds, r.getCategoryIds) : scopeEn(r.productIds, r.categoryIds) || 'any item';
     const off = Number(r.getPercent) >= 100 ? 'ببلاش' : `بخصم ${Number(r.getPercent)}%`;
-    return { ar: `اشتري ${r.buyQty} من ${scope(r.productIds, r.categoryIds) || 'أي صنف'} وخد ${r.getQty} من ${get} ${off}`, en: `Buy ${r.buyQty} get ${r.getQty} ${Number(r.getPercent) >= 100 ? 'free' : r.getPercent + '% off'}` };
+    return { ar: `اشتري ${r.buyQty} من ${scope(r.productIds, r.categoryIds) || 'أي صنف'} وخد ${r.getQty} من ${get} ${off}`, en: `Buy ${r.buyQty} ${scopeEn(r.productIds, r.categoryIds) || 'of any item'}, get ${r.getQty} ${getEn} ${Number(r.getPercent) >= 100 ? 'free' : r.getPercent + '% off'}` };
   }
-  return { ar: `خصم ${benefit} على الشيك كله`, en: `${benefit} off the whole check` };
+  return { ar: `خصم ${benefit} على الشيك كله`, en: `${benefitEn} off the whole check` };
 }
 
 export { m4 };

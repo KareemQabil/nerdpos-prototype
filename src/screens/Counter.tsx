@@ -68,7 +68,7 @@ function StaffMealDialog({ onClose }: { onClose: () => void }) {
   const [pick, setPick] = useState<any>(null);
   const [staff, setStaff] = useState('');
   return (
-    <Modal open onClose={onClose} xwide title={t('وجبة موظف')} badge={<StateBadge ops={['Order.CreateStaffMeal']} />} footer={<><div className="me-auto text-sm text-dim">{lines.length ? lines.map((l) => `${l.name} ×${l.quantity}`).join('، ') : t('اختار الأصناف من المنيو')}</div><Button variant="primary" loading={busy} disabled={!lines.length || !staff} onClick={async () => { if (await run('Order.CreateStaffMeal', { body: { staffName: staff, lines: lines.map(({ name, ...l }) => l) } }, { success: t('وجبة الموظف اتسجلت واتبعتت للمطبخ') })) onClose(); }}>{t('سجّل')}</Button></>}>
+    <Modal open onClose={onClose} xwide title={t('وجبة موظف')} badge={<StateBadge ops={['Order.CreateStaffMeal']} />} footer={<><div className="me-auto text-sm text-dim">{lines.length ? lines.map((l) => `${l.name} ×${l.quantity}`).join(t('، ')) : t('اختار الأصناف من المنيو')}</div><Button variant="primary" loading={busy} disabled={!lines.length || !staff} onClick={async () => { if (await run('Order.CreateStaffMeal', { body: { staffName: staff, lines: lines.map(({ name, ...l }) => l) } }, { success: t('وجبة الموظف اتسجلت واتبعتت للمطبخ') })) onClose(); }}>{t('سجّل')}</Button></>}>
       <div className="space-y-3">
         <Banner tone="info">{t('وجبة الموظف مش بيع: من غير إيصال ولا إيصال إلكتروني، وليها سطر لوحدها في التقارير. بتتبعت للمطبخ عادي.')}</Banner>
         <Field label={t('اسم الموظف')}><Input value={staff} onChange={(e) => setStaff(e.target.value)} /></Field>

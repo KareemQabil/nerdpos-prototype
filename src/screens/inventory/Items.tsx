@@ -5,7 +5,7 @@ import { Plus, Package, Coins, TrendingDown, PackageX } from 'lucide-react';
 import { useDev } from '../../app/hooks';
 import { Button, Card, EmptyState, Money, PageHeader, Pill, SearchInput, Select, StatCard, StatGrid, StateBadge, Switch, Table, Toolbar } from '../../ui';
 import { Tech } from '../../app/tech';
-import { t, L } from '../../i18n';
+import { t, L, tv } from '../../i18n';
 import { BranchScope, LEVEL_TEXT, LevelPill, Qty, useBranchScope, useList } from './common';
 import { ItemDrawer, NewItemDialog } from './ItemDrawer';
 
@@ -47,7 +47,7 @@ export default function InventoryItems() {
       <Card padding="sm">
         <Toolbar>
           <SearchInput data-fb="items:search" value={text} onChange={setText} placeholder={t('دوّر باسم الصنف')} />
-          <Select data-fb="items:category" className="!w-auto min-w-[150px]" value={cat} onChange={(e) => setCat(e.target.value)} options={[{ value: '', label: t('كل المجموعات') }, ...(q.raw?.categories ?? []).map((c: string) => ({ value: c, label: c }))]} />
+          <Select data-fb="items:category" className="!w-auto min-w-[150px]" value={cat} onChange={(e) => setCat(e.target.value)} options={[{ value: '', label: t('كل المجموعات') }, ...(q.raw?.categories ?? []).map((c: string) => ({ value: c, label: tv(c) }))]} />
           <Select data-fb="items:kind" className="!w-auto min-w-[140px]" value={kind} onChange={(e) => setKind(e.target.value)} options={[{ value: '', label: t('كل الأنواع') }, ...Object.entries(KIND_LABEL).map(([k, v]) => ({ value: k, label: t(v) }))]} />
           <Select data-fb="items:state" className="!w-auto min-w-[150px]" value={state} onChange={(e) => setState(e.target.value)} options={[{ value: '', label: t('كل الحالات') }, { value: 'LOW,OUT,NEGATIVE', label: t('النواقص بس') }, ...Object.entries(LEVEL_TEXT).map(([k, v]) => ({ value: k, label: t(v.ar) }))]} />
           <Switch checked={showInactive} onChange={setShowInactive} label={t('اعرض الموقوف')} />
@@ -57,12 +57,12 @@ export default function InventoryItems() {
         <Table loading={loading} dense maxHeight={640} onRowClick={(i) => setOpen(shown[i].id)}
           align={['start', 'start', ...whs.map(() => 'end' as const), 'end', 'start', 'start', 'end']}
           empty={<EmptyState compact icon={<Package />} title={q.items.length ? t('مفيش أصناف بالفلتر ده') : t('لسه مفيش أصناف في المخزن')} text={q.items.length ? t('غيّر البحث أو الفلتر.') : t('ضيف أول خامة من «صنف جديد».')} action={!q.items.length ? <Button variant="primary" onClick={() => setCreating(true)}>{t('صنف جديد')}</Button> : undefined} />}
-          head={[t('الصنف'), t('المجموعة'), ...whs.map((w) => <span key={w.id}>{w.name}{w.salesDefault ? ' ★' : ''}</span>), t('القيمة'), t('الحالة'), t('أقرب صلاحية'), t('في وصفات')]} rows={shown.map((i) => [
+          head={[t('الصنف'), t('المجموعة'), ...whs.map((w) => <span key={w.id}>{tv(w.name)}{w.salesDefault ? ' ★' : ''}</span>), t('القيمة'), t('الحالة'), t('أقرب صلاحية'), t('في وصفات')]} rows={shown.map((i) => [
           <div data-fb={`items:open:${i.id}`} className="text-start min-w-[150px]">
             <div className="font-bold flex items-center gap-1.5">{L(i.name)}{!i.active && <Pill tone="neutral">{t('موقوف')}</Pill>}</div>
             <div className="text-[11px] text-dim flex gap-1.5 items-center"><Tech><span className="num">{i.sku}</span></Tech>{i.kind !== 'RAW' && <Pill tone={i.kind === 'PREP' ? 'violet' : 'info'}>{t(KIND_LABEL[i.kind])}</Pill>}{i.packs?.length ? <span>{L(i.packs.find((p: any) => p.id === i.purchasePackId)?.name ?? i.packs[0].name)}</span> : null}</div>
           </div>,
-          <span className="text-xs">{i.category}</span>,
+          <span className="text-xs">{tv(i.category)}</span>,
           ...i.stock.map((s: any) => <span key={s.warehouseId} className={s.state === 'LOW' || s.state === 'OUT' ? 'text-[var(--warning)]' : s.state === 'NEGATIVE' ? 'text-[var(--error)]' : ''}><Qty v={s.quantity} unit={i.unit} hint={false} /></span>),
           <Money v={i.value} className="text-xs" />,
           <LevelPill state={i.state} />,

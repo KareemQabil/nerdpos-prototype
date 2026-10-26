@@ -14,8 +14,10 @@ export function Inp(props: React.InputHTMLAttributes<HTMLInputElement>) {
 export function Sel({ className, ...props }: React.ComponentProps<typeof Select>) {
   return <div className={cn('shrink-0', className)}><Select {...props} /></div>;
 }
-import { t, L } from '../../i18n';
+import { t, L, tv, tLabel } from '../../i18n';
 import { cn, dateTime, money } from '../../lib/format';
+import { personText } from '../../demo/people';
+import { store } from '../../mock/store';
 
 // ───────── words
 export const UNIT_AR: Record<string, string> = { KG: 'كجم', G: 'جم', L: 'لتر', ML: 'مل', PCS: 'قطعة', DEMO_EA: 'قطعة', EA: 'قطعة' };
@@ -138,7 +140,7 @@ export function BranchScope({ scope }: { scope: ReturnType<typeof useBranchScope
 export function WarehouseSelect({ value, onChange, warehouses, includeAll, fb, branchId, activeOnly = true, exclude }: { value: string; onChange: (v: string) => void; warehouses: any[]; includeAll?: string; fb?: string; branchId?: string | null; activeOnly?: boolean; exclude?: string }) {
   const list = warehouses.filter((w) => (!activeOnly || w.active) && (!branchId || w.branchId === branchId) && w.id !== exclude);
   const multiBranch = new Set(list.map((w) => w.branchId)).size > 1;
-  return <Select data-fb={fb} value={value} onChange={(e) => onChange(e.target.value)} options={[...(includeAll ? [{ value: '', label: includeAll }] : []), ...list.map((w) => ({ value: w.id, label: `${w.name}${multiBranch ? ' — ' + w.branchName : ''}${w.salesDefault ? ' ★' : ''}` }))]} />;
+  return <Select data-fb={fb} value={value} onChange={(e) => onChange(e.target.value)} options={[...(includeAll ? [{ value: '', label: includeAll }] : []), ...list.map((w) => ({ value: w.id, label: `${tv(w.name)}${multiBranch ? ' — ' + tv(w.branchName) : ''}${w.salesDefault ? ' ★' : ''}` }))]} />;
 }
 
 /** Searchable item picker (name / code / category). */
@@ -170,7 +172,7 @@ export function ItemPicker({ items, value, onChange, placeholder, fb, exclude = 
             {shown.length === 0 && <div className="text-xs text-dim p-3 text-center">{t('مفيش نتايج')}</div>}
             {shown.map((i) => (
               <button key={i.id} type="button" data-fb={fb ? `${fb}:opt:${i.id}` : undefined} onClick={() => { onChange(i.id, i); setOpen(false); setText(''); }} className={cn('w-full text-start px-2 py-1.5 rounded-lg hover:surface-2 flex items-center justify-between gap-2 text-sm', i.id === value && 'surface-2')}>
-                <span className="truncate">{L(i.name)}</span><span className="text-[11px] text-dim shrink-0">{i.category} · {unitLabel(i.unit)}</span>
+                <span className="truncate">{L(i.name)}</span><span className="text-[11px] text-dim shrink-0">{tv(i.category)} · {unitLabel(i.unit)}</span>
               </button>
             ))}
           </div>
@@ -200,23 +202,25 @@ export function MovementTable({ items, showItem = true, showWarehouse = true, em
           <button className="text-xs text-dim whitespace-nowrap hover:text-[var(--primary)]" data-fb={`movement:${m.id}`} onClick={() => setOpen(m.id)}>{dateTime(m.at)}</button>,
           <span className="inline-flex items-center gap-1">{Number(m.quantity) >= 0 ? <ArrowDownLeft className="w-3.5 h-3.5 text-[var(--success)]" /> : <ArrowUpRight className="w-3.5 h-3.5 text-[var(--error)]" />}<KindPill kind={m.kind} />{m.negative && <Pill tone="error">{t('سالب')}</Pill>}</span>,
           ...(showItem ? [<span className="font-bold">{L(m.item?.name)}</span>] : []),
-          ...(showWarehouse ? [<span className="text-xs">{m.warehouse?.name}</span>] : []),
+          ...(showWarehouse ? [<span className="text-xs">{tv(m.warehouse?.name)}</span>] : []),
           <Qty v={m.quantity} unit={m.item?.unit} signed />,
           ...(compact ? [] : [<span className="num text-xs">{money(m.unitCost)}</span>]),
           <Money v={m.value} className="text-xs" tone={Number(m.value) < 0 ? 'error' : undefined} />,
           <Qty v={m.balanceAfter} unit={m.item?.unit} hint={false} />,
-          <span className="text-xs">{sourceText(m)}{m.reason ? <span className="text-dim"> · {reasonText(m.reason)}</span> : null}{m.userName ? <span className="text-dim"> · {m.userName}</span> : null}</span>,
+          <span className="text-xs">{sourceText(m)}{m.reason ? <span className="text-dim"> · {reasonText(m.reason)}</span> : null}{personText(m.userName) ? <span className="text-dim"> · {personText(m.userName)}</span> : null}</span>,
         ])} />
       <MovementDialog id={open} onClose={() => setOpen(null)} />
     </>
   );
 }
+/** A movement label that is a product or item name stored in Arabic → its name in the UI language. */
+const nameText = (label: string) => { const p = store.db.products.find((x) => (x.name as any)?.ar === label); return p ? L(p.name as any) : tLabel(label); };
 export function sourceText(m: any): string {
   const s = m.source ?? {};
-  if (s.label && !s.number) return s.label;
+  if (s.label && !s.number) return nameText(s.label);
   const mod: Record<string, string> = { orders: 'شيك', receiving: 'استلام', transfers: 'تحويل', production: 'تحضير', waste: 'هالك', counts: 'جرد', suppliers: 'مرتجع مورد', returns: 'مرتجع زبون', inventory: 'تسوية' };
   const base = `${t(mod[s.module] ?? s.module ?? '')} ${s.number ?? ''}`.trim();
-  return s.label && s.number ? `${base} · ${s.label}` : base || '—';
+  return s.label && s.number ? `${base} · ${nameText(s.label)}` : base || '—';
 }
 export function MovementDialog({ id, onClose }: { id: string | null; onClose: () => void }) {
   const q = useQuery<any>(id ? 'Movement.Get' : null, { params: { movementId: id } });
@@ -227,17 +231,17 @@ export function MovementDialog({ id, onClose }: { id: string | null; onClose: ()
         <div className="space-y-3">
           <div className="flex items-center gap-2 flex-wrap"><KindPill kind={m.kind} /><span className="font-bold text-lg">{L(m.item?.name)}</span><Qty v={m.quantity} unit={m.item?.unit} signed className="text-lg" /></div>
           <KV rows={[
-            [t('المخزن'), `${m.warehouse?.name} — ${m.warehouse?.branchName}`],
+            [t('المخزن'), `${tv(m.warehouse?.name)} — ${tv(m.warehouse?.branchName)}`],
             [t('إمتى'), dateTime(m.at)],
             [t('التكلفة للوحدة'), money(m.unitCost)],
             [t('القيمة'), <Money v={m.value} />],
             [t('الرصيد بعد الحركة'), <Qty v={m.balanceAfter} unit={m.item?.unit} />],
             [t('متوسط التكلفة بعدها'), money(m.avgCostAfter)],
             [t('السبب'), reasonText(m.reason) || '—'],
-            [t('ملاحظة'), m.note || '—'],
-            [t('مين'), m.userName || '—'],
+            [t('ملاحظة'), tv(m.note) || '—'],
+            [t('مين'), personText(m.userName) || '—'],
             [t('المصدر'), <span className="inline-flex items-center gap-1"><Link2 className="w-3.5 h-3.5" />{sourceText(m)}{m.sourceTrace?.orderStatus && <Pill tone="neutral">{t('حالة الشيك')}: {m.sourceTrace.orderStatus === 'COMPLETED' ? t('اتقفل') : m.sourceTrace.orderStatus === 'VOIDED' ? t('اتلغى') : m.sourceTrace.orderStatus === 'CONFIRMED' ? t('اتأكد') : m.sourceTrace.orderStatus}</Pill>}</span>],
-            ...(m.sourceTrace?.approverName ? [[t('وافق عليها'), m.sourceTrace.approverName] as [string, string]] : []),
+            ...(m.sourceTrace?.approverName ? [[t('وافق عليها'), personText(m.sourceTrace.approverName)] as [string, string]] : []),
           ]} />
           {m.lots?.length > 0 && (
             <div>

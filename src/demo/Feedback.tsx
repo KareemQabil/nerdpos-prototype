@@ -1,6 +1,7 @@
 // Feedback mode (03_DIRECTION §3): click any element, leave a comment; export as feedback.json
 // with the policy snapshot the expert was looking at.
 import { saveFile } from '../lib/files';
+import { dateTimeLong } from '../lib/format';
 import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { Download, Trash2, Upload, Copy, MessageSquarePlus } from 'lucide-react';
 import { Modal, Button, Field, Input, Select, Textarea, Pill, Empty, EmptyState, toast } from '../ui';
@@ -150,7 +151,7 @@ export function FeedbackPanel() {
             <div className="text-[11px] text-dim break-words">{t('على')}: «{elementText(i.element)}»{i.device ? ` · ${deviceName(i.device)}` : ''}</div>
             <Tech><div className="text-[10px] text-dim break-words num" dir="ltr">{i.element}</div></Tech>
             <div>{i.text}</div>
-            <div className="text-[11px] text-dim">{i.expert}{i.role ? ` · ${i.role}` : ''} · {new Date(i.at).toLocaleString('ar-EG-u-nu-latn')}</div>
+            <div className="text-[11px] text-dim">{i.expert}{i.role ? ` · ${i.role}` : ''} · {dateTimeLong(i.at)}</div>
           </div>
         ))}
       </div>

@@ -5,12 +5,13 @@ import { ArrowRight, Pencil, PhoneCall, MapPin, Plus, Trash2, Star, Crown, Merge
 import { useDev, useQuery, useCommand } from '../../app/hooks';
 import { Section, StateBadge, Button, Card, Pill, Money, Modal, Field, Input, Textarea, Banner, Tabs, Table, Spinner, Empty, KV, confirmDialog } from '../../ui';
 import { Tech } from '../../app/tech';
-import { t, L } from '../../i18n';
+import { t, L, tv } from '../../i18n';
 import { cn, money, dateTime } from '../../lib/format';
 import { ALLERGEN_AR } from '../order/MenuGrid';
 import { TAGS, ALLERGENS, TagPills, TierBadge, AllergyWarning, AddressForm, EMPTY_ADDRESS, cleanAddress, addressText, useZones, CustomerPicker, CustomerRow } from './common';
 import { STATE, PAYMENT_MODE, DeliveryDetail } from '../delivery/common';
 import { StatusPill } from '../order/CheckPanel';
+import { personText } from '../../demo/people';
 
 const ENTRY: Record<string, { ar: string; tone: 'success' | 'error' | 'info' | 'violet' | 'neutral' }> = {
   EARN: { ar: 'كسب', tone: 'success' }, REDEEM: { ar: 'صرف', tone: 'error' }, ADJUST: { ar: 'تعديل يدوي', tone: 'info' }, MERGE_IN: { ar: 'دمج (داخل)', tone: 'violet' }, MERGE_OUT: { ar: 'دمج (خارج)', tone: 'neutral' }, REVERSE: { ar: 'إلغاء', tone: 'neutral' },
@@ -44,7 +45,7 @@ export default function CustomerProfile() {
               <div className="flex items-center gap-2"><Phone className="w-4 h-4 text-dim" /><a href={`tel:${c.phone}`} className="num font-bold" dir="ltr">{c.phone}</a>{c.altPhone && <span className="num text-dim" dir="ltr">· {c.altPhone}</span>}</div>
               {c.email && <div className="flex items-center gap-2"><Mail className="w-4 h-4 text-dim" />{c.email}</div>}
               <AllergyWarning allergies={c.allergies} />
-              {c.notes && <div className="rounded-lg surface-1 px-3 py-2 text-xs">✎ {c.notes}</div>}
+              {tv(c.notes) && <div className="rounded-lg surface-1 px-3 py-2 text-xs">✎ {tv(c.notes)}</div>}
               <div className="text-[11px] text-dim">{t('عميل من')} {dateTime(c.createdAt)}</div>
             </div>
           </Card>
@@ -64,7 +65,7 @@ export default function CustomerProfile() {
                   <div className="h-1.5 rounded-full surface-3 overflow-hidden mt-1"><div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${Math.min(100, Math.round((L1.lifetime / L1.nextTier.minPoints) * 100))}%` }} /></div>
                 </div>
               ) : L1.tier ? <div className="text-[11px] text-dim pt-1">{t('أعلى مستوى')}</div> : null}
-              {c.stats.favourite && <div className="text-[11px] text-dim pt-2">{t('بيطلب غالبًا')}: <b className="text-soft">{c.stats.favourite}</b></div>}
+              {c.stats.favourite && <div className="text-[11px] text-dim pt-2">{t('بيطلب غالبًا')}: <b className="text-soft">{tv(c.stats.favourite)}</b></div>}
             </div>
           </Card>
         </div>
@@ -128,7 +129,7 @@ function Addresses({ c }: { c: any }) {
             <div className="flex items-start gap-3">
               <MapPin className="w-5 h-5 mt-0.5 shrink-0" style={{ color: z?.color }} />
               <div className="flex-1 min-w-0">
-                <div className="font-bold flex items-center gap-2 flex-wrap">{a.label ?? t('عنوان')}{a.isDefault && <Pill tone="primary">{t('الأساسي')}</Pill>}{z ? <Pill tone="neutral">{L(z.name)} · {money(z.fee)} · {z.etaMinutes} {t('د')}</Pill> : <Pill tone="warning">{t('برة مناطق التوصيل')}</Pill>}</div>
+                <div className="font-bold flex items-center gap-2 flex-wrap">{tv(a.label) ?? t('عنوان')}{a.isDefault && <Pill tone="primary">{t('الأساسي')}</Pill>}{z ? <Pill tone="neutral">{L(z.name)} · {money(z.fee)} · {z.etaMinutes} {t('د')}</Pill> : <Pill tone="warning">{t('برة مناطق التوصيل')}</Pill>}</div>
                 <div className="text-sm text-soft mt-0.5">{addressText(a)}</div>
               </div>
               {c.active && can('customeraddress:upsert') && <div className="flex gap-1">
@@ -166,7 +167,7 @@ function Orders({ c }: { c: any }) {
     <div className="space-y-3">
       <Card title={<span className="flex items-center gap-2"><ShoppingBag className="w-4 h-4" />{t('الطلبات على السيستم')}</span>}>
         <Table head={[t('الطلب'), t('الوقت'), t('النوع'), t('الأصناف'), t('الإجمالي'), t('الحالة'), '']} empty={t('لسه مفيش طلبات على السيستم')}
-          rows={c.orders.map((o: any) => [<span className="num font-bold">#{o.number}</span>, <span className="text-xs num">{dateTime(o.createdAt)}</span>, o.channel === 'DELIVERY' ? t('دليفري') : o.channel === 'TAKEAWAY' ? t('تيك أواي') : t('صالة'), <span className="text-xs line-clamp-2">{o.items}</span>, <Money v={o.payable} />, <StatusPill s={o.status} />,
+          rows={c.orders.map((o: any) => [<span className="num font-bold">#{o.number}</span>, <span className="text-xs num">{dateTime(o.createdAt)}</span>, o.channel === 'DELIVERY' ? t('دليفري') : o.channel === 'TAKEAWAY' ? t('تيك أواي') : t('صالة'), <span className="text-xs line-clamp-2">{L({ ar: o.items, en: o.itemsEn })}</span>, <Money v={o.payable} />, <StatusPill s={o.status} />,
             <span className="flex gap-1">{o.deliveryId && <Button size="sm" variant="ghost" onClick={() => setOpen(o.deliveryId)}><Bike className="w-3.5 h-3.5" /></Button>}{o.status === 'COMPLETED' && <Button size="sm" variant="ghost" onClick={() => nav('receipt', { orderId: o.id })}>{t('الإيصال')}</Button>}</span>])} />
       </Card>
       {hist.length > 0 && (
@@ -193,7 +194,7 @@ function Points({ c }: { c: any }) {
         <>
           <div className="text-xs text-dim mb-3">{t('كل {e} ج.م من قيمة الأصناف = نقطة، والنقطة بـ {v} ج.م عند الصرف. المستوى بيتحدد بالنقاط اللي اتكسبت كلها ({l} نقطة).', { e: money(d.program.egpPerPoint, false), v: money(d.program.pointValue, false), l: d.lifetime })}</div>
           <Table head={[t('الوقت'), t('الحركة'), t('النقاط'), t('الرصيد بعدها'), t('الطلب'), t('التفاصيل')]} empty={t('مفيش حركة نقاط')}
-            rows={d.entries.map((e: any) => [<span className="text-xs num">{dateTime(e.at)}</span>, <Pill tone={ENTRY[e.kind]?.tone}>{t(ENTRY[e.kind]?.ar ?? e.kind)}</Pill>, <b className={cn('num', e.points > 0 ? 'text-[var(--success)]' : 'text-[var(--error)]')}>{e.points > 0 ? '+' : ''}{e.points}</b>, <span className="num">{e.balanceAfter}</span>, e.orderNumber ? <span className="num">#{e.orderNumber}</span> : '—', <span className="text-xs">{e.reason ?? ''}{e.byName ? <span className="text-dim"> · {e.byName}</span> : ''}{e.approvalGrantId ? <span className="text-dim"> · {t('بموافقة')}</span> : ''}</span>])} />
+            rows={d.entries.map((e: any) => [<span className="text-xs num">{dateTime(e.at)}</span>, <Pill tone={ENTRY[e.kind]?.tone}>{t(ENTRY[e.kind]?.ar ?? e.kind)}</Pill>, <b className={cn('num', e.points > 0 ? 'text-[var(--success)]' : 'text-[var(--error)]')}>{e.points > 0 ? '+' : ''}{e.points}</b>, <span className="num">{e.balanceAfter}</span>, e.orderNumber ? <span className="num">#{e.orderNumber}</span> : '—', <span className="text-xs">{tv(e.reason) ?? ''}{personText(e.byName) ? <span className="text-dim"> · {personText(e.byName)}</span> : ''}{e.approvalGrantId ? <span className="text-dim"> · {t('بموافقة')}</span> : ''}</span>])} />
         </>
       )}
       {adj && <AdjustDialog c={c} balance={d?.balance ?? 0} onClose={() => setAdj(false)} />}
@@ -252,7 +253,7 @@ function MergePanel({ c }: { c: any }) {
             <div className="flex gap-2"><Button variant="ghost" onClick={() => setSrc(null)}>{t('إلغاء')}</Button><Button variant="warning" loading={busy} onClick={merge} data-fb="merge-confirm"><Merge className="w-4 h-4" />{t('ادمج')}</Button></div>
           </div>
         )}
-        {c.mergedFrom.length > 0 && <div className="text-xs text-dim">{t('اتدمج فيه قبل كده')}: {c.mergedFrom.map((m: any) => `${m.name} (${m.phone})`).join('، ')}</div>}
+        {c.mergedFrom.length > 0 && <div className="text-xs text-dim">{t('اتدمج فيه قبل كده')}: {c.mergedFrom.map((m: any) => `${m.name} (${m.phone})`).join(t('، '))}</div>}
       </div>
       <CustomerPicker open={pick} onClose={() => setPick(false)} title={t('اختار العميل المكرر')} onPick={(x) => { setPick(false); if (x.id !== c.id) setSrc(x); }} />
     </Card>

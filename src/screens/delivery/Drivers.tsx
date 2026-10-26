@@ -7,6 +7,7 @@ import { Section, StateBadge, Button, Card, Pill, Money, Modal, Field, Input, Se
 import { t } from '../../i18n';
 import { cn, money, time, dateTime } from '../../lib/format';
 import { DRIVER_STATUS, STATE, VEHICLE, VehicleIcon } from './common';
+import { personText } from '../../demo/people';
 
 export default function Drivers() {
   const { can, terminal } = useDev();
@@ -63,7 +64,7 @@ export default function Drivers() {
       {!terminal?.drawer && <Banner tone="info">{t('استلام فلوس الطيار بيتعمل من جهاز الكاشير اللي فيه درج مفتوح (الفلوس بتدخل الدرج ده).')}</Banner>}
       <Card title={<span className="flex items-center gap-2"><History className="w-4 h-4" />{t('آخر تسليمات الفلوس')}</span>}>
         <Table head={[t('الوقت'), t('الطيار'), t('المفروض'), t('اتعد'), t('الفرق'), t('عدد الطلبات'), t('استلم')]} empty={t('لسه مفيش تسليمات النهارده')}
-          rows={(q.data?.recentSettlements ?? []).map((x: any) => [<span className="num text-xs">{dateTime(x.at)}</span>, x.driverName, <Money v={x.expected} />, <Money v={x.counted} />, <Money v={x.variance} tone={Number(x.variance) < 0 ? 'error' : Number(x.variance) > 0 ? 'success' : 'dim'} />, <span className="num">{x.deliveryIds.length}</span>, x.byName])} />
+          rows={(q.data?.recentSettlements ?? []).map((x: any) => [<span className="num text-xs">{dateTime(x.at)}</span>, x.driverName, <Money v={x.expected} />, <Money v={x.counted} />, <Money v={x.variance} tone={Number(x.variance) < 0 ? 'error' : Number(x.variance) > 0 ? 'success' : 'dim'} />, <span className="num">{x.deliveryIds.length}</span>, personText(x.byName)])} />
       </Card>
       {edit && <DriverDialog d={edit} onClose={() => setEdit(null)} />}
       {settle && <SettleDialog d={settle} onClose={() => setSettle(null)} />}

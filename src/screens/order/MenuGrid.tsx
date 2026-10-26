@@ -9,7 +9,7 @@ import { call, ApiFailure } from '../../api/client';
 import { clock } from '../../mock/clock';
 import { Pill, StateBadge, Input, Modal, Button, EmptyState, Skeleton } from '../../ui';
 import { Tech } from '../../app/tech';
-import { t, L } from '../../i18n';
+import { t, L, tv } from '../../i18n';
 import { cn, money } from '../../lib/format';
 import { SoldOutBoard } from '../menu/SoldOutBoard';
 import { timeText } from '../menu/parts';
@@ -178,7 +178,7 @@ function Tile({ p, quote, onPick, disabled }: { p: any; quote?: QuoteState; onPi
   const noPrice = err && !unavailable;
   const blocked = off || unavailable || noPrice || !quote?.data;
   const d = quote?.data;
-  const reason = off ? p.menuNow.reasonAr : soldOut ? (p.availability?.reason ?? t('خلص النهارده')) : err?.details?.reasonAr ?? p.availability?.reason ?? '';
+  const reason = off ? L({ ar: p.menuNow.reasonAr, en: p.menuNow.reasonEn }) : soldOut ? (tv(p.availability?.reason) ?? t('خلص النهارده')) : tv(err?.details?.reasonAr) ?? tv(p.availability?.reason) ?? '';
   return (
     <button data-fb={`tile:${p.sku}`} disabled={disabled || blocked} onClick={onPick} title={reason}
       className={cn('relative overflow-hidden rounded-xl bg-[var(--card-raised)] border border-[var(--glass-border)] flex flex-col text-start transition-all hover:border-[color-mix(in_srgb,var(--primary)_55%,transparent)] hover:shadow-[0_6px_24px_-10px_var(--primary-glow)] active:scale-[.96]', blocked && 'opacity-55 cursor-not-allowed hover:border-[var(--glass-border)] hover:shadow-none')}>
@@ -196,7 +196,7 @@ function Tile({ p, quote, onPick, disabled }: { p: any; quote?: QuoteState; onPi
           {p.halfAndHalf && <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-500/80 text-white font-bold inline-flex items-center gap-0.5"><Pizza className="w-3 h-3" />{t('نص ونص')}</span>}
           {p.variants?.filter((v: any) => v.active).length > 1 && <span className="text-[9px] px-1.5 py-0.5 rounded bg-violet-500/80 text-white font-bold inline-flex items-center gap-0.5"><Ruler className="w-3 h-3" />{t('{n} أحجام', { n: p.variants.filter((v: any) => v.active).length })}</span>}
         </div>
-        {p.allergens?.length ? <div className="absolute bottom-1.5 start-1.5 flex gap-1" title={p.allergens.map((a: string) => ALLERGEN_AR[a] ?? a).join('، ')}><span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/80 text-black font-bold flex items-center gap-0.5"><AlertTriangle className="w-3 h-3" />{p.allergens.length}</span></div> : null}
+        {p.allergens?.length ? <div className="absolute bottom-1.5 start-1.5 flex gap-1" title={p.allergens.map((a: string) => ALLERGEN_AR[a] ?? a).join(t('، '))}><span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/80 text-black font-bold flex items-center gap-0.5"><AlertTriangle className="w-3 h-3" />{p.allergens.length}</span></div> : null}
         {p.menuNow?.restricted && p.menuNow?.endsAt && <div className="absolute bottom-1.5 end-1.5 text-[9px] px-1.5 py-0.5 rounded bg-black/60 text-white num">{t('لحد {h}', { h: timeText(p.menuNow.endsAt) })}</div>}
       </div>
       <div className="p-2.5 flex flex-col gap-0.5">

@@ -3,6 +3,7 @@
 import { api, as, expectRefusal, tableId, openVisit, order, openSession, sleep, userIdOf, type Logger } from './runner';
 import { call, newCommandId, ApiFailure } from '../api/client';
 import { store } from '../mock/store';
+import { t } from '../i18n';
 import { sim } from '../mock/sim';
 import { demo } from '../mock/demo';
 import { runOutbox } from '../mock/outbox';
@@ -34,13 +35,13 @@ export const NEGATIVE_RUNS: Record<string, (log: Logger) => Promise<boolean>> = 
     const w1 = await as('t_floor', 'demo-waiter-1', log);
     const cmd = newCommandId();
     const first = await call(w1, 'TableVisit.Open', { params: { tableId: tableId(table) }, body: { guestCount: 2 }, commandId: cmd });
-    log({ ok: first.status === 201, text: `waiter-1 open table ${table} → ${first.status}`, plain: `محمود فتح ترابيزة ${table}` });
+    log({ ok: first.status === 201, text: `waiter-1 open table ${table} → ${first.status}`, plain: t('محمود فتح ترابيزة {t}', { t: table }) });
     const w2 = await as('t_admin', 'demo-waiter-2', log);
-    await expectRefusal(api(w2, 'TableVisit.Open', { params: { tableId: tableId(table) }, body: { guestCount: 3 } }), 'TABLE_OCCUPIED', log, 'waiter-2 opens the same table', 'يوسف حاول يفتح نفس الترابيزة من جهاز تاني');
+    await expectRefusal(api(w2, 'TableVisit.Open', { params: { tableId: tableId(table) }, body: { guestCount: 3 } }), 'TABLE_OCCUPIED', log, 'waiter-2 opens the same table', t('يوسف حاول يفتح نفس الترابيزة من جهاز تاني'));
     const replay = await call(w1, 'TableVisit.Open', { params: { tableId: tableId(table) }, body: { guestCount: 2 }, commandId: cmd });
-    log({ ok: replay.replayed && replay.status === 201, text: `waiter-1 replay same X-Command-Id → ${replay.status} Idempotent-Replayed: ${replay.replayed}`, plain: replay.replayed ? 'محمود ضغط «فتح» تاني بنفس الطلب: رجعله نفس النتيجة من غير ما يتكرر' : 'الطلب المكرر ما رجعش نفس النتيجة' });
+    log({ ok: replay.replayed && replay.status === 201, text: `waiter-1 replay same X-Command-Id → ${replay.status} Idempotent-Replayed: ${replay.replayed}`, plain: replay.replayed ? t('محمود ضغط «فتح» تاني بنفس الطلب: رجعله نفس النتيجة من غير ما يتكرر') : t('الطلب المكرر ما رجعش نفس النتيجة') });
     const n = store.db.visits.filter((v) => v.state === 'OPEN' && v.tableId === tableId(table)).length;
-    log({ ok: n === 1, text: `OPEN visits on table ${table}: ${n}`, plain: `على ترابيزة ${table} قعدة واحدة بس مفتوحة` });
+    log({ ok: n === 1, text: `OPEN visits on table ${table}: ${n}`, plain: t('على ترابيزة {t} قعدة واحدة بس مفتوحة', { t: table }) });
     return n === 1 && replay.replayed;
   },
   N2: async (log) => {
@@ -52,8 +53,8 @@ export const NEGATIVE_RUNS: Record<string, (log: Logger) => Promise<boolean>> = 
     await sleep(150); runOutbox();
     const rounds = order(id).rounds.length;
     const tickets = store.db.tickets.filter((t) => t.orderId === id).length;
-    log({ ok: b.replayed && a.data.fireRound === b.data.fireRound, text: `first fireRound ${a.data.fireRound}; resend → replayed ${b.replayed}, fireRound ${b.data.fireRound}`, plain: b.replayed ? 'الضغطة التانية على «ابعت للمطبخ» رجّعت نفس النتيجة الأولى' : 'الضغطة التانية عملت حاجة جديدة' });
-    log({ ok: rounds === 1 && tickets === 1, text: `rounds ${rounds}, kitchen tickets ${tickets}`, plain: `المطبخ استلم ${tickets} طلب في ${rounds} دفعة` });
+    log({ ok: b.replayed && a.data.fireRound === b.data.fireRound, text: `first fireRound ${a.data.fireRound}; resend → replayed ${b.replayed}, fireRound ${b.data.fireRound}`, plain: b.replayed ? t('الضغطة التانية على «ابعت للمطبخ» رجّعت نفس النتيجة الأولى') : t('الضغطة التانية عملت حاجة جديدة') });
+    log({ ok: rounds === 1 && tickets === 1, text: `rounds ${rounds}, kitchen tickets ${tickets}`, plain: t('المطبخ استلم {n} طلب في {r} دفعة', { n: tickets, r: rounds }) });
     return b.replayed && rounds === 1 && tickets === 1;
   },
   N3: async (log) => {
@@ -63,8 +64,8 @@ export const NEGATIVE_RUNS: Record<string, (log: Logger) => Promise<boolean>> = 
     const res = await Promise.allSettled([call(w, 'Order.Fire', { params: { orderId: id }, body: { expectedVersion: v } }), call(w2, 'Order.Fire', { params: { orderId: id }, body: { expectedVersion: v } })]);
     const ok = res.filter((r) => r.status === 'fulfilled').length;
     const conflict = res.find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined;
-    log({ ok: ok === 1 && conflict?.reason?.code === 'CONCURRENCY_CONFLICT', text: `${ok} × 200, other → ${conflict?.reason?.code} ${conflict?.reason?.status}`, plain: ok === 1 ? 'جهاز واحد بس نجح، والتاني اتقاله «حد تاني عدّل الشيك»' : `نجح ${ok} جهاز — كان المفروض واحد بس` });
-    log({ ok: order(id).rounds.length === 1, text: `rounds ${order(id).rounds.length}`, plain: `الطلب راح المطبخ ${order(id).rounds.length === 1 ? 'مرة واحدة' : order(id).rounds.length + ' مرات'}` });
+    log({ ok: ok === 1 && conflict?.reason?.code === 'CONCURRENCY_CONFLICT', text: `${ok} × 200, other → ${conflict?.reason?.code} ${conflict?.reason?.status}`, plain: ok === 1 ? t('جهاز واحد بس نجح، والتاني اتقاله «حد تاني عدّل الشيك»') : t('نجح {n} جهاز — كان المفروض واحد بس', { n: ok }) });
+    log({ ok: order(id).rounds.length === 1, text: `rounds ${order(id).rounds.length}`, plain: order(id).rounds.length === 1 ? t('الطلب راح المطبخ مرة واحدة') : t('الطلب راح المطبخ {n} مرات', { n: order(id).rounds.length }) });
     return ok === 1 && order(id).rounds.length === 1;
   },
   N4: async (log) => {
@@ -72,10 +73,10 @@ export const NEGATIVE_RUNS: Record<string, (log: Logger) => Promise<boolean>> = 
     await api(w, 'Order.Fire', { params: { orderId: id }, body: { expectedVersion: order(id).version } }, log, 'fire');
     const line = order(id).lines[0];
     const auditBefore = store.db.audit.filter((a) => a.op === 'Order.VoidLine').length;
-    const f = await expectRefusal(api(w, 'Order.VoidLine', { params: { orderId: id, lineId: line.id }, body: { expectedVersion: order(id).version, reasonCode: 'WRONG_ITEM' } }), 'APPROVAL_REQUIRED', log, 'void without approvalGrantId', 'محمود حاول يلغي صنف اتبعت من غير موافقة');
+    const f = await expectRefusal(api(w, 'Order.VoidLine', { params: { orderId: id, lineId: line.id }, body: { expectedVersion: order(id).version, reasonCode: 'WRONG_ITEM' } }), 'APPROVAL_REQUIRED', log, 'void without approvalGrantId', t('محمود حاول يلغي صنف اتبعت من غير موافقة'));
     const still = order(id).lines[0].status;
     const auditAfter = store.db.audit.filter((a) => a.op === 'Order.VoidLine').length;
-    log({ ok: still === 'ACTIVE' && auditAfter === auditBefore, text: `line ${still}; void audit rows +${auditAfter - auditBefore}; dialog cancelled → nothing written`, plain: still === 'ACTIVE' ? 'لغينا شاشة الموافقة: الصنف فضل زي ما هو ومفيش حاجة اتسجلت' : 'الصنف اتلغى من غير موافقة!' });
+    log({ ok: still === 'ACTIVE' && auditAfter === auditBefore, text: `line ${still}; void audit rows +${auditAfter - auditBefore}; dialog cancelled → nothing written`, plain: still === 'ACTIVE' ? t('لغينا شاشة الموافقة: الصنف فضل زي ما هو ومفيش حاجة اتسجلت') : t('الصنف اتلغى من غير موافقة!') });
     return !!f && still === 'ACTIVE';
   },
   N5: async (log) => {
@@ -85,32 +86,32 @@ export const NEGATIVE_RUNS: Record<string, (log: Logger) => Promise<boolean>> = 
     const c = await cashierWithShift(log);
     await api(c, 'Order.Confirm', { params: { orderId: id }, body: { expectedVersion: order(id).version } }, log, 'confirm');
     let details: any;
-    try { await call(m, 'Order.Void', { params: { orderId: id }, body: { expectedVersion: order(id).version, reasonCode: 'CUSTOMER_LEFT', reason: 'test' } }); } catch (e) { details = (e as ApiFailure).details; log({ ok: true, text: `Order.Void → ${(e as ApiFailure).code}`, plain: 'إلغاء الشيك طلب موافقة مدير' }); }
+    try { await call(m, 'Order.Void', { params: { orderId: id }, body: { expectedVersion: order(id).version, reasonCode: 'CUSTOMER_LEFT', reason: 'test' } }); } catch (e) { details = (e as ApiFailure).details; log({ ok: true, text: `Order.Void → ${(e as ApiFailure).code}`, plain: t('إلغاء الشيك طلب موافقة مدير') }); }
     const grantsBefore = store.db.grants.length;
-    await expectRefusal(api(m, 'Approval.Grant', { body: { action: 'ORDER_VOID', targetType: details.targetType, targetId: details.targetId, context: details.context, approverUserId: userIdOf('demo-manager-1'), approverCredentialKind: 'PIN', approverSecret: demo.pin } }), 'SELF_APPROVAL_DENIED', log, 'manager-1 approves their own void', 'أحمد حاول يوافق على طلبه هو');
-    log({ ok: store.db.grants.length === grantsBefore && order(id).status === 'CONFIRMED', text: `grants issued: ${store.db.grants.length - grantsBefore}; order ${order(id).status}`, plain: store.db.grants.length === grantsBefore ? 'مفيش موافقة اتعملت، والشيك فضل زي ما هو' : 'اتعملت موافقة — غلط' });
+    await expectRefusal(api(m, 'Approval.Grant', { body: { action: 'ORDER_VOID', targetType: details.targetType, targetId: details.targetId, context: details.context, approverUserId: userIdOf('demo-manager-1'), approverCredentialKind: 'PIN', approverSecret: demo.pin } }), 'SELF_APPROVAL_DENIED', log, 'manager-1 approves their own void', t('أحمد حاول يوافق على طلبه هو'));
+    log({ ok: store.db.grants.length === grantsBefore && order(id).status === 'CONFIRMED', text: `grants issued: ${store.db.grants.length - grantsBefore}; order ${order(id).status}`, plain: store.db.grants.length === grantsBefore ? t('مفيش موافقة اتعملت، والشيك فضل زي ما هو') : t('اتعملت موافقة — غلط') });
     return store.db.grants.length === grantsBefore;
   },
   N6: async (log) => {
     const { c, id } = await confirmedCheck(log, freeTable(['6', '5']));
     const cmd = newCommandId();
     const st = await api<any>(c, 'Payment.GetSettlement', { params: { orderId: id } });
-    await expectRefusal(call(c, 'Payment.Capture', { params: { orderId: id }, body: { tenders: [{ method: 'CARD', amount: st.remaining }] }, commandId: cmd }), 'TENDER_REFERENCE_REQUIRED', log, 'card without reference', 'دفع كارت من غير رقم العملية');
+    await expectRefusal(call(c, 'Payment.Capture', { params: { orderId: id }, body: { tenders: [{ method: 'CARD', amount: st.remaining }] }, commandId: cmd }), 'TENDER_REFERENCE_REQUIRED', log, 'card without reference', t('دفع كارت من غير رقم العملية'));
     const r = await call(c, 'Payment.Capture', { params: { orderId: id }, body: { tenders: [{ method: 'CARD', amount: st.remaining, reference: 'DEMO-REF-0002' }] }, commandId: cmd });
     const n = store.db.captures.filter((x) => x.orderId === id).length;
-    log({ ok: r.status === 201 && n === 1, text: `same command id with DEMO-REF-0002 → ${r.status}; captures ${n}`, plain: n === 1 ? 'بعد ما كتب رقم العملية الدفع اتسجل — دفعة واحدة بس' : `اتسجل ${n} دفعات — غلط` });
+    log({ ok: r.status === 201 && n === 1, text: `same command id with DEMO-REF-0002 → ${r.status}; captures ${n}`, plain: n === 1 ? t('بعد ما كتب رقم العملية الدفع اتسجل — دفعة واحدة بس') : t('اتسجل {n} دفعات — غلط', { n }) });
     return n === 1;
   },
   N7: async (log) => {
     const { c, id } = await confirmedCheck(log, freeTable(['5', '4']));
     const st = await api<any>(c, 'Payment.GetSettlement', { params: { orderId: id } });
     const over = (Number(st.remaining) + 50).toFixed(2);
-    await expectRefusal(api(c, 'Payment.Capture', { params: { orderId: id }, body: { tenders: [{ method: 'CARD', amount: over, reference: 'R-OVER' }] } }), 'OVERPAYMENT', log, `card ${over} > remaining ${st.remaining}`, 'دفع كارت بمبلغ أكبر من المتبقي');
+    await expectRefusal(api(c, 'Payment.Capture', { params: { orderId: id }, body: { tenders: [{ method: 'CARD', amount: over, reference: 'R-OVER' }] } }), 'OVERPAYMENT', log, `card ${over} > remaining ${st.remaining}`, t('دفع كارت بمبلغ أكبر من المتبقي'));
     const res = await Promise.allSettled([call(c, 'Payment.Capture', { params: { orderId: id }, body: { tenders: [{ method: 'CARD', amount: st.remaining, reference: 'R-A' }] } }), call(c, 'Payment.Capture', { params: { orderId: id }, body: { tenders: [{ method: 'CARD', amount: st.remaining, reference: 'R-B' }] } })]);
     const ok = res.filter((r) => r.status === 'fulfilled').length;
     const paid = store.db.captures.filter((x) => x.orderId === id).reduce((a, x) => a + Number(x.amount), 0);
-    log({ ok: ok === 1, text: `parallel full captures: ${ok} succeeded, other → ${(res.find((r) => r.status === 'rejected') as any)?.reason?.code}`, plain: ok === 1 ? 'دفعتين بالمبلغ كله في نفس اللحظة: واحدة بس اتقبلت' : `اتقبل ${ok} دفعات — غلط` });
-    log({ ok: paid <= Number(st.payable), text: `sum of captures ${paid.toFixed(2)} ≤ payable ${st.payable}`, plain: `المدفوع ${paid.toFixed(2)} جنيه — مش أكتر من المطلوب` });
+    log({ ok: ok === 1, text: `parallel full captures: ${ok} succeeded, other → ${(res.find((r) => r.status === 'rejected') as any)?.reason?.code}`, plain: ok === 1 ? t('دفعتين بالمبلغ كله في نفس اللحظة: واحدة بس اتقبلت') : t('اتقبل {n} دفعات — غلط', { n: ok }) });
+    log({ ok: paid <= Number(st.payable), text: `sum of captures ${paid.toFixed(2)} ≤ payable ${st.payable}`, plain: t('المدفوع {a} جنيه — مش أكتر من المطلوب', { a: paid.toFixed(2) }) });
     return ok === 1 && paid <= Number(st.payable);
   },
   N8: async (log) => {
@@ -122,17 +123,17 @@ export const NEGATIVE_RUNS: Record<string, (log: Logger) => Promise<boolean>> = 
     const admin = await as('BO', 'demo-owner', log);
     const u = () => store.db.users.find((x) => x.username === 'demo-waiter-2')!;
     await api(admin, 'User.ManageAccess', { params: { userId: u().id }, body: { expectedVersion: u().version, active: false, roleAssignments: u().roleAssignments } }, log, 'deactivate demo-waiter-2');
-    await expectRefusal(api(w2, 'Order.Fire', { params: { orderId: o.id }, body: { expectedVersion: order(o.id).version } }), 'UNAUTHENTICATED', log, 'fire after deactivation', 'يوسف حاول يبعت للمطبخ بعد ما حسابه اتوقف');
+    await expectRefusal(api(w2, 'Order.Fire', { params: { orderId: o.id }, body: { expectedVersion: order(o.id).version } }), 'UNAUTHENTICATED', log, 'fire after deactivation', t('يوسف حاول يبعت للمطبخ بعد ما حسابه اتوقف'));
     await api(admin, 'User.ManageAccess', { params: { userId: u().id }, body: { expectedVersion: u().version, active: true, roleAssignments: u().roleAssignments } }, log, 'reactivate');
     let noFire = store.db.roles.find((r) => r.name === 'Waiter without fire (N8)');
     if (!noFire) noFire = await api<any>(admin, 'Role.Create', { body: { name: 'Waiter without fire (N8)', permissionIds: store.db.roles.find((r) => r.id === 'role_waiter')!.permissionIds.filter((p) => p !== 'order:fire') } }, log, 'role without order:fire');
     const original = u().roleAssignments;
     await api(admin, 'User.ManageAccess', { params: { userId: u().id }, body: { expectedVersion: u().version, active: true, roleAssignments: [{ roleId: noFire!.id, branchIds: ['branch_main'] }] } }, log, 'role change');
     const w2b = await as('t_admin', 'demo-waiter-2', log);
-    await expectRefusal(api(w2b, 'Order.Fire', { params: { orderId: o.id }, body: { expectedVersion: order(o.id).version } }), 'PERMISSION_DENIED', log, 'fire without order:fire', 'يوسف حاول يبعت للمطبخ بعد ما الصلاحية اتشالت منه');
+    await expectRefusal(api(w2b, 'Order.Fire', { params: { orderId: o.id }, body: { expectedVersion: order(o.id).version } }), 'PERMISSION_DENIED', log, 'fire without order:fire', t('يوسف حاول يبعت للمطبخ بعد ما الصلاحية اتشالت منه'));
     await api(admin, 'User.ManageAccess', { params: { userId: u().id }, body: { expectedVersion: u().version, active: true, roleAssignments: original } }, log, 'restore role');
     const fired = order(o.id).rounds.length;
-    log({ ok: fired === 0, text: `rounds fired: ${fired}`, plain: fired === 0 ? 'ولا طلب راح المطبخ' : 'طلب راح المطبخ — غلط' });
+    log({ ok: fired === 0, text: `rounds fired: ${fired}`, plain: fired === 0 ? t('ولا طلب راح المطبخ') : t('طلب راح المطبخ — غلط') });
     return fired === 0;
   },
   N9: async (log) => {
@@ -141,11 +142,11 @@ export const NEGATIVE_RUNS: Record<string, (log: Logger) => Promise<boolean>> = 
     const v = openVisit('7')!;
     const before = { table: v.tableId, version: v.version };
     const ws = await as('t_second_floor', 'demo-waiter-second', log);
-    await expectRefusal(api(ws, 'TableVisit.Transfer', { params: { visitId: v.id }, body: { expectedVersion: v.version, toTableId: 'tbl_second_7' } }), 'TABLE_VISIT_NOT_FOUND', log, 'second-branch waiter moves a main visit', 'ويتر الفرع التاني حاول ينقل زباين الفرع الرئيسي');
-    await expectRefusal(api(w1, 'TableVisit.Transfer', { params: { visitId: v.id }, body: { expectedVersion: v.version, toTableId: 'tbl_second_7' } }), 'TABLE_NOT_FOUND', log, 'main waiter moves to the other branch table "7"', 'محمود حاول ينقل الزباين لترابيزة 7 بتاعة الفرع التاني');
-    await expectRefusal(api(ws, 'Pricing.QuoteItem', { params: { productId: 'p_tea' }, body: { branchId: 'branch_second', channel: 'DINE_IN', quantity: '1', modifierOptionIds: ['opt_size_regular'] } }), 'PRICE_NOT_FOUND', log, 'second branch sells nothing (no price)', 'الفرع التاني حاول يبيع شاي (مالوش سعر هناك)');
+    await expectRefusal(api(ws, 'TableVisit.Transfer', { params: { visitId: v.id }, body: { expectedVersion: v.version, toTableId: 'tbl_second_7' } }), 'TABLE_VISIT_NOT_FOUND', log, 'second-branch waiter moves a main visit', t('ويتر الفرع التاني حاول ينقل زباين الفرع الرئيسي'));
+    await expectRefusal(api(w1, 'TableVisit.Transfer', { params: { visitId: v.id }, body: { expectedVersion: v.version, toTableId: 'tbl_second_7' } }), 'TABLE_NOT_FOUND', log, 'main waiter moves to the other branch table "7"', t('محمود حاول ينقل الزباين لترابيزة 7 بتاعة الفرع التاني'));
+    await expectRefusal(api(ws, 'Pricing.QuoteItem', { params: { productId: 'p_tea' }, body: { branchId: 'branch_second', channel: 'DINE_IN', quantity: '1', modifierOptionIds: ['opt_size_regular'] } }), 'PRICE_NOT_FOUND', log, 'second branch sells nothing (no price)', t('الفرع التاني حاول يبيع شاي (مالوش سعر هناك)'));
     const after = openVisit('7')!;
-    log({ ok: after.tableId === before.table && after.version === before.version, text: 'visit unchanged (table, version); nothing of the other branch revealed', plain: 'القعدة فضلت زي ما هي، ومفيش حاجة من الفرع التاني ظهرت' });
+    log({ ok: after.tableId === before.table && after.version === before.version, text: 'visit unchanged (table, version); nothing of the other branch revealed', plain: t('القعدة فضلت زي ما هي، ومفيش حاجة من الفرع التاني ظهرت') });
     return after.version === before.version;
   },
   N10: async (log) => {
@@ -159,12 +160,12 @@ export const NEGATIVE_RUNS: Record<string, (log: Logger) => Promise<boolean>> = 
     for (const d of store.db.kitchenDeliveries.filter((x) => x.orderId === id).reverse()) { d.state = 'PENDING'; d.nextAt = 0; }
     runOutbox();
     const after = store.db.tickets.filter((t) => t.orderId === id).length;
-    log({ ok: before === after, text: `tickets before redelivery ${before}, after ${after} (dedupe by order+round+station)`, plain: before === after ? `بعتنا نفس الطلبات للمطبخ تاني وبترتيب غلط: فضلوا ${after} زي ما هم من غير تكرار` : 'الطلبات اتكررت في المطبخ — غلط' });
+    log({ ok: before === after, text: `tickets before redelivery ${before}, after ${after} (dedupe by order+round+station)`, plain: before === after ? t('بعتنا نفس الطلبات للمطبخ تاني وبترتيب غلط: فضلوا {n} زي ما هم من غير تكرار', { n: after }) : t('الطلبات اتكررت في المطبخ — غلط') });
     return before === after;
   },
   N11: async (log) => {
     sim.set({ kds: 'DOWN' });
-    log({ ok: null, text: 'worker stopped (kitchen delivery DOWN)', plain: 'وقّفنا توصيل الطلبات للمطبخ' });
+    log({ ok: null, text: 'worker stopped (kitchen delivery DOWN)', plain: t('وقّفنا توصيل الطلبات للمطبخ') });
     const ids: string[] = [];
     for (const table of ['2', '1'].filter((n) => !openVisit(n)).slice(0, 2)) { const { w, id } = await freshCheck(log, table); await api(w, 'Order.Fire', { params: { orderId: id }, body: { expectedVersion: order(id).version } }, log, `fire ${table}`); ids.push(id); }
     runOutbox();
@@ -173,7 +174,7 @@ export const NEGATIVE_RUNS: Record<string, (log: Logger) => Promise<boolean>> = 
     for (const d of store.db.kitchenDeliveries.filter((x) => ids.includes(x.orderId))) { d.state = 'PENDING'; d.nextAt = 0; }
     runOutbox(); runOutbox();
     const per = ids.map((id) => store.db.tickets.filter((t) => t.orderId === id).length);
-    log({ ok: per.every((n) => n === 1), text: `ticket sets per round after restart: ${per.join(', ')}`, plain: per.every((n) => n === 1) ? 'بعد ما التوصيل رجع، كل طلب وصل المطبخ مرة واحدة بس' : 'في طلبات اتكررت — غلط' });
+    log({ ok: per.every((n) => n === 1), text: `ticket sets per round after restart: ${per.join(', ')}`, plain: per.every((n) => n === 1) ? t('بعد ما التوصيل رجع، كل طلب وصل المطبخ مرة واحدة بس') : t('في طلبات اتكررت — غلط') });
     return per.every((n) => n === 1);
   },
   N12: async (log) => {
@@ -181,10 +182,10 @@ export const NEGATIVE_RUNS: Record<string, (log: Logger) => Promise<boolean>> = 
     const st = await api<any>(c, 'Payment.GetSettlement', { params: { orderId: id } });
     sim.set({ dropNextResponse: 'Payment.Capture' });
     const cmd = newCommandId();
-    try { await call(c, 'Payment.Capture', { params: { orderId: id }, body: { tenders: [{ method: 'CASH', tendered: st.remaining }] }, commandId: cmd }); } catch (e) { log({ ok: (e as ApiFailure).network, text: 'response lost → result unknown', plain: 'رد الدفع ضاع — النتيجة مش معروفة' }); }
+    try { await call(c, 'Payment.Capture', { params: { orderId: id }, body: { tenders: [{ method: 'CASH', tendered: st.remaining }] }, commandId: cmd }); } catch (e) { log({ ok: (e as ApiFailure).network, text: 'response lost → result unknown', plain: t('رد الدفع ضاع — النتيجة مش معروفة') }); }
     const r = await call(c, 'Payment.Capture', { params: { orderId: id }, body: { tenders: [{ method: 'CASH', tendered: st.remaining }] }, commandId: cmd });
     const n = store.db.captures.filter((x) => x.orderId === id).length;
-    log({ ok: r.replayed && n === 1, text: `retry same X-Command-Id → ${r.status} Idempotent-Replayed ${r.replayed}; captures ${n}`, plain: r.replayed && n === 1 ? 'إعادة المحاولة رجّعت نفس النتيجة — والفلوس اتحسبت مرة واحدة' : `اتسجل ${n} دفعات — غلط` });
+    log({ ok: r.replayed && n === 1, text: `retry same X-Command-Id → ${r.status} Idempotent-Replayed ${r.replayed}; captures ${n}`, plain: r.replayed && n === 1 ? t('إعادة المحاولة رجّعت نفس النتيجة — والفلوس اتحسبت مرة واحدة') : t('اتسجل {n} دفعات — غلط', { n }) });
     return r.replayed && n === 1;
   },
 };

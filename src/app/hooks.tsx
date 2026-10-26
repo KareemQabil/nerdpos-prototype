@@ -184,7 +184,7 @@ function offlineLabel(opId: string, opts: RunOptions, body: any, meta: RunMeta):
   const base = OFFLINE_ALLOWLIST[opId]?.ar ?? opId;
   const order = opts.params?.orderId ? db.orders.find((o) => o.id === opts.params!.orderId) : null;
   const where = order ? ` · #${order.number}${order.tableId ? ' ' + t('ترابيزة') + ' ' + (db.tables.find((x) => x.id === order.tableId)?.name ?? '') : ''}` : '';
-  if (opId === 'Order.AddLines') return `${base}${where}: ${(body?.lines ?? []).map((l: any) => `${db.products.find((p) => p.id === l.productId)?.name.ar ?? ''} ×${l.quantity ?? 1}`).join('، ')}`;
+  if (opId === 'Order.AddLines') return `${base}${where}: ${(body?.lines ?? []).map((l: any) => `${db.products.find((p) => p.id === l.productId)?.name.ar ?? ''} ×${l.quantity ?? 1}`).join(t('، '))}`;
   if (opId === 'Kitchen.AdvanceTicket' || opId === 'TicketItem.Bump') { const tk = db.tickets.find((x) => x.id === opts.params?.ticketId); return `${base}${tk ? ` · #${tk.orderNumber} ${t('جولة')} ${tk.round}` : ''}${body?.toState ? ' → ' + ({ IN_PROGRESS: t('بيتعمل'), READY: t('جاهز'), DONE: t('اتسلّم') } as Record<string, string>)[body.toState] : ''}`; }
   if (opId === 'TableVisit.Open' || opId === 'Table.MarkClean') return `${base} ${db.tables.find((x) => x.id === opts.params?.tableId)?.name ?? ''}`;
   if (opId === 'Payment.Capture') return `${base}${where}`;

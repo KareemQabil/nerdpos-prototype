@@ -7,7 +7,7 @@ import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Banner, Button, Card, Field, Input, KV, Money, Pill, Section, Select, StateBadge, Switch, Table, Tabs } from '../../ui';
 import { Tech } from '../../app/tech';
 import { t, L } from '../../i18n';
-import { branchLabel } from '../../demo/people';
+import { branchLabel, personText } from '../../demo/people';
 import { cn, dateTime, money } from '../../lib/format';
 import { CHANNELS, Check, PolicyChip, Radio, cairoLocal, cairoLocalToIso, channelLabel, ruleText, serverNow, useItems, usePolicy, type ChannelId } from './catalog/common';
 
@@ -323,7 +323,7 @@ function Batches() {
     <Card title={t('التغييرات الجماعية')} badge={<StateBadge ops={['Catalog.PriceChangeBatches']} />}>
       <Table head={[t('اتعمل'), t('بواسطة'), t('التغيير'), t('التقريب'), t('عدد الأسعار'), t('الحالة'), '']} empty={t('لسه مفيش تغييرات جماعية')} rows={list.items.map((b) => [
         <span className="text-xs">{dateTime(b.createdAt)}</span>,
-        b.createdByName,
+        personText(b.createdByName),
         changeText(b),
         <span className="text-xs">{b.rounding.step === '0' ? t('بالقرش') : `${b.rounding.step} · ${({ NEAREST: t('لأقرب'), UP: t('لفوق'), DOWN: t('لتحت') } as any)[b.rounding.direction]}`}</span>,
         <span className="num">{b.rows.filter((r: any) => !r.skipped).length}</span>,

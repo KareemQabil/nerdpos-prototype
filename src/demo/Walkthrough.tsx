@@ -112,7 +112,7 @@ export function Walkthrough() {
       await s.run(log);
       setDone((d) => ({ ...d, [k]: !lines.some((l) => l.ok === false) }));
     } catch (e) {
-      log({ ok: false, text: `${(e as any).code ?? ''} ${errorText(e)}`, plain: `ما نفعش: ${errorText(e)}` });
+      log({ ok: false, text: `${(e as any).code ?? ''} ${errorText(e)}`, plain: t('ما نفعش: {e}', { e: errorText(e) }) });
       setDone((d) => ({ ...d, [k]: false }));
     }
     refreshAll();
