@@ -3,8 +3,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Landmark, Save, Cpu, Barcode, HelpCircle, Pause, Play, AlertTriangle } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';
-import { Section, StateBadge, Banner, Button, Pill, Card, Field, Input, Select, Table, Spinner, Switch, Modal, Textarea } from '../../ui';
+import { PageHeader, StateBadge, Banner, Button, Pill, Card, Field, Input, Select, Table, Spinner, Switch, Modal, Textarea, SearchInput, Toolbar, StatGrid, StatCard, EmptyState } from '../../ui';
 import { t, L } from '../../i18n';
+import { Tech } from '../../app/tech';
+import { branchLabel, deviceName } from '../../demo/people';
 
 const EMPTY_PROFILE = { issuerId: '', issuerName: '', issuerBranchCode: '0', activityCode: '5610', receiptType: 'SC', governate: '', city: '', street: '', buildingNumber: '' };
 
@@ -24,20 +26,18 @@ export default function Fiscal() {
 
   return (
     <div className="space-y-4" data-screen-id="G4">
-      <Section title={t('التسجيل الضريبي')} badge={<StateBadge ops={['FiscalProfile.Configure', 'FiscalDevice.Register', 'FiscalDevice.SetState', 'FiscalItemMapping.SetMany']} />}
-        sub={t('تجهيز الإيصال الإلكتروني (منظومة الإيصال الإلكتروني — مصلحة الضرائب): ملف الفرع، جهاز ضريبي لكل كاشير، وكود لكل صنف. أي بيانات ناقصة بتخلّي الإيصال "مستني بيانات" — والبيع بيكمل عادي.')}
-        actions={<Button size="sm" variant="outline" onClick={() => nav('ereceipts')} data-fb="fiscal:goto-queue">{t('طابور الإيصالات')}</Button>} />
+      <PageHeader icon={<Landmark />} title={t('التسجيل الضريبي')} badge={<StateBadge ops={['FiscalProfile.Configure', 'FiscalDevice.Register', 'FiscalDevice.SetState', 'FiscalItemMapping.SetMany']} />}
+        description={t('تجهيز الإيصال الإلكتروني مع مصلحة الضرايب: بيانات الفرع، جهاز ضريبي لكل كاشير، وكود لكل صنف. أي بيانات ناقصة بتخلّي الإيصال يستنى — والبيع بيكمل عادي.')}
+        actions={<>
+          <Select data-fb="fiscal:branch" className="!w-auto min-w-[180px]" value={branchId} onChange={(e) => setBranchId(e.target.value)} options={branchList.map((b) => ({ value: b.id, label: branchLabel(b) || L(b.name) }))} />
+          <Button variant="outline" onClick={() => nav('ereceipts')} data-fb="fiscal:goto-queue">{t('طابور الإيصالات')}</Button>
+        </>} />
 
-      <Banner tone="info">
+      <Tech><Banner tone="info">
         <span className="flex items-center gap-2 flex-wrap">{t('القراءة هنا من FiscalSetup.Get')} <StateBadge state="PROPOSED" /> {t('— العقود فيها أوامر كتابة بس ومفيش قراءة للملف والأجهزة والأكواد، فالقراءة دي مقترحة.')}</span>
-      </Banner>
-
-      <div className="flex items-end gap-3 flex-wrap">
-        <Field label={t('الفرع')} className="w-96">
-          <Select data-fb="fiscal:branch" value={branchId} onChange={(e) => setBranchId(e.target.value)} options={branchList.map((b) => ({ value: b.id, label: `${b.code ?? ''} · ${L(b.name)}` }))} />
-        </Field>
-        {setup.loading && <Spinner />}
-      </div>
+      </Banner></Tech>
+      {setup.loading && !setup.data && <Spinner />}
+      <FiscalStats profile={profiles.find((p) => p.branchId === branchId) ?? null} terminals={branchTerminals} devices={devices} mappings={mappings} />
 
       <div className="grid xl:grid-cols-2 gap-4">
         <ProfileCard key={branchId + ':' + (profiles.find((p) => p.branchId === branchId)?.version ?? 0)} branchId={branchId} profile={profiles.find((p) => p.branchId === branchId) ?? null} />
@@ -47,6 +47,22 @@ export default function Fiscal() {
       <MappingCard mappings={mappings} />
       <OpenQuestions />
     </div>
+  );
+}
+
+function FiscalStats({ profile, terminals, devices, mappings }: { profile: any | null; terminals: any[]; devices: any[]; mappings: any[] }) {
+  const products = useQuery<any>('Catalog.Search', { query: { limit: 500 } });
+  const list: any[] = products.data?.items ?? [];
+  const mapped = new Set(mappings.map((m) => m.productId));
+  const missing = list.filter((p) => !mapped.has(p.id)).length;
+  const cashiers = terminals.filter((x) => x.drawer);
+  const covered = cashiers.filter((x) => devices.some((d) => d.terminalId === x.id && d.state === 'ACTIVE')).length;
+  return (
+    <StatGrid>
+      <StatCard label={t('بيانات الفرع')} value={profile ? t('متسجلة') : t('ناقصة')} tone={profile ? 'success' : 'warning'} icon={<Landmark />} hint={profile ? t('رقم التسجيل والعنوان موجودين') : t('اكتبها تحت')} />
+      <StatCard label={t('كاشير عليه جهاز ضريبي')} value={<>{covered}<span className="text-sm text-dim font-normal"> / {cashiers.length}</span></>} tone={covered === cashiers.length ? 'success' : 'warning'} icon={<Cpu />} />
+      <StatCard label={t('أصناف من غير كود')} value={missing} tone={missing ? 'warning' : 'success'} icon={<Barcode />} hint={missing ? t('إيصالاتها هتستنى') : t('كل الأصناف ليها كود')} loading={products.loading && !products.data} />
+    </StatGrid>
   );
 }
 
@@ -62,20 +78,20 @@ function ProfileCard({ branchId, profile }: { branchId: string; profile: any | n
     <Field label={label} hint={hint}><Input data-fb={`fiscal:profile:${k}`} dir={ltr ? 'ltr' : undefined} value={f[k] ?? ''} onChange={(e) => set(k, e.target.value)} /></Field>
   );
   return (
-    <Card title={<span className="flex items-center gap-2"><Landmark className="w-4 h-4" />{t('ملف الفرع الضريبي')}</span>} badge={<StateBadge ops={['FiscalProfile.Configure']} />}
-      actions={profile ? <Pill tone="success">{t('متسجل')} · v<span className="num">{profile.version}</span></Pill> : <Pill tone="warning">{t('مش متسجل — الإيصالات هتبقى "مستني بيانات"')}</Pill>}>
+    <Card title={<span className="flex items-center gap-2"><Landmark className="w-4 h-4" />{t('بيانات الفرع في المنظومة')}</span>} description={t('زي ما هي في شهادة التسجيل الضريبي بالظبط.')}
+      actions={profile ? <Pill tone="success">{t('متسجل')}<Tech> · v<span className="num">{profile.version}</span></Tech></Pill> : <Pill tone="warning">{t('مش متسجل — الإيصالات هتستنى')}</Pill>}>
       <div className="grid grid-cols-2 gap-3">
-        {inp('issuerId', t('رقم التسجيل الضريبي (RIN)'), 'issuerId')}
-        {inp('issuerName', t('الاسم التجاري المسجل'), 'issuerName', false)}
+        {inp('issuerId', t('رقم التسجيل الضريبي'), t('9 أرقام من البطاقة الضريبية'))}
+        {inp('issuerName', t('الاسم التجاري المسجل'), undefined, false)}
         {inp('issuerBranchCode', t('كود الفرع في المنظومة'), t('0 = المركز الرئيسي'))}
-        {inp('activityCode', t('كود النشاط'), t('5610 = مطاعم (OD-EG-1: يتأكد)'))}
-        <Field label={t('نوع الإيصال')} hint={t('SC = إيصال مطاعم وكافيهات v1.2')}>
-          <Select data-fb="fiscal:profile:receiptType" value={f.receiptType} onChange={(e) => set('receiptType', e.target.value)} options={[{ value: 'SC', label: 'SC — Coffee & Restaurant' }, { value: 'S', label: 'S — Simplified' }]} />
+        {inp('activityCode', t('كود النشاط'), t('5610 = مطاعم — المحاسب يأكده'))}
+        <Field label={t('نوع الإيصال')} hint={t('إيصال المطاعم والكافيهات هو المعتاد')}>
+          <Select data-fb="fiscal:profile:receiptType" value={f.receiptType} onChange={(e) => set('receiptType', e.target.value)} options={[{ value: 'SC', label: t('إيصال مطاعم وكافيهات') }, { value: 'S', label: t('إيصال مبسط') }]} />
         </Field>
-        {inp('governate', t('المحافظة'), 'governate', false)}
-        {inp('city', t('المدينة / الحي'), 'city', false)}
-        {inp('street', t('الشارع'), 'street', false)}
-        {inp('buildingNumber', t('رقم المبنى'), 'buildingNumber')}
+        {inp('governate', t('المحافظة'), undefined, false)}
+        {inp('city', t('المدينة / الحي'), undefined, false)}
+        {inp('street', t('الشارع'), undefined, false)}
+        {inp('buildingNumber', t('رقم المبنى'))}
       </div>
       <div className="flex justify-end mt-3"><Button variant="primary" loading={busy} onClick={save} disabled={!branchId} data-fb="fiscal:profile:save"><Save className="w-4 h-4" />{t('حفظ الملف')}</Button></div>
     </Card>
@@ -97,31 +113,30 @@ function DevicesCard({ terminals, devices }: { terminals: any[]; devices: any[] 
   const rows = devices.filter((d) => tIds.has(d.terminalId));
   return (
     <Card title={<span className="flex items-center gap-2"><Cpu className="w-4 h-4" />{t('الأجهزة الضريبية (جهاز لكل كاشير)')}</span>} badge={<StateBadge ops={['FiscalDevice.Register', 'FiscalDevice.SetState']} />}>
-      <Table head={[t('الكاشير'), t('سيريال الجهاز'), t('مرجع السر'), t('الحالة'), t('السلسلة'), '']}
-        empty={t('مفيش أجهزة ضريبية على الفرع ده')}
+      <Table head={[t('الكاشير'), t('سيريال الجهاز'), t('الحالة'), t('آخر إيصال'), '']} align={[undefined, undefined, undefined, undefined, 'end']}
+        empty={<EmptyState compact icon={<Cpu />} title={t('مفيش أجهزة ضريبية على الفرع ده')} text={t('سجّل جهاز لكل كاشير من تحت.')} />}
         rows={rows.map((d) => [
-          <span className="num whitespace-nowrap">{d.terminalCode ?? d.terminalId}</span>,
+          <div><div className="font-bold whitespace-nowrap">{deviceName(d.terminalCode ?? d.terminalId)}</div><Tech><div className="num text-[10px] text-dim">{d.terminalCode} · {d.credentialRef}</div></Tech></div>,
           <span className="num whitespace-nowrap">{d.deviceSerial}</span>,
-          <span className="num text-xs break-all" title={t('ده اسم السر في خزنة الأسرار — السر نفسه عمره ما بيتخزن هنا')}>{d.credentialRef}</span>,
-          <Pill tone={d.state === 'ACTIVE' ? 'success' : 'warning'}>{d.state === 'ACTIVE' ? t('نشط') : t('موقوف')}</Pill>,
-          <span className="num text-xs whitespace-nowrap">#{d.lastSequence} · {d.lastDocumentHash ? d.lastDocumentHash.slice(0, 8) + '…' : '—'}</span>,
+          <Pill tone={d.state === 'ACTIVE' ? 'success' : 'warning'} dot>{d.state === 'ACTIVE' ? t('نشط') : t('موقوف')}</Pill>,
+          <span className="text-xs whitespace-nowrap">{d.lastSequence ? t('رقم {n}', { n: d.lastSequence }) : t('لسه')}<Tech><span className="num"> · {d.lastDocumentHash ? d.lastDocumentHash.slice(0, 8) + '…' : '—'}</span></Tech></span>,
           <Button size="sm" variant={d.state === 'ACTIVE' ? 'danger' : 'success'} data-fb={`fiscal:device:state:${d.id}`} onClick={() => setStateFor(d)}>{d.state === 'ACTIVE' ? <><Pause className="w-3.5 h-3.5" />{t('إيقاف')}</> : <><Play className="w-3.5 h-3.5" />{t('تنشيط')}</>}</Button>,
         ])} />
       {terminals.filter((x) => x.drawer && !rows.some((d) => d.terminalId === x.id && d.state === 'ACTIVE')).length > 0 && (
-        <Banner tone="warning"><span className="flex items-center gap-1"><AlertTriangle className="w-4 h-4" />{t('كاشير من غير جهاز ضريبي نشط')}: <span className="num">{terminals.filter((x) => x.drawer && !rows.some((d) => d.terminalId === x.id && d.state === 'ACTIVE')).map((x) => x.code).join('، ')}</span> — {t('إيصالاته هتبقى "مستني بيانات" (NO_ACTIVE_DEVICE)')}</span></Banner>
+        <Banner tone="warning"><span className="flex items-center gap-1 flex-wrap"><AlertTriangle className="w-4 h-4" />{t('كاشير من غير جهاز ضريبي نشط')}: {terminals.filter((x) => x.drawer && !rows.some((d) => d.terminalId === x.id && d.state === 'ACTIVE')).map((x) => deviceName(x.code, x.kind, x.name)).join('، ')} — {t('إيصالاته هتستنى لحد ما يتسجل جهاز')}<Tech> (NO_ACTIVE_DEVICE)</Tech></span></Banner>
       )}
       <div className="mt-4 rounded-xl surface-1 p-3 space-y-3">
         <div className="font-bold text-sm">{t('تسجيل جهاز جديد')}</div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <Field label={t('الجهاز (الكاشير)')}>
-            <Select data-fb="fiscal:device:terminal" value={terminalId} onChange={(e) => setTerminalId(e.target.value)} options={[{ value: '', label: t('اختار') }, ...terminals.map((x) => ({ value: x.id, label: `${x.code} · ${x.name}${x.drawer ? '' : ' (' + t('من غير درج') + ')'}` }))]} />
+            <Select data-fb="fiscal:device:terminal" value={terminalId} onChange={(e) => setTerminalId(e.target.value)} options={[{ value: '', label: t('اختار') }, ...terminals.map((x) => ({ value: x.id, label: `${deviceName(x.code, x.kind, x.name)}${x.drawer ? '' : ' (' + t('من غير درج') + ')'}` }))]} />
           </Field>
           <Field label={t('سيريال جهاز المنظومة')}><Input data-fb="fiscal:device:serial" dir="ltr" value={serial} onChange={(e) => setSerial(e.target.value)} placeholder="POS-0002" /></Field>
-          <Field label={t('مرجع السر (credentialRef)')} error={cred && !credOk ? t('لازم يبدأ بـ secret:// — ده اسم السر، مش السر نفسه') : null}>
+          <Field label={t('اسم السر في الخزنة')} hint={t('اسم بس، مش السر نفسه')} error={cred && !credOk ? t('لازم يبدأ بـ secret://') : null}>
             <Input data-fb="fiscal:device:cred" dir="ltr" value={cred} onChange={(e) => setCred(e.target.value)} />
           </Field>
         </div>
-        <div className="text-[11px] text-dim">{t('بيانات دخول المنظومة (client id / secret) والختم الإلكتروني بيتحفظوا في خزنة الأسرار بس. هنا بنكتب اسمها بس (OD-EG-2).')}</div>
+        <div className="text-[11px] text-dim">{t('بيانات دخول المنظومة والختم الإلكتروني بيتحفظوا في خزنة الأسرار بس — هنا بنكتب اسمها بس.')}<Tech> (OD-EG-2)</Tech></div>
         <div className="flex justify-end"><Button variant="primary" loading={busy} disabled={!terminalId || !serial} onClick={register} data-fb="fiscal:device:register"><Cpu className="w-4 h-4" />{t('سجّل الجهاز')}</Button></div>
       </div>
       {stateFor && <DeviceStateDialog d={stateFor} onClose={() => setStateFor(null)} />}
@@ -141,7 +156,7 @@ function DeviceStateDialog({ d, onClose }: { d: any; onClose: () => void }) {
     <Modal open onClose={onClose} title={next === 'SUSPENDED' ? t('إيقاف جهاز ضريبي') : t('تنشيط جهاز ضريبي')} badge={<StateBadge ops={['FiscalDevice.SetState']} />}
       footer={<><Button variant="ghost" onClick={onClose}>{t('إلغاء')}</Button><Button variant={next === 'SUSPENDED' ? 'danger' : 'success'} loading={busy} disabled={!reason.trim()} onClick={go} data-fb="fiscal:device:state:confirm">{t('تأكيد')}</Button></>}>
       <div className="space-y-3">
-        <div className="num font-bold">{d.terminalCode} · {d.deviceSerial}</div>
+        <div className="font-bold">{deviceName(d.terminalCode)} · <span className="num">{d.deviceSerial}</span></div>
         {next === 'SUSPENDED' && <Banner tone="warning">{t('طول ما الجهاز موقوف، إيصالات الكاشير ده هتبقى "مستني بيانات" لحد ما يرجع نشط أو يتسجل جهاز تاني. البيع مش بيقف.')}</Banner>}
         <Field label={t('السبب (مطلوب)')}><Textarea value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
       </div>
@@ -157,11 +172,12 @@ function MappingCard({ mappings }: { mappings: any[] }) {
   const cats = useQuery<any>('Category.List');
   const [edits, setEdits] = useState<Record<string, Row>>({});
   const [onlyMissing, setOnlyMissing] = useState(false);
+  const [q, setQ] = useState('');
   const byProduct = useMemo(() => new Map(mappings.map((m) => [m.productId, m])), [mappings]);
   const catName = (id: string) => L((cats.data?.items ?? cats.data ?? []).find?.((c: any) => c.id === id)?.name) || id;
   const list: any[] = products.data?.items ?? [];
   const missing = list.filter((p) => !byProduct.get(p.id));
-  const shown = onlyMissing ? missing : list;
+  const shown = (onlyMissing ? missing : list).filter((p) => !q.trim() || L(p.name).includes(q.trim()));
   const valueOf = (pid: string): Row => edits[pid] ?? (byProduct.get(pid) ? { itemCode: byProduct.get(pid).itemCode, codeType: byProduct.get(pid).codeType, unitType: byProduct.get(pid).unitType } : { itemCode: '', codeType: 'EGS', unitType: 'EA' });
   const setRow = (pid: string, patch: Partial<Row>) => setEdits((e) => ({ ...e, [pid]: { ...valueOf(pid), ...patch } }));
   const changed = Object.entries(edits).filter(([pid, r]) => {
@@ -180,22 +196,23 @@ function MappingCard({ mappings }: { mappings: any[] }) {
     setEdits(next);
   };
   return (
-    <Card title={<span className="flex items-center gap-2"><Barcode className="w-4 h-4" />{t('أكواد الأصناف (EGS / GS1)')}</span>} badge={<StateBadge ops={['FiscalItemMapping.SetMany', 'Catalog.Search']} />}
-      actions={<>
-        <Pill tone={missing.length ? 'warning' : 'success'} >{missing.length ? t('{n} صنف من غير كود', { n: missing.length }) : t('كل الأصناف ليها كود')}</Pill>
+    <Card title={<span className="flex items-center gap-2"><Barcode className="w-4 h-4" />{t('أكواد الأصناف في المنظومة')}</span>} badge={<Pill tone={missing.length ? 'warning' : 'success'} >{missing.length ? t('{n} صنف من غير كود', { n: missing.length }) : t('كل الأصناف ليها كود')}</Pill>}
+      description={t('كل صنف على الإيصال لازم يبقى له كود مسجل في المنظومة. الصنف اللي من غير كود إيصاله بيستنى لحد ما تضيفه وتعيد بناء الإيصال.')}>
+      <Toolbar>
+        <SearchInput value={q} onChange={setQ} placeholder={t('دوّر على صنف')} />
         <Switch checked={onlyMissing} onChange={setOnlyMissing} label={t('الناقص بس')} />
-      </>}>
-      <div className="text-xs text-dim mb-3">{t('كل سطر على الإيصال لازم يبقى له كود صنف مسجل ونوع وحدة. أي صنف من غير كود بيخلّي إيصاله "مستني بيانات" (ITEM_CODE_MISSING) لحد ما تضيف الكود وتعمل إعادة بناء. الأكواد بتتخزن في محوّل الإيصال المصري بس، مش في المنيو.')}</div>
+        <Tech><span className="text-[11px] text-dim">ITEM_CODE_MISSING · EGS / GS1</span></Tech>
+      </Toolbar>
       {products.loading && !products.data ? <Spinner /> : (
-        <Table head={[t('الصنف'), t('القسم'), t('نوع الكود'), t('كود الصنف'), t('الوحدة'), '']}
+        <Table maxHeight={520} dense head={[t('الصنف'), t('القسم'), t('نوع الكود'), t('كود الصنف'), t('الوحدة'), '']}
           rows={shown.map((p) => {
             const v = valueOf(p.id);
             const has = !!byProduct.get(p.id);
             const dirty = !!edits[p.id];
             return [
-              <div className={has ? '' : 'text-[var(--warning)] font-bold'}>{L(p.name)}{!has && <div className="text-[10px] font-normal">{t('من غير كود — بيعمل "مستني بيانات"')}</div>}</div>,
+              <div className={has ? '' : 'text-[var(--warning)] font-bold'}>{L(p.name)}{!has && <div className="text-[10px] font-normal">{t('من غير كود — إيصاله هيستنى')}</div>}</div>,
               <span className="text-xs">{catName(p.categoryId)}</span>,
-              <Select data-fb={`fiscal:map:type:${p.id}`} className="w-24" value={v.codeType} onChange={(e) => setRow(p.id, { codeType: e.target.value })} options={[{ value: 'EGS', label: 'EGS' }, { value: 'GS1', label: 'GS1' }]} />,
+              <Select data-fb={`fiscal:map:type:${p.id}`} className="w-24" value={v.codeType} onChange={(e) => setRow(p.id, { codeType: e.target.value })} options={[{ value: 'EGS', label: t('كود مصري') }, { value: 'GS1', label: t('باركود عالمي') }]} />,
               <Input data-fb={`fiscal:map:code:${p.id}`} dir="ltr" className={`w-48 ${!has && !v.itemCode ? 'border-[var(--warning)]' : ''}`} placeholder={t('مثال EG-123456789-0001')} value={v.itemCode} onChange={(e) => setRow(p.id, { itemCode: e.target.value })} />,
               <Input data-fb={`fiscal:map:unit:${p.id}`} dir="ltr" className="w-20" value={v.unitType} onChange={(e) => setRow(p.id, { unitType: e.target.value.toUpperCase() })} />,
               dirty ? <Pill tone="primary">{t('اتعدل')}</Pill> : has ? <Pill tone="success">{t('متسجل')}</Pill> : null,
@@ -212,20 +229,20 @@ function MappingCard({ mappings }: { mappings: any[] }) {
 
 function OpenQuestions() {
   const qs: [string, string][] = [
-    ['OD-EG-1', 'المطعم داخل في إلزام الإيصال الإلكتروني (B2C)؟ وكود النشاط إيه؟ ونوع الإيصال SC مناسب له؟'],
-    ['OD-EG-2', 'مين ماسك شهادة التوقيع (توكن USB ولا HSM) وبيانات دخول المنظومة؟ — السر عمره ما بيتخزن في النظام.'],
-    ['OD-EG-3', 'أكواد الأصناف: GS1 ولا نسجّل أكواد EGS للمنيو؟ ومين اللي يسجلها؟'],
-    ['OD-EG-4', 'الخدمة: تتكتب على الإيصال كسطر لوحدها (T9 ولا T17)؟ — لحد الإجابة بتفضل برة الإيصال.'],
+    ['OD-EG-1', 'المطعم داخل في إلزام الإيصال الإلكتروني للأفراد؟ وكود النشاط إيه؟ وإيصال المطاعم مناسب له؟'],
+    ['OD-EG-2', 'مين ماسك شهادة التوقيع (فلاشة التوقيع ولا جهاز تشفير) وبيانات دخول المنظومة؟ — السر عمره ما بيتخزن في النظام.'],
+    ['OD-EG-3', 'أكواد الأصناف: باركود عالمي ولا نسجّل أكواد مصرية للمنيو؟ ومين اللي يسجلها؟'],
+    ['OD-EG-4', 'الخدمة: تتكتب على الإيصال كسطر لوحدها؟ وبأنهي نوع ضريبة؟ — لحد الإجابة بتفضل برة الإيصال.'],
     ['OD-EG-5', 'الكارت المسجل هيتستخدم في التجربة؟ وكود وسيلة الدفع بتاعه إيه؟'],
     ['OD-EG-6', 'شيك مدفوع كاش وكارت مع بعض والإيصال فيه وسيلة دفع واحدة — الافتراضي: الوسيلة الأكبر، والكاش لو اتساووا.'],
-    ['OD-EG-7', 'فرق التقريب يظهر إزاي على الإيصال؟ — لحد الإجابة: "مستني بيانات" ROUNDING_UNMAPPED.'],
+    ['OD-EG-7', 'فرق التقريب يظهر إزاي على الإيصال؟ — لحد الإجابة الإيصال اللي فيه تقريب بيستنى.'],
   ];
   return (
     <Card title={<span className="flex items-center gap-2"><HelpCircle className="w-4 h-4" />{t('أسئلة مفتوحة للمحاسب ومصلحة الضرائب')}</span>}>
-      <ul className="space-y-1.5 text-sm">
-        {qs.map(([id, q]) => <li key={id} className="flex gap-2"><Pill tone="violet"><span className="num">{id}</span></Pill><span className="text-soft">{t(q)}</span></li>)}
-      </ul>
-      <div className="text-[11px] text-dim mt-2">{t('المصدر: docs/19 §3 و§7. ولا سؤال منهم بيوقف البيع.')}</div>
+      <ol className="space-y-2 text-sm list-decimal ps-5">
+        {qs.map(([id, q]) => <li key={id} className="text-soft leading-relaxed">{t(q)}<Tech> <span className="num text-[10px] text-dim">{id}</span></Tech></li>)}
+      </ol>
+      <div className="text-[11px] text-dim mt-2">{t('ولا سؤال منهم بيوقف البيع.')}<Tech> {t('المصدر: docs/19 §3 و§7.')}</Tech></div>
     </Card>
   );
 }

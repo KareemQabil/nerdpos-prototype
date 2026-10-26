@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Columns2, SlidersHorizontal, MessageSquarePlus, ScrollText, PlayCircle, FlaskConical, Languages, Palette, Box, Library, HelpCircle, Code2, Armchair, ShoppingCart, ChefHat, Briefcase, Building2, Monitor } from 'lucide-react';
+import React, { useEffect, useState, useSyncExternalStore } from 'react';
+import { Columns2, SlidersHorizontal, MessageSquarePlus, ScrollText, PlayCircle, FlaskConical, Languages, Box, Library, HelpCircle, Code2, Armchair, ShoppingCart, ChefHat, Briefcase, Building2, Monitor, MoreHorizontal, WifiOff, Sun, Moon, Gem, X } from 'lucide-react';
 import { DevicePane } from './app/DevicePane';
 import { devices, deviceIds, deviceLabel, useDevicesState } from './app/devices';
 import { useStoreVersion } from './app/hooks';
@@ -18,6 +18,8 @@ import { Walkthrough } from './demo/Walkthrough';
 import { Scenarios } from './demo/Scenarios';
 import { Welcome, welcomeSeen } from './demo/Welcome';
 import { DEVICE_NAMES, deviceName, personName } from './demo/people';
+import { Popover } from './demo/Popover';
+import { sim } from './mock/sim';
 
 type Panel = null | 'policy' | 'feedback' | 'log' | 'walk' | 'scenarios';
 const KIND_ICON: Record<string, React.ElementType> = { CASH: ShoppingCart, FLOOR: Armchair, KDS: ChefHat, ADMIN: Briefcase, BO: Building2 };
@@ -42,64 +44,53 @@ export default function App() {
 
   return (
     <div className={cn('h-full flex flex-col', fb.mode && 'fb-mode')}>
-      <div className="h-12 shrink-0 flex items-center gap-2 px-3 border-b line glass-strong z-[80] relative overflow-x-auto scrollbar-hide" data-demo-chrome>
-        <div className="flex items-center gap-2 shrink-0" title={t('ده مطعم تجريبي: كل البيانات وهمية ومفيش فلوس حقيقية بتتحرك')}>
-          <Box className="w-6 h-6 text-cyan-400" />
-          <div className="leading-none"><div className="font-extrabold text-sm">NerdPOS</div><div className="text-[10px] text-dim">{t('مطعم تجريبي — بيانات وهمية')}</div></div>
+      <div className="chrome-bar h-12 shrink-0 flex items-center gap-1.5 px-2.5 border-b line z-[80] relative" data-demo-chrome>
+        <div className="flex items-center gap-2 shrink-0 pe-1" title={t('ده مطعم تجريبي: كل البيانات وهمية ومفيش فلوس حقيقية بتتحرك')}>
+          <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-[var(--primary)] to-[color-mix(in_srgb,var(--primary)_55%,#1e3a8a)] flex items-center justify-center"><Box className="w-4 h-4 text-[var(--primary-foreground)]" /></span>
+          <div className="leading-none hidden min-[1100px]:block"><div className="font-extrabold text-sm tracking-tight">NerdPOS</div><div className="text-[10px] text-dim mt-0.5">{t('تجربة — بيانات وهمية')}</div></div>
         </div>
+        <Divider />
 
         {/* devices */}
-        <Group label={t('الأجهزة')}>
-          <div className="flex items-center gap-1" data-fb="device-switcher">
-            {ids.map((id) => {
-              const l = deviceLabel(id, lang);
-              const d = ds.devices[id];
-              const term = store.db.terminals.find((x) => x.id === id);
-              const kind = term?.kind ?? 'BO';
-              const Icon = KIND_ICON[kind] ?? Monitor;
-              const on = id === primary || (ds.split && id === secondary);
-              const name = DEVICE_NAMES[id]?.short ?? deviceName(id, kind, term?.name);
-              const who = d?.token ? personName(null, d.userName) : null;
-              const tip = [DEVICE_NAMES[id]?.hint ?? deviceName(id, kind, term?.name), who ? t('داخل عليه: {n}', { n: who }) : t('محدش داخل عليه'), t('كليك: افتحه — كليك يمين: افتحه في الشاشة التانية'), tech ? `${l.short} · ${l.code}` : ''].filter(Boolean).join('\n');
-              return (
-                <button key={id} data-fb={`device:${id}`} onClick={(e) => (e.shiftKey || (ds.split && id !== primary && e.altKey) ? devices.setSecondary(id) : devices.setPrimary(id))} onContextMenu={(e) => { e.preventDefault(); devices.setSecondary(id); devices.setSplit(true); }} title={tip}
-                  className={cn('h-8 px-2 rounded-lg text-xs font-bold border flex items-center gap-1.5 transition-colors whitespace-nowrap', on ? 'border-[var(--primary)] bg-[var(--primary-container)] text-[var(--primary)]' : 'border-[var(--glass-border)] surface-1 text-soft hover:surface-2')}>
-                  <Icon className="w-3.5 h-3.5" /><span className="hidden min-[1450px]:inline">{name}</span>{tech && <span className="num font-normal text-[10px] opacity-70">{l.short}</span>}
-                  <span className={cn('w-1.5 h-1.5 rounded-full', d?.token ? 'bg-[var(--success)]' : 'bg-white/20')} />
-                </button>
-              );
-            })}
-            <button data-fb="device-split" onClick={() => devices.setSplit(!ds.split)} title={t('اعرض جهازين جنب بعض — مثلًا الويتر والمطبخ')} className={cn('h-8 px-2 rounded-lg border flex items-center gap-1 text-xs', ds.split ? 'border-[var(--primary)] text-[var(--primary)] bg-[var(--primary-container)]' : 'border-[var(--glass-border)] surface-1 text-soft')}><Columns2 className="w-4 h-4" /><span className="hidden min-[2000px]:inline">{t('جهازين')}</span></button>
-          </div>
-        </Group>
-        <div className="flex-1" />
+        <div className="flex items-center gap-1 min-w-0" data-fb="device-switcher" role="group" aria-label={t('الأجهزة')}>
+          {ids.map((id) => {
+            const overflow = !CORE_DEVICES.includes(id);
+            const on = id === primary || (ds.split && id === secondary);
+            return <DeviceBtn key={id} id={id} on={on} primary={id === primary} className={overflow && !on ? 'hidden min-[1560px]:flex' : undefined} />;
+          })}
+          {ids.some((id) => !CORE_DEVICES.includes(id) && !(id === primary || (ds.split && id === secondary))) && <MoreDevices ids={ids.filter((id) => !CORE_DEVICES.includes(id))} />}
+          <button data-fb="device-split" data-on={ds.split} onClick={() => devices.setSplit(!ds.split)} title={t('اعرض جهازين جنب بعض — مثلًا الويتر والمطبخ')} className="chrome-btn ms-0.5"><Columns2 className="w-4 h-4" /><span className="hidden min-[1800px]:inline">{t('جهازين')}</span></button>
+        </div>
+        <div className="flex-1 min-w-2" />
 
         {/* time */}
-        <Group label={t('الوقت')}><ClockControl /></Group>
+        <ClockControl />
+        <Divider />
 
         {/* demo tools */}
-        <Group label={t('أدوات التجربة')}>
-          <ChromeBtn fb="chrome:policy" on={panel === 'policy'} onClick={() => toggle('policy')} icon={<SlidersHorizontal className="w-4 h-4" />} label={t('إعدادات المطعم')} tip={t('غيّر طريقة شغل المطعم (الخدمة، الدرج، الموافقات…) وشوف الأجهزة بتتصرف إزاي')} />
-          <ChromeBtn fb="chrome:walk" on={panel === 'walk'} onClick={() => toggle('walk')} icon={<PlayCircle className="w-4 h-4" />} label={t('رحلات بالخطوة')} tip={t('قصص جاهزة من يوم المطعم، خطوة بخطوة')} />
+        <div className="flex items-center gap-0.5 shrink-0" role="group" aria-label={t('أدوات التجربة')}>
+          <ChromeBtn fb="chrome:policy" on={panel === 'policy'} onClick={() => toggle('policy')} icon={<SlidersHorizontal className="w-4 h-4" />} label={t('إعدادات المطعم')} tip={t('غيّر طريقة شغل المطعم (الخدمة، الدرج، الموافقات…) وشوف الأجهزة بتتصرف إزاي')} labelAt="wide" />
+          <ChromeBtn fb="chrome:walk" on={panel === 'walk'} onClick={() => toggle('walk')} icon={<PlayCircle className="w-4 h-4" />} label={t('رحلات بالخطوة')} tip={t('قصص جاهزة من يوم المطعم، خطوة بخطوة')} labelAt="wide" />
           <ChromeBtn fb="chrome:scenarios" on={panel === 'scenarios'} onClick={() => toggle('scenarios')} icon={<FlaskConical className="w-4 h-4" />} label={t('سيناريوهات الفشل')} tip={t('جرّب حاجات المفروض السيستم يرفضها أو يتصرف فيها صح')} />
           <Simulators />
-          <ChromeBtn fb="chrome:feedback-mode" on={fb.mode} onClick={() => feedback.setMode(!fb.mode)} icon={<MessageSquarePlus className="w-4 h-4" />} label={fb.mode ? t('اضغط على أي حاجة…') : t('ملاحظة')} tip={t('شغّلها واضغط على أي حاجة في الشاشة عشان تكتب رأيك فيها')} badge={fb.items.length || undefined} tone="pink" />
+          <ChromeBtn fb="chrome:feedback-mode" on={fb.mode} onClick={() => feedback.setMode(!fb.mode)} icon={<MessageSquarePlus className="w-4 h-4" />} label={fb.mode ? t('اضغط على أي حاجة…') : t('ملاحظة')} tip={t('شغّلها واضغط على أي حاجة في الشاشة عشان تكتب رأيك فيها')} badge={fb.items.length || undefined} tone="pink" labelAt={fb.mode ? 'always' : undefined} />
           <ChromeBtn fb="chrome:feedback" on={panel === 'feedback'} onClick={() => toggle('feedback')} icon={<Library className="w-4 h-4" />} label={t('ملاحظاتي')} tip={t('كل الملاحظات اللي كتبتها، وتنزيلها كملف')} />
           <ResetMenu />
-        </Group>
+        </div>
+        <Divider />
 
         {/* help & view */}
-        <Group label={t('مساعدة')}>
-          <ChromeBtn fb="chrome:help" on={!!welcome} onClick={() => setWelcome('help')} icon={<HelpCircle className="w-4 h-4" />} label={t('مساعدة')} tip={t('إزاي تستخدم التجربة، وتجرّب كـ ويتر أو كاشير أو مدير')} alwaysLabel />
-          <button className="h-8 px-2 rounded-lg surface-1 border border-[var(--glass-border)] text-xs flex items-center gap-1 shrink-0" onClick={() => setLang(lang === 'ar' ? 'en' : 'ar')} title={t('غيّر اللغة')}><Languages className="w-4 h-4" />{lang === 'ar' ? 'EN' : 'ع'}</button>
-          <button className="h-8 px-2 rounded-lg surface-1 border border-[var(--glass-border)] text-xs flex items-center gap-1 shrink-0" onClick={() => setTheme(theme === 'dark' ? 'light' : theme === 'light' ? 'luxury' : 'dark')} title={t('غيّر الألوان (غامق / فاتح / فاخر)')}><Palette className="w-4 h-4" /></button>
+        <div className="flex items-center gap-0.5 shrink-0" role="group" aria-label={t('مساعدة')}>
+          <ChromeBtn fb="chrome:help" on={!!welcome} onClick={() => setWelcome('help')} icon={<HelpCircle className="w-4 h-4" />} label={t('مساعدة')} tip={t('إزاي تستخدم التجربة، وتجرّب كـ ويتر أو كاشير أو مدير')} labelAt="mid" />
+          <button className="chrome-btn" onClick={() => setLang(lang === 'ar' ? 'en' : 'ar')} title={t('غيّر اللغة')}><Languages className="w-4 h-4" /><span className="font-bold">{lang === 'ar' ? 'EN' : 'ع'}</span></button>
+          <button className="chrome-btn" onClick={() => setTheme(theme === 'dark' ? 'light' : theme === 'light' ? 'luxury' : 'dark')} title={`${t('غيّر الألوان (غامق / فاتح / فاخر)')}\n${t('دلوقتي')}: ${theme === 'dark' ? t('غامق') : theme === 'light' ? t('فاتح') : t('فاخر')}`}>{theme === 'light' ? <Sun className="w-4 h-4" /> : theme === 'luxury' ? <Gem className="w-4 h-4" /> : <Moon className="w-4 h-4" />}</button>
           <button data-chrome data-fb="chrome:tech" role="switch" aria-checked={tech} onClick={() => techMode.set(!tech)} title={t('للفريق بس: بيظهر أكواد العمليات والأخطاء والقيم الخام وسجل الطلبات. سيبه مقفول وإنت بتجرب.')}
-            className={cn('h-8 px-2 rounded-lg border flex items-center gap-1.5 text-xs shrink-0', tech ? 'border-amber-400 text-amber-300 bg-amber-500/15' : 'border-[var(--glass-border)] surface-1 text-soft')}>
-            <Code2 className="w-4 h-4" /><span className="hidden min-[1150px]:inline">{t('تفاصيل تقنية')}</span>
-            <span className={cn('w-7 h-4 rounded-full relative transition-colors', tech ? 'bg-amber-400' : 'surface-3')}><span className={cn('absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all', tech ? 'start-[14px]' : 'start-0.5')} /></span>
+            className={cn('chrome-btn', tech && '!border-amber-400/60 !text-amber-500 !bg-amber-500/15')}>
+            <Code2 className="w-4 h-4" /><span className="hidden min-[1700px]:inline">{t('تفاصيل تقنية')}</span>
+            <span className={cn('w-7 h-4 rounded-full relative transition-colors', tech ? 'bg-amber-400' : 'surface-3')}><span className={cn('absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all shadow', tech ? 'start-[14px]' : 'start-0.5')} /></span>
           </button>
           {tech && <ChromeBtn fb="chrome:log" on={panel === 'log'} onClick={() => toggle('log')} icon={<ScrollText className="w-4 h-4" />} label={t('سجل الطلبات')} tip={t('كل طلب راح للسيرفر التجريبي (للفريق)')} />}
-        </Group>
+        </div>
       </div>
 
       <div className="flex-1 min-h-0 flex">
@@ -108,9 +99,9 @@ export default function App() {
           {ds.split && secondary && <DevicePane key={secondary} id={secondary} compact />}
         </div>
         {panel === 'policy' && <SidePanel onClose={() => setPanel(null)} wide><PolicyPanel onClose={() => setPanel(null)} /></SidePanel>}
-        {panel === 'feedback' && <SidePanel onClose={() => setPanel(null)}><FeedbackPanel /></SidePanel>}
-        {panel === 'walk' && <SidePanel onClose={() => setPanel(null)} wide><Walkthrough key={walkKey} /></SidePanel>}
-        {panel === 'scenarios' && <SidePanel onClose={() => setPanel(null)} wide><Scenarios /></SidePanel>}
+        {panel === 'feedback' && <SidePanel onClose={() => setPanel(null)} closeBtn><FeedbackPanel /></SidePanel>}
+        {panel === 'walk' && <SidePanel onClose={() => setPanel(null)} wide closeBtn><Walkthrough key={walkKey} /></SidePanel>}
+        {panel === 'scenarios' && <SidePanel onClose={() => setPanel(null)} wide closeBtn><Scenarios /></SidePanel>}
       </div>
       {panel === 'log' && tech && <ApiLogPanel onClose={() => setPanel(null)} />}
       <FeedbackLayer />
@@ -121,27 +112,85 @@ export default function App() {
   );
 }
 
-function Group({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-center gap-1 shrink-0 rounded-xl border border-[var(--glass-border)] px-1 py-0.5" role="group" aria-label={label}>
-      <span className="hidden min-[2300px]:inline text-[9px] text-dim px-1 leading-tight max-w-[44px] text-center">{label}</span>
-      {children}
-    </div>
-  );
+/** Devices always shown in the bar; the others (second branch, extra counters, new terminals) go to «أجهزة تانية» on narrow windows. */
+const CORE_DEVICES = ['t_floor', 't_cash', 't_kds', 't_admin', 'BO'];
+
+function Divider() { return <span className="w-px h-6 bg-[var(--line)] shrink-0 mx-1" aria-hidden />; }
+
+function deviceInfo(id: string, lang: 'ar' | 'en', tech: boolean) {
+  const ds = devices.state();
+  const l = deviceLabel(id, lang);
+  const d = ds.devices[id];
+  const term = store.db.terminals.find((x) => x.id === id);
+  const kind = term?.kind ?? 'BO';
+  const Icon = KIND_ICON[kind] ?? Monitor;
+  const name = DEVICE_NAMES[id]?.short ?? deviceName(id, kind, term?.name);
+  const who = d?.token ? personName(null, d.userName) : null;
+  const offline = sim.isOffline(id);
+  const tip = [DEVICE_NAMES[id]?.hint ?? deviceName(id, kind, term?.name), who ? t('داخل عليه: {n}', { n: who }) : t('محدش داخل عليه'), offline ? t('النت مقطوع عن الجهاز ده (محاكاة)') : '', t('كليك: افتحه — كليك يمين: افتحه في الشاشة التانية'), tech ? `${l.short} · ${l.code}` : ''].filter(Boolean).join('\n');
+  return { l, Icon, name, who, tip, offline, logged: !!d?.token };
 }
 
-function ChromeBtn({ on, onClick, icon, label, badge, tone, tip, fb, alwaysLabel }: { on: boolean; onClick: () => void; icon: React.ReactNode; label: string; badge?: number; tone?: 'pink'; tip?: string; fb?: string; alwaysLabel?: boolean }) {
+function DeviceBtn({ id, on, primary, className }: { id: string; on: boolean; primary: boolean; className?: string }) {
+  const lang = useLang();
+  const tech = useTech();
+  useSyncExternalStore(sim.subscribe, sim.get);
+  const ds = useDevicesState();
+  const { l, Icon, name, tip, offline, logged } = deviceInfo(id, lang, tech);
   return (
-    <button data-chrome data-fb={fb} onClick={onClick} title={tip ? `${label}\n${tip}` : label} className={cn('relative h-8 px-2 rounded-lg border flex items-center gap-1.5 text-xs shrink-0 transition-colors whitespace-nowrap', on ? (tone === 'pink' ? 'border-pink-400 text-pink-300 bg-pink-500/15' : 'border-[var(--primary)] text-[var(--primary)] bg-[var(--primary-container)]') : 'border-[var(--glass-border)] surface-1 text-soft hover:surface-2')}>
-      {icon}<span className={alwaysLabel ? 'hidden min-[1100px]:inline' : 'hidden min-[2000px]:inline'}>{label}</span>
-      {badge ? <span className="absolute -top-1 -end-1 min-w-[16px] h-4 px-1 rounded-full bg-pink-500 text-white text-[9px] font-bold flex items-center justify-center">{badge}</span> : null}
+    <button data-fb={`device:${id}`} onClick={(e) => (e.shiftKey || (ds.split && id !== ds.primary && e.altKey) ? devices.setSecondary(id) : devices.setPrimary(id))} onContextMenu={(e) => { e.preventDefault(); devices.setSecondary(id); devices.setSplit(true); }} title={tip} aria-pressed={on}
+      className={cn('relative h-8 px-2 rounded-lg text-xs font-bold border flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0', on ? 'border-[color-mix(in_srgb,var(--primary)_45%,transparent)] bg-[var(--primary-container)] text-[var(--primary)]' : 'border-transparent text-soft hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]', className)}>
+      <Icon className="w-4 h-4 shrink-0" />
+      <span className={on ? 'inline' : 'hidden min-[1180px]:inline'}>{name}</span>
+      {tech && <span className="num font-normal text-[10px] opacity-70">{l.short}</span>}
+      {ds.split && on && <span className="num text-[9px] font-bold opacity-70">{primary ? '1' : '2'}</span>}
+      {offline ? <WifiOff className="w-3 h-3 text-[var(--error)]" /> : <span className={cn('w-1.5 h-1.5 rounded-full', logged ? 'bg-[var(--success)]' : 'bg-[var(--text-dim)] opacity-50')} />}
     </button>
   );
 }
 
-function SidePanel({ children, wide }: { children: React.ReactNode; onClose: () => void; wide?: boolean }) {
+function MoreDevices({ ids }: { ids: string[] }) {
+  const lang = useLang();
+  const tech = useTech();
   return (
-    <aside className={cn('shrink-0 h-full glass-strong border-s line overflow-hidden flex flex-col animate-fade-in z-30', wide ? 'w-[min(560px,48vw)]' : 'w-[min(420px,40vw)]')} data-demo-chrome>
+    <span className="min-[1560px]:hidden">
+      <Popover width={300} title={t("أجهزة تانية: الفرع التاني وكاشير التيك أواي وأي جهاز جديد")} button={(o) => <button data-fb="device-more" data-on={o} className="chrome-btn"><MoreHorizontal className="w-4 h-4" /><span className="sr-only">{t('أجهزة تانية')}</span></button>}>
+        {(close) => (
+          <div className="space-y-1">
+            <div className="text-xs font-bold text-soft mb-1">{t('أجهزة تانية')}</div>
+            {ids.map((id) => {
+              const { Icon, name, who, tip } = deviceInfo(id, lang, tech);
+              return (
+                <div key={id} className="flex items-center gap-1">
+                  <button data-fb={`device-menu:${id}`} title={tip} onClick={() => { devices.setPrimary(id); close(); }} className="flex-1 min-w-0 flex items-center gap-2.5 px-2 h-11 rounded-xl hover:bg-[var(--surface-2)] text-start">
+                    <span className="w-8 h-8 rounded-lg bg-[var(--surface-2)] flex items-center justify-center shrink-0"><Icon className="w-4 h-4" /></span>
+                    <span className="min-w-0"><span className="block text-sm font-bold truncate">{name}</span><span className="block text-[11px] text-dim truncate">{who ? t('داخل عليه: {n}', { n: who }) : t('محدش داخل عليه')}</span></span>
+                  </button>
+                  <button title={t('افتحه في الشاشة التانية')} onClick={() => { devices.setSecondary(id); devices.setSplit(true); close(); }} className="chrome-btn"><Columns2 className="w-4 h-4" /></button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Popover>
+    </span>
+  );
+}
+
+function ChromeBtn({ on, onClick, icon, label, badge, tone, tip, fb, labelAt }: { on: boolean; onClick: () => void; icon: React.ReactNode; label: string; badge?: number; tone?: 'pink'; tip?: string; fb?: string; labelAt?: 'always' | 'mid' | 'wide' }) {
+  const lc = labelAt === 'always' ? 'inline' : labelAt === 'mid' ? 'hidden min-[1440px]:inline' : labelAt === 'wide' ? 'hidden min-[1800px]:inline' : 'hidden min-[2100px]:inline';
+  return (
+    <button data-chrome data-fb={fb} data-on={on} onClick={onClick} title={tip ? `${label}\n${tip}` : label} aria-pressed={on} className={cn('chrome-btn relative', on && tone === 'pink' && '!border-pink-400/60 !text-pink-500 !bg-pink-500/15')}>
+      {icon}<span className={lc}>{label}</span>
+      {badge ? <span className="absolute -top-1 -end-1 min-w-[16px] h-4 px-1 rounded-full bg-pink-500 text-white text-[9px] font-bold flex items-center justify-center num">{badge}</span> : null}
+    </button>
+  );
+}
+
+function SidePanel({ children, wide, onClose, closeBtn }: { children: React.ReactNode; onClose: () => void; wide?: boolean; closeBtn?: boolean }) {
+  return (
+    <aside className={cn('relative shrink-0 h-full overlay-panel !rounded-none !border-y-0 !border-e-0 overflow-hidden flex flex-col animate-fade-in z-30', wide ? 'w-[min(560px,46vw)]' : 'w-[min(420px,40vw)]')} data-demo-chrome>
+      {closeBtn && <button onClick={onClose} title={t('إغلاق')} aria-label={t('إغلاق')} data-fb="panel-close" className="absolute top-2.5 end-2.5 z-10 w-8 h-8 rounded-lg flex items-center justify-center text-dim hover:text-[var(--foreground)] hover:bg-[var(--surface-2)]"><X className="w-4 h-4" /></button>}
       {children}
     </aside>
   );

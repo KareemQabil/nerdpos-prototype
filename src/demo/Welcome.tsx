@@ -69,26 +69,26 @@ export function Welcome({ open, onClose, onOpenPanel, startTab = 'start' }: { op
         <Tabs value={tab} onChange={setTab} tabs={[{ id: 'start', label: t('ابدأ من هنا') }, { id: 'help', label: t('إزاي أستخدم التجربة') }]} />
         {tab === 'start' ? (
           <>
-            <div className="rounded-xl surface-1 border line p-4 space-y-1.5 text-sm leading-relaxed">
+            <div className="rounded-2xl border border-[color-mix(in_srgb,var(--primary)_25%,transparent)] bg-[linear-gradient(135deg,var(--primary-container),transparent_70%)] p-4 space-y-1.5 text-sm leading-relaxed">
               <p>{t('ده مطعم تجريبي كامل جوه المتصفح: صالة وكاشير ومطبخ ومدير وإدارة — كل جهاز زرار فوق.')}</p>
               <p>{t('كل البيانات وهمية: مفيش فلوس حقيقية بتتحرك، مفيش دفع بجد، ومفيش حاجة بتتبعت للضرايب. جرّب براحتك واغلط براحتك.')}</p>
               <p>{t('الرقم السري لكل الناس')}: <b className="num">{demo.pin}</b> — {t('أو اضغط «دخول سريع».')}</p>
               <p className="text-dim text-xs">{t('شايف حاجة غلط أو ناقصة؟ شغّل «ملاحظة» من الشريط اللي فوق واضغط عليها واكتب رأيك.')}</p>
             </div>
             <div>
-              <div className="font-bold mb-2">{t('جرّب كـ…')}</div>
+              <div className="font-bold mb-2.5 text-base">{t('جرّب كـ…')}</div>
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {ROLES.map((r) => {
                   const Icon = r.icon;
                   return (
-                    <div key={r.id} className="rounded-xl border line surface-1 p-3 flex flex-col gap-2" data-fb={`welcome:role:${r.id}`}>
+                    <div key={r.id} className="rounded-2xl border border-[var(--glass-border)] bg-[var(--surface-1)] p-4 flex flex-col gap-2.5 card-surface card-interactive" data-fb={`welcome:role:${r.id}`}>
                       <div className="flex items-center gap-2">
                         <span className={cn('w-10 h-10 rounded-xl bg-gradient-to-br text-slate-900 flex items-center justify-center shrink-0', r.tone)}><Icon className="w-5 h-5" /></span>
                         <div className="min-w-0"><div className="font-bold">{t(r.title)}</div><div className="text-[11px] text-dim">{t(r.who)}</div></div>
                       </div>
                       <div className="text-xs text-soft flex-1">{t(r.what)}</div>
                       <div className="flex flex-wrap gap-1.5">
-                        <Button size="sm" variant="primary" loading={busy === r.id} onClick={() => tryRole(r, !!r.zero)} data-fb={`welcome:try:${r.id}`}>{r.zero ? t('ابدأ التركيب') : t('ادخل')}<ArrowLeft className="w-3.5 h-3.5 ltr:rotate-180" /></Button>
+                        <Button size="sm" variant="subtle" loading={busy === r.id} onClick={() => tryRole(r, !!r.zero)} data-fb={`welcome:try:${r.id}`}>{r.zero ? t('ابدأ التركيب') : t('ادخل')}<ArrowLeft className="w-3.5 h-3.5 ltr:rotate-180" /></Button>
                         {r.journey && !r.zero && <Button size="sm" variant="ghost" loading={busy === r.id + ':j'} onClick={() => tryRole(r, true)} data-fb={`welcome:journey:${r.id}`}><PlayCircle className="w-3.5 h-3.5" />{t(r.journeyLabel!)}</Button>}
                       </div>
                     </div>
@@ -109,7 +109,7 @@ function HelpPage({ onOpenPanel }: { onOpenPanel: (p: 'walk' | 'policy') => void
     { icon: KeyRound, title: 'الدخول', body: 'اختار اسمك واكتب الرقم السري 123456 (أو «دخول سريع»). كل شخص بيشوف الشاشات اللي مسموح له بيها بس.' },
     { icon: Columns2, title: 'جهازين جنب بعض', body: 'اضغط «جهازين» عشان تشوف شاشتين مع بعض — مثلًا الويتر بيبعت والمطبخ بيستلم. كليك يمين على أي جهاز بيفتحه في الشاشة التانية.' },
     { icon: Clock, title: 'الساعة', body: 'السيستم ليه ساعة لوحده تقدر تقدّمها: مثلًا بعد نص الليل عشان تشوف إن البيع لسه على نفس اليوم التجاري، أو 12 ساعة عشان تنبيهات الإيصال الإلكتروني.' },
-    { icon: Radio, title: 'محاكاة الأعطال', body: 'وقّع الطابعة أو شاشة المطبخ أو منظومة الضرايب، أو ضيّع رد الشبكة — وشوف إن البيع بيكمل ومفيش حاجة بتتكرر.' },
+    { icon: Radio, title: 'محاكاة الأعطال', body: 'وقّع الطابعة أو شاشة المطبخ أو منظومة الضرايب أو البرامج المربوطة، اقطع النت عن جهاز، أو ضيّع رد الشبكة — وشوف إن البيع بيكمل ومفيش حاجة بتتكرر.' },
     { icon: SlidersHorizontal, title: 'إعدادات المطعم', body: 'غيّر أي إعداد (مثلًا الخدمة 12%، أو الويتر يفتح شيك من غير درج) وشوف الأجهزة بتتصرف إزاي. التغيير بيطبق على اللي جاي بس.' },
     { icon: PlayCircle, title: 'رحلات بالخطوة', body: 'قصص جاهزة من يوم المطعم: كل خطوة بتقولك مين يعمل إيه وعلى أنهي جهاز والمفروض تشوف إيه. تعملها بإيدك أو السيستم يعملها قدامك.' },
     { icon: FlaskConical, title: 'سيناريوهات الفشل', body: 'تجارب جاهزة لحاجات المفروض السيستم يرفضها: ضغطتين ورا بعض، جهازين في نفس اللحظة، مدير بيوافق لنفسه…' },
@@ -121,8 +121,8 @@ function HelpPage({ onOpenPanel }: { onOpenPanel: (p: 'walk' | 'policy') => void
     <div className="space-y-3">
       <div className="grid sm:grid-cols-2 gap-2">
         {items.map((i) => { const Icon = i.icon; return (
-          <div key={i.title} className="rounded-xl surface-1 border line p-3 flex gap-2.5">
-            <Icon className="w-5 h-5 text-[var(--primary)] shrink-0 mt-0.5" />
+          <div key={i.title} className="rounded-xl surface-1 border line p-3 flex gap-3">
+            <span className="w-8 h-8 rounded-lg bg-[var(--primary-container)] text-[var(--primary)] flex items-center justify-center shrink-0"><Icon className="w-4 h-4" /></span>
             <div><div className="font-bold text-sm">{t(i.title)}</div><div className="text-xs text-soft leading-relaxed">{t(i.body)}</div></div>
           </div>
         ); })}

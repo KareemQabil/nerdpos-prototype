@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Save, Plus, Trash2, SlidersHorizontal, Scale, PackagePlus } from 'lucide-react';
 import { useCommand, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
-import { Banner, Button, Field, Input, KV, Modal, Money, Pill, Select, Spinner, StateBadge, Switch, Table, Tabs, Textarea } from '../../ui';
+import { Banner, Button, Field, Input, KV, Modal, Drawer, Money, Pill, Select, Spinner, StateBadge, Switch, Table, Tabs, Textarea } from '../../ui';
 import { t, L } from '../../i18n';
 import { dateTime, money } from '../../lib/format';
 import { ADJUST_REASONS, ADJUST_REASON_TEXT, LevelPill, MovementTable, Qty, WH_KIND, fmtQty, unitLabel, useList, Inp } from './common';
@@ -21,7 +21,7 @@ export function ItemDrawer({ itemId, onClose, initialTab = 'stock' }: { itemId: 
   useEffect(() => setTab(initialTab), [itemId, initialTab]);
   const it = q.data;
   return (
-    <Modal open={!!itemId} onClose={onClose} xwide title={it ? <span className="flex items-center gap-2">{L(it.name)} <span className="text-sm text-dim">{it.category}</span></span> : t('صنف مخزن')}
+    <Drawer width="xl" open={!!itemId} onClose={onClose} title={it ? <span className="flex items-center gap-2">{L(it.name)} <span className="text-sm text-dim">{it.category}</span></span> : t('صنف مخزن')}
       badge={<>{it && !it.active && <Pill tone="neutral">{t('موقوف')}</Pill>}{it?.kind === 'PREP' && <Pill tone="violet">{t('تجهيزة مطبخ')}</Pill>}{it?.kind === 'RESALE' && <Pill tone="info">{t('بيتباع زي ما هو')}</Pill>}<StateBadge ops={OPS} /></>}>
       {!it ? <Spinner /> : (
         <div className="space-y-4">
@@ -77,7 +77,7 @@ export function ItemDrawer({ itemId, onClose, initialTab = 'stock' }: { itemId: 
       )}
       {it && adjust && <AdjustDialog item={it} balance={adjust} onClose={() => setAdjust(null)} />}
       {it && waste && <WasteDialog open onClose={() => setWaste(null)} presetItemId={it.id} presetWarehouseId={waste} />}
-    </Modal>
+    </Drawer>
   );
 }
 

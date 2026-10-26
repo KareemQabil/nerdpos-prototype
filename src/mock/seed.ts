@@ -12,6 +12,11 @@ import { seedInventory } from './seed-inventory';
 export const DEMO_PIN = '123456';
 export const DEMO_PASSWORD = 'demo-password-1';
 
+/** Arabic display names for seeded branches and terminals (ids and codes unchanged). */
+const DISPLAY_NAME_AR: Record<string, string> = {
+  branch_main: 'الفرع الرئيسي — مدينة نصر', branch_second: 'الفرع التاني — المعادي',
+  t_floor: 'تابلت الويتر 1 (من غير درج)', t_cash: 'جهاز الكاشير 1 (عليه درج)', t_kds: 'شاشة المطبخ 1', t_admin: 'كمبيوتر المدير', t_second_floor: 'تابلت ويتر الفرع التاني (من غير درج)',
+};
 const KIND: Record<string, 'FLOOR' | 'CASH' | 'KDS' | 'ADMIN'> = { t_floor: 'FLOOR', t_cash: 'CASH', t_kds: 'KDS', t_admin: 'ADMIN', t_second_floor: 'FLOOR' };
 
 export function buildSeed(nowMs: number): DB {
@@ -20,9 +25,9 @@ export function buildSeed(nowMs: number): DB {
   const db: DB = {
     schema: 4,
     seq: {},
-    business: { id: 'biz', name: seed.business.name, nameAr: 'مطعم نيردبوس التجريبي', legalName: seed.business.legalName, currency: 'EGP', version: 1 },
-    branches: seed.branches.map((b: any) => ({ id: b.key, code: b.code, name: b.name, timezone: b.timezone, businessDayCutoff: b.businessDayCutoff, active: b.active, version: 1 })),
-    terminals: seed.terminals.map((t: any) => ({ id: t.key, code: t.code, name: t.name, branchId: t.branch, drawer: t.drawer, lifecycle: t.lifecycle, purpose: t.purpose, kind: KIND[t.key] ?? 'FLOOR', version: 1 })),
+    business: { id: 'biz', name: seed.business.name, nameAr: 'مطعم الحاج سامي للمشويات', legalName: seed.business.legalName, currency: 'EGP', version: 1 },
+    branches: seed.branches.map((b: any) => ({ id: b.key, code: b.code, name: DISPLAY_NAME_AR[b.key] ?? b.name, timezone: b.timezone, businessDayCutoff: b.businessDayCutoff, active: b.active, version: 1 })),
+    terminals: seed.terminals.map((t: any) => ({ id: t.key, code: t.code, name: DISPLAY_NAME_AR[t.key] ?? t.name, branchId: t.branch, drawer: t.drawer, lifecycle: t.lifecycle, purpose: t.purpose, kind: KIND[t.key] ?? 'FLOOR', version: 1 })),
     roles: [
       ...seed.roles.map((r: any) => ({ id: r.key, name: r.name, permissionIds: [...r.permissionIds], active: true, version: 1 })),
     ],

@@ -151,7 +151,7 @@ export function Walkthrough() {
           <div className="h-1.5 rounded-full surface-3 overflow-hidden"><div className="h-full bg-[var(--success)] transition-all" style={{ width: `${pct}%` }} /></div>
         </div>
         <div className="flex gap-1 flex-wrap">
-          {j.steps.map((s, i) => { const st = status(s); return <button key={s.id} onClick={() => { setIdx(i); setView('step'); }} title={pick(STEP_PLAIN[s.id]?.do).slice(0, 80)} className={cn('w-7 h-7 rounded-md text-[11px] num border', i === idx && view === 'step' ? 'border-[var(--primary)] bg-[var(--primary-container)] text-[var(--primary)] font-bold' : st === true ? 'border-emerald-400/50 text-emerald-300' : st === false ? 'border-red-400/50 text-red-300' : 'border-[var(--glass-border)] text-dim')}>{i + 1}</button>; })}
+          {j.steps.map((s, i) => { const st = status(s); return <button key={s.id} onClick={() => { setIdx(i); setView('step'); }} title={pick(STEP_PLAIN[s.id]?.do).slice(0, 80)} className={cn('w-7 h-7 rounded-md text-[11px] num border', i === idx && view === 'step' ? 'border-[var(--primary)] bg-[var(--primary-container)] text-[var(--primary)] font-bold' : st === true ? 'border-[color-mix(in_srgb,var(--success)_50%,transparent)] text-[var(--success)]' : st === false ? 'border-[color-mix(in_srgb,var(--error)_50%,transparent)] text-[var(--error)]' : 'border-[var(--glass-border)] text-dim')}>{i + 1}</button>; })}
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button size="sm" variant="ghost" onClick={restart} data-fb="walk-restart"><RotateCcw className="w-4 h-4" />{t('ابدأ من الأول')}</Button>
@@ -170,7 +170,7 @@ export function Walkthrough() {
           {j.steps.map((s, i) => logs[`${j.id}:${s.id}`] ? (
             <div key={s.id} className="rounded-xl surface-1 border line p-2.5 space-y-1">
               <button className="text-xs font-bold flex items-center gap-1.5 hover:text-[var(--primary)]" onClick={() => { setIdx(i); setView('step'); }}>
-                {status(s) === true ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : status(s) === false ? <XCircle className="w-4 h-4 text-red-400" /> : <Circle className="w-4 h-4 text-dim" />}
+                {status(s) === true ? <CheckCircle2 className="w-4 h-4 text-[var(--success)]" /> : status(s) === false ? <XCircle className="w-4 h-4 text-[var(--error)]" /> : <Circle className="w-4 h-4 text-dim" />}
                 {t('خطوة {i}', { i: i + 1 })}: <span className="font-normal text-soft">{pick(STEP_PLAIN[s.id]?.do).split(/[.:،]/)[0]}</span>
               </button>
               <LogView lines={logs[`${j.id}:${s.id}`]} tech={tech} />
@@ -233,7 +233,7 @@ function LogView({ lines, tech }: { lines: LogLine[]; tech: boolean }) {
     <div className="space-y-1">
       {shown.map((l, i) => (
         <div key={i} className="flex gap-1.5 items-start text-xs">
-          {l.ok === true ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" /> : l.ok === false ? <XCircle className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" /> : <Circle className="w-3.5 h-3.5 text-dim shrink-0 mt-0.5" />}
+          {l.ok === true ? <CheckCircle2 className="w-3.5 h-3.5 text-[var(--success)] shrink-0 mt-0.5" /> : l.ok === false ? <XCircle className="w-3.5 h-3.5 text-[var(--error)] shrink-0 mt-0.5" /> : <Circle className="w-3.5 h-3.5 text-dim shrink-0 mt-0.5" />}
           <div className="min-w-0">
             <div className="break-words leading-relaxed">{l.plain ?? (l.ok === false ? t('حاجة ما مشيتش زي المتوقع') : l.text)}</div>
             {tech && <div className="num text-[10px] text-dim break-words" dir="ltr" style={{ textAlign: 'left' }}>{l.text}</div>}

@@ -3,8 +3,10 @@
 import React, { useMemo, useState } from 'react';
 import { ChefHat, Route, Plus, Pencil, Power, Armchair, AlertTriangle, Users } from 'lucide-react';
 import { useCommand, useDev } from '../../app/hooks';
-import { Banner, Button, Card, Field, Input, Pill, Section, Select, StateBadge, Switch, Table, Tabs } from '../../ui';
+import { Banner, Button, Card, EmptyState, Field, Input, PageHeader, Pill, Select, StatCard, StatGrid, StateBadge, Switch, Table, Tabs } from '../../ui';
 import { t, L } from '../../i18n';
+import { Tech } from '../../app/tech';
+import { stationName } from '../../demo/humanLog';
 import { cn } from '../../lib/format';
 import { useList, usePerm, Refused, CHANNELS, channelLabel, Modal } from './org/common';
 
@@ -12,15 +14,25 @@ export default function Stations() {
   const [tab, setTab] = useState<'kitchen' | 'tables'>('kitchen');
   const { me, auth } = useDev();
   const noBranch = !(me?.branchId ?? auth.branchId);
+  const stations = useList<any>('KitchenStation.List');
+  const rules = useList<any>('RoutingRule.List');
+  const tables = useList<any>('Table.List');
+  const catchAll = rules.items.some((r) => r.active && !r.match?.productId && !r.match?.categoryId && !r.match?.channel);
   return (
     <div className="space-y-4" data-fb="screen:F2">
-      <Section
-        title={t('المحطات والتوجيه والترابيزات')}
+      <PageHeader
+        icon={<Route />}
+        title={t('المطبخ والمحطات والترابيزات')}
         badge={<StateBadge ops={['KitchenStation.List', 'KitchenStation.Create', 'KitchenStation.Configure', 'RoutingRule.List', 'RoutingRule.Create', 'RoutingRule.Configure', 'Table.List', 'Table.Create', 'Table.Configure', 'Table.SetActive']} />}
-        sub={t('كل صنف بيتبعت للمطبخ بيروح لمحطة حسب أول قاعدة تنطبق عليه. الترابيزات بتظهر في شاشة الصالة على طول.')}
+        description={t('كل صنف بيتبعت للمطبخ بيروح لمحطة حسب أول قاعدة تنطبق عليه. الترابيزات بتظهر في شاشة الصالة على طول.')}
       />
-      {noBranch && <Banner tone="warning">{t('الجهاز ده من غير فرع: المحطات والترابيزات تبع فرع. سجّل دخول على جهاز الفرع أو اختار الفرع من شاشة الدخول (CONTEXT_REQUIRED).')}</Banner>}
-      <Tabs value={tab} onChange={setTab} tabs={[{ id: 'kitchen', label: <span className="flex items-center gap-1"><ChefHat className="w-4 h-4" />{t('المحطات والتوجيه')}</span> }, { id: 'tables', label: <span className="flex items-center gap-1"><Armchair className="w-4 h-4" />{t('الترابيزات')}</span> }]} />
+      {noBranch && <Banner tone="warning">{t('الجهاز ده مش متربط بفرع، والمحطات والترابيزات تبع فرع. ادخل من جهاز في الفرع أو اختار الفرع من شاشة الدخول.')}<Tech> (CONTEXT_REQUIRED)</Tech></Banner>}
+      <StatGrid>
+        <StatCard label={t('محطات شغالة')} value={stations.items.filter((x) => x.active).length} icon={<ChefHat />} loading={stations.loading && !stations.data} />
+        <StatCard label={t('قواعد التوزيع')} value={rules.items.filter((x) => x.active).length} icon={<Route />} tone={catchAll || !rules.items.length ? 'neutral' : 'error'} hint={catchAll ? t('فيه قاعدة «أي حاجة تانية» في الآخر') : t('ناقصة قاعدة «أي حاجة تانية»')} loading={rules.loading && !rules.data} />
+        <StatCard label={t('ترابيزات شغالة')} value={tables.items.filter((x) => x.active).length} icon={<Armchair />} hint={t('{n} كرسي', { n: tables.items.filter((x) => x.active).reduce((a, x) => a + Number(x.capacity ?? 0), 0) })} loading={tables.loading && !tables.data} />
+      </StatGrid>
+      <Tabs variant="underline" value={tab} onChange={setTab} tabs={[{ id: 'kitchen', icon: <ChefHat className="w-4 h-4" />, label: t('المحطات والتوزيع') }, { id: 'tables', icon: <Armchair className="w-4 h-4" />, label: t('الترابيزات'), count: tables.items.length || undefined }]} />
       {tab === 'kitchen' ? <KitchenTab /> : <TablesTab />}
     </div>
   );
@@ -36,7 +48,7 @@ function KitchenTab() {
   const { run, busy } = useCommand();
   const [stEdit, setStEdit] = useState<any | null | 'new'>(null);
   const [rEdit, setREdit] = useState<any | null | 'new'>(null);
-  const stName = (id: string) => stations.items.find((s) => s.id === id)?.name ?? id;
+  const stName = (id: string) => stationName(stations.items.find((s) => s.id === id)?.name) || t('محطة');
   const pName = (id: string) => L(products.items.find((p) => p.id === id)?.name) || id;
   const cName = (id: string) => L(categories.items.find((c) => c.id === id)?.name) || id;
   const isCatchAll = (r: any) => !r.match?.productId && !r.match?.categoryId && !r.match?.channel;
@@ -46,13 +58,13 @@ function KitchenTab() {
   const toggleStation = (s: any) => run('KitchenStation.Configure', { params: { stationId: s.id }, body: { name: s.name, active: !s.active, expectedVersion: s.version } }, { success: s.active ? t('اتوقفت المحطة') : t('اتفعلت المحطة') });
   return (
     <div className="grid xl:grid-cols-[minmax(280px,1fr)_2fr] gap-4 items-start">
-      <Card title={<span className="flex items-center gap-2"><ChefHat className="w-4 h-4 text-[var(--primary)]" />{t('محطات المطبخ')}</span>} badge={<StateBadge ops={['KitchenStation.List', 'KitchenStation.Create', 'KitchenStation.Configure']} />}
+      <Card title={<span className="flex items-center gap-2"><ChefHat className="w-4 h-4 text-[var(--primary)]" />{t('محطات المطبخ')}</span>} description={t('كل محطة ليها شاشة طلبات لوحدها.')}
         actions={<Button size="sm" variant="primary" data-fb="stations:new" disabled={!perm.ok} title={perm.title} onClick={() => setStEdit('new')}><Plus className="w-3.5 h-3.5" />{t('محطة')}</Button>}>
         <Refused error={stations.error} />
         <div className="space-y-1.5">
           {stations.items.map((s) => (
             <div key={s.id} className={cn('flex items-center justify-between gap-2 rounded-xl surface-1 px-3 py-2', !s.active && 'opacity-60')} data-fb={`stations:station:${s.name}`}>
-              <div className="min-w-0"><div className="font-bold text-sm truncate">{s.name}</div><div className="text-[10px] num text-dim">{s.id} · v{s.version}</div></div>
+              <div className="min-w-0"><div className="font-bold text-sm truncate">{stationName(s.name)}</div><Tech><div className="text-[10px] num text-dim">{s.name} · {s.id} · v{s.version}</div></Tech></div>
               <div className="flex items-center gap-1">
                 {s.active ? <Pill tone="success">{t('شغالة')}</Pill> : <Pill tone="neutral">{t('موقوفة')}</Pill>}
                 <Button size="sm" variant="ghost" disabled={!perm.ok} title={t('تغيير الاسم')} onClick={() => setStEdit(s)}><Pencil className="w-3.5 h-3.5" /></Button>
@@ -60,14 +72,14 @@ function KitchenTab() {
               </div>
             </div>
           ))}
-          {stations.items.length === 0 && !stations.error && <div className="text-sm text-dim py-4 text-center">{t('مفيش محطات لسه')}</div>}
+          {stations.items.length === 0 && !stations.error && <EmptyState compact icon={<ChefHat />} title={t('مفيش محطات لسه')} text={t('ابدأ بمحطة زي المشويات أو البارد أو البار.')} />}
         </div>
       </Card>
 
-      <Card title={<span className="flex items-center gap-2"><Route className="w-4 h-4 text-[var(--primary)]" />{t('قواعد التوجيه')}</span>} badge={<StateBadge ops={['RoutingRule.List', 'RoutingRule.Create', 'RoutingRule.Configure']} />}
+      <Card title={<span className="flex items-center gap-2"><Route className="w-4 h-4 text-[var(--primary)]" />{t('مين يروح فين')}</span>} description={t('القواعد بتتقري بالترتيب، وأول قاعدة تنطبق على الصنف هي اللي بتحدد المحطة.')}
         actions={<Button size="sm" variant="primary" data-fb="routing:new" disabled={!perm.ok || stations.items.length === 0} title={perm.title} onClick={() => setREdit('new')}><Plus className="w-3.5 h-3.5" />{t('قاعدة')}</Button>}>
         <div className="space-y-3">
-          <Banner tone="info">{t('القواعد بتتقري بالترتيب من الأولوية الأصغر للأكبر، وأول قاعدة تنطبق على الصنف هي اللي بتحدد المحطة. مفيش محطة افتراضية مخفية: لازم قاعدة عامة صريحة ("أي حاجة تانية") في الآخر.')}</Banner>
+          <div className="text-xs text-dim">{t('مفيش محطة افتراضية مخفية: لازم قاعدة «أي حاجة تانية» في الآخر عشان أي صنف جديد يوصل لمحطة.')}</div>
           {!catchAll && rules.items.length > 0 && <Banner tone="error"><span className="flex items-center gap-1"><AlertTriangle className="w-4 h-4" />{t('مفيش قاعدة عامة شغالة: أي صنف مش متطابق مع قاعدة مش هيروح لأي محطة.')}</span></Banner>}
           {afterCatchAll.length > 0 && <Banner tone="warning">{t('في {n} قاعدة بعد القاعدة العامة — عمرها ما هتتطبق.', { n: afterCatchAll.length })}</Banner>}
           <Refused error={rules.error} />
@@ -78,13 +90,13 @@ function KitchenTab() {
               const dead = afterCatchAll.includes(r);
               return [
                 <span className={cn('num font-bold', dead && 'line-through text-dim')}>{r.priority}</span>,
-                parts.length ? <div className="flex flex-wrap gap-1">{parts}</div> : <Pill tone="violet">{t('أي حاجة تانية (catch-all)')}</Pill>,
-                r.destination === 'NO_TICKET' ? <span className="flex items-center gap-1"><Pill tone="neutral">{t('من غير تذكرة')}</Pill><StateBadge state="PROPOSED" /></span> : <span className="font-bold">{stName(r.stationId)}</span>,
+                parts.length ? <div className="flex flex-wrap gap-1">{parts}</div> : <Pill tone="violet">{t('أي حاجة تانية')}</Pill>,
+                r.destination === 'NO_TICKET' ? <span className="flex items-center gap-1"><Pill tone="neutral">{t('من غير ورقة للمطبخ')}</Pill><Tech><StateBadge state="PROPOSED" /></Tech></span> : <span className="font-bold">{stName(r.stationId)}</span>,
                 r.active ? <Pill tone="success">{t('شغالة')}</Pill> : <Pill tone="neutral">{t('موقوفة')}</Pill>,
                 <Button size="sm" variant="ghost" disabled={!perm.ok} title={perm.title} onClick={() => setREdit(r)} data-fb={`routing:edit:${r.priority}`}><Pencil className="w-3.5 h-3.5" /></Button>,
               ];
-            })} empty={t('مفيش قواعد — أي صنف هيتبعت مش هيوصل لأي محطة')} />
-          <div className="text-[11px] text-dim">{t('شاشة المطبخ ومتابعة الجولة على الشيك بيقولوا كل صنف راح فين فعلاً. النموذج مش بيحسب التوجيه في المتصفح.')}</div>
+            })} empty={<EmptyState compact icon={<Route />} title={t('مفيش قواعد لسه')} text={t('من غير قواعد، الأصناف اللي بتتبعت مش هتوصل لأي محطة. ضيف قاعدة «أي حاجة تانية».')} />} />
+          <div className="text-[11px] text-dim">{t('شاشة المطبخ والشيك نفسه بيقولوا كل صنف راح فين فعلًا.')}</div>
         </div>
       </Card>
       {stEdit && <StationModal station={stEdit === 'new' ? null : stEdit} onClose={() => setStEdit(null)} />}
@@ -105,7 +117,7 @@ function StationModal({ station, onClose }: { station: any | null; onClose: () =
   return (
     <Modal open onClose={onClose} title={station ? t('تغيير اسم المحطة') : t('محطة جديدة')} badge={<StateBadge ops={[station ? 'KitchenStation.Configure' : 'KitchenStation.Create']} />}
       footer={<><Button variant="ghost" onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" loading={busy} disabled={!name.trim()} onClick={save} data-fb="stations:save">{t('حفظ')}</Button></>}>
-      <Field label={t('اسم المحطة')} hint={t('مثلاً: الشواية، البارد، البار. التكرار في نفس الفرع بيرجع KITCHEN_STATION_NAME_TAKEN')}><Input value={name} onChange={(e) => setName(e.target.value)} data-fb="stations:name" /></Field>
+      <Field label={t('اسم المحطة')} hint={t('مثلًا: الشواية، البارد، البار. مينفعش يتكرر في نفس الفرع.')}><Input value={name} onChange={(e) => setName(e.target.value)} data-fb="stations:name" /></Field>
     </Modal>
   );
 }
@@ -138,31 +150,31 @@ function RuleModal({ rule, stations, products, categories, nextPriority, onClose
     if (r) onClose();
   };
   return (
-    <Modal open wide onClose={onClose} title={rule ? t('تعديل قاعدة توجيه') : t('قاعدة توجيه جديدة')} badge={<StateBadge ops={[rule ? 'RoutingRule.Configure' : 'RoutingRule.Create']} />}
+    <Modal open wide onClose={onClose} title={rule ? t('تعديل قاعدة') : t('قاعدة جديدة')} badge={<StateBadge ops={[rule ? 'RoutingRule.Configure' : 'RoutingRule.Create']} />}
       footer={<><Button variant="ghost" onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" loading={busy} disabled={!priority || (destination === 'STATION' && !stationId)} onClick={save} data-fb="routing:save">{t('حفظ')}</Button></>}>
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
-          <Field label={t('الأولوية')} hint={t('الأصغر الأول')}><Input type="number" value={priority} onChange={(e) => setPriority(e.target.value)} data-fb="routing:priority" /></Field>
+          <Field label={t('الترتيب')} hint={t('الرقم الأصغر بيتقري الأول')}><Input type="number" value={priority} onChange={(e) => setPriority(e.target.value)} data-fb="routing:priority" /></Field>
           {rule && <Field label={t('الحالة')}><Switch checked={active} onChange={setActive} label={active ? t('شغالة') : t('موقوفة')} /></Field>}
         </div>
         <div className="text-xs font-bold text-soft">{t('ينطبق على (سيبهم فاضيين = أي حاجة تانية)')}</div>
         <div className="grid grid-cols-3 gap-3">
           <Field label={t('صنف')}><Select value={productId} onChange={(e) => setProductId(e.target.value)} options={[{ value: '', label: t('أي صنف') }, ...products.map((p) => ({ value: p.id, label: L(p.name) }))]} data-fb="routing:product" /></Field>
           <Field label={t('قسم')}><Select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} options={[{ value: '', label: t('أي قسم') }, ...categories.map((c) => ({ value: c.id, label: L(c.name) }))]} data-fb="routing:category" /></Field>
-          <Field label={t('القناة')}><Select value={channel} onChange={(e) => setChannel(e.target.value)} options={[{ value: '', label: t('أي قناة') }, ...CHANNELS.map((c) => ({ value: c, label: channelLabel(c) }))]} data-fb="routing:channel" /></Field>
+          <Field label={t('نوع الطلب')}><Select value={channel} onChange={(e) => setChannel(e.target.value)} options={[{ value: '', label: t('أي نوع') }, ...CHANNELS.map((c) => ({ value: c, label: channelLabel(c) }))]} data-fb="routing:channel" /></Field>
         </div>
-        {catchAll && <Banner tone="info">{t('دي قاعدة عامة (catch-all): خليها بأكبر أولوية عشان تبقى الأخيرة.')}</Banner>}
+        {catchAll && <Banner tone="info">{t('دي قاعدة «أي حاجة تانية»: خلّي رقمها أكبر رقم عشان تبقى الأخيرة.')}</Banner>}
         <div className="grid grid-cols-2 gap-3">
-          <Field label={<span className="flex items-center gap-2">{t('الوجهة')}<StateBadge state="PROPOSED" /></span>} hint={t('"من غير تذكرة" (للأصناف اللي مش محتاجة مطبخ زي المية) اقتراح مش في العقد.')}>
-            <Select value={destination} onChange={(e) => setDestination(e.target.value as any)} options={[{ value: 'STATION', label: t('محطة') }, { value: 'NO_TICKET', label: t('من غير تذكرة (مقترح)') }]} />
+          <Field label={<span className="flex items-center gap-2">{t('يروح فين')}<Tech><StateBadge state="PROPOSED" /></Tech></span>} hint={t('«من غير ورقة للمطبخ» للأصناف اللي مش محتاجة تحضير زي المية الساقعة.')}>
+            <Select value={destination} onChange={(e) => setDestination(e.target.value as any)} options={[{ value: 'STATION', label: t('محطة') }, { value: 'NO_TICKET', label: t('من غير ورقة للمطبخ') }]} />
           </Field>
           {destination === 'STATION' && (
-            <Field label={<span className="flex items-center gap-2">{t('المحطة')}{rule && <StateBadge state="PROPOSED" />}</span>} hint={rule ? t('RoutingRule.Configure مفيهوش تغيير المحطة؛ في العقد بتعمل قاعدة جديدة.') : t('محطة موقوفة بترجع KITCHEN_STATION_INACTIVE')}>
-              <Select value={stationId} onChange={(e) => setStationId(e.target.value)} options={stations.map((s) => ({ value: s.id, label: `${s.name}${s.active ? '' : ' — ' + t('موقوفة')}` }))} data-fb="routing:station" />
+            <Field label={<span className="flex items-center gap-2">{t('المحطة')}{rule && <Tech><StateBadge state="PROPOSED" /></Tech>}</span>} hint={<>{t('المحطة الموقوفة مينفعش تستقبل طلبات.')}<Tech> {rule ? t('RoutingRule.Configure مفيهوش تغيير المحطة؛ في العقد بتعمل قاعدة جديدة.') : 'KITCHEN_STATION_INACTIVE'}</Tech></>}>
+              <Select value={stationId} onChange={(e) => setStationId(e.target.value)} options={stations.map((s) => ({ value: s.id, label: `${stationName(s.name)}${s.active ? '' : ' — ' + t('موقوفة')}` }))} data-fb="routing:station" />
             </Field>
           )}
         </div>
-        {rule && <div className="text-[11px] text-dim">{t('التعديل مبني على النسخة {v}. لو جهاز تاني عدّل القاعدة قبلك هيرجع CONCURRENCY_CONFLICT وتعمل تحديث.', { v: baseVersion ?? '—' })}</div>}
+        {rule && <Tech><div className="text-[11px] text-dim">{t('التعديل مبني على النسخة {v}. لو جهاز تاني عدّل القاعدة قبلك هيرجع CONCURRENCY_CONFLICT وتعمل تحديث.', { v: baseVersion ?? '—' })}</div></Tech>}
       </div>
     </Modal>
   );
@@ -177,11 +189,11 @@ function TablesTab() {
   const areas = useMemo(() => [...new Set(tables.items.map((x) => x.area || t('من غير منطقة')))], [tables.items]);
   const setActive = (x: any) => run('Table.SetActive', { params: { tableId: x.id }, body: { active: !x.active, expectedVersion: x.version } }, { success: x.active ? t('الترابيزة {n} اتقفلت', { n: x.name }) : t('الترابيزة {n} اتفعلت', { n: x.name }) });
   return (
-    <Card title={<span className="flex items-center gap-2"><Armchair className="w-4 h-4 text-[var(--primary)]" />{t('الترابيزات')}</span>} badge={<StateBadge ops={['Table.List', 'Table.Create', 'Table.Configure', 'Table.SetActive']} />}
+    <Card title={<span className="flex items-center gap-2"><Armchair className="w-4 h-4 text-[var(--primary)]" />{t('الترابيزات')}</span>} description={t('الترابيزة اللي عليها ناس مينفعش تتقفل، والاسم مينفعش يتكرر في نفس الفرع.')}
       actions={<Button size="sm" variant="primary" data-fb="tables:new" disabled={!perm.ok} title={perm.title} onClick={() => setEdit('new')}><Plus className="w-3.5 h-3.5" />{t('ترابيزة')}</Button>}>
       <Refused error={tables.error} />
-      <Banner tone="info">{t('ترابيزة عليها ناس مينفعش تتقفل (TABLE_OCCUPIED). الاسم فريد في الفرع (TABLE_NAME_TAKEN).')}</Banner>
-      <div className="space-y-4 mt-3">
+      <Tech><div className="text-[11px] text-dim num">TABLE_OCCUPIED · TABLE_NAME_TAKEN</div></Tech>
+      <div className="space-y-4">
         {areas.map((a) => (
           <div key={a}>
             <div className="text-sm font-bold mb-2">{a} <span className="text-dim font-normal text-xs">({tables.items.filter((x) => (x.area || t('من غير منطقة')) === a).length})</span></div>
@@ -201,7 +213,7 @@ function TablesTab() {
             </div>
           </div>
         ))}
-        {tables.items.length === 0 && !tables.error && <div className="text-sm text-dim py-6 text-center">{t('مفيش ترابيزات لسه')}</div>}
+        {tables.items.length === 0 && !tables.error && <EmptyState compact icon={<Armchair />} title={t('مفيش ترابيزات لسه')} text={t('ضيف الترابيزات هنا أو ارسمها من «خريطة الصالة».')} />}
       </div>
       {edit && <TableModal table={edit === 'new' ? null : edit} areas={areas} onClose={() => setEdit(null)} />}
     </Card>

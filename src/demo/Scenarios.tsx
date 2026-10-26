@@ -81,7 +81,7 @@ function Negatives() {
                 <div className="text-[10px] font-bold text-dim">{t('اللي حصل')}</div>
                 {shown.map((l, i) => (
                   <div key={i} className="flex gap-1.5 items-start text-xs">
-                    {l.ok === true ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" /> : l.ok === false ? <XCircle className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" /> : <Circle className="w-3.5 h-3.5 text-dim shrink-0 mt-0.5" />}
+                    {l.ok === true ? <CheckCircle2 className="w-3.5 h-3.5 text-[var(--success)] shrink-0 mt-0.5" /> : l.ok === false ? <XCircle className="w-3.5 h-3.5 text-[var(--error)] shrink-0 mt-0.5" /> : <Circle className="w-3.5 h-3.5 text-dim shrink-0 mt-0.5" />}
                     <div className="min-w-0"><div className="break-words">{l.plain ?? (l.ok === false ? t('حاجة ما مشيتش زي المتوقع') : l.text)}</div>{tech && <div className="num text-[10px] text-dim break-words" dir="ltr" style={{ textAlign: 'left' }}>{l.text}</div>}</div>
                   </div>
                 ))}

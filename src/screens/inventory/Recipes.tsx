@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, Pencil, BookOpen, History, Save, Trash2, CookingPot } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
-import { Banner, Button, Empty, Field, Input, KV, Modal, Money, Pill, Section, Select, Spinner, StateBadge, Table, Tabs, Textarea } from '../../ui';
+import { Banner, Button, Empty, Field, Input, KV, Modal, Drawer, Money, Pill, Section, Select, Spinner, StateBadge, Table, Tabs, Textarea } from '../../ui';
 import { t, L } from '../../i18n';
 import { dateTime, money } from '../../lib/format';
 import { BandPill, ItemPicker, Pct, fmtQty, newKey, unitIdLabel, unitLabel, unitOptions, useItemsCatalog, useList, Inp, Sel } from './common';
@@ -71,7 +71,7 @@ function RecipeView({ id, onClose, onEdit }: { id: string | null; onClose: () =>
   const c = useQuery<any>(id ? 'Recipe.Cost' : null, { params: { recipeId: id }, query: { versionId: ver || undefined } });
   const cost = c.data;
   return (
-    <Modal open={!!id} onClose={onClose} xwide title={r ? <span className="flex items-center gap-2"><CookingPot className="w-5 h-5 text-[var(--primary)]" />{L(r.name)}</span> : t('وصفة')}
+    <Drawer width="xl" open={!!id} onClose={onClose} title={r ? <span className="flex items-center gap-2"><CookingPot className="w-5 h-5 text-[var(--primary)]" />{L(r.name)}</span> : t('وصفة')}
       badge={r ? <><Pill tone={r.outputKind === 'MENU' ? 'primary' : r.outputKind === 'PREP' ? 'violet' : 'neutral'}>{r.outputKind === 'MENU' ? t('صنف منيو') : r.outputKind === 'PREP' ? t('تحضيرة') : t('إضافة')}</Pill><StateBadge ops={OPS} /></> : undefined}
       footer={r && <Button variant="primary" data-fb="recipe:edit" onClick={() => onEdit(r)}><Pencil className="w-4 h-4" />{t('عدّل (نسخة جديدة)')}</Button>}>
       {!r || !cost ? <Spinner /> : (
@@ -103,7 +103,7 @@ function RecipeView({ id, onClose, onEdit }: { id: string | null; onClose: () =>
           <Tech><div className="text-[11px] num text-dim">{r.id} · {r.outputProductId} · method {cost.method}</div></Tech>
         </div>
       )}
-    </Modal>
+    </Drawer>
   );
 }
 function Box({ l, v }: { l: React.ReactNode; v: React.ReactNode }) { return <div className="rounded-xl surface-1 p-3"><div className="text-[11px] text-dim">{l}</div><div className="font-bold mt-0.5">{v}</div></div>; }
@@ -139,7 +139,7 @@ function RecipeEditor({ init, onClose, onSaved }: { init: any; onClose: () => vo
   };
   const valid = (kind === 'MODIFIER' ? !!option : !!output) && lines.some((l) => l.itemId && Number(l.quantity) > 0) && (kind !== 'PREP' || Number(outQty) > 0);
   return (
-    <Modal open onClose={onClose} xwide title={r ? t('تعديل وصفة — {n}', { n: L(r.name) }) : t('وصفة جديدة')} badge={<StateBadge ops={['Recipe.Define']} />}
+    <Drawer width="xl" open onClose={onClose} title={r ? t('تعديل وصفة — {n}', { n: L(r.name) }) : t('وصفة جديدة')} badge={<StateBadge ops={['Recipe.Define']} />}
       footer={<><Button onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" data-fb="recipe-edit:save" loading={busy} disabled={!valid} onClick={save}><Save className="w-4 h-4" />{r ? t('احفظ نسخة جديدة') : t('احفظ الوصفة')}</Button></>}>
       <div className="space-y-3">
         {!r && <div className="text-sm text-dim">{kind === 'MENU' ? t('وصفة طبق من المنيو: الكميات لطبق واحد.') : kind === 'PREP' ? t('وصفة تحضيرة: الكميات لدفعة واحدة، واكتب الدفعة بتطلع كام.') : t('وصفة إضافة: المكونات الزيادة لما الزبون يختار الإضافة دي.')}</div>}
@@ -176,6 +176,6 @@ function RecipeEditor({ init, onClose, onSaved }: { init: any; onClose: () => vo
         <Field label={t('ملاحظة على النسخة')}><Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('مثال: تقليل البورشن بعد زيادة سعر اللحمة')} /></Field>
         {r && <Banner tone="info">{t('التعديل بيعمل نسخة جديدة — المبيعات اللي فاتت بتفضل محسوبة بالنسخة القديمة.')}</Banner>}
       </div>
-    </Modal>
+    </Drawer>
   );
 }

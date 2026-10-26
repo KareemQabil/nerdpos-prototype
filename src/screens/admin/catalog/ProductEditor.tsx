@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, CheckCircle2, Circle, Plus, Save, Pizza, Layers, Ruler, Package, AlertTriangle } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../../app/hooks';
-import { Banner, Button, Card, Field, Input, KV, Modal, Money, Pill, Select, Spinner, StateBadge, Switch, Textarea, Tabs, toast } from '../../../ui';
+import { Banner, Button, Card, Field, Input, KV, Modal, Drawer, Money, Pill, Select, Spinner, StateBadge, Switch, Textarea, Tabs, toast } from '../../../ui';
 import { Tech } from '../../../app/tech';
 import { t, L } from '../../../i18n';
 import { branchLabel } from '../../../demo/people';
@@ -96,7 +96,7 @@ export function ProductCreate({ open, onClose, onCreated }: { open: boolean; onC
     onCreated(r.id, KIND_TAB[kind]);
   };
   return (
-    <Modal open={open} onClose={onClose} xwide title={t('صنف جديد')} badge={<StateBadge ops={['Product.Create', 'Product.NameCheck', 'Catalog.SetPrice', 'Product.SetAvailability']} />}
+    <Drawer width="xl" open={open} onClose={onClose} title={t('صنف جديد')} badge={<StateBadge ops={['Product.Create', 'Product.NameCheck', 'Catalog.SetPrice', 'Product.SetAvailability']} />}
       footer={<><Button onClick={onClose}>{t('إلغاء')}</Button><Button data-fb="product-create:submit" variant="primary" loading={busy} onClick={submit}><Save className="w-4 h-4" />{kind === 'SIMPLE' ? t('حفظ الصنف') : t('حفظ وكمّل الإعداد')}</Button></>}>
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_240px] gap-4">
         <div className="space-y-4">
@@ -150,7 +150,7 @@ export function ProductCreate({ open, onClose, onCreated }: { open: boolean; onC
           <ImageInput value={f.imageUrl} onChange={(v) => setF({ ...f, imageUrl: v })} color={f.colorCode} fb="product-create" />
         </div>
       </div>
-    </Modal>
+    </Drawer>
   );
 }
 
@@ -163,7 +163,7 @@ export function ProductDrawer({ productId, onClose, initialTab = 'data' }: { pro
   useEffect(() => setTab(start), [productId, start]);
   const p = q.data;
   return (
-    <Modal open={!!productId} onClose={onClose} xwide title={p ? <span className="flex items-center gap-2"><Swatch color={p.colorCode} />{L(p.name)} <span className="num text-sm text-dim">{p.sku}</span></span> : t('صنف')}
+    <Drawer width="xl" open={!!productId} onClose={onClose} title={p ? <span className="flex items-center gap-2"><Swatch color={p.colorCode} />{L(p.name)} <Tech><span className="num text-sm text-dim">{p.sku}</span></Tech></span> : t('صنف')}
       badge={<>{p && <Tech><Pill tone="neutral">v{p.version}</Pill></Tech>}{p?.combo?.length > 0 && <Pill tone="info">{t('وجبة')}</Pill>}{p?.halfAndHalf && <Pill tone="violet">{t('نص ونص')}</Pill>}</>}>
       {!p ? <Spinner /> : (
         <div className="space-y-4">
@@ -186,7 +186,7 @@ export function ProductDrawer({ productId, onClose, initialTab = 'data' }: { pro
           {tab === 'availability' && <AvailabilityTab p={p} />}
         </div>
       )}
-    </Modal>
+    </Drawer>
   );
 }
 

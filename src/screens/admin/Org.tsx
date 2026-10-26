@@ -1,22 +1,40 @@
 // A0 Business, branches & devices (J-A1 steps 2–4 and the step-6 provisioning tool).
 import React, { useState } from 'react';
-import { Building2, GitBranch, MonitorSmartphone, Plus, Pencil, Power, Wrench, Landmark, Info } from 'lucide-react';
+import { Building2, GitBranch, MonitorSmartphone, Plus, Pencil, Power, Wrench, Landmark, Info, Clock3 } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../app/hooks';
-import { Banner, Button, Card, Field, Input, KV, Pill, Section, Select, StateBadge, Switch, Table, Textarea, toast } from '../../ui';
+import { Banner, Button, Card, EmptyState, Field, Input, KV, PageHeader, Pill, Select, StatCard, StatGrid, StateBadge, Switch, Table, Textarea, toast } from '../../ui';
 import { t } from '../../i18n';
+import { Tech } from '../../app/tech';
 import { demo } from '../../mock/demo';
 import { egProfile } from '../../mock/contracts';
+import { policyMeta } from '../../mock/policyRegistry';
+import { policyTitle, policyQuestion, valueSummary, confidenceText } from '../../demo/policyText';
+import { branchLabel, deviceName } from '../../demo/people';
 import { useList, show, usePerm, terminalKindLabel, Refused, Modal } from './org/common';
 
 export default function Org() {
+  const branches = useList<any>('Branch.List');
+  const terms = useList<any>('Terminal.List');
+  const biz = useQuery<any>('Business.Get');
+  const active = terms.items.filter((x) => x.lifecycle === 'ACTIVE');
+  const kinds = new Set(active.map((x) => x.kind));
+  const open = active.filter((x) => x.openSession).length;
+  const loading = branches.loading && !branches.data;
   return (
     <div className="space-y-4" data-fb="screen:A0">
-      <Section
-        title={t('النشاط والفروع والأجهزة')}
+      <PageHeader
+        icon={<Building2 />}
+        title={t('المطعم والفروع والأجهزة')}
         badge={<StateBadge ops={['Business.Get', 'Business.Configure', 'Branch.List', 'Branch.Create', 'Terminal.List', 'Terminal.Register', 'Terminal.Decommission']} />}
-        sub={t('أول خطوات التجهيز (J-A1 من 2 لـ 4): بيانات النشاط، الفروع بالتقويم بتاعها، والأجهزة. كل جهاز جديد بيظهر فوق كشريحة جهاز تقدر تشتغل عليه.')}
+        description={t('أول خطوة في التجهيز: اسم المطعم، الفروع ومواعيد اليوم التجاري، والأجهزة اللي في كل فرع.')}
       />
-      <div className="grid xl:grid-cols-2 gap-4">
+      <StatGrid>
+        <StatCard label={t('اسم المطعم')} value={<span className="text-lg">{biz.data?.nameAr || biz.data?.name || '—'}</span>} icon={<Building2 />} loading={biz.loading && !biz.data} />
+        <StatCard label={t('فروع شغالة')} value={branches.items.filter((b) => b.active).length} icon={<GitBranch />} loading={loading} hint={t('كل فرع ليه يوم تجاري لوحده')} />
+        <StatCard label={t('أجهزة شغالة')} value={active.length} icon={<MonitorSmartphone />} tone={kinds.size === 4 ? 'success' : 'warning'} loading={loading} hint={kinds.size === 4 ? t('كل الأنواع موجودة') : t('{k} من 4 أنواع — كمّل الباقي', { k: kinds.size })} />
+        <StatCard label={t('ورديات مفتوحة دلوقتي')} value={open} icon={<Clock3 />} loading={loading} hint={t('على أجهزة الكاشير')} />
+      </StatGrid>
+      <div className="grid xl:grid-cols-2 gap-4 items-start">
         <BusinessCard />
         <BranchesCard />
       </div>
@@ -34,20 +52,20 @@ function BusinessCard() {
   const [open, setOpen] = useState(false);
   const b = biz.data;
   return (
-    <Card title={<span className="flex items-center gap-2"><Building2 className="w-4 h-4 text-[var(--primary)]" />{t('بيانات النشاط')}</span>} badge={<StateBadge ops={['Business.Get', 'Business.Configure']} />}
+    <Card title={<span className="flex items-center gap-2"><Building2 className="w-4 h-4 text-[var(--primary)]" />{t('بيانات المطعم')}</span>} description={t('الاسم اللي بيظهر على الإيصال والتقارير.')}
       actions={<Button size="sm" variant="outline" data-fb="org:business-edit" disabled={!b || !perm.ok} title={perm.title} onClick={() => setOpen(true)}><Pencil className="w-3.5 h-3.5" />{t('تعديل')}</Button>}>
       <Refused error={biz.error} />
       {b && (
         <div className="space-y-3">
           <KV rows={[
             [t('الاسم (إنجليزي)'), b.name || <span className="text-dim">{t('لسه متكتبش')}</span>],
-            [t('الاسم (عربي)'), <span className="flex items-center gap-2">{b.nameAr || <span className="text-dim">—</span>}<StateBadge state="PROPOSED" /></span>],
+            [t('الاسم (عربي)'), <span className="flex items-center gap-2">{b.nameAr || <span className="text-dim">—</span>}<Tech><StateBadge state="PROPOSED" /></Tech></span>],
             [t('الاسم القانوني'), b.legalName || <span className="text-dim">—</span>],
             [t('العملة'), <span className="flex items-center gap-2"><span className="num">{b.currency}</span><Pill tone="neutral">{t('ثابتة بعد التجهيز')}</Pill></span>],
-            [t('النسخة'), <span className="num">v{b.version}</span>],
           ]} />
-          <Banner tone="info" action={<Button size="sm" variant="ghost" onClick={() => nav('fiscal')}><Landmark className="w-3.5 h-3.5" />G4</Button>}>
-            {t('بيانات التسجيل في الإيصال الإلكتروني (رقم التسجيل، كود الفرع، النشاط) مش هنا: مكانها شاشة التسجيل الضريبي G4 (E-40). مفيش أي حقل ضريبي على سجل النشاط.')}
+          <Tech><div className="num text-[11px] text-dim">v{b.version}</div></Tech>
+          <Banner tone="info" action={<Button size="sm" variant="ghost" onClick={() => nav('fiscal')}><Landmark className="w-3.5 h-3.5" />{t('التسجيل الضريبي')}</Button>}>
+            {t('بيانات الإيصال الإلكتروني (رقم التسجيل الضريبي، كود الفرع، النشاط) بتتكتب في شاشة التسجيل الضريبي، مش هنا.')}<Tech> (G4 · E-40)</Tech>
           </Banner>
         </div>
       )}
@@ -66,13 +84,13 @@ function BusinessModal({ b, onClose }: { b: any; onClose: () => void }) {
     if (r) onClose();
   };
   return (
-    <Modal open onClose={onClose} title={t('بيانات النشاط')} badge={<StateBadge ops={['Business.Configure']} />}
+    <Modal open onClose={onClose} title={t('بيانات المطعم')} badge={<StateBadge ops={['Business.Configure']} />}
       footer={<><Button variant="ghost" onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" loading={busy} disabled={!name.trim()} onClick={save} data-fb="org:business-save">{t('حفظ')}</Button></>}>
       <div className="space-y-3">
-        <Field label={t('الاسم (إنجليزي) — name')}><Input value={name} onChange={(e) => setName(e.target.value)} dir="ltr" data-fb="org:business-name" /></Field>
-        <Field label={<span className="flex items-center gap-2">{t('الاسم (عربي)')}<StateBadge state="PROPOSED" /></span>} hint={t('Business.Configure فيه حقل name واحد بس؛ الاسم العربي إضافة مقترحة (PROTOTYPE_GAPS).')}><Input value={nameAr} onChange={(e) => setNameAr(e.target.value)} /></Field>
+        <Field label={t('الاسم (إنجليزي)')} required hint={t('بيظهر في النسخة الإنجليزي والتقارير')}><Input value={name} onChange={(e) => setName(e.target.value)} dir="ltr" data-fb="org:business-name" /></Field>
+        <Field label={t('الاسم (عربي)')} hint={<>{t('بيظهر على الإيصال.')}<Tech> {t('Business.Configure فيه حقل name واحد بس؛ الاسم العربي إضافة مقترحة (PROTOTYPE_GAPS).')}</Tech></>}><Input value={nameAr} onChange={(e) => setNameAr(e.target.value)} /></Field>
         <Field label={t('الاسم القانوني (السجل التجاري)')}><Input value={legalName} onChange={(e) => setLegalName(e.target.value)} /></Field>
-        <div className="text-[11px] text-dim">{t('بنبعت expectedVersion = {v}. لو حد تاني عدّل في نفس الوقت هيرجع CONCURRENCY_CONFLICT.', { v: b.version })}</div>
+        <Tech><div className="text-[11px] text-dim">{t('بنبعت expectedVersion = {v}. لو حد تاني عدّل في نفس الوقت هيرجع CONCURRENCY_CONFLICT.', { v: b.version })}</div></Tech>
       </div>
     </Modal>
   );
@@ -85,18 +103,19 @@ function BranchesCard() {
   const [open, setOpen] = useState(false);
   const cal = egProfile.owner_data.find((d) => d.id === 'EG-BRANCH-CALENDAR');
   return (
-    <Card title={<span className="flex items-center gap-2"><GitBranch className="w-4 h-4 text-[var(--primary)]" />{t('الفروع')}</span>} badge={<StateBadge ops={['Branch.List', 'Branch.Create']} />}
+    <Card title={<span className="flex items-center gap-2"><GitBranch className="w-4 h-4 text-[var(--primary)]" />{t('الفروع')}</span>} description={t('اليوم التجاري لكل فرع بيبدأ في الساعة اللي تحددها.')}
       actions={<Button size="sm" variant="primary" data-fb="org:branch-new" disabled={!perm.ok} title={perm.title} onClick={() => setOpen(true)}><Plus className="w-3.5 h-3.5" />{t('فرع جديد')}</Button>}>
       <Refused error={branches.error} />
-      <Table head={[t('الكود'), t('الاسم'), t('المنطقة الزمنية'), t('بداية اليوم التجاري'), t('الحالة')]}
+      <Table head={[t('الفرع'), t('التوقيت'), t('اليوم بيبدأ'), t('الحالة')]} loading={branches.loading && !branches.data}
         rows={branches.items.map((b) => [
-          <span className="num font-bold">{b.code}</span>, b.name, <span className="num">{b.timezone}</span>, <span className="num">{b.businessDayCutoff}</span>,
-          b.active ? <Pill tone="success">{t('شغال')}</Pill> : <Pill tone="neutral">{t('موقوف')}</Pill>,
+          <div><div className="font-bold">{branchLabel(b)}</div><Tech><div className="num text-[11px] text-dim">{b.code} · {b.name}</div></Tech></div>,
+          <span>{b.timezone === 'Africa/Cairo' ? t('توقيت القاهرة') : <span className="num">{b.timezone}</span>}</span>, <span className="num">{b.businessDayCutoff}</span>,
+          b.active ? <Pill tone="success" dot>{t('شغال')}</Pill> : <Pill tone="neutral" dot>{t('موقوف')}</Pill>,
         ])}
-        empty={t('مفيش فروع لسه — ابدأ بإنشاء الفرع الأول')} />
+        empty={<EmptyState compact icon={<GitBranch />} title={t('مفيش فروع لسه')} text={t('ابدأ بالفرع الأول من «فرع جديد».')} />} />
       <div className="mt-3 space-y-2">
-        <Banner tone="info">{t('اليوم التجاري بيتحسب على السيرفر لكل فرع من المنطقة الزمنية وساعة بداية اليوم، عمره ما بيتاخد من ساعة الجهاز. أي عملية قبل ساعة البداية بتتحسب على اليوم اللي فات: بيعة الساعة 2 الفجر بتدخل في تقارير امبارح.')}</Banner>
-        {cal && <div className="text-[11px] rounded-lg bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] border border-[color-mix(in_srgb,var(--warning)_30%,transparent)] px-2 py-1"><b>{t('سؤال للخبير')}</b> <Pill tone="warning">{cal.confidence}</Pill> {cal.expertQuestion}</div>}
+        <div className="text-xs text-dim leading-relaxed">{t('أي بيعة قبل ساعة البداية بتتحسب على اليوم اللي فات: بيعة الساعة 2 الفجر بتدخل في تقارير امبارح. الساعة دي من السيرفر، مش من ساعة الجهاز.')}</div>
+        {cal && <div className="text-[11px] rounded-lg bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] border border-[color-mix(in_srgb,var(--warning)_30%,transparent)] px-2 py-1"><b>{t('سؤال للخبير')}:</b> {t('المطعم بيقفل الساعة كام؟ بداية اليوم 4 الفجر مناسبة؟')}<Tech> <Pill tone="warning">{cal.confidence}</Pill> {cal.expertQuestion}</Tech></div>}
       </div>
       {open && <BranchModal onClose={() => setOpen(false)} />}
     </Card>
@@ -119,10 +138,10 @@ function BranchModal({ onClose }: { onClose: () => void }) {
     <Modal open onClose={onClose} title={t('فرع جديد')} badge={<StateBadge ops={['Branch.Create']} />}
       footer={<><Button variant="ghost" onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" loading={busy} disabled={!code.trim() || !name.trim()} onClick={save} data-fb="org:branch-save">{t('إنشاء الفرع')}</Button></>}>
       <div className="grid grid-cols-2 gap-3">
-        <Field label={t('الكود')} hint={t('فريد؛ تكراره بيرجع BRANCH_CODE_TAKEN')}><Input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} dir="ltr" data-fb="org:branch-code" /></Field>
-        <Field label={t('الاسم')}><Input value={name} onChange={(e) => setName(e.target.value)} data-fb="org:branch-name" /></Field>
-        <Field label={t('المنطقة الزمنية (IANA)')} hint={t('غلط بيرجع TIMEZONE_INVALID')}><Input value={timezone} onChange={(e) => setTimezone(e.target.value)} dir="ltr" /></Field>
-        <Field label={t('بداية اليوم التجاري')} hint={t('بروفايل مصر: 04:00 (ثقة متوسطة — اسأل صاحب المطعم بيقفل إمتى)')}><Input type="time" value={cutoff} onChange={(e) => setCutoff(e.target.value)} dir="ltr" data-fb="org:branch-cutoff" /></Field>
+        <Field label={t('الكود')} required hint={t('حروف إنجليزي قصيرة ومينفعش تتكرر، مثلًا: MAADI-1')}><Input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} dir="ltr" data-fb="org:branch-code" /></Field>
+        <Field label={t('اسم الفرع')} required><Input value={name} onChange={(e) => setName(e.target.value)} data-fb="org:branch-name" /></Field>
+        <Field label={t('التوقيت')} hint={t('مصر: Africa/Cairo')}><Input value={timezone} onChange={(e) => setTimezone(e.target.value)} dir="ltr" /></Field>
+        <Field label={t('اليوم التجاري بيبدأ الساعة')} hint={t('في مصر غالبًا 4 الفجر — اسأل صاحب المطعم بيقفل إمتى')}><Input type="time" value={cutoff} onChange={(e) => setCutoff(e.target.value)} dir="ltr" data-fb="org:branch-cutoff" /></Field>
       </div>
       <Banner tone="info"><span className="flex items-start gap-1"><Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />{prev ? t('مثال: بيعة الساعة 02:00 يوم 27 هتتحسب على اليوم التجاري 26.') : t('مثال: بيعة الساعة 02:00 يوم 27 هتتحسب على اليوم التجاري 27.')}</span></Banner>
     </Modal>
@@ -138,10 +157,10 @@ function TerminalsCard() {
   const { terminal } = useDev();
   const [open, setOpen] = useState(false);
   const [dec, setDec] = useState<any | null>(null);
-  const bName = (id: string) => branches.items.find((b) => b.id === id)?.code ?? id;
+  const bName = (id: string) => branchLabel(branches.items.find((b) => b.id === id)) || id;
   const kinds = new Set(terms.items.filter((x) => x.lifecycle === 'ACTIVE').map((x) => x.kind));
   return (
-    <Card title={<span className="flex items-center gap-2"><MonitorSmartphone className="w-4 h-4 text-[var(--primary)]" />{t('الأجهزة')}</span>} badge={<StateBadge ops={['Terminal.List', 'Terminal.Register', 'Terminal.Decommission']} />}
+    <Card title={<span className="flex items-center gap-2"><MonitorSmartphone className="w-4 h-4 text-[var(--primary)]" />{t('الأجهزة')}</span>} description={t('كل جهاز جديد بيظهر فوق في شريط الأجهزة وتقدر تشتغل عليه.')}
       actions={<Button size="sm" variant="primary" data-fb="org:terminal-new" disabled={!perm.ok || branches.items.length === 0} title={perm.title} onClick={() => setOpen(true)}><Plus className="w-3.5 h-3.5" />{t('تسجيل جهاز')}</Button>}>
       <Refused error={terms.error} />
       <div className="flex flex-wrap gap-1 mb-3 text-xs items-center">
@@ -149,18 +168,17 @@ function TerminalsCard() {
         {(['CASH', 'FLOOR', 'KDS', 'ADMIN'] as const).map((k) => <Pill key={k} tone={kinds.has(k) ? 'success' : 'neutral'}>{kinds.has(k) ? '✓ ' : ''}{terminalKindLabel(k)}</Pill>)}
         <span className="text-dim">{t('— جهاز الكاشير بس اللي عليه درج.')}</span>
       </div>
-      <Table head={[t('الكود'), t('الاسم'), t('الفرع'), t('النوع'), t('درج'), t('الحالة'), t('وردية مفتوحة'), '']}
+      <Table head={[t('الجهاز'), t('الفرع'), t('النوع'), t('درج فلوس'), t('الحالة'), t('وردية'), '']} align={[undefined, undefined, undefined, undefined, undefined, undefined, 'end']} loading={terms.loading && !terms.data}
         rows={terms.items.map((x) => [
-          <span className="num font-bold">{x.code}</span>,
-          <span>{x.name}{terminal?.id === x.id && <Pill tone="primary" className="ms-1">{t('الجهاز ده')}</Pill>}</span>,
-          <span className="num">{bName(x.branchId)}</span>,
+          <div className="min-w-0"><div className="font-bold flex items-center gap-1.5 flex-wrap">{deviceName(x.code, x.kind, x.name)}{terminal?.id === x.id && <Pill tone="primary">{t('الجهاز ده')}</Pill>}</div><Tech><div className="num text-[11px] text-dim">{x.code} · {x.name}</div></Tech></div>,
+          <span>{bName(x.branchId)}</span>,
           terminalKindLabel(x.kind),
           x.drawer ? <Pill tone="success">{t('بدرج')}</Pill> : <span className="text-dim">—</span>,
-          x.lifecycle === 'ACTIVE' ? <Pill tone="success">ACTIVE</Pill> : <Pill tone="neutral">DECOMMISSIONED</Pill>,
-          x.openSession ? <span className="num text-xs">{x.openSession}</span> : <span className="text-dim">—</span>,
+          x.lifecycle === 'ACTIVE' ? <Pill tone="success" dot>{t('شغال')}</Pill> : <Pill tone="neutral" dot>{t('متوقف نهائي')}</Pill>,
+          x.openSession ? <Pill tone="info">{t('مفتوحة')}<Tech> <span className="num">{x.openSession}</span></Tech></Pill> : <span className="text-dim">—</span>,
           x.lifecycle === 'ACTIVE' ? <Button size="sm" variant="danger" data-fb={`org:terminal-decommission:${x.code}`} disabled={!permDec.ok} title={permDec.title} onClick={() => setDec(x)}><Power className="w-3.5 h-3.5" />{t('إيقاف نهائي')}</Button> : null,
         ])}
-        empty={t('مفيش أجهزة متسجلة')} />
+        empty={<EmptyState compact icon={<MonitorSmartphone />} title={t('مفيش أجهزة متسجلة')} text={t('سجّل جهاز كاشير وتابلت وشاشة مطبخ وكمبيوتر إدارة.')} />} />
       {open && <TerminalModal branches={branches.items} onClose={() => setOpen(false)} />}
       {dec && <DecommissionModal term={dec} self={terminal?.id === dec.id} onClose={() => setDec(null)} />}
     </Card>
@@ -182,15 +200,15 @@ function TerminalModal({ branches, onClose }: { branches: any[]; onClose: () => 
     <Modal open onClose={onClose} title={t('تسجيل جهاز')} badge={<StateBadge ops={['Terminal.Register']} />}
       footer={<><Button variant="ghost" onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" loading={busy} disabled={!code.trim() || !name.trim() || !branchId} onClick={save} data-fb="org:terminal-save">{t('تسجيل')}</Button></>}>
       <div className="grid grid-cols-2 gap-3">
-        <Field label={t('الكود')} hint={t('فريد؛ تكراره بيرجع TERMINAL_CODE_TAKEN')}><Input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} dir="ltr" data-fb="org:terminal-code" /></Field>
-        <Field label={t('الاسم')}><Input value={name} onChange={(e) => setName(e.target.value)} data-fb="org:terminal-name" /></Field>
-        <Field label={t('الفرع')} className="col-span-2"><Select value={branchId} onChange={(e) => setBranchId(e.target.value)} options={branches.map((b) => ({ value: b.id, label: `${b.code} · ${b.name}${b.active ? '' : ' — ' + t('موقوف')}` }))} /></Field>
-        <Field label={<span className="flex items-center gap-2">{t('النوع')}<StateBadge state="PROPOSED" /></span>}>
-          <Select value={kind} onChange={(e) => { const k = e.target.value as any; setKind(k); setDrawer(k === 'CASH'); }} options={(['CASH', 'FLOOR', 'KDS', 'ADMIN'] as const).map((k) => ({ value: k, label: `${terminalKindLabel(k)} (${k})` }))} data-fb="org:terminal-kind" />
+        <Field label={t('الكود')} required hint={t('حروف إنجليزي قصيرة ومينفعش تتكرر، مثلًا: CASH-2')}><Input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} dir="ltr" data-fb="org:terminal-code" /></Field>
+        <Field label={t('اسم الجهاز')} required hint={t('مثلًا: كاشير التيك أواي')}><Input value={name} onChange={(e) => setName(e.target.value)} data-fb="org:terminal-name" /></Field>
+        <Field label={t('الفرع')} className="col-span-2"><Select value={branchId} onChange={(e) => setBranchId(e.target.value)} options={branches.map((b) => ({ value: b.id, label: `${branchLabel(b)}${b.active ? '' : ' — ' + t('موقوف')}` }))} /></Field>
+        <Field label={<span className="flex items-center gap-2">{t('نوع الجهاز')}<Tech><StateBadge state="PROPOSED" /></Tech></span>}>
+          <Select value={kind} onChange={(e) => { const k = e.target.value as any; setKind(k); setDrawer(k === 'CASH'); }} options={(['CASH', 'FLOOR', 'KDS', 'ADMIN'] as const).map((k) => ({ value: k, label: terminalKindLabel(k) }))} data-fb="org:terminal-kind" />
         </Field>
-        <Field label={<span className="flex items-center gap-2">{t('عليه درج فلوس')}<StateBadge state="PROPOSED" /></span>}><Switch checked={drawer} onChange={setDrawer} label={drawer ? t('أيوه') : t('لأ')} /></Field>
+        <Field label={<span className="flex items-center gap-2">{t('عليه درج فلوس')}<Tech><StateBadge state="PROPOSED" /></Tech></span>} hint={t('جهاز الكاشير بس اللي عليه درج')}><Switch checked={drawer} onChange={setDrawer} label={drawer ? t('أيوه') : t('لأ')} /></Field>
       </div>
-      <div className="text-[11px] text-dim mt-3">{t('Terminal.Register في العقد فيه الكود والاسم والفرع بس. النوع والدرج إضافة مقترحة عشان النموذج يعرف شكل الجهاز (PROTOTYPE_GAPS).')}</div>
+      <Tech><div className="text-[11px] text-dim mt-3">{t('Terminal.Register في العقد فيه الكود والاسم والفرع بس. النوع والدرج إضافة مقترحة عشان النموذج يعرف شكل الجهاز (PROTOTYPE_GAPS).')}</div></Tech>
     </Modal>
   );
 }
@@ -203,10 +221,10 @@ function DecommissionModal({ term, self, onClose }: { term: any; self: boolean; 
     if (r) onClose();
   };
   return (
-    <Modal open onClose={onClose} title={t('إيقاف الجهاز {c} نهائي', { c: term.code })} badge={<StateBadge ops={['Terminal.Decommission']} />}
+    <Modal open onClose={onClose} title={t('إيقاف «{c}» نهائي', { c: deviceName(term.code, term.kind, term.name) })} badge={<StateBadge ops={['Terminal.Decommission']} />}
       footer={<><Button variant="ghost" onClick={onClose}>{t('إلغاء')}</Button><Button variant="danger" loading={busy} disabled={!reason.trim()} onClick={save} data-fb="org:terminal-decommission-confirm">{t('إيقاف نهائي')}</Button></>}>
       <div className="space-y-3">
-        <Banner tone="warning">{t('الإيقاف نهائي: أي طلب من الجهاز ده بعد كده بيرجع TERMINAL_NOT_ACTIVE، وشريحته هتختفي من فوق.')}</Banner>
+        <Banner tone="warning">{t('الإيقاف نهائي: الجهاز ده مش هيقدر يعمل أي حركة بعد كده، وهيختفي من شريط الأجهزة فوق.')}<Tech> TERMINAL_NOT_ACTIVE</Tech></Banner>
         {self && <Banner tone="error">{t('ده الجهاز اللي إنت شغال عليه دلوقتي.')}</Banner>}
         {term.openSession && <Banner tone="warning">{t('عليه وردية مفتوحة — اقفلها الأول.')}</Banner>}
         <Field label={t('السبب (إجباري)')}><Textarea value={reason} onChange={(e) => setReason(e.target.value)} data-fb="org:terminal-decommission-reason" /></Field>
@@ -224,40 +242,46 @@ function ProvisioningCard() {
   const applied = (eff.data?.rows ?? []).some((r: any) => String(r.source ?? '').startsWith('EG.profile')) || hist.items.some((h) => h.via === 'PROFILE');
   const apply = () => {
     demo.applyEgProfile();
-    toast('success', t('اتطبق بروفايل مصر (EG.profile 1.4.0) على النشاط كله'), 'settings.ApplyMarketProfile · internal');
+    toast('success', t('اتطبقت إعدادات السوق المصري على المطعم كله'), 'settings.ApplyMarketProfile · internal');
     setConfirmAgain(false);
   };
+  const ownerTitle: Record<string, string> = { 'EG-VAT': 'ضريبة القيمة المضافة 14%', 'EG-BRANCH-CALENDAR': 'توقيت الفرع وبداية اليوم (4 الفجر)', 'EG-CURRENCY-RECEIPT': 'العملة (جنيه مصري) وبيانات الإيصال', 'EG-REASON-CODES': 'أسباب الإلغاء والخصم والمرتجع الجاهزة' };
+  const ownerScreen: Record<string, string> = { 'EG-VAT': 'شاشة الضرايب', 'EG-BRANCH-CALENDAR': 'الفروع (فوق)', 'EG-CURRENCY-RECEIPT': 'بيانات المطعم (فوق)', 'EG-REASON-CODES': 'الإعدادات والأسباب' };
   return (
-    <Card className="border-[rgba(168,85,247,.4)]" title={<span className="flex items-center gap-2"><Wrench className="w-4 h-4 text-[#c084fc]" />{t('تجهيز (داخلي)')} <span className="num text-xs text-dim font-normal">settings.ApplyMarketProfile</span></span>}
-      badge={<Pill tone="violet">{t('أداة تجهيز داخلية — مش endpoint في العقد')}</Pill>}
-      actions={<Button size="sm" variant="primary" data-fb="org:apply-eg-profile" disabled={!can('*') && !can('settings:updatepolicy')} onClick={() => (applied ? setConfirmAgain(true) : apply())}>{t('طبّق بروفايل مصر')}</Button>}>
-      <div className="space-y-3">
-        <div className="text-sm text-soft">{t('فريق التركيب بيطبق ملف السوق المصري مرة واحدة على نشاط فاضي (من غير HTTP ومن غير موافقة)، وبعدها يراجع كل قيمة مع صاحب المطعم. بعد كده أي تغيير بيعدي من شاشة الإعدادات بموافقة.')}</div>
-        {applied && <Banner tone="info">{t('البروفايل متطبق بالفعل. في النظام الحقيقي التطبيق التاني بيترفض بـ SETTINGS_PROFILE_ALREADY_APPLIED.')}</Banner>}
+    <Card className="border-[rgba(168,85,247,.4)]" title={<span className="flex items-center gap-2"><Wrench className="w-4 h-4 text-[#c084fc]" />{t('إعدادات السوق المصري — أداة فريق التركيب')}<Tech><span className="num text-xs text-dim font-normal">settings.ApplyMarketProfile</span></Tech></span>}
+      description={t('فريق التركيب بيطبقها مرة واحدة على مطعم جديد، وبعدها يراجع كل قيمة مع صاحب المطعم. أي تغيير بعد كده بيتعمل من شاشة الإعدادات.')}
+      badge={<Pill tone="violet">{t('أداة داخلية')}</Pill>}
+      actions={<Button size="sm" variant="primary" data-fb="org:apply-eg-profile" disabled={!can('*') && !can('settings:updatepolicy')} onClick={() => (applied ? setConfirmAgain(true) : apply())}>{t('طبّق إعدادات مصر')}</Button>}>
+      <div className="space-y-4">
+        {applied && <Banner tone="success">{t('الإعدادات دي متطبقة بالفعل على المطعم.')}<Tech> {t('في النظام الحقيقي التطبيق التاني بيترفض بـ SETTINGS_PROFILE_ALREADY_APPLIED.')}</Tech></Banner>}
         {confirmAgain && (
-          <Banner tone="warning" action={<div className="flex gap-1"><Button size="sm" variant="ghost" onClick={() => setConfirmAgain(false)}>{t('إلغاء')}</Button><Button size="sm" variant="warning" onClick={apply} data-fb="org:apply-eg-profile-again">{t('طبّقه تاني (عرض)')}</Button></div>}>
-            <div className="font-bold">SETTINGS_PROFILE_ALREADY_APPLIED</div>
-            <div className="text-xs">{t('للعرض بس: تقدر ترجّع قيم البروفايل تاني فوق التعديلات اللي اتعملت.')}</div>
+          <Banner tone="warning" action={<div className="flex gap-1"><Button size="sm" variant="ghost" onClick={() => setConfirmAgain(false)}>{t('إلغاء')}</Button><Button size="sm" variant="warning" onClick={apply} data-fb="org:apply-eg-profile-again">{t('طبّقها تاني (للعرض)')}</Button></div>}>
+            <div className="font-bold">{t('الإعدادات متطبقة قبل كده')}<Tech> SETTINGS_PROFILE_ALREADY_APPLIED</Tech></div>
+            <div className="text-xs">{t('للعرض بس: تقدر ترجّع القيم الأصلية تاني فوق التعديلات اللي اتعملت.')}</div>
           </Banner>
         )}
-        <Table head={[t('السياسة'), t('النطاق'), t('القيمة'), t('النوع'), t('الثقة'), t('المراجع'), t('سؤال للخبير')]}
-          rows={egProfile.values.map((v) => [
-            <span className="num text-xs font-bold">{v.policyId}</span>, <span className="num text-xs">{v.scope}</span>,
-            <span className="num text-[11px] break-all max-w-[260px] inline-block">{show(v.value)}</span>, <span className="num text-[11px]">{v.label}</span>,
-            <Pill tone={v.confidence === 'HIGH' ? 'success' : v.confidence === 'MEDIUM' ? 'warning' : 'error'}>{v.confidence}</Pill>, <span className="num text-[11px]">{v.reviewer}</span>,
-            <span className="text-xs">{v.expertQuestion}</span>,
-          ])} />
+        <Table dense maxHeight={460} head={[t('الإعداد'), t('القيمة في مصر'), t('مين يأكدها'), t('سؤال للخبير')]}
+          rows={egProfile.values.map((v) => {
+            const meta = policyMeta.get(v.policyId);
+            const q = meta ? policyQuestion(meta) : undefined;
+            return [
+              <div className="min-w-0"><div className="font-bold text-sm">{meta ? policyTitle(meta) : v.policyId}</div><Tech><div className="num text-[10px] text-dim">{v.policyId} · {v.scope}</div></Tech></div>,
+              <div className="text-xs leading-relaxed max-w-[340px]">{meta ? valueSummary(meta, v.value) : show(v.value)}<Tech><div className="num text-[10px] text-dim break-all" dir="ltr">{show(v.value)}</div></Tech></div>,
+              <span className="text-xs">{confidenceText(v.confidence, v.reviewer)}</span>,
+              <span className="text-xs text-dim">{q ?? '—'}<Tech><span className="block" dir="ltr">{v.expertQuestion}</span></Tech></span>,
+            ];
+          })} />
         <div className="grid md:grid-cols-2 gap-3">
           <div>
-            <div className="text-xs font-bold text-soft mb-1">{t('بيانات صاحب المطعم (بتتعمل من شاشاتها)')}</div>
-            <div className="space-y-1">{egProfile.owner_data.map((d) => <div key={d.id} className="text-xs rounded-lg surface-1 px-2 py-1"><span className="num font-bold">{d.id}</span> · <span className="num text-dim">{d.operation}</span> <Pill tone={d.confidence === 'HIGH' ? 'success' : 'warning'}>{d.confidence}</Pill><div className="text-dim">{d.expertQuestion}</div></div>)}</div>
+            <div className="text-xs font-bold text-soft mb-1.5">{t('بيانات بيدخلها صاحب المطعم من شاشاتها')}</div>
+            <div className="space-y-1.5">{egProfile.owner_data.map((d) => <div key={d.id} className="text-xs rounded-lg surface-1 border line px-3 py-2"><div className="font-bold">{t(ownerTitle[d.id] ?? d.id)}</div><div className="text-dim">{t('من: {s}', { s: t(ownerScreen[d.id] ?? '—') })} · {confidenceText(d.confidence)}</div><Tech><div className="num text-[10px] text-dim" dir="ltr">{d.id} · {d.operation} · {d.expertQuestion}</div></Tech></div>)}</div>
           </div>
           <div>
-            <div className="text-xs font-bold text-soft mb-1">{t('قيم مستنية رد الخبير')}</div>
-            <div className="space-y-1">{egProfile.pending.map((d, i) => <div key={d.policyId + i} className="text-xs rounded-lg surface-1 px-2 py-1"><span className="num font-bold">{d.policyId}</span> · <span className="text-dim">{d.awaiting}</span> <Pill tone="warning">{d.confidence}</Pill><div className="text-dim">{d.expertQuestion}</div></div>)}</div>
+            <div className="text-xs font-bold text-soft mb-1.5">{t('قيم لسه مستنية رأي الخبير')}</div>
+            <div className="space-y-1.5">{egProfile.pending.map((d, i) => { const meta = policyMeta.get(d.policyId); return <div key={d.policyId + i} className="text-xs rounded-lg surface-1 border line px-3 py-2"><div className="font-bold">{meta ? policyTitle(meta) : d.policyId}</div><div className="text-dim">{meta && d.policyId !== 'ApprovalRequirementPolicy' ? valueSummary(meta, d.value) : t('قواعد موافقة إضافية')} · {confidenceText(d.confidence)}</div><Tech><div className="num text-[10px] text-dim" dir="ltr">{d.policyId} · {d.awaiting} · {d.expertQuestion}</div></Tech></div>; })}</div>
           </div>
         </div>
-        <div className="text-[11px] text-dim">{t('المصدر: rules/EG.profile.json')}</div>
+        <Tech><div className="text-[11px] text-dim">{t('المصدر: rules/EG.profile.json')}</div></Tech>
       </div>
     </Card>
   );

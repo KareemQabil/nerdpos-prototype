@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Plus, Pencil, Truck, Phone, ShoppingBag, Save, Eye } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
-import { Button, Card, Empty, Field, Input, KV, Modal, Money, Pill, Section, Spinner, StateBadge, Switch, Table, Tabs, Textarea } from '../../ui';
+import { Button, Card, Empty, Field, Input, KV, Modal, Drawer, Money, Pill, Section, Spinner, StateBadge, Switch, Table, Tabs, Textarea } from '../../ui';
 import { t, L } from '../../i18n';
 import { dateTime } from '../../lib/format';
 import { PO_STATE, StatePill, newKey, unitLabel, useList, Inp } from './common';
@@ -56,7 +56,7 @@ function SupplierForm({ s, onClose }: { s: any; onClose: () => void }) {
     if (r) onClose();
   };
   return (
-    <Modal open onClose={onClose} wide title={s.id ? t('تعديل مورد') : t('مورد جديد')} badge={<StateBadge ops={['Supplier.Upsert']} />}
+    <Drawer width="lg" open onClose={onClose} title={s.id ? t('تعديل مورد') : t('مورد جديد')} badge={<StateBadge ops={['Supplier.Upsert']} />}
       footer={<><Button onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" data-fb="supplier-form:save" loading={busy} disabled={!d.name.trim()} onClick={save}><Save className="w-4 h-4" />{t('حفظ')}</Button></>}>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label={t('اسم المورد')}><Input data-fb="supplier-form:name" value={d.name} onChange={(e) => setD({ ...d, name: e.target.value })} /></Field>
@@ -68,7 +68,7 @@ function SupplierForm({ s, onClose }: { s: any; onClose: () => void }) {
         <Field label={t('ملاحظات')} className="sm:col-span-2"><Textarea value={d.notes} onChange={(e) => setD({ ...d, notes: e.target.value })} /></Field>
         <Switch checked={d.active} onChange={(v) => setD({ ...d, active: v })} label={t('المورد شغال')} />
       </div>
-    </Modal>
+    </Drawer>
   );
 }
 
@@ -77,7 +77,7 @@ function SupplierView({ id, onClose }: { id: string | null; onClose: () => void 
   const [tab, setTab] = useState<'po' | 'gr' | 'ret' | 'items'>('po');
   const s = q.data;
   return (
-    <Modal open={!!id} onClose={onClose} xwide title={s?.name ?? t('مورد')} badge={<StateBadge ops={['Supplier.Get']} />}>
+    <Drawer width="xl" open={!!id} onClose={onClose} title={s?.name ?? t('مورد')} badge={<StateBadge ops={['Supplier.Get']} />}>
       {!s ? <Spinner /> : (
         <div className="space-y-3">
           <Tabs value={tab} onChange={setTab} tabs={[{ id: 'po', label: t('أوامر الشراء ({n})', { n: s.purchaseOrders.length }) }, { id: 'gr', label: t('الاستلامات ({n})', { n: s.receipts.length }) }, { id: 'ret', label: t('المرتجعات ({n})', { n: s.returns.length }) }, { id: 'items', label: t('الأصناف ({n})', { n: s.items.length }) }]} />
@@ -87,6 +87,6 @@ function SupplierView({ id, onClose }: { id: string | null; onClose: () => void 
           {tab === 'items' && <Table empty={t('مفيش أصناف مربوطة بالمورد ده')} head={[t('الصنف'), t('عبوة الشراء'), t('متوسط التكلفة')]} rows={s.items.map((i: any) => [<span className="font-bold">{L(i.name)}</span>, i.packs?.length ? L((i.packs.find((p: any) => p.id === i.purchasePackId) ?? i.packs[0]).name) : unitLabel(i.unit), <Money v={i.avgCost} className="text-xs" />])} />}
         </div>
       )}
-    </Modal>
+    </Drawer>
   );
 }

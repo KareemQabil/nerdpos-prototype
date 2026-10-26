@@ -7,7 +7,7 @@ import { Package, Search, AlertTriangle, PackageX, Clock, Eye, EyeOff, Layers, P
 import { useDev, useQuery } from '../../app/hooks';
 import { call, ApiFailure } from '../../api/client';
 import { clock } from '../../mock/clock';
-import { Pill, Spinner, StateBadge, Input, Modal, Button } from '../../ui';
+import { Pill, StateBadge, Input, Modal, Button, EmptyState, Skeleton } from '../../ui';
 import { Tech } from '../../app/tech';
 import { t, L } from '../../i18n';
 import { cn, money } from '../../lib/format';
@@ -119,15 +119,15 @@ export function MenuGrid({ channel, onPick, disabled }: { channel: string; onPic
   const nextUp = (overview.data?.dayparts ?? []).filter((d: any) => !d.runningNow && d.active && d.nextStart).sort((a: any, b: any) => a.nextStart.localeCompare(b.nextStart))[0];
   return (
     <div className="flex flex-col gap-3 min-h-0 h-full">
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1"><Search className="w-4 h-4 absolute top-3 start-3 text-dim" /><Input data-fb="menu-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('دوّر على صنف أو كود…')} className="ps-9" /></div>
-        <button data-fb="menu:soldout-board" onClick={() => setBoard(true)} title={t('خلص النهارده')} className={cn('shrink-0 h-10 px-3 rounded-lg border text-sm inline-flex items-center gap-1.5', soldOutCount ? 'border-[color-mix(in_srgb,var(--error)_45%,transparent)] text-[var(--error)] bg-[color-mix(in_srgb,var(--error)_10%,transparent)]' : 'border-[var(--glass-border)] text-soft surface-1')}>
+      <div className="flex items-center gap-2 shrink-0">
+        <div className="relative flex-1"><Search className="w-4 h-4 absolute top-1/2 -translate-y-1/2 start-3 text-dim" /><Input data-fb="menu-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('دوّر على صنف أو كود…')} className="ps-9 h-11" /></div>
+        <button data-fb="menu:soldout-board" onClick={() => setBoard(true)} title={t('خلص النهارده')} className={cn('shrink-0 h-11 px-3 rounded-xl border text-sm inline-flex items-center gap-1.5', soldOutCount ? 'border-[color-mix(in_srgb,var(--error)_45%,transparent)] text-[var(--error)] bg-[color-mix(in_srgb,var(--error)_10%,transparent)]' : 'border-[var(--glass-border)] text-soft surface-1')}>
           <PackageX className="w-4 h-4" /><span className="hidden sm:inline">{t('خلص النهارده')}</span>{soldOutCount > 0 && <span className="num text-xs font-bold">{soldOutCount}</span>}
         </button>
         <StateBadge ops={['Category.List', 'Catalog.Search', 'ModifierGroup.List', 'Pricing.QuoteItem', 'Menu.Overview']} />
       </div>
       {(running.length > 0 || offMenu.length > 0) && (
-        <div className="flex items-center gap-2 flex-wrap text-xs" data-fb="menu:daypart">
+        <div className="flex items-center gap-2 flex-wrap text-xs shrink-0" data-fb="menu:daypart">
           <Clock className="w-3.5 h-3.5 text-dim" />
           {running.map((d: any) => <span key={d.id} className="px-2 py-0.5 rounded-full font-bold" style={{ background: (d.color ?? '#22d3ee') + '26', color: d.color ?? 'var(--primary)' }}>{t('دلوقتي')}: {L(d.name)} <span className="num font-normal">{d.start}–{d.end}</span></span>)}
           {nextUp && <span className="text-dim">{t('بعدها')}: {L(nextUp.name)} <span className="num">{timeText(nextUp.nextStart)}</span></span>}
@@ -139,14 +139,14 @@ export function MenuGrid({ channel, onPick, disabled }: { channel: string; onPic
           )}
         </div>
       )}
-      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide" data-fb="category-rail">
+      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide shrink-0" data-fb="category-rail">
         <CatPill on={!cat} onClick={() => setCat(null)} label={t('الكل')} count={listed.length} />
         {catsShown.map((c: any) => <CatPill key={c.id} on={cat === c.id} onClick={() => setCat(c.id)} label={L(c.name)} count={listed.filter((p) => p.categoryId === c.id).length} proposed={c.id === 'cat_direction'} />)}
       </div>
-      {(products.loading || cats.loading) && !items.length ? <Spinner /> : visible.length === 0 ? (
-        <div className="text-center text-dim text-sm py-10">{q ? t('مفيش صنف بالاسم ده في المنيو دلوقتي') : t('مفيش أصناف في المنيو دلوقتي للقناة دي')}</div>
+      {(products.loading || cats.loading) && !items.length ? <div className="grid gap-2.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(132px, 1fr))' }}>{Array.from({ length: 10 }, (_, i) => <Skeleton key={i} className="h-40 rounded-xl" />)}</div> : visible.length === 0 ? (
+        <EmptyState compact icon={<Search />} title={q ? t('مفيش صنف بالاسم ده') : t('مفيش أصناف في المنيو دلوقتي')} text={q ? t('جرّب جزء من الاسم أو الكود.') : t('المنيو الشغالة دلوقتي مفيهاش أصناف للنوع ده من الطلبات.')} action={q ? <Button size="sm" onClick={() => setQ('')}>{t('امسح البحث')}</Button> : undefined} />
       ) : (
-        <div className="grid gap-3 overflow-y-auto pe-1 pb-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gridAutoRows: 'max-content', alignContent: 'start' }}>
+        <div className="grid gap-2.5 overflow-y-auto pe-1 pb-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(132px, 1fr))', gridAutoRows: 'max-content', alignContent: 'start' }}>
           {visible.map((p) => <Tile key={p.id} p={p} quote={quoteOf(p.id)} onPick={() => onPick(p)} disabled={disabled} />)}
         </div>
       )}
@@ -161,10 +161,10 @@ export function MenuGrid({ channel, onPick, disabled }: { channel: string; onPic
 
 function CatPill({ on, onClick, label, count, proposed }: { on: boolean; onClick: () => void; label: string; count: number; proposed?: boolean }) {
   return (
-    <button onClick={onClick} className={cn('shrink-0 px-4 py-2 rounded-lg text-sm border flex items-center gap-2 transition-all', on ? 'bg-gradient-to-r from-cyan-400 to-cyan-500 text-slate-900 font-bold border-transparent shadow-[0_0_20px_rgba(34,211,238,0.3)]' : 'bg-white/[0.05] text-soft border-white/[0.15] hover:bg-white/[0.08]')}>
+    <button onClick={onClick} className={cn('shrink-0 px-4 h-11 rounded-xl text-sm border flex items-center gap-2 transition-all', on ? 'bg-[var(--primary)] text-[var(--primary-foreground)] font-bold border-transparent shadow-[0_4px_16px_-6px_var(--primary-glow)]' : 'surface-1 text-soft border-[var(--glass-border)] hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]')}>
       <span>{label}</span>
-      <span className={cn('text-xs px-1.5 rounded-full', on ? 'bg-slate-900/20' : 'bg-white/10 text-dim')}>{count}</span>
-      {proposed && <span className="text-[9px] px-1 rounded bg-purple-500/30 text-purple-200">{t('مقترح')}</span>}
+      <span className={cn('text-xs px-1.5 rounded-full', on ? 'bg-black/15' : 'surface-3 text-dim')}>{count}</span>
+      {proposed && <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--violet)' }} title={t('مقترح')} />}
     </button>
   );
 }
@@ -181,9 +181,9 @@ function Tile({ p, quote, onPick, disabled }: { p: any; quote?: QuoteState; onPi
   const reason = off ? p.menuNow.reasonAr : soldOut ? (p.availability?.reason ?? t('خلص النهارده')) : err?.details?.reasonAr ?? p.availability?.reason ?? '';
   return (
     <button data-fb={`tile:${p.sku}`} disabled={disabled || blocked} onClick={onPick} title={reason}
-      className={cn('relative overflow-hidden rounded-xl bg-white/[0.06] border border-white/[0.12] flex flex-col text-start transition-all hover:bg-white/[0.1] hover:border-cyan-400/40 hover:shadow-[0_0_30px_rgba(34,211,238,0.15)] active:scale-[.97]', blocked && 'opacity-55 cursor-not-allowed hover:border-white/[0.12] hover:shadow-none')}>
-      <div className="relative aspect-[4/3] w-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${p.colorCode ?? '#334155'}33, #0f172a88)` }}>
-        {p.imageUrl ? <img src={p.imageUrl} alt="" className={cn('w-full h-full object-cover', (soldOut || off) && 'grayscale')} /> : <Package className="w-10 h-10 text-white/25" />}
+      className={cn('relative overflow-hidden rounded-xl bg-[var(--card-raised)] border border-[var(--glass-border)] flex flex-col text-start transition-all hover:border-[color-mix(in_srgb,var(--primary)_55%,transparent)] hover:shadow-[0_6px_24px_-10px_var(--primary-glow)] active:scale-[.96]', blocked && 'opacity-55 cursor-not-allowed hover:border-[var(--glass-border)] hover:shadow-none')}>
+      <div className="relative aspect-[4/3] w-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${p.colorCode ?? '#64748b'}40, var(--surface-2))` }}>
+        {p.imageUrl ? <img src={p.imageUrl} alt="" className={cn('w-full h-full object-cover', (soldOut || off) && 'grayscale')} /> : <Package className="w-10 h-10 text-dim opacity-60" />}
         <div className="absolute top-2 end-2 flex flex-col gap-1 items-end">
           {soldOut && <Pill tone="error">{t('خلص')}</Pill>}
           {!soldOut && unavailable && <Pill tone="error">{st === 'BLOCKED' ? t('متوقف') : t('غير متاح')}</Pill>}
@@ -201,8 +201,7 @@ function Tile({ p, quote, onPick, disabled }: { p: any; quote?: QuoteState; onPi
       </div>
       <div className="p-2.5 flex flex-col gap-0.5">
         <div className="font-bold text-sm leading-tight truncate">{L(p.name)}</div>
-        <div className="text-[10px] text-dim truncate" dir="ltr">{p.name.en}</div>
-        <span className="num text-[var(--primary)] font-bold text-sm">{d ? money(d.display?.unitTotal ?? d.unitTotal) : quote || off ? '—' : '…'}</span>
+                <span className="num text-[var(--primary)] font-extrabold text-[15px]" style={{ textAlign: 'start' }}>{d ? money(d.display?.unitTotal ?? d.unitTotal) : quote || off ? '—' : '…'}</span>
         {d?.display?.taxIncluded && <span className="text-[9px] text-dim leading-none">{L(d.display.label)}</span>}
         {p.calories != null && <div className="text-[9px] text-dim num">{p.calories} {t('سعر حراري')}</div>}
         <Tech>{d && <div className="text-[9px] text-dim num" dir="ltr">{d.priceRuleId} · {d.unitTotal}</div>}</Tech>

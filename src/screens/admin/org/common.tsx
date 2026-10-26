@@ -6,6 +6,8 @@ import { useDev, useQuery, useApprovals, useUnknowns } from '../../../app/hooks'
 import { Banner, Pill, Modal as UiModal } from '../../../ui';
 import { t } from '../../../i18n';
 import { APPROVAL_ACTIONS } from '../../../mock/policyRegistry';
+import { Tech } from '../../../app/tech';
+import { ruleSentence, actionTitle } from '../../../demo/policyText';
 
 /** The UI-kit modal rendered into document.body: a .glass ancestor (backdrop-filter) would otherwise become the
  *  containing block of its position:fixed overlay and clip it inside the card. Context still flows through the portal. */
@@ -40,13 +42,7 @@ export function setPath(o: any, path: string, v: any) {
 
 /** Human text of an approval rule {mode, field, threshold}. */
 export function ruleText(rule: any): string {
-  if (!rule) return '—';
-  if (rule.mode === 'ALWAYS') return t('دايمًا');
-  if (rule.mode === 'NEVER') return t('أبدًا (من غير موافقة)');
-  if (rule.mode === 'ABOVE_THRESHOLD') return `${rule.field} > ${rule.threshold}`;
-  if (rule.mode === 'WHEN_TRUE') return `${rule.field} = true`;
-  if (rule.mode === 'ANY_OF') return (rule.rules ?? []).map(ruleText).join(t(' أو '));
-  return String(rule.mode);
+  return ruleSentence('', rule);
 }
 
 /** The approval rule currently in force for one action (Settings.Effective ApprovalRequirementPolicy). */
@@ -62,20 +58,20 @@ export function useApprovalRule(action: string) {
 export function RulePill({ action }: { action: string }) {
   const { rule } = useApprovalRule(action);
   const needs = rule && rule.mode !== 'NEVER';
-  return <Pill tone={needs ? 'warning' : 'neutral'} title={`ApprovalRequirementPolicy[${action}]`}><span className="num">{action}</span>: {ruleText(rule)}</Pill>;
+  return <Pill tone={needs ? 'warning' : 'neutral'} title={ruleText(rule)}>{actionTitle(action)}: {ruleText(rule)}<Tech><span className="num opacity-70">{action}</span></Tech></Pill>;
 }
 
 /** A refused read (usually PERMISSION_DENIED) shown in place of the content. */
 export function Refused({ error }: { error: any }) {
   if (!error) return null;
-  return <Banner tone="warning"><span className="flex items-center gap-1"><Lock className="w-3.5 h-3.5" />{t('مش متاح للمستخدم ده')}</span> <span className="num text-xs text-dim">{error.code}{error.details?.required ? ` · ${error.details.required}` : ''}</span></Banner>;
+  return <Banner tone="warning"><span className="flex items-center gap-1"><Lock className="w-3.5 h-3.5" />{t('الحساب ده مش مسموح له يشوف الجزء ده. ادخل بحساب مدير أو صاحب المطعم.')}</span><Tech> <span className="num text-xs text-dim">{error.code}{error.details?.required ? ` · ${error.details.required}` : ''}</span></Tech></Banner>;
 }
 
 /** Permission check with a visible reason on disabled buttons. */
 export function usePerm(p: string) {
   const { can } = useDev();
   const ok = can(p);
-  return { ok, title: ok ? undefined : t('محتاج صلاحية {p}', { p }) };
+  return { ok, title: ok ? undefined : t('الحساب ده مش مسموح له يعمل الحركة دي') };
 }
 
 export const CHANNELS = ['DINE_IN', 'TAKEAWAY', 'DELIVERY'] as const;

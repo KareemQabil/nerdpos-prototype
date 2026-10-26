@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Plus, PackageCheck, Undo2, RotateCcw, Trash2, Save } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
-import { Banner, Button, Empty, Field, Input, KV, Modal, Money, Pill, Section, Select, Spinner, StateBadge, Table, Tabs, Textarea } from '../../ui';
+import { Banner, Button, Empty, Field, Input, KV, Modal, Drawer, Money, Pill, Section, Select, Spinner, StateBadge, Table, Tabs, Textarea } from '../../ui';
 import { t, L } from '../../i18n';
 import { dateTime, money } from '../../lib/format';
 import { BranchScope, ItemPicker, Qty, WarehouseSelect, fmtQty, unitLabel, useBranchScope, useItemsCatalog, useList, useWarehouses, Inp, Sel } from './common';
@@ -83,7 +83,7 @@ export function ReceiveDialog({ po, onClose, onDone }: { po?: any; onClose: () =
   };
   const valid = supplierId && wh && lines.some((l) => l.itemId && Number(l.quantity) > 0);
   return (
-    <Modal open onClose={onClose} xwide title={selPo ? t('استلام على أمر شراء {n}', { n: selPo.number }) : t('استلام بضاعة')} badge={<StateBadge ops={['GoodsReceipt.Post']} />}
+    <Drawer width="xl" open onClose={onClose} title={selPo ? t('استلام على أمر شراء {n}', { n: selPo.number }) : t('استلام بضاعة')} badge={<StateBadge ops={['GoodsReceipt.Post']} />}
       footer={<><span className="text-sm me-auto">{t('قيمة الإذن')}: <b className="num">{money(total.toFixed(4))}</b></span><Button onClick={onClose}>{t('إلغاء')}</Button><Button variant="success" data-fb="receive:post" loading={busy} disabled={!valid} onClick={post}><PackageCheck className="w-4 h-4" />{t('سجّل الاستلام')}</Button></>}>
       <div className="space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
@@ -111,7 +111,7 @@ export function ReceiveDialog({ po, onClose, onDone }: { po?: any; onClose: () =
         <Field label={t('ملاحظة')}><Input value={note} onChange={(e) => setNote(e.target.value)} /></Field>
         <Banner tone="info">{t('السعر بالعبوة اللي اخترتها. الأصناف اللي بتتابع صلاحيتها: لو ما كتبتش تاريخ، بيتحط حسب مدة الصلاحية المعتادة. استلام أكتر من المطلوب في الأمر بيترفض حسب الإعداد.')}</Banner>
       </div>
-    </Modal>
+    </Drawer>
   );
 }
 
@@ -123,7 +123,7 @@ function ReceiptView({ id, onClose }: { id: string | null; onClose: () => void }
   const [ret, setRet] = useState(false);
   if (!id) return null;
   return (
-    <Modal open onClose={onClose} xwide title={r ? <span className="flex items-center gap-2">{t('إذن استلام')} <span className="num">{r.number}</span> — {r.supplierName}</span> : t('إذن استلام')} badge={r ? <>{r.state === 'REVERSED' ? <Pill tone="error">{t('اتلغى')}</Pill> : <Pill tone="success">{t('متسجل')}</Pill>}<StateBadge ops={['GoodsReceipt.Get', 'GoodsReceipt.Reverse']} /></> : undefined}
+    <Drawer width="xl" open onClose={onClose} title={r ? <span className="flex items-center gap-2">{t('إذن استلام')} <span className="num">{r.number}</span> — {r.supplierName}</span> : t('إذن استلام')} badge={r ? <>{r.state === 'REVERSED' ? <Pill tone="error">{t('اتلغى')}</Pill> : <Pill tone="success">{t('متسجل')}</Pill>}<StateBadge ops={['GoodsReceipt.Get', 'GoodsReceipt.Reverse']} /></> : undefined}
       footer={r && r.state === 'POSTED' && <>
         <Button variant="danger" data-fb="receipt:reverse" onClick={() => setRev('')}><RotateCcw className="w-4 h-4" />{t('الغي الإذن ده')}</Button>
         <div className="flex-1" />
@@ -153,7 +153,7 @@ function ReceiptView({ id, onClose }: { id: string | null; onClose: () => void }
         </Modal>
       )}
       {ret && r && <SupplierReturnDialog receipt={r} onClose={() => setRet(false)} />}
-    </Modal>
+    </Drawer>
   );
 }
 
@@ -196,7 +196,7 @@ function SupplierReturnDialog({ receipt, onClose }: { receipt?: any; onClose: ()
     if (r) onClose();
   };
   return (
-    <Modal open onClose={onClose} xwide title={t('مرتجع للمورد')} badge={<StateBadge ops={['SupplierReturn.Post']} />}
+    <Drawer width="xl" open onClose={onClose} title={t('مرتجع للمورد')} badge={<StateBadge ops={['SupplierReturn.Post']} />}
       footer={<><span className="text-sm me-auto">{t('القيمة')}: <b className="num">{money(total.toFixed(4))}</b></span><Button onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" data-fb="supplier-return:save" loading={busy} disabled={!supplierId || !wh || !reason.trim() || !lines.some((l) => l.itemId && Number(l.quantity) > 0)} onClick={save}><Save className="w-4 h-4" />{t('سجّل المرتجع')}</Button></>}>
       <div className="space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -220,6 +220,6 @@ function SupplierReturnDialog({ receipt, onClose }: { receipt?: any; onClose: ()
         <Field label={t('السبب')}><Textarea data-fb="supplier-return:reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t('مثال: طماطم مفعوصة في القفص')} /></Field>
         <Banner tone="warning">{t('المرتجع بيخرج الكمية من المخزن بسعر الاستلام، وبيحتاج موافقة مدير.')}</Banner>
       </div>
-    </Modal>
+    </Drawer>
   );
 }

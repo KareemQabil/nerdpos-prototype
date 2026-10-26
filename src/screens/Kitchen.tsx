@@ -4,7 +4,7 @@
 import React, { useMemo, useState } from 'react';
 import { ChefHat, Clock, Play, Check, Truck, Undo2, AlertTriangle, Flame, RotateCcw, ArrowRightLeft, History, MoreVertical, LayoutList, ConciergeBell, Layers, CheckCircle2, Users } from 'lucide-react';
 import { useQuery, useCommand } from '../app/hooks';
-import { Section, StateBadge, Tabs, Pill, Button, Empty, useNow, Modal, Field, Select, Input, Banner } from '../ui';
+import { StateBadge, Tabs, Pill, Button, Empty, EmptyState, Skeleton, SegmentedControl, useNow, Modal, Field, Select, Input, Banner } from '../ui';
 import { t, L } from '../i18n';
 import { cn, qty, time } from '../lib/format';
 import { ALLERGEN_AR } from './order/MenuGrid';
@@ -16,10 +16,10 @@ const OPS = ['Kitchen.Board', 'Kitchen.AdvanceTicket', 'TicketItem.Bump', 'Ticke
 
 type Tone = 'ok' | 'warn' | 'late';
 const toneOf = (tk: any): Tone => (tk.late ? 'late' : tk.warn ? 'warn' : 'ok');
-const TONE: Record<Tone, { bar: string; pill: 'success' | 'warning' | 'error'; ring: string }> = {
-  ok: { bar: 'bg-emerald-500', pill: 'success', ring: 'border-transparent' },
-  warn: { bar: 'bg-amber-400', pill: 'warning', ring: 'border-amber-400/60' },
-  late: { bar: 'bg-red-500', pill: 'error', ring: 'border-red-500/70 animate-pulse-glow' },
+const TONE: Record<Tone, { color: string; pill: 'success' | 'warning' | 'error' }> = {
+  ok: { color: 'var(--success)', pill: 'success' },
+  warn: { color: 'var(--warning)', pill: 'warning' },
+  late: { color: 'var(--error)', pill: 'error' },
 };
 
 export default function Kitchen() {
@@ -35,46 +35,50 @@ export default function Kitchen() {
   const timing = board.data?.timing;
   const reasons = board.data?.refireReasons ?? {};
   const active = (stations.data?.items ?? []).filter((s: any) => s.active);
-  const cols: { id: string; title: string; tone: string }[] = [
-    { id: 'NEW', title: t('جديد'), tone: 'border-cyan-400/60' },
-    { id: 'IN_PROGRESS', title: t('بيتعمل'), tone: 'border-amber-400/60' },
-    { id: 'READY', title: t('جاهز للتسليم'), tone: 'border-emerald-400/60' },
-  ];
-  const late = tickets.filter((x) => x.late && x.state !== 'READY').length;
-  const rush = tickets.filter((x) => x.priority === 'RUSH' && x.state !== 'READY').length;
+  // cooking queue: rush first, then the oldest
+  const cooking = tickets.filter((x) => x.state !== 'READY').sort((a, b) => Number(b.priority === 'RUSH') - Number(a.priority === 'RUSH') || b.ageMinutes - a.ageMinutes);
+  const ready = tickets.filter((x) => x.state === 'READY').sort((a, b) => (b.readyMinutes ?? 0) - (a.readyMinutes ?? 0));
+  const late = cooking.filter((x) => x.late).length;
+  const rush = cooking.filter((x) => x.priority === 'RUSH').length;
+  const loading = board.loading && !board.data;
   return (
     <div data-screen="F1" className="h-full flex flex-col gap-3 min-h-0">
-      <Section title={t('شاشة المطبخ')} badge={<StateBadge ops={OPS} />}
-        sub={timing ? t('المستهدف {a} دقيقة · بتحمّر بعد {b} دقيقة', { a: timing.targetMinutes, b: timing.alertMinutes }) : ''}
-        actions={<>
-          <Tabs value={view} onChange={setView} tabs={[{ id: 'board', label: <span className="flex items-center gap-1.5"><LayoutList className="w-4 h-4" />{t('المحطات')}</span> }, { id: 'expo', label: <span className="flex items-center gap-1.5"><ConciergeBell className="w-4 h-4" />{t('الإكسبو (التسليم)')}</span> }]} />
-          <Button size="sm" variant={showAllDay ? 'outline' : 'ghost'} onClick={() => setShowAllDay(!showAllDay)} data-fb="kds-allday-toggle"><Layers className="w-4 h-4" />{t('المطلوب كله')}</Button>
-          <Button size="sm" variant="ghost" onClick={() => setRecall(true)} data-fb="kds-recall-open"><History className="w-4 h-4" />{t('اتسلّم مؤخراً')}</Button>
-        </>} />
+      <div className="flex items-center gap-3 flex-wrap shrink-0">
+        <h1 className="text-[22px] font-extrabold tracking-tight flex items-center gap-2"><ChefHat className="w-6 h-6 text-[var(--primary)]" />{t('شاشة المطبخ')}</h1>
+        <StateBadge ops={OPS} />
+        {timing && <span className="text-xs text-dim">{t('المستهدف {a} دقيقة · بتحمّر بعد {b} دقيقة', { a: timing.targetMinutes, b: timing.alertMinutes })}</span>}
+        <div className="flex-1" />
+        <SegmentedControl value={view} onChange={setView} options={[{ id: 'board', label: t('المحطات'), icon: <LayoutList />, fb: 'kds-view:board' }, { id: 'expo', label: t('التسليم (الإكسبو)'), icon: <ConciergeBell />, fb: 'kds-view:expo' }]} />
+        <Button size="sm" variant={showAllDay ? 'subtle' : 'ghost'} onClick={() => setShowAllDay(!showAllDay)} data-fb="kds-allday-toggle"><Layers className="w-4 h-4" />{t('المطلوب كله')}</Button>
+        <Button size="sm" variant="ghost" onClick={() => setRecall(true)} data-fb="kds-recall-open"><History className="w-4 h-4" />{t('اتسلّم مؤخرًا')}</Button>
+      </div>
       {view === 'board' && (
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
           <Tabs value={station} onChange={setStation} tabs={[{ id: 'ALL', label: <span>{t('كل المحطات')} <span className="num text-xs opacity-70">{all.length}</span></span> }, ...active.map((s: any) => ({ id: s.id, label: <span data-fb={`kds-station:${s.name}`}>{stationLabel(s.name)} <span className="num text-xs opacity-70">{all.filter((x) => x.stationId === s.id).length}</span></span> }))]} />
           <div className="flex-1" />
-          {rush > 0 && <Pill tone="error"><Flame className="w-3 h-3" />{rush} {t('مستعجلة')}</Pill>}
-          {late > 0 && <Pill tone="error"><AlertTriangle className="w-3 h-3" />{late} {t('متأخرة')}</Pill>}
-          <span className="flex items-center gap-1.5 text-[11px] text-dim"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />{t('في الوقت')}<span className="w-2.5 h-2.5 rounded-full bg-amber-400 ms-2" />{t('قربت')}<span className="w-2.5 h-2.5 rounded-full bg-red-500 ms-2" />{t('متأخرة')}</span>
+          {rush > 0 && <Pill tone="error"><Flame className="w-3 h-3" /><span className="num">{rush}</span> {t('مستعجلة')}</Pill>}
+          {late > 0 && <Pill tone="error"><AlertTriangle className="w-3 h-3" /><span className="num">{late}</span> {t('متأخرة')}</Pill>}
+          <span className="flex items-center gap-3 text-[11px] text-soft"><span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full" style={{ background: TONE.ok.color }} />{t('في الوقت')}</span><span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full" style={{ background: TONE.warn.color }} />{t('قربت')}</span><span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full" style={{ background: TONE.late.color }} />{t('متأخرة')}</span></span>
         </div>
       )}
       {showAllDay && view === 'board' && <AllDay tickets={tickets} />}
       {view === 'board' ? (
-        <div className="flex-1 min-h-0 grid gap-3 grid-cols-1 md:grid-cols-3">
-          {cols.map((c) => {
-            const list = tickets.filter((x) => x.state === c.id);
-            return (
-              <div key={c.id} className={cn('rounded-2xl border-t-4 surface-1 flex flex-col min-h-[240px]', c.tone)} data-fb={`kds-col:${c.id}`}>
-                <div className="px-3 py-2 font-bold flex items-center justify-between">{c.title}<Pill tone="neutral">{list.length}</Pill></div>
-                <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                  {list.map((tk) => <Ticket key={tk.id} tk={tk} stations={active} reasons={reasons} showStation={station === 'ALL'} />)}
-                  {!list.length && <Empty text={t('مفيش تذاكر')} />}
+        <div className="flex-1 min-h-0 flex gap-3">
+          <div className="flex-1 min-w-0 overflow-y-auto pe-1" data-fb="kds-col:ACTIVE">
+            {loading ? <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>{Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-64 rounded-2xl" />)}</div>
+              : cooking.length ? (
+                <div className="grid gap-3 items-start" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
+                  {cooking.map((tk) => <Ticket key={tk.id} tk={tk} stations={active} reasons={reasons} showStation={station === 'ALL'} />)}
                 </div>
-              </div>
-            );
-          })}
+              ) : <EmptyState icon={<ChefHat />} title={t('مفيش طلبات بتتعمل دلوقتي')} text={t('أول ما الويتر أو الكاشير يبعت طلب هيظهر هنا على طول.')} />}
+          </div>
+          <div className="w-[min(300px,34%)] shrink-0 rounded-2xl border-t-4 surface-1 flex flex-col min-h-0" style={{ borderTopColor: TONE.ok.color }} data-fb="kds-col:READY">
+            <div className="px-3 py-2.5 font-bold flex items-center justify-between"><span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-[var(--success)]" />{t('جاهز للتسليم')}</span><Pill tone={ready.length ? 'success' : 'neutral'}><span className="num">{ready.length}</span></Pill></div>
+            <div className="flex-1 overflow-y-auto p-2 space-y-2">
+              {ready.map((tk) => <ReadyCard key={tk.id} tk={tk} stations={active} reasons={reasons} showStation={station === 'ALL'} />)}
+              {!ready.length && <EmptyState compact icon={<ConciergeBell />} text={t('اللي يجهز هيستنى هنا لحد ما يتسلّم.')} />}
+            </div>
+          </div>
         </div>
       ) : <Expo tickets={all} />}
       {recall && <RecallDrawer onClose={() => setRecall(false)} stations={active} reasons={reasons} />}
@@ -101,88 +105,116 @@ function AllDay({ tickets }: { tickets: any[] }) {
   }, [tickets]);
   if (!rows.length) return null;
   return (
-    <div className="rounded-xl surface-1 border line px-3 py-2 flex items-center gap-2 overflow-x-auto scrollbar-hide" data-fb="kds-allday">
-      <span className="text-xs font-bold text-soft whitespace-nowrap flex items-center gap-1"><Layers className="w-3.5 h-3.5" />{t('المطلوب دلوقتي')}:</span>
+    <div className="shrink-0 rounded-2xl surface-1 border line px-3 py-2 flex items-center gap-2 overflow-x-auto scrollbar-hide" data-fb="kds-allday">
+      <span className="text-xs font-bold text-soft whitespace-nowrap flex items-center gap-1"><Layers className="w-3.5 h-3.5" />{t('المطلوب دلوقتي')}</span>
       {rows.map((r) => (
-        <span key={r.name.ar} title={[...r.mods.entries()].map(([k, v]) => `${k} ×${v}`).join(' · ')} className="whitespace-nowrap inline-flex items-center gap-1.5 px-2.5 h-8 rounded-lg surface-2 border border-[var(--glass-border)] text-sm">
-          <span className="num font-extrabold text-[var(--primary)] text-base">{r.qty}</span><span className="font-bold">{L(r.name)}</span>
-          {r.mods.size > 0 && <span className="text-[10px] text-orange-300">{[...r.mods.entries()].slice(0, 2).map(([k, v]) => `${k} ${v}`).join('، ')}</span>}
+        <span key={r.name.ar} title={[...r.mods.entries()].map(([k, v]) => `${k} ×${v}`).join(' · ')} className="whitespace-nowrap inline-flex items-center gap-2 px-3 h-10 rounded-xl bg-[var(--card-raised)] border border-[var(--glass-border)] text-sm">
+          <span className="num font-extrabold text-[var(--primary)] text-xl leading-none">{r.qty}</span><span className="font-bold">{L(r.name)}</span>
+          {r.mods.size > 0 && <span className="text-[11px] text-[var(--warning-text)]">{[...r.mods.entries()].slice(0, 2).map(([k, v]) => `${k} ${v}`).join('، ')}</span>}
         </span>
       ))}
     </div>
   );
 }
 
-function Ticket({ tk, stations, reasons, showStation, compact }: { tk: any; stations: any[]; reasons: Record<string, any>; showStation?: boolean; compact?: boolean }) {
+const whereOf = (tk: any) => (tk.tableName ? `${t('ترابيزة')} ${tk.tableName}` : tk.channel === 'TAKEAWAY' ? t('تيك أواي') : tk.channel === 'DELIVERY' ? t('دليفري') : t('كاونتر'));
+
+function Ticket({ tk, stations, reasons, showStation }: { tk: any; stations: any[]; reasons: Record<string, any>; showStation?: boolean }) {
   const { run, busy } = useCommand();
   const [menu, setMenu] = useState(false);
   const [dlg, setDlg] = useState<null | 'refire' | 'move' | 'history'>(null);
   const adv = (toState: string) => run('Kitchen.AdvanceTicket', { params: { ticketId: tk.id }, body: { expectedVersion: tk.version, toState } });
   const bump = (it: any) => run('TicketItem.Bump', { params: { ticketId: tk.id, itemId: it.lineId }, body: {} });
-  const rush = () => run('Ticket.SetPriority', { params: { ticketId: tk.id }, body: { expectedVersion: tk.version, priority: tk.priority === 'RUSH' ? 'NORMAL' : 'RUSH' } }, { success: tk.priority === 'RUSH' ? t('رجعت عادية') : t('التذكرة بقت مستعجلة — طلعت أول الطابور') });
-  const tone = toneOf(tk);
-  const where = tk.tableName ? `${t('ترابيزة')} ${tk.tableName}` : tk.channel === 'TAKEAWAY' ? t('تيك أواي') : tk.channel === 'DELIVERY' ? t('دليفري') : t('كاونتر');
+  const rush = () => run('Ticket.SetPriority', { params: { ticketId: tk.id }, body: { expectedVersion: tk.version, priority: tk.priority === 'RUSH' ? 'NORMAL' : 'RUSH' } }, { success: tk.priority === 'RUSH' ? t('رجعت عادية') : t('الطلب بقى مستعجل — طلع أول الطابور') });
+  const tone = TONE[toneOf(tk)];
+  const isRush = tk.priority === 'RUSH';
   return (
-    <div data-fb={`ticket:${tk.orderNumber}:r${tk.round}`} data-ticket-state={tk.state} data-priority={tk.priority} className={cn('relative rounded-xl glass overflow-hidden border-2', tk.state === 'READY' ? 'border-emerald-400/40' : TONE[tone].ring, tk.priority === 'RUSH' && tk.state !== 'READY' && 'ring-2 ring-red-500/60')}>
-      <div className={cn('h-1.5', tk.state === 'READY' ? 'bg-emerald-400' : TONE[tone].bar)} />
-      <div className="p-3 space-y-2">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="font-extrabold text-lg flex items-center gap-1.5 flex-wrap">
-              {tk.priority === 'RUSH' && <Pill tone="error"><Flame className="w-3 h-3" />{t('مستعجل')}</Pill>}
-              {where}
-              {tk.guestCount ? <span className="text-xs text-dim font-normal flex items-center gap-0.5"><Users className="w-3 h-3" />{tk.guestCount}</span> : null}
-            </div>
-            <div className="text-[11px] text-dim"><span className="num">#{tk.orderNumber}</span> · {t('الجولة')} {tk.round}{showStation ? ` · ${stationLabel(tk.stationName)}` : ''} · {tk.serverName}</div>
+    <div data-fb={`ticket:${tk.orderNumber}:r${tk.round}`} data-ticket-state={tk.state} data-priority={tk.priority} className={cn('relative rounded-2xl overflow-hidden border-2 bg-[var(--card-raised)] shadow-[0_8px_24px_-14px_rgba(0,0,0,.5)]', toneOf(tk) === 'late' && 'animate-pulse-glow')} style={{ borderColor: isRush ? 'var(--error)' : tone.color }}>
+      {/* header: where + timer, coloured by the timing */}
+      <div className="px-3 py-2 flex items-center gap-2" style={{ background: `color-mix(in srgb, ${tone.color} 22%, transparent)` }}>
+        <div className="min-w-0 flex-1">
+          <div className="font-extrabold text-xl leading-tight flex items-center gap-1.5 flex-wrap">
+            {isRush && <span className="inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-md bg-[var(--error)] text-white"><Flame className="w-3 h-3" />{t('مستعجل')}</span>}
+            {whereOf(tk)}
+            {tk.guestCount ? <span className="text-xs text-soft font-bold inline-flex items-center gap-0.5"><Users className="w-3.5 h-3.5" /><span className="num">{tk.guestCount}</span></span> : null}
           </div>
-          <div className="flex items-center gap-1">
-            {tk.state === 'READY' ? <Pill tone="success"><CheckCircle2 className="w-3 h-3" />{t('مستني')} <span className="num">{tk.readyMinutes ?? 0}</span>{t('د')}</Pill>
-              : <Pill tone={TONE[tone].pill}><Clock className="w-3 h-3" /><span className="num">{tk.ageMinutes}</span>/<span className="num">{tk.targetMinutes}</span>{t('د')}</Pill>}
-            <button className="w-8 h-8 rounded-lg hover:surface-2 flex items-center justify-center" onClick={() => setMenu(!menu)} data-fb={`ticket-menu:${tk.orderNumber}:r${tk.round}`} aria-label={t('خيارات')}><MoreVertical className="w-4 h-4" /></button>
-          </div>
+          <div className="text-[11px] text-soft"><span className="num">#{tk.orderNumber}</span> · {t('الدفعة')} <span className="num">{tk.round}</span>{showStation ? ` · ${stationLabel(tk.stationName)}` : ''}{tk.serverName ? ` · ${tk.serverName.split(' — ')[0]}` : ''}</div>
         </div>
+        <div className="text-center shrink-0 leading-none" title={t('من {a} دقيقة — المستهدف {b}', { a: tk.ageMinutes, b: tk.targetMinutes })}>
+          <div className="num font-extrabold text-2xl" style={{ color: tone.color }}>{tk.ageMinutes} <span className="text-xs">{t('د')}</span></div>
+          <div className="text-[10px] text-dim num">/ {tk.targetMinutes}</div>
+        </div>
+        <button className="w-9 h-9 rounded-lg hover:bg-[var(--surface-3)] flex items-center justify-center shrink-0" onClick={() => setMenu(!menu)} data-fb={`ticket-menu:${tk.orderNumber}:r${tk.round}`} aria-label={t('خيارات')}><MoreVertical className="w-5 h-5" /></button>
+      </div>
+      <div className="p-3 space-y-2">
         {(tk.refireOf || tk.transferredFromName || tk.recalledAt) && (
           <div className="flex flex-wrap gap-1">
             {tk.refireOf && <Pill tone="violet"><RotateCcw className="w-3 h-3" />{t('إعادة')}: {L(tk.refireReasonText)}{tk.refireNote ? ` — ${tk.refireNote}` : ''}</Pill>}
             {tk.transferredFromName && <Pill tone="info"><ArrowRightLeft className="w-3 h-3" />{t('جاية من')} {stationLabel(tk.transferredFromName)}</Pill>}
-            {tk.recalledAt && <Pill tone="warning"><Undo2 className="w-3 h-3" />{t('اترجعت')} {time(tk.recalledAt)}</Pill>}
+            {tk.recalledAt && <Pill tone="warning"><Undo2 className="w-3 h-3" />{t('اترجعت')} <span className="num">{time(tk.recalledAt)}</span></Pill>}
           </div>
         )}
         {menu && (
           <div className="rounded-xl surface-2 border line p-1.5 grid grid-cols-2 gap-1" data-fb="ticket-menu">
-            {tk.state !== 'READY' && <Button size="sm" variant={tk.priority === 'RUSH' ? 'ghost' : 'danger'} disabled={busy} onClick={() => { setMenu(false); rush(); }} data-fb="ticket-rush"><Flame className="w-3.5 h-3.5" />{tk.priority === 'RUSH' ? t('خليها عادية') : t('مستعجل')}</Button>}
+            <Button size="sm" variant={isRush ? 'ghost' : 'danger'} disabled={busy} onClick={() => { setMenu(false); rush(); }} data-fb="ticket-rush"><Flame className="w-3.5 h-3.5" />{isRush ? t('خليها عادية') : t('مستعجل')}</Button>
             <Button size="sm" disabled={busy} onClick={() => { setMenu(false); setDlg('move'); }} data-fb="ticket-move"><ArrowRightLeft className="w-3.5 h-3.5" />{t('انقل لمحطة')}</Button>
-            {tk.state === 'READY' && <Button size="sm" disabled={busy} onClick={() => { setMenu(false); setDlg('refire'); }} data-fb="ticket-refire"><RotateCcw className="w-3.5 h-3.5" />{t('اعمله تاني')}</Button>}
             <Button size="sm" variant="ghost" onClick={() => { setMenu(false); setDlg('history'); }}><History className="w-3.5 h-3.5" />{t('اللي حصل')}</Button>
           </div>
         )}
-        {!compact && (
-          <div className="space-y-1.5">
-            {tk.items.map((it: any) => (
-              <div key={it.lineId} className={cn('text-sm rounded-lg px-1 -mx-1', it.status === 'CANCELLED' && 'line-through opacity-50', it.bumped && 'opacity-50')}>
-                <div className="flex gap-2 items-center">
-                  {it.status !== 'CANCELLED' && tk.state !== 'READY' && <button onClick={() => bump(it)} disabled={busy} data-fb={`ticket-item-bump:${it.name.ar}`} className={cn('w-5 h-5 rounded-md border flex items-center justify-center shrink-0', it.bumped ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-[var(--glass-border)] hover:border-emerald-400')} title={t('الصنف ده خلص')}>{it.bumped && <Check className="w-3.5 h-3.5" />}</button>}
-                  <span className="num font-extrabold text-[var(--primary)]">{qty(it.quantity)}×</span><span className={cn('font-bold', it.bumped && 'line-through')}>{L(it.name)}</span>
-                  {it.seat ? <span className="text-[10px] px-1 rounded bg-white/10">{t('كرسي')} {it.seat}</span> : null}{it.status === 'CANCELLED' && <Pill tone="error">{t('ملغي')}</Pill>}
+        <div className="space-y-1">
+          {tk.items.map((it: any) => {
+            const cancelled = it.status === 'CANCELLED';
+            return (
+              <button key={it.lineId} disabled={cancelled || busy} onClick={() => bump(it)} data-fb={`ticket-item-bump:${it.name.ar}`} title={it.bumped ? t('رجّع الصنف') : t('الصنف ده خلص')}
+                className={cn('w-full text-start rounded-xl px-2 py-1.5 transition-colors hover:bg-[var(--surface-2)] disabled:hover:bg-transparent', cancelled && 'opacity-50', it.bumped && 'opacity-45')}>
+                <div className="flex gap-2 items-start">
+                  <span className={cn('w-6 h-6 mt-0.5 rounded-md border-2 flex items-center justify-center shrink-0', it.bumped ? 'bg-[var(--success)] border-[var(--success)] text-white' : 'border-[var(--glass-border)]')}>{it.bumped && <Check className="w-4 h-4" />}</span>
+                  <span className="num font-extrabold text-lg text-[var(--primary)] leading-6">{qty(it.quantity)}×</span>
+                  <span className={cn('font-bold text-lg leading-6 flex-1 min-w-0', (it.bumped || cancelled) && 'line-through')}>{L(it.name)}</span>
+                  {it.seat ? <span className="text-[11px] px-1.5 py-0.5 rounded-md surface-3 font-bold">{t('كرسي')} <span className="num">{it.seat}</span></span> : null}{cancelled && <Pill tone="error">{t('اتلغى')}</Pill>}
                 </div>
-                {it.modifiers?.length > 0 && <div className="ps-7 text-xs text-orange-300">{it.modifiers.map((m: any) => L(m)).join(' · ')}</div>}
-                {it.children?.length > 0 && <div className="ps-7 text-xs text-sky-300">{it.children.map((c: string, i: number) => <div key={i}>↳ {c}</div>)}</div>}
-                {it.note && <div className="ps-7 text-xs text-amber-300">✎ {it.note}</div>}
-                {it.allergens?.length > 0 && <div className="ps-7 text-xs font-extrabold text-amber-400 flex items-center gap-1"><AlertTriangle className="w-3 h-3" />{it.allergens.map((a: string) => ALLERGEN_AR[a] ?? a).join('، ')}</div>}
-                {it.mods?.map((m: any, i: number) => <div key={i} className="ps-7 text-xs font-bold text-sky-300 bg-sky-500/10 rounded px-1 mt-0.5">{t('تعديل')}: {m.text} · <span className="num">{time(m.at)}</span></div>)}
-              </div>
-            ))}
-          </div>
-        )}
-        {tk.siblings?.length > 0 && <div className="flex flex-wrap gap-1 text-[10px]">{tk.siblings.map((s: any) => <span key={s.id} className={cn('px-1.5 py-0.5 rounded border', s.state === 'READY' || s.state === 'DONE' ? 'border-emerald-400/50 text-emerald-300' : 'border-[var(--glass-border)] text-dim')}>{stationLabel(s.stationName)}: {s.state === 'READY' || s.state === 'DONE' ? t('جاهز') : t('لسه')}</span>)}</div>}
+                {it.modifiers?.length > 0 && <div className="ps-14 text-sm font-bold text-[var(--warning-text)]">{it.modifiers.map((m: any) => L(m)).join(' · ')}</div>}
+                {it.children?.length > 0 && <div className="ps-14 text-sm text-[var(--info)]">{it.children.map((c: string, i: number) => <div key={i}>↳ {c}</div>)}</div>}
+                {it.note && <div className="ps-14 text-sm font-bold text-[var(--warning-text)] flex items-center gap-1">✎ {it.note}</div>}
+                {it.allergens?.length > 0 && <div className="ps-14 text-sm font-extrabold text-[var(--error)] flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" />{it.allergens.map((a: string) => t(ALLERGEN_AR[a] ?? a)).join('، ')}</div>}
+                {it.mods?.map((m: any, i: number) => <div key={i} className="ms-14 mt-0.5 text-sm font-bold text-[var(--info)] bg-[color-mix(in_srgb,var(--info)_12%,transparent)] rounded-md px-1.5">{t('تعديل')}: {m.text} · <span className="num">{time(m.at)}</span></div>)}
+              </button>
+            );
+          })}
+        </div>
+        {tk.siblings?.length > 0 && <div className="flex flex-wrap gap-1 text-[11px]">{tk.siblings.map((s: any) => { const ok = s.state === 'READY' || s.state === 'DONE'; return <span key={s.id} className={cn('px-1.5 py-0.5 rounded-md border font-bold', ok ? 'border-[color-mix(in_srgb,var(--success)_45%,transparent)] text-[var(--success)]' : 'border-[var(--glass-border)] text-dim')}>{stationLabel(s.stationName)}: {ok ? t('جاهز') : t('لسه')}</span>; })}</div>}
         <div className="flex gap-1.5 pt-1">
-          {tk.state === 'NEW' && <Button size="sm" variant="primary" className="flex-1" disabled={busy} onClick={() => adv('IN_PROGRESS')} data-fb="ticket-start"><Play className="w-3.5 h-3.5" />{t('ابدأ')}</Button>}
-          {(tk.state === 'NEW' || tk.state === 'IN_PROGRESS') && <Button size="sm" variant="success" className="flex-1" disabled={busy} onClick={() => adv('READY')} data-fb="ticket-ready"><Check className="w-3.5 h-3.5" />{t('جاهز')}</Button>}
-          {tk.state === 'READY' && <><Button size="sm" variant="ghost" disabled={busy} onClick={() => adv('IN_PROGRESS')} title={t('رجّعها للشغل')}><Undo2 className="w-3.5 h-3.5" /></Button><Button size="sm" className="flex-1" disabled={busy} onClick={() => adv('DONE')} data-fb="ticket-done"><Truck className="w-3.5 h-3.5" />{t('اتسلّم')}</Button></>}
+          {tk.state === 'NEW' && <Button size="lg" variant="secondary" disabled={busy} onClick={() => adv('IN_PROGRESS')} data-fb="ticket-start"><Play className="w-4 h-4" />{t('ابدأ')}</Button>}
+          {tk.state === 'IN_PROGRESS' && <span className="h-12 px-2 rounded-xl text-xs font-bold text-[var(--warning-text)] flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{t('بيتعمل')}</span>}
+          <Button size="lg" variant="success" className="flex-1" disabled={busy} onClick={() => adv('READY')} data-fb="ticket-ready"><Check className="w-5 h-5" />{t('جاهز')}</Button>
         </div>
       </div>
       {dlg === 'refire' && <RefireDialog tk={tk} reasons={reasons} stations={stations} onClose={() => setDlg(null)} />}
       {dlg === 'move' && <MoveDialog tk={tk} stations={stations} onClose={() => setDlg(null)} />}
+      {dlg === 'history' && <HistoryDialog tk={tk} onClose={() => setDlg(null)} />}
+    </div>
+  );
+}
+
+/** A ready ticket waiting for pickup: compact, with "handed over", back to cooking and "make it again". */
+function ReadyCard({ tk, stations, reasons, showStation }: { tk: any; stations: any[]; reasons: Record<string, any>; showStation?: boolean }) {
+  const { run, busy } = useCommand();
+  const [dlg, setDlg] = useState<null | 'refire' | 'history'>(null);
+  const adv = (toState: string) => run('Kitchen.AdvanceTicket', { params: { ticketId: tk.id }, body: { expectedVersion: tk.version, toState } });
+  const waiting = tk.readyMinutes ?? 0;
+  return (
+    <div data-fb={`ticket:${tk.orderNumber}:r${tk.round}`} data-ticket-state={tk.state} className="rounded-xl bg-[var(--card-raised)] border border-[color-mix(in_srgb,var(--success)_40%,transparent)] p-2.5 space-y-1.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0"><div className="font-extrabold leading-tight">{whereOf(tk)}</div><div className="text-[11px] text-dim"><span className="num">#{tk.orderNumber}</span> · {t('الدفعة')} <span className="num">{tk.round}</span>{showStation ? ` · ${stationLabel(tk.stationName)}` : ''}</div></div>
+        <Pill tone={waiting >= 5 ? 'warning' : 'success'}><Clock className="w-3 h-3" />{t('مستني')} <span className="num">{waiting}</span>{t('د')}</Pill>
+      </div>
+      <div className="text-sm text-soft leading-snug">{tk.items.filter((i: any) => i.status === 'ACTIVE').map((i: any) => `${qty(i.quantity)}× ${L(i.name)}`).join(' · ')}</div>
+      <div className="flex gap-1">
+        <Button size="sm" variant="ghost" disabled={busy} onClick={() => adv('IN_PROGRESS')} title={t('رجّعها للشغل')} aria-label={t('رجّعها للشغل')}><Undo2 className="w-3.5 h-3.5" /></Button>
+        <Button size="sm" variant="ghost" disabled={busy} onClick={() => setDlg('refire')} data-fb="ticket-refire" title={t('اعمله تاني')}><RotateCcw className="w-3.5 h-3.5" /></Button>
+        <Button size="sm" variant="primary" className="flex-1" disabled={busy} onClick={() => adv('DONE')} data-fb="ticket-done"><Truck className="w-3.5 h-3.5" />{t('اتسلّم')}</Button>
+      </div>
+      {dlg === 'refire' && <RefireDialog tk={tk} reasons={reasons} stations={stations} onClose={() => setDlg(null)} />}
       {dlg === 'history' && <HistoryDialog tk={tk} onClose={() => setDlg(null)} />}
     </div>
   );
@@ -229,7 +261,7 @@ function MoveDialog({ tk, stations, onClose }: { tk: any; stations: any[]; onClo
     <Modal open onClose={onClose} title={<span className="flex items-center gap-2"><ArrowRightLeft className="w-5 h-5" />{t('انقل التذكرة لمحطة تانية')}</span>} badge={<StateBadge ops={['Ticket.TransferStation']} />}
       footer={<><Button variant="ghost" onClick={onClose}>{t('رجوع')}</Button><Button variant="primary" loading={busy} disabled={!to} onClick={submit} data-fb="move-submit">{t('انقل')}</Button></>}>
       <div className="space-y-3">
-        <div className="text-sm">#{tk.orderNumber} · {t('الجولة')} {tk.round} · {t('دلوقتي على')} <b>{stationLabel(tk.stationName)}</b></div>
+        <div className="text-sm">#{tk.orderNumber} · {t('الدفعة')} {tk.round} · {t('دلوقتي على')} <b>{stationLabel(tk.stationName)}</b></div>
         <div className="grid grid-cols-2 gap-2">{stations.filter((s) => s.id !== tk.stationId).map((s) => <button key={s.id} onClick={() => setTo(s.id)} data-fb={`move-to:${s.name}`} className={cn('h-14 rounded-xl border font-bold', to === s.id ? 'border-[var(--primary)] bg-[var(--primary-container)]' : 'border-[var(--glass-border)] surface-1')}>{stationLabel(s.name)}</button>)}</div>
         <Field label={t('السبب (اختياري)')}><Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t('مثلاً: الشوّاية زحمة')} /></Field>
         <div className="text-[11px] text-dim">{t('لو المحطة التانية عندها تذكرة لنفس الطلب ونفس الجولة، الأصناف بتنضم لها بدل ما تطلع تذكرتين.')}</div>
@@ -266,11 +298,11 @@ function Expo({ tickets }: { tickets: any[] }) {
   return (
     <div className="flex-1 min-h-0 overflow-y-auto grid gap-3 content-start" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }} data-fb="kds-expo">
       {groups.map(({ list, ready, first, oldest, rush, late }) => (
-        <div key={`${first.orderId}:${first.round}`} className={cn('rounded-2xl glass p-3 space-y-2 border-2', ready ? 'border-emerald-400/70' : late ? 'border-red-500/60' : 'border-transparent')} data-fb={`expo:${first.orderNumber}:r${first.round}`}>
+        <div key={`${first.orderId}:${first.round}`} className={cn('rounded-2xl bg-[var(--card-raised)] p-3 space-y-2 border-2', ready ? 'border-[var(--success)]' : late ? 'border-[var(--error)]' : 'border-[var(--glass-border)]')} data-fb={`expo:${first.orderNumber}:r${first.round}`}>
           <div className="flex items-start justify-between gap-2">
             <div>
-              <div className="font-extrabold text-lg flex items-center gap-1.5">{rush && <Flame className="w-4 h-4 text-red-400" />}{first.tableName ? `${t('ترابيزة')} ${first.tableName}` : first.channel === 'TAKEAWAY' ? t('تيك أواي') : first.channel === 'DELIVERY' ? t('دليفري') : t('كاونتر')}</div>
-              <div className="text-[11px] text-dim"><span className="num">#{first.orderNumber}</span> · {t('الجولة')} {first.round} · {first.serverName}</div>
+              <div className="font-extrabold text-xl flex items-center gap-1.5">{rush && <Flame className="w-4 h-4 text-[var(--error)]" />}{first.tableName ? `${t('ترابيزة')} ${first.tableName}` : first.channel === 'TAKEAWAY' ? t('تيك أواي') : first.channel === 'DELIVERY' ? t('دليفري') : t('كاونتر')}</div>
+              <div className="text-[11px] text-dim"><span className="num">#{first.orderNumber}</span> · {t('الدفعة')} {first.round} · {first.serverName?.split(' — ')[0]}</div>
             </div>
             <Pill tone={ready ? 'success' : late ? 'error' : 'neutral'}><Clock className="w-3 h-3" /><span className="num">{oldest}</span>{t('د')}</Pill>
           </div>
@@ -278,11 +310,11 @@ function Expo({ tickets }: { tickets: any[] }) {
             {list.map((tk) => (
               <div key={tk.id} className="rounded-lg surface-1 px-2 py-1.5">
                 <div className="flex items-center justify-between text-xs mb-0.5"><b>{stationLabel(tk.stationName)}</b>{tk.state === 'READY' ? <Pill tone="success">{t('جاهز')}</Pill> : <Pill tone={tk.late ? 'error' : tk.warn ? 'warning' : 'neutral'}>{tk.state === 'NEW' ? t('لسه ما بدأش') : t('بيتعمل')}</Pill>}</div>
-                <div className="text-xs text-soft">{tk.items.filter((i: any) => i.status === 'ACTIVE').map((i: any) => `${qty(i.quantity)}× ${L(i.name)}`).join(' · ')}</div>
+                <div className="text-sm text-soft">{tk.items.filter((i: any) => i.status === 'ACTIVE').map((i: any) => `${qty(i.quantity)}× ${L(i.name)}`).join(' · ')}</div>
               </div>
             ))}
           </div>
-          {ready ? <Button variant="success" className="w-full" disabled={busy} onClick={() => serve(list)} data-fb="expo-serve"><Truck className="w-4 h-4" />{t('كله جاهز — سلّم للويتر')}</Button>
+          {ready ? <Button variant="success" size="lg" className="w-full" disabled={busy} onClick={() => serve(list)} data-fb="expo-serve"><Truck className="w-4 h-4" />{t('كله جاهز — سلّم للويتر')}</Button>
             : <div className="text-xs text-dim text-center">{t('مستني')}: {list.filter((x) => x.state !== 'READY').map((x) => stationLabel(x.stationName)).join('، ')}</div>}
         </div>
       ))}
@@ -302,7 +334,7 @@ function RecallDrawer({ onClose, stations, reasons }: { onClose: () => void; sta
         {items.map((tk) => (
           <div key={tk.id} className="flex items-center gap-3 px-3 py-2 rounded-xl surface-1 border line">
             <div className="flex-1 min-w-0">
-              <div className="font-bold text-sm">{tk.tableName ? `${t('ترابيزة')} ${tk.tableName}` : t('تيك أواي / كاونتر')} · <span className="num">#{tk.orderNumber}</span> · {t('الجولة')} {tk.round} · {stationLabel(tk.stationName)}</div>
+              <div className="font-bold text-sm">{tk.tableName ? `${t('ترابيزة')} ${tk.tableName}` : t('تيك أواي / كاونتر')} · <span className="num">#{tk.orderNumber}</span> · {t('الدفعة')} {tk.round} · {stationLabel(tk.stationName)}</div>
               <div className="text-xs text-dim truncate">{tk.items.filter((i: any) => i.status === 'ACTIVE').map((i: any) => `${qty(i.quantity)}× ${L(i.name)}`).join(' · ')}</div>
             </div>
             <span className="num text-xs text-dim">{time(tk.doneAt)}</span>

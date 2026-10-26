@@ -3,7 +3,7 @@
 import { saveFile } from '../lib/files';
 import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { Download, Trash2, Upload, Copy, MessageSquarePlus } from 'lucide-react';
-import { Modal, Button, Field, Input, Select, Textarea, Pill, Empty, toast } from '../ui';
+import { Modal, Button, Field, Input, Select, Textarea, Pill, Empty, EmptyState, toast } from '../ui';
 import { POLICIES } from '../mock/policyRegistry';
 import { demo } from '../mock/demo';
 import { clock } from '../mock/clock';
@@ -143,7 +143,7 @@ export function FeedbackPanel() {
         </div>
       </div>
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
-        {items.length === 0 && <Empty text={t('مفيش ملاحظات لسه')} />}
+        {items.length === 0 && <EmptyState icon={<MessageSquarePlus />} title={t('مفيش ملاحظات لسه')} text={t('شغّل «ملاحظة» واضغط على أي حاجة في الشاشة عشان تكتب رأيك فيها.')} action={<Button size="sm" variant="subtle" onClick={() => feedback.setMode(true)} data-fb="feedback-start"><MessageSquarePlus className="w-4 h-4" />{t('ابدأ ملاحظة')}</Button>} />}
         {items.map((i) => (
           <div key={i.id} className="rounded-xl surface-1 border line p-3 text-sm space-y-1">
             <div className="flex items-center justify-between gap-2"><div className="flex gap-1 flex-wrap"><Pill tone={i.type === 'wrong' ? 'error' : i.type === 'missing' ? 'warning' : i.type === 'unclear' ? 'info' : 'neutral'}>{{ wrong: t('غلط'), missing: t('ناقص'), unclear: t('مش واضح'), extra: t('زيادة') }[i.type]}</Pill><Pill tone="primary">{screenName(i.screen)}</Pill></div><button onClick={() => feedback.remove(i.id)} className="text-dim hover:text-[var(--error)]"><Trash2 className="w-4 h-4" /></button></div>

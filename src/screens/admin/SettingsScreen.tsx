@@ -4,7 +4,7 @@
 import React, { useMemo, useState } from 'react';
 import { History, Pencil, Search, ShieldAlert, Undo2, Plus, Power, ListChecks, SlidersHorizontal, HelpCircle } from 'lucide-react';
 import { useCommand, useQuery } from '../../app/hooks';
-import { Banner, Button, Card, Field, Input, KV, Pill, Section, Select, StateBadge, Switch, Table, Tabs, Textarea } from '../../ui';
+import { Banner, Button, Card, EmptyState, Field, Input, KV, PageHeader, Pill, SearchInput, Select, StateBadge, Switch, Table, Tabs, Textarea, Toolbar } from '../../ui';
 import { Tech } from '../../app/tech';
 import { t, useLang } from '../../i18n';
 import { cn, dateTime } from '../../lib/format';
@@ -21,13 +21,14 @@ export default function SettingsScreen() {
   const [tab, setTab] = useState<'policies' | 'reasons'>('policies');
   return (
     <div className="space-y-4" data-fb="screen:B4">
-      <Section
+      <PageHeader
+        icon={<SlidersHorizontal />}
         title={t('الإعدادات والأسباب')}
         badge={<StateBadge ops={['Settings.Effective', 'Settings.UpdatePolicy', 'Policy.History', 'ReasonCode.List', 'ReasonCode.Create', 'ReasonCode.Configure']} />}
-        sub={t('هنا بتتغيّر طريقة شغل المطعم بجد. كل تغيير بيتسجل في السجل ومش بيمسح اللي قبله، وتغيير الإعدادات الحساسة محتاج موافقة مدير تاني.')}
-        actions={<SensitiveRulePill />}
+        description={t('هنا بتتغيّر طريقة شغل المطعم بجد. كل تغيير بيتسجل ومش بيمسح اللي قبله، والإعدادات الحساسة محتاجة موافقة مدير تاني.')}
+        meta={<SensitiveRulePill />}
       />
-      <Tabs value={tab} onChange={setTab} tabs={[{ id: 'policies', label: <span className="flex items-center gap-1"><SlidersHorizontal className="w-4 h-4" />{t('إعدادات المطعم')}</span> }, { id: 'reasons', label: <span className="flex items-center gap-1"><ListChecks className="w-4 h-4" />{t('أسباب الإلغاء والخصم')}</span> }]} />
+      <Tabs variant="underline" value={tab} onChange={setTab} tabs={[{ id: 'policies', icon: <SlidersHorizontal className="w-4 h-4" />, label: t('إعدادات المطعم') }, { id: 'reasons', icon: <ListChecks className="w-4 h-4" />, label: t('أسباب الإلغاء والخصم') }]} />
       {tab === 'policies' ? <PoliciesTab /> : <ReasonsTab />}
     </div>
   );
@@ -61,17 +62,18 @@ function PoliciesTab() {
   const nameOf = (id: string) => users.items.find((u) => u.id === id)?.displayName ?? (id === 'demo' ? t('لوحة العرض') : id === 'provisioning' ? t('التجهيز') : t('شخص تاني'));
   return (
     <div className="space-y-3">
-      <div className="flex gap-2 flex-wrap items-center">
-        <div className="relative flex-1 min-w-[220px]"><Search className="w-4 h-4 absolute top-3 start-3 text-dim" /><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('دوّر على إعداد… (مثلًا: خدمة، درج، خصم)')} className="ps-9" data-fb="settings:search" /></div>
-        <Select value={scope} onChange={(e) => setScope(e.target.value)} className="max-w-[260px]" data-fb="settings:scope"
+      <Toolbar className="mb-0">
+        <SearchInput value={q} onChange={setQ} placeholder={t('دوّر على إعداد… (مثلًا: خدمة، درج، خصم)')} data-fb="settings:search" />
+        <Toolbar.Spacer />
+        <Select value={scope} onChange={(e) => setScope(e.target.value)} className="!w-auto min-w-[220px]" data-fb="settings:scope"
           options={[{ value: 'TENANT', label: t('بتظبط: المطعم كله') }, ...branches.items.map((b) => ({ value: b.id, label: t('بتظبط: {b} بس', { b: branchLabel(b) }) }))]} />
-      </div>
-      {!needle && <Tabs value={group} onChange={setGroup} tabs={POLICY_GROUPS.map((g) => ({ id: g.id, label: lang === 'ar' ? g.title.replace(' (مقترح)', '') : g.titleEn }))} />}
-      <Banner tone="info">{t('لو الفرع مالوش قيمة خاصة، بياخد قيمة المطعم كله، ولو مفيش بياخد الافتراضي الآمن. التغيير بيطبق على اللي جاي بس — الشيكات القديمة محتفظة بقيمتها. الموافقة لازم تيجي من مدير غير اللي طالب التغيير (مثلًا هبة — مديرة الفرع).')}</Banner>
-      <div className="grid xl:grid-cols-2 gap-3">
+      </Toolbar>
+      {!needle && <Tabs value={group} onChange={setGroup} tabs={POLICY_GROUPS.map((g) => ({ id: g.id, label: lang === 'ar' ? g.title.replace(' (مقترح)', '') : g.titleEn, count: POLICIES.filter((p) => p.group === g.id).length }))} />}
+      <div className="text-xs text-dim leading-relaxed">{t('الفرع اللي مالوش قيمة خاصة بياخد قيمة المطعم كله. التغيير بيطبق على اللي جاي بس — الشيكات القديمة محتفظة بقيمتها. الموافقة لازم تيجي من مدير غير اللي طلب التغيير (مثلًا هبة — مديرة الفرع).')}</div>
+      <div className="grid xl:grid-cols-2 gap-3 items-start">
         {list.map((p) => <PolicyCard key={`${p.id}:${scopeId}`} p={p} scopeType={scopeType} scopeId={scopeId} scopeName={branch ? branchLabel(branch) : undefined} nameOf={nameOf} ctx={ctx} />)}
       </div>
-      {list.length === 0 && <div className="text-sm text-dim text-center py-6">{t('مفيش إعداد بالاسم ده')}</div>}
+      {list.length === 0 && <EmptyState compact icon={<Search />} title={t('مفيش إعداد بالاسم ده')} text={t('جرّب كلمة تانية زي: خدمة، درج، خصم، ضريبة.')} />}
     </div>
   );
 }
@@ -90,7 +92,7 @@ function PolicyCard({ p, scopeType, scopeId, scopeName, nameOf, ctx }: { p: Poli
   const reacts = policyReacts(p);
   const question = policyQuestion(p);
   return (
-    <div className="glass rounded-xl p-3 space-y-2" data-fb={`settings:policy:${p.id}`}>
+    <div className={cn('glass card-surface rounded-2xl p-4 space-y-2.5', editing && 'ring-2 ring-[var(--primary)]')} data-fb={`settings:policy:${p.id}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="font-bold text-sm">{policyTitle(p)}</div>
@@ -121,6 +123,7 @@ function PolicyCard({ p, scopeType, scopeId, scopeName, nameOf, ctx }: { p: Poli
           <>
             <Button size="sm" variant="primary" data-fb={`settings:save:${p.id}`} onClick={() => setConfirm({ state: 'SET' })}>{t('احفظ…')}</Button>
             <Button size="sm" variant="ghost" onClick={() => setDraft(undefined)}>{t('إلغاء')}</Button>
+            <span className="text-[11px] text-[var(--warning)]">{t('فيه تغيير لسه ما اتحفظش')}</span>
           </>
         ) : (
           editable && <Button size="sm" variant="outline" data-fb={`settings:edit:${p.id}`} disabled={!perm.ok || !scopeAllowed || value === undefined} title={perm.ok ? undefined : t('الحساب ده مش مسموح له يغيّر الإعدادات')} onClick={() => setDraft(structuredClone(value ?? (p.editor.kind === 'object' ? {} : value)))}><Pencil className="w-3.5 h-3.5" />{t('غيّر')}</Button>
@@ -201,8 +204,10 @@ function ReasonsTab() {
   const permTitle = perm.ok ? undefined : t('الحساب ده مش مسموح له يعدّل الأسباب');
   return (
     <div className="space-y-3">
-      <Banner tone="info">{t('لكل نوع حركة: «من قايمة ثابتة» يعني الموظف يختار سبب من القايمة دي بس (ولو السبب محتاج ملاحظة لازم يكتبها)، و«كتابة حرة» يعني يكتب السبب بإيده. التحويل بيتعمل من تبويب «إعدادات المطعم» (الأسباب: من قايمة ولا كتابة حرة). نوع «من قايمة» لازم يفضل فيه سبب واحد شغال على الأقل، وكود السبب ونوعه مش بيتغيروا بعد ما يتعمل.')}</Banner>
-      <div className="flex justify-end"><Button size="sm" variant="primary" data-fb="reasons:new" disabled={!perm.ok} title={permTitle} onClick={() => setCreate('LINE_VOID')}><Plus className="w-4 h-4" />{t('سبب جديد')}</Button></div>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="text-xs text-dim leading-relaxed max-w-3xl">{t('لكل نوع حركة: «من قايمة ثابتة» يعني الموظف يختار سبب من القايمة دي بس، و«كتابة حرة» يعني يكتب السبب بإيده (بتتغير من تبويب «إعدادات المطعم»). القايمة لازم يفضل فيها سبب واحد شغال على الأقل.')}</div>
+        <Button variant="primary" data-fb="reasons:new" disabled={!perm.ok} title={permTitle} onClick={() => setCreate('LINE_VOID')}><Plus className="w-4 h-4" />{t('سبب جديد')}</Button>
+      </div>
       <Refused error={codes.error} />
       <div className="grid xl:grid-cols-2 gap-3">
         {kinds.map((k) => {
@@ -212,9 +217,10 @@ function ReasonsTab() {
           return (
             <Card key={k} title={<span>{reasonKindText(k)}<Tech><span className="num text-xs text-dim font-normal ms-1">{k}</span></Tech></span>}
               badge={<>{m ? <Pill tone={m === 'MANAGED' ? 'success' : 'neutral'}>{optionText('ReasonCodePolicy', k, m).label}</Pill> : <Pill tone="neutral">{t('كتابة حرة (الافتراضي)')}</Pill>}{k === 'VARIANCE' && <StateBadge state="SPECIFIED" />}{k === 'REPRINT' && <StateBadge state="PROPOSED" />}</>}
+              description={t('{a} سبب شغال من {n}', { a: active, n: list.length })}
               actions={<Button size="sm" variant="ghost" disabled={!perm.ok} title={permTitle ?? t('سبب جديد')} onClick={() => setCreate(k)} data-fb={`reasons:new:${k}`}><Plus className="w-3.5 h-3.5" /></Button>}>
               {m === 'MANAGED' && active === 0 && <Banner tone="error">{t('النوع ده بيختار من قايمة، ومفيش ولا سبب شغال فيها! فعّل سبب.')}</Banner>}
-              <Table head={[t('السبب'), 'English', t('ملاحظة'), t('الترتيب'), t('الحالة'), '']}
+              <Table dense align={[undefined, undefined, undefined, 'end', undefined, 'end']} head={[t('السبب'), t('بالإنجليزي'), t('ملاحظة'), t('الترتيب'), t('الحالة'), '']}
                 rows={list.map((c) => [
                   <span>{c.label?.ar}<Tech><span className="num text-[10px] text-dim ms-1" dir="ltr">{c.code}</span></Tech></span>, <span dir="ltr">{c.label?.en}</span>,
                   c.requiresNote ? <Pill tone="warning">{t('إجبارية')}</Pill> : <span className="text-dim">—</span>,
@@ -224,7 +230,7 @@ function ReasonsTab() {
                     <Button size="sm" variant="ghost" disabled={!perm.ok} title={permTitle ?? t('تعديل')} onClick={() => setEdit(c)} data-fb={`reasons:edit:${k}:${c.code}`}><Pencil className="w-3.5 h-3.5" /></Button>
                     <Button size="sm" variant="ghost" disabled={!perm.ok || busy} title={c.active ? t('إيقاف') : t('تفعيل')} onClick={() => toggle(c)} data-fb={`reasons:toggle:${k}:${c.code}`}><Power className={cn('w-3.5 h-3.5', c.active ? 'text-[var(--error)]' : 'text-[var(--success)]')} /></Button>
                   </div>,
-                ])} empty={t('مفيش أسباب للنوع ده')} />
+                ])} empty={<span>{t('مفيش أسباب للنوع ده — ضيف سبب من زرار +')}</span>} />
             </Card>
           );
         })}

@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, ClipboardCheck, Send, CheckCheck, XCircle, Eye, EyeOff, Save } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
-import { Banner, Button, Card, Empty, Field, Input, KV, Modal, Money, Pill, Section, Select, Spinner, StateBadge, Switch, Table, Textarea } from '../../ui';
+import { Banner, Button, Card, Empty, Field, Input, KV, Modal, Drawer, Money, Pill, Section, Select, Spinner, StateBadge, Switch, Table, Textarea } from '../../ui';
 import { t, L } from '../../i18n';
 import { cn, dateTime, money } from '../../lib/format';
 import { BranchScope, COUNT_STATE, Qty, StatePill, WarehouseSelect, fmtQty, unitLabel, unitOptions, useBranchScope, useItemsCatalog, useList, useWarehouses, Inp, Sel } from './common';
@@ -107,7 +107,7 @@ function CountSheet({ id, onClose }: { id: string | null; onClose: () => void })
   };
   const next = (idx: number) => { const nx = lines[idx + 1]; if (nx) refs.current[nx.itemId]?.focus(); };
   return (
-    <Modal open onClose={onClose} xwide title={c ? <span className="flex items-center gap-2">{t('جرد')} <span className="num">{c.number}</span> — {c.warehouse.name}</span> : t('جرد')} badge={c ? <><StatePill map={COUNT_STATE} state={c.state} /><StateBadge ops={OPS} /></> : undefined}
+    <Drawer width="xl" open onClose={onClose} title={c ? <span className="flex items-center gap-2">{t('جرد')} <span className="num">{c.number}</span> — {c.warehouse.name}</span> : t('جرد')} badge={c ? <><StatePill map={COUNT_STATE} state={c.state} /><StateBadge ops={OPS} /></> : undefined}
       footer={c && <>
         {(c.state === 'DRAFT' || c.state === 'SUBMITTED') && <Button variant="danger" data-fb="count:cancel" onClick={() => setCancelAsk(true)}><XCircle className="w-4 h-4" />{t('إلغاء الجرد')}</Button>}
         <div className="flex-1" />
@@ -157,7 +157,7 @@ function CountSheet({ id, onClose }: { id: string | null; onClose: () => void })
       )}
       {submitAsk && c && <SubmitDialog c={c} onClose={() => setSubmitAsk(false)} />}
       {cancelAsk && c && <CancelDialog c={c} onClose={() => setCancelAsk(false)} />}
-    </Modal>
+    </Drawer>
   );
 }
 function Box({ l, v }: { l: React.ReactNode; v: React.ReactNode }) { return <div className="rounded-xl surface-1 p-2.5"><div className="text-[11px] text-dim">{l}</div><div className="font-bold text-sm mt-0.5 truncate">{v}</div></div>; }

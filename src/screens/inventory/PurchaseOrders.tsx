@@ -4,11 +4,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, ShoppingBag, Send, XCircle, Lock, PackageCheck, Pencil, Trash2, Save, MessageSquareText, Wand2 } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
-import { Banner, Button, Empty, Field, Input, KV, Modal, Money, Pill, Section, Select, Spinner, StateBadge, Table, Textarea } from '../../ui';
+import { Banner, Button, Card, Empty, EmptyState, Field, Input, KV, Modal, Drawer, Money, PageHeader, Pill, Section, Select, Spinner, StatCard, StatGrid, StateBadge, Table, Textarea, Toolbar } from '../../ui';
 import { t, L } from '../../i18n';
 import { dateTime, money } from '../../lib/format';
 import { BranchScope, ItemPicker, PO_STATE, Qty, StatePill, WarehouseSelect, fmtQty, unitLabel, useBranchScope, useItemsCatalog, useList, useWarehouses, Inp, Sel } from './common';
 import { ReceiveDialog } from './Receipts';
+import { clock } from '../../mock/clock';
 
 const OPS = ['PurchaseOrder.Create', 'PurchaseOrder.Update', 'PurchaseOrder.Issue', 'PurchaseOrder.Find', 'PurchaseOrder.Get', 'PurchaseOrder.Close', 'PurchaseOrder.Cancel', 'Inventory.LowStock'];
 
@@ -23,23 +24,37 @@ export default function PurchaseOrders() {
   const [editor, setEditor] = useState<any | null>(params?.create ? { supplierId: params?.supplierId } : null);
   const [suggest, setSuggest] = useState(!!params?.fromLowStock);
   useEffect(() => { if (params?.fromLowStock) setSuggest(true); if (params?.create) setEditor({ supplierId: params?.supplierId }); }, [params?.fromLowStock, params?.create, params?.supplierId]);
+  const all = useList<any>('PurchaseOrder.Find', { branchId: scope.branchId });
+  const openPos = all.items.filter((p) => ['DRAFT', 'ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state));
+  const waiting = all.items.filter((p) => ['ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state));
+  const today = new Date(clock.now()).toISOString().slice(0, 10);
+  const late = waiting.filter((p) => p.expectedDate && p.expectedDate < today);
+  const loading = all.loading && !all.raw;
   return (
-    <div>
-      <Section title={t('أوامر الشراء')} badge={<StateBadge ops={OPS} />} sub={t('اطلب من المورد: مسودة ← اتبعت للمورد ← اتستلم جزء أو كله ← اتقفل. ممكن تعمل الأوامر أوتوماتيك من النواقص.')}
+    <div className="space-y-4">
+      <PageHeader icon={<ShoppingBag />} title={t('أوامر الشراء')} badge={<StateBadge ops={OPS} />} description={t('اطلب من المورد: مسودة ← اتبعت للمورد ← اتستلم جزء أو كله ← اتقفل. ممكن تعمل الأوامر أوتوماتيك من النواقص.')}
         actions={<><BranchScope scope={scope} /><Button data-fb="po:suggest" onClick={() => setSuggest(true)}><Wand2 className="w-4 h-4" />{t('من النواقص')}</Button><Button data-fb="po:new" variant="primary" onClick={() => setEditor({})}><Plus className="w-4 h-4" />{t('أمر شراء جديد')}</Button></>} />
-      <div className="flex gap-2 mb-3 flex-wrap">
-        <Sel className="w-48" data-fb="po:state" value={state} onChange={(e) => setState(e.target.value)} options={[{ value: '', label: t('كل الحالات') }, { value: 'DRAFT,ISSUED,PARTIALLY_RECEIVED', label: t('المفتوحة بس') }, ...Object.entries(PO_STATE).map(([k, v]) => ({ value: k, label: t(v.ar) }))]} />
-        <Sel className="w-60" value={supplier} onChange={(e) => setSupplier(e.target.value)} options={[{ value: '', label: t('كل الموردين') }, ...suppliers.items.map((s) => ({ value: s.id, label: s.name }))]} />
-      </div>
-      {q.loading && !q.raw ? <Spinner /> : q.items.length === 0 ? <Empty icon={<ShoppingBag className="w-10 h-10" />} text={t('مفيش أوامر شراء')} /> : (
-        <Table head={[t('الرقم'), t('المورد'), t('يستلم في'), t('الحالة'), t('القيمة'), t('اتستلم'), t('ميعاد التوريد'), '']} rows={q.items.map((p) => [
-          <button className="num font-bold hover:text-[var(--primary)]" data-fb={`po:open:${p.id}`} onClick={() => setOpen(p.id)}>{p.number}</button>,
+      <StatGrid>
+        <StatCard label={t('أوامر مفتوحة')} value={openPos.length} icon={<ShoppingBag />} loading={loading} hint={t('بقيمة {m}', { m: money(String(openPos.reduce((a, p) => a + Number(p.total), 0))) })} onClick={() => setState(state === 'DRAFT,ISSUED,PARTIALLY_RECEIVED' ? '' : 'DRAFT,ISSUED,PARTIALLY_RECEIVED')} />
+        <StatCard label={t('مسودات لسه ما اتبعتتش')} value={all.items.filter((p) => p.state === 'DRAFT').length} icon={<Pencil />} loading={loading} onClick={() => setState(state === 'DRAFT' ? '' : 'DRAFT')} />
+        <StatCard label={t('مستنيين الاستلام')} value={waiting.length} icon={<PackageCheck />} tone={waiting.length ? 'info' : 'neutral'} loading={loading} onClick={() => setState(state === 'ISSUED,PARTIALLY_RECEIVED' ? '' : 'ISSUED,PARTIALLY_RECEIVED')} />
+        <StatCard label={t('متأخرين عن ميعاد التوريد')} value={late.length} icon={<XCircle />} tone={late.length ? 'error' : 'neutral'} loading={loading} hint={late.length ? late.map((p) => p.supplierName).slice(0, 2).join('، ') : t('كله في ميعاده')} />
+      </StatGrid>
+      <Card padding="sm">
+        <Toolbar>
+          <Sel className="w-52" data-fb="po:state" value={state} onChange={(e) => setState(e.target.value)} options={[{ value: '', label: t('كل الحالات') }, { value: 'DRAFT,ISSUED,PARTIALLY_RECEIVED', label: t('المفتوحة بس') }, { value: 'ISSUED,PARTIALLY_RECEIVED', label: t('مستنية الاستلام') }, ...Object.entries(PO_STATE).map(([k, v]) => ({ value: k, label: t(v.ar) }))]} />
+          <Sel className="w-60" value={supplier} onChange={(e) => setSupplier(e.target.value)} options={[{ value: '', label: t('كل الموردين') }, ...suppliers.items.map((s) => ({ value: s.id, label: s.name }))]} />
+        </Toolbar>
+        <Table loading={q.loading && !q.raw} onRowClick={(i) => setOpen(q.items[i].id)} align={[undefined, undefined, undefined, undefined, 'end', 'end', undefined, 'end']}
+          empty={<EmptyState compact icon={<ShoppingBag />} title={t('مفيش أوامر شراء')} text={t('اعمل أمر شراء جديد، أو خلّي السيستم يجهّزه من النواقص.')} action={<Button variant="primary" onClick={() => setSuggest(true)}><Wand2 className="w-4 h-4" />{t('من النواقص')}</Button>} />}
+          head={[t('الرقم'), t('المورد'), t('يستلم في'), t('الحالة'), t('القيمة'), t('اتستلم'), t('ميعاد التوريد'), '']} rows={q.items.map((p) => [
+          <span className="num font-bold" data-fb={`po:open:${p.id}`}>{p.number}</span>,
           <span className="font-bold">{p.supplierName}</span>, <span className="text-xs">{p.warehouse.name}</span>, <StatePill map={PO_STATE} state={p.state} />,
           <Money v={p.total} className="text-xs" />, Number(p.receivedValue) > 0 ? <Money v={p.receivedValue} className="text-xs" tone="success" /> : <span className="text-dim text-xs">—</span>,
-          <span className="num text-xs">{p.expectedDate ?? '—'}</span>,
-          <Button size="sm" onClick={() => setOpen(p.id)}>{p.state === 'DRAFT' ? t('راجع وابعت') : ['ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state) ? t('استلم') : t('اعرض')}</Button>,
+          <span className={`num text-xs ${p.expectedDate && p.expectedDate < today && ['ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state) ? 'text-[var(--error)] font-bold' : ''}`}>{p.expectedDate ?? '—'}</span>,
+          <Button size="sm" variant={p.state === 'DRAFT' || ['ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state) ? 'outline' : 'ghost'} onClick={(e) => { e.stopPropagation(); setOpen(p.id); }}>{p.state === 'DRAFT' ? t('راجع وابعت') : ['ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state) ? t('استلم') : t('اعرض')}</Button>,
         ])} />
-      )}
+      </Card>
       {suggest && <Suggestions branchId={scope.branchId} onClose={() => setSuggest(false)} onDone={(id) => { setSuggest(false); if (id) setOpen(id); }} />}
       {editor && <PoEditor init={editor} onClose={() => setEditor(null)} onSaved={(id) => { setEditor(null); setOpen(id); }} />}
       <PoView id={open} onClose={() => setOpen(null)} onEdit={(po) => { setOpen(null); setEditor({ po }); }} />
@@ -131,7 +146,7 @@ function PoEditor({ init, onClose, onSaved }: { init: any; onClose: () => void; 
   };
   const [showAll, setShowAll] = useState(false);
   return (
-    <Modal open onClose={onClose} xwide title={po ? t('تعديل أمر شراء {n}', { n: po.number }) : t('أمر شراء جديد')} badge={<StateBadge ops={[po ? 'PurchaseOrder.Update' : 'PurchaseOrder.Create']} />}
+    <Drawer width="xl" open onClose={onClose} title={po ? t('تعديل أمر شراء {n}', { n: po.number }) : t('أمر شراء جديد')} badge={<StateBadge ops={[po ? 'PurchaseOrder.Update' : 'PurchaseOrder.Create']} />}
       footer={<><span className="text-sm me-auto">{t('الإجمالي')}: <b className="num">{money(total.toFixed(4))}</b></span><Button onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" data-fb="po-edit:save" loading={busy} disabled={!supplierId || !wh || !lines.some((l) => l.itemId && Number(l.orderedQuantity) > 0)} onClick={save}><Save className="w-4 h-4" />{t('احفظ مسودة')}</Button></>}>
       <div className="space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
@@ -155,7 +170,7 @@ function PoEditor({ init, onClose, onSaved }: { init: any; onClose: () => void; 
         })} />
         <Button size="sm" data-fb="po-edit:add" onClick={() => setLines([...lines, { itemId: '', packId: '', orderedQuantity: '', orderedUnitCost: '' }])}><Plus className="w-3.5 h-3.5" />{t('صنف كمان')}</Button>
       </div>
-    </Modal>
+    </Drawer>
   );
 }
 
@@ -171,7 +186,7 @@ function PoView({ id, onClose, onEdit }: { id: string | null; onClose: () => voi
   const open = po && ['ISSUED', 'PARTIALLY_RECEIVED'].includes(po.state);
   const message = po ? `${t('السلام عليكم')} ${po.supplierName}،\n${t('طلبية رقم')} ${po.number}${po.expectedDate ? ` — ${t('التوريد يوم')} ${po.expectedDate}` : ''}:\n${po.lines.map((l: any) => `• ${L(l.item?.name)}: ${fmtQty(l.orderedQuantity)} ${l.packId ? L(l.item?.packs?.find((p: any) => p.id === l.packId)?.name) : unitLabel(l.item?.unit)}`).join('\n')}\n${t('الإجمالي التقريبي')}: ${money(po.total)}\n${t('شكرًا')}` : '';
   return (
-    <Modal open onClose={onClose} xwide title={po ? <span className="flex items-center gap-2">{t('أمر شراء')} <span className="num">{po.number}</span> — {po.supplierName}</span> : t('أمر شراء')} badge={po ? <><StatePill map={PO_STATE} state={po.state} /><StateBadge ops={OPS} /></> : undefined}
+    <Drawer width="xl" open onClose={onClose} title={po ? <span className="flex items-center gap-2">{t('أمر شراء')} <span className="num">{po.number}</span> — {po.supplierName}</span> : t('أمر شراء')} badge={po ? <><StatePill map={PO_STATE} state={po.state} /><StateBadge ops={OPS} /></> : undefined}
       footer={po && <>
         {['DRAFT', 'ISSUED'].includes(po.state) && <Button variant="danger" data-fb="po-view:cancel" onClick={() => { setReason(''); setAsk('cancel'); }}><XCircle className="w-4 h-4" />{t('الغي')}</Button>}
         {open && <Button data-fb="po-view:close" onClick={() => { setReason(''); setAsk('close'); }}><Lock className="w-4 h-4" />{t('اقفل الأمر (الباقي مش جاي)')}</Button>}
@@ -214,7 +229,7 @@ function PoView({ id, onClose, onEdit }: { id: string | null; onClose: () => voi
         </Modal>
       )}
       {receive && po && <ReceiveDialog po={po} onClose={() => setReceive(false)} />}
-    </Modal>
+    </Drawer>
   );
 }
 const poHistoryText = (s: string) => s.replace(/^DRAFT$/, t('اتعمل مسودة')).replace(/^ISSUED$/, t('اتبعت للمورد')).replace(/^CANCELLED/, t('اتلغى')).replace(/^CLOSED/, t('اتقفل')).replace('lines updated', t('الأصناف اتعدلت')).replace(/^received (\S+) → (\S+)$/, (_m, n, st) => `${t('استلام')} ${n} ← ${t(PO_STATE[st]?.ar ?? st)}`).replace(/^received → (\S+)$/, (_m, st) => `${t('استلام')} ← ${t(PO_STATE[st]?.ar ?? st)}`).replace(/^receipt (\S+) reversed → (\S+)$/, (_m, n, st) => `${t('إلغاء استلام')} ${n} ← ${t(PO_STATE[st]?.ar ?? st)}`);

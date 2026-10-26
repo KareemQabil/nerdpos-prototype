@@ -15,16 +15,16 @@ export function ClockControl() {
   const go = (fn: () => void) => { fn(); demo.tick(); };
   return (
     <Popover title={t('ساعة التجربة: قدّم الوقت عشان تشوف اليوم التجاري، الأسعار المجدولة، الهابي أور، وتنبيهات الإيصال الإلكتروني')} width={340} button={(o) => (
-      <button data-fb="chrome:clock" className={cn('h-8 px-2 rounded-lg border flex items-center gap-1.5 text-xs', off ? 'border-[var(--warning)] text-[var(--warning)]' : 'border-[var(--glass-border)] surface-1 text-soft', o && 'bg-[var(--primary-container)]')}>
-        <Clock className="w-4 h-4" /><span className="num">{localTime(now)}</span>{off ? <span className="text-[10px] hidden lg:inline">{t('متقدمة')}</span> : null}<span className="num text-dim hidden min-[2200px]:inline">{businessDate(now)}</span>
+      <button data-fb="chrome:clock" data-on={o} className={cn('chrome-btn', !!off && '!border-[color-mix(in_srgb,var(--warning)_50%,transparent)] !text-[var(--warning-text)] !bg-[color-mix(in_srgb,var(--warning)_12%,transparent)]')}>
+        <Clock className="w-4 h-4" /><span className="num font-bold">{localTime(now)}</span>{off ? <span className="text-[10px] hidden min-[1400px]:inline">{t('متقدمة')}</span> : null}<span className="num text-dim hidden min-[2200px]:inline">{businessDate(now)}</span>
       </button>
     )}>
       <div className="space-y-3 text-sm">
-        <div className="font-bold">{t('ساعة التجربة')}</div>
+        <div className="font-bold text-base">{t('ساعة التجربة')}</div>
         <div className="text-xs text-dim">{t('السيستم ليه ساعة لوحده تقدر تقدّمها. اليوم التجاري بيبدأ الساعة 4 الفجر بتوقيت القاهرة: البيع الساعة 2 بالليل بيتحسب على اليوم اللي قبله.')}</div>
         <div className="grid grid-cols-2 gap-2 text-xs">
-          <div className="surface-1 rounded-lg p-2"><div className="text-dim">{t('القاهرة')}</div><div className="num font-bold text-lg">{localTime(now)}</div></div>
-          <div className="surface-1 rounded-lg p-2"><div className="text-dim">{t('اليوم التجاري')}</div><div className="num font-bold text-lg">{businessDate(now)}</div></div>
+          <div className="surface-1 rounded-xl p-2.5"><div className="text-dim">{t('القاهرة')}</div><div className="num font-bold text-lg">{localTime(now)}</div></div>
+          <div className="surface-1 rounded-xl p-2.5"><div className="text-dim">{t('اليوم التجاري')}</div><div className="num font-bold text-lg">{businessDate(now)}</div></div>
         </div>
         <div className="grid grid-cols-3 gap-1.5">
           <Button size="sm" onClick={() => go(() => clock.advance(15 * 60_000))}>+15 {t('دقيقة')}</Button>

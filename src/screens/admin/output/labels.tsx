@@ -2,6 +2,7 @@
 // Display only: no money is computed here.
 import React from 'react';
 import { Pill } from '../../../ui';
+import { Tech } from '../../../app/tech';
 import { t } from '../../../i18n';
 import { clock } from '../../../mock/clock';
 import { time } from '../../../lib/format';
@@ -14,7 +15,7 @@ export function printStateLabel(s: string): string {
 }
 export function PrintStatePill({ state }: { state: string }) {
   const tone: Tone = state === 'SUCCEEDED' ? 'success' : state === 'FAILED' ? 'warning' : state === 'DEAD' ? 'error' : 'info';
-  return <Pill tone={tone} title={state}>{printStateLabel(state)}</Pill>;
+  return <Pill tone={tone} dot>{printStateLabel(state)}</Pill>;
 }
 export function docTypeLabel(d: string): string {
   return ({ RECEIPT: t('إيصال'), KITCHEN_TICKET: t('تذكرة مطبخ'), PRE_BILL: t('شيك مبدئي'), X_REPORT: t('تقرير X'), Z_REPORT: t('تقرير Z'), FISCAL_DOCUMENT: t('إيصال إلكتروني') } as Record<string, string>)[d] ?? d;
@@ -37,7 +38,7 @@ export function fiscalStateLabel(s: string): string {
 }
 export function FiscalStatePill({ state }: { state: string }) {
   const tone: Tone = state === 'ACCEPTED' ? 'success' : state === 'REJECTED' ? 'error' : state === 'PENDING_DATA' ? 'warning' : state === 'SUPERSEDED' ? 'neutral' : 'info';
-  return <Pill tone={tone} title={state}>{fiscalStateLabel(state)} <span className="num opacity-70 font-normal">{state}</span></Pill>;
+  return <Pill tone={tone}>{fiscalStateLabel(state)}<Tech> <span className="num opacity-70 font-normal">{state}</span></Tech></Pill>;
 }
 export function issueLabel(code: string): string {
   return ({ NO_FISCAL_PROFILE: t('مفيش ملف ضريبي للفرع'), NO_ACTIVE_DEVICE: t('مفيش جهاز ضريبي نشط'), ITEM_CODE_MISSING: t('صنف من غير كود'), SERVICE_CHARGE_UNMAPPED: t('الخدمة برة الإيصال (معلومة، مش بتوقف)'), ROUNDING_UNMAPPED: t('التقريب مش متعرف') } as Record<string, string>)[code] ?? code;
