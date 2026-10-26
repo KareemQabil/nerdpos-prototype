@@ -2,7 +2,8 @@
 import React, { useState } from 'react';
 import { Users, UserPlus, Search, Copy, Crown } from 'lucide-react';
 import { useDev, useQuery } from '../../app/hooks';
-import { Section, StateBadge, Button, Card, Pill, Money, Input, Select, Table, Spinner, Empty } from '../../ui';
+import { PageHeader, StateBadge, Button, Card, Money, Select, Table, EmptyState, StatGrid, StatCard, Toolbar, SearchInput, FilterChips } from '../../ui';
+import { Tech } from '../../app/tech';
 import { t, L } from '../../i18n';
 import { cn, money, dateTime } from '../../lib/format';
 import { TAGS, TagPills, TierBadge, CustomerPicker, addressText } from './common';
@@ -19,32 +20,33 @@ export default function Customers() {
   const res = useQuery<any>('Customer.Search', { query });
   const tiers = useQuery<any>('LoyaltyTier.List', { query: {} });
   const items: any[] = res.data?.items ?? [];
+  const PAGE = 50;
+  const [n, setN] = useState(PAGE);
   return (
     <div data-screen="CR1" className="space-y-4">
-      <Section title={t('العملاء')} badge={<StateBadge ops={['Customer.Search', 'Customer.Create', 'Customer.Get']} />}
-        sub={t('كل العملاء اللي طلبوا قبل كده: عناوينهم، طلباتهم، نقاطهم وملاحظاتهم. ابحث برقم الموبايل أو الاسم.')}
+      <PageHeader icon={<Users />} title={t('العملاء')} badge={<StateBadge ops={['Customer.Search', 'Customer.Create', 'Customer.Get']} />}
+        description={t('كل العملاء اللي طلبوا قبل كده: عناوينهم، طلباتهم، نقاطهم وملاحظاتهم. ابحث برقم الموبايل أو الاسم.')}
         actions={<Button variant="primary" onClick={() => setCreating(true)} data-fb="customers-new"><UserPlus className="w-4 h-4" />{t('عميل جديد')}</Button>} />
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        <div className="glass rounded-xl px-3 py-2"><div className="text-[11px] text-dim">{t('عدد العملاء')}</div><div className="text-xl font-bold num">{res.data?.total ?? '—'}</div></div>
+      <StatGrid>
+        <StatCard label={t('عدد العملاء')} value={res.data?.total ?? '—'} icon={<Users />} loading={res.loading && !res.data} />
         {(tiers.data?.items ?? []).filter((x: any) => x.active).map((x: any) => (
-          <div key={x.id} className="glass rounded-xl px-3 py-2"><div className="text-[11px] text-dim flex items-center gap-1"><Crown className="w-3 h-3" style={{ color: x.color }} />{L(x.name)}</div><div className="text-xl font-bold num" style={{ color: x.color }}>{x.customers}</div></div>
+          <StatCard key={x.id} label={L(x.name)} value={<span style={{ color: x.color }}>{x.customers}</span>} icon={<Crown style={{ color: x.color }} />} hint={t('عميل في المستوى ده')} />
         ))}
-      </div>
-      <Card>
-        <div className="flex flex-wrap items-center gap-2 mb-3">
-          <div className="relative flex-1 min-w-[220px]"><Search className="w-4 h-4 absolute top-3 start-3 text-dim" /><Input data-fb="customers-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('رقم الموبايل، الاسم، الحي، ملاحظة…')} className="ps-9" /></div>
-          <div className="flex gap-1 flex-wrap">
-            <button onClick={() => setTag('')} className={cn('px-3 h-9 rounded-lg text-xs border', !tag ? 'bg-[var(--primary)] text-[var(--primary-foreground)] border-transparent font-bold' : 'surface-1 border-[var(--glass-border)]')}>{t('الكل')}</button>
-            {Object.entries(TAGS).map(([k, v]) => <button key={k} onClick={() => setTag(k)} className={cn('px-3 h-9 rounded-lg text-xs border', tag === k ? 'bg-[var(--primary)] text-[var(--primary-foreground)] border-transparent font-bold' : 'surface-1 border-[var(--glass-border)]')}>{t(v.ar)}</button>)}
-          </div>
-          <div className="w-44 shrink-0"><Select value={sort} onChange={(e) => setSort(e.target.value)} options={[{ value: 'RECENT', label: t('آخر طلب') }, { value: 'SPENT', label: t('الأكتر صرفًا') }, { value: 'POINTS', label: t('الأكتر نقاط') }, { value: 'NAME', label: t('الاسم') }]} /></div>
-        </div>
-        {res.loading && !items.length ? <Spinner /> : (
-          <Table head={[t('العميل'), t('الموبايل'), t('المنطقة'), t('المستوى'), t('النقاط'), t('الطلبات'), t('إجمالي الصرف'), t('آخر طلب')]} empty={<Empty icon={<Users className="w-10 h-10" />} text={t('مفيش عملاء بالبحث ده')} />}
-            rows={items.map((c) => {
+      </StatGrid>
+      <Card padding="sm">
+        <Toolbar>
+          <SearchInput data-fb="customers-search" value={q} onChange={(v) => { setQ(v); setN(PAGE); }} placeholder={t('رقم الموبايل، الاسم، الحي، ملاحظة…')} />
+          <FilterChips value={tag} onChange={(v) => { setTag(v); setN(PAGE); }} options={[{ id: '', label: t('الكل') }, ...Object.entries(TAGS).map(([k, v]) => ({ id: k, label: t(v.ar) }))]} />
+          <Toolbar.Spacer />
+          <Select className="!w-auto min-w-[150px]" value={sort} onChange={(e) => setSort(e.target.value)} options={[{ value: 'RECENT', label: t('ترتيب: آخر طلب') }, { value: 'SPENT', label: t('ترتيب: الأكتر صرفًا') }, { value: 'POINTS', label: t('ترتيب: الأكتر نقاط') }, { value: 'NAME', label: t('ترتيب: الاسم') }]} />
+        </Toolbar>
+        {(
+          <Table loading={res.loading && !items.length} maxHeight={640} onRowClick={(i) => nav('customer', { customerId: items[i].id })} align={[undefined, undefined, undefined, undefined, 'end', 'end', 'end', undefined]}
+            head={[t('العميل'), t('الموبايل'), t('المنطقة'), t('المستوى'), t('النقاط'), t('الطلبات'), t('إجمالي الصرف'), t('آخر طلب')]} empty={<EmptyState compact icon={<Users />} title={t('مفيش عملاء بالبحث ده')} text={t('جرّب رقم موبايل تاني، أو ضيف العميل من «عميل جديد».')} />}
+            rows={items.slice(0, n).map((c) => {
               const a = c.addresses.find((x: any) => x.isDefault) ?? c.addresses[0];
               return [
-                <button className="text-start" onClick={() => nav('customer', { customerId: c.id })} data-fb={`open-customer:${c.phone}`}><div className="font-bold flex items-center gap-1.5 flex-wrap">{c.name}<TagPills tags={c.tags} /></div><div className="text-[11px] text-dim num">{c.code}{c.allergies?.length ? <span className="text-amber-300"> · ⚠ {t('حساسية')}</span> : null}</div></button>,
+                <div className="text-start" data-fb={`open-customer:${c.phone}`}><div className="font-bold flex items-center gap-1.5 flex-wrap">{c.name}<TagPills tags={c.tags} /></div><div className="text-[11px] text-dim"><Tech><span className="num">{c.code}</span></Tech>{c.allergies?.length ? <span className="text-[var(--warning)]">⚠ {t('عنده حساسية')}</span> : null}</div></div>,
                 <span className="num text-xs" dir="ltr">{c.phone}</span>,
                 <span className="text-xs">{a ? a.area : '—'}</span>,
                 <TierBadge tier={c.loyalty.tier} />,
@@ -55,6 +57,7 @@ export default function Customers() {
               ];
             })} />
         )}
+        {n < items.length && <div className="flex justify-center mt-2"><Button size="sm" variant="ghost" onClick={() => setN(n + PAGE)}>{t('اعرض أكتر ({n} كمان)', { n: items.length - n })}</Button></div>}
       </Card>
       <CustomerPicker open={creating} createFirst onClose={() => setCreating(false)} title={t('عميل جديد')} onPick={(c) => { setCreating(false); nav('customer', { customerId: c.id }); }} />
     </div>

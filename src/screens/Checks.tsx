@@ -1,51 +1,90 @@
-// D2 Find and reopen checks: by number, table, status, business date. After a lost response or a restart,
-// the check is re-read from the server (the same command never runs twice).
+// D2 Find and reopen checks: by number, status and business date. Tap a row for the details and the next step.
+// After a lost response or a restart the check is re-read from the server (the same command never runs twice).
 import React, { useState } from 'react';
-import { Search, History, Wallet, Receipt, ClipboardList, ArrowRightLeft } from 'lucide-react';
+import { History, Wallet, Receipt, ClipboardList, ArrowRightLeft, CalendarDays } from 'lucide-react';
 import { TransferSessionDialog } from './ops/TransferSessionDialog';
 import { useDev, useQuery } from '../app/hooks';
-import { Section, StateBadge, Input, Select, Table, Money, Button, Field } from '../ui';
-import { t } from '../i18n';
-import { time } from '../lib/format';
+import { PageHeader, Input, Table, Money, Button, Toolbar, SearchInput, FilterChips, EmptyState, Drawer, KV, StateBadge } from '../ui';
+import { t, L } from '../i18n';
+import { time, money, qty } from '../lib/format';
 import { StatusPill, HistoryDialog } from './order/CheckPanel';
 import { clock, businessDate } from '../mock/clock';
+import { personName } from '../demo/people';
+
+type St = 'ALL' | 'DRAFT' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED,VOIDED';
+const placeOf = (o: any) => (o.kind === 'STAFF_MEAL' ? t('وجبة موظف') : o.tableName ? `${t('ترابيزة')} ${o.tableName} · ${t('شيك')} ${o.checkNo}` : o.channel === 'TAKEAWAY' ? t('تيك أواي') : o.channel === 'DELIVERY' ? t('دليفري') : t('صالة كاونتر'));
+const live = (o: any) => o.status === 'DRAFT' || o.status === 'CONFIRMED';
 
 export default function Checks() {
   const { nav, kind, can } = useDev();
   const [number, setNumber] = useState('');
-  const [lifecycle, setLifecycle] = useState('');
+  const [st, setSt] = useState<St>('ALL');
   const [bd, setBd] = useState('');
   const [hist, setHist] = useState<any>(null);
   const [move, setMove] = useState<any>(null);
-  const q = useQuery<any>('Order.Find', { query: { number: number || undefined, lifecycle: lifecycle || undefined, businessDate: bd || undefined, limit: 200 } });
-  const rows = (q.data?.items ?? []).map((o: any) => [
+  const [sel, setSel] = useState<any>(null);
+  const q = useQuery<any>('Order.Find', { query: { number: number || undefined, lifecycle: st === 'ALL' ? undefined : st, businessDate: bd || undefined, limit: 200 } });
+  const items: any[] = q.data?.items ?? [];
+  const today = businessDate(clock.now());
+  const open = (o: any) => nav(o.visitId ? 'order' : kind === 'CASH' ? 'counter' : 'order', { orderId: o.id, back: 'checks' });
+  const rows = items.map((o: any) => [
     <span className="num font-bold">#{o.number}</span>,
-    o.kind === 'STAFF_MEAL' ? t('وجبة موظف') : o.tableName ? `${t('ترابيزة')} ${o.tableName} · ${t('شيك')} ${o.checkNo}` : o.channel === 'TAKEAWAY' ? t('تيك أواي') : t('صالة كاونتر'),
+    <span className="font-bold">{placeOf(o)}</span>,
     <StatusPill s={o.status} />,
-    <span className="num text-xs">{o.businessDate}</span>,
-    <span className="num text-xs">{time(o.createdAt)}</span>,
-    o.serverName,
+    <span className="num text-xs text-soft">{o.businessDate === today ? t('النهارده') : o.businessDate} · {time(o.createdAt)}</span>,
+    <span className="text-soft">{personName(null, o.serverName)}</span>,
     <Money v={o.totals.payable} />,
-    <div className="flex gap-1">
-      {(o.status === 'DRAFT' || o.status === 'CONFIRMED') && <Button size="sm" onClick={() => nav(o.visitId ? 'order' : kind === 'CASH' ? 'counter' : 'order', { orderId: o.id, back: 'checks' })}><ClipboardList className="w-3.5 h-3.5" />{t('افتح')}</Button>}
-      {(o.status === 'DRAFT' || o.status === 'CONFIRMED') && can('payment:capture') && kind !== 'FLOOR' && <Button size="sm" variant="success" onClick={() => nav('pay', { orderId: o.id, back: 'checks' })}><Wallet className="w-3.5 h-3.5" /></Button>}
-      {o.status !== 'DRAFT' && <Button size="sm" onClick={() => nav('receipt', { orderId: o.id })}><Receipt className="w-3.5 h-3.5" /></Button>}
-      {(o.status === 'DRAFT' || o.status === 'CONFIRMED') && o.sessionId && can('session:close') && <Button size="sm" variant="ghost" title={t('نقل لوردية تانية')} onClick={() => setMove(o)} data-fb={`check-transfer:${o.number}`}><ArrowRightLeft className="w-3.5 h-3.5" /></Button>}
-      <Button size="sm" variant="ghost" onClick={() => setHist(o)}><History className="w-3.5 h-3.5" /></Button>
+    <div className="flex gap-1 justify-end" onClick={(e) => e.stopPropagation()}>
+      {live(o) && <Button size="sm" onClick={() => open(o)} data-fb={`check-open:${o.number}`}><ClipboardList className="w-3.5 h-3.5" />{t('افتح')}</Button>}
+      {live(o) && can('payment:capture') && kind !== 'FLOOR' && <Button size="sm" variant="success" onClick={() => nav('pay', { orderId: o.id, back: 'checks' })} title={t('تحصيل')} aria-label={t('تحصيل')}><Wallet className="w-3.5 h-3.5" /></Button>}
+      {o.status !== 'DRAFT' && <Button size="sm" variant="ghost" onClick={() => nav('receipt', { orderId: o.id })} title={t('الإيصال')} aria-label={t('الإيصال')}><Receipt className="w-3.5 h-3.5" /></Button>}
     </div>,
   ]);
   return (
-    <div data-screen="D2">
-      <Section title={t('الشيكات')} badge={<StateBadge ops={['Order.Find', 'Order.Get', 'Order.Timeline']} />} sub={t('دوّر على أي شيك وافتحه تاني — بعد رد ضايع أو بعد إعادة تشغيل الجهاز، نفس الأمر عمره ما بيتنفذ مرتين.')} />
-      <div className="grid sm:grid-cols-4 gap-2 mb-3">
-        <Field label={t('رقم الشيك')}><div className="relative"><Search className="w-4 h-4 absolute top-3 start-3 text-dim" /><Input value={number} onChange={(e) => setNumber(e.target.value)} className="ps-9" placeholder="0001" /></div></Field>
-        <Field label={t('الحالة')}><Select value={lifecycle} onChange={(e) => setLifecycle(e.target.value)} options={[{ value: '', label: t('الكل') }, { value: 'DRAFT', label: t('مفتوح') }, { value: 'CONFIRMED', label: t('متأكد — مستني الدفع') }, { value: 'COMPLETED', label: t('اتقفل') }, { value: 'CANCELLED,VOIDED', label: t('ملغي') }]} /></Field>
-        <Field label={t('اليوم التجاري')}><Input type="date" value={bd} onChange={(e) => setBd(e.target.value)} /></Field>
-        <div className="flex items-end"><Button variant="ghost" onClick={() => setBd(businessDate(clock.now()))}>{t('النهارده')}</Button></div>
-      </div>
-      <Table head={['#', t('المكان'), t('الحالة'), t('اليوم التجاري'), t('الوقت'), t('الويتر'), t('الإجمالي'), '']} rows={rows} empty={t('مفيش شيكات')} />
+    <div data-screen="D2" className="space-y-4">
+      <PageHeader title={t('الشيكات')} ops={['Order.Find', 'Order.Get', 'Order.Timeline']} description={t('دوّر على أي شيك وافتحه تاني، حصّله، أو شوف إيصاله وسجله.')} className="!mb-0" />
+      <Toolbar className="!mb-0">
+        <SearchInput value={number} onChange={setNumber} placeholder={t('رقم الشيك')} data-fb="checks-search" />
+        <FilterChips value={st} onChange={setSt} options={[{ id: 'ALL', label: t('الكل') }, { id: 'DRAFT', label: t('مفتوح') }, { id: 'CONFIRMED', label: t('مستني الدفع'), tone: 'warning' }, { id: 'COMPLETED', label: t('اتقفل') }, { id: 'CANCELLED,VOIDED', label: t('ملغي') }]} />
+        <Toolbar.Spacer />
+        <Button size="sm" variant={bd === today ? 'subtle' : 'ghost'} onClick={() => setBd(bd === today ? '' : today)} data-fb="checks-today"><CalendarDays className="w-4 h-4" />{t('النهارده')}</Button>
+        <Input type="date" value={bd} onChange={(e) => setBd(e.target.value)} className="!w-44 h-10" aria-label={t('اليوم')} />
+      </Toolbar>
+      <Table head={['#', t('المكان'), t('الحالة'), t('الوقت'), t('الويتر / الكاشير'), t('الإجمالي'), '']} align={['start', 'start', 'start', 'start', 'start', 'end', 'end']} rows={rows} loading={q.loading} maxHeight="calc(100vh - 300px)"
+        onRowClick={(i) => setSel(items[i])}
+        empty={<EmptyState compact icon={<Receipt />} title={number || st !== 'ALL' || bd ? t('مفيش شيكات بالبحث ده') : t('لسه مفيش شيكات')} text={number || st !== 'ALL' || bd ? t('غيّر الرقم أو الحالة أو اليوم.') : t('أول شيك هيتفتح من الصالة أو نقطة البيع هيظهر هنا.')} />} />
+      {sel && <CheckDrawer o={items.find((x) => x.id === sel.id) ?? sel} onClose={() => setSel(null)} onOpen={() => open(sel)} onHistory={() => setHist(sel)} onMove={() => setMove(sel)} />}
       {hist && <HistoryDialog order={hist} onClose={() => setHist(null)} />}
       {move && <TransferSessionDialog orders={[move]} onClose={() => setMove(null)} />}
     </div>
+  );
+}
+
+function CheckDrawer({ o, onClose, onOpen, onHistory, onMove }: { o: any; onClose: () => void; onOpen: () => void; onHistory: () => void; onMove: () => void }) {
+  const { nav, kind, can } = useDev();
+  const full = useQuery<any>('Order.Get', { params: { orderId: o.id } });
+  const d = full.data ?? o;
+  const T = d.totals;
+  return (
+    <Drawer open onClose={onClose} width="md" title={<span className="flex items-center gap-2">{t('شيك')} <span className="num">#{o.number}</span><StatusPill s={o.status} /></span>} description={placeOf(o)} badge={<StateBadge ops={['Order.Get']} />}
+      footer={<>
+        <Button variant="ghost" onClick={onHistory}><History className="w-4 h-4" />{t('السجل')}</Button>
+        {live(o) && o.sessionId && can('session:close') && <Button variant="ghost" onClick={onMove} data-fb={`check-transfer:${o.number}`}><ArrowRightLeft className="w-4 h-4" />{t('نقل لدرج تاني')}</Button>}
+        <div className="flex-1" />
+        {o.status !== 'DRAFT' && <Button onClick={() => nav('receipt', { orderId: o.id })}><Receipt className="w-4 h-4" />{t('الإيصال')}</Button>}
+        {live(o) && can('payment:capture') && kind !== 'FLOOR' && <Button variant="success" onClick={() => nav('pay', { orderId: o.id, back: 'checks' })}><Wallet className="w-4 h-4" />{t('تحصيل')}</Button>}
+        {live(o) && <Button variant="primary" onClick={onOpen}><ClipboardList className="w-4 h-4" />{t('افتح الشيك')}</Button>}
+      </>}>
+      <div className="space-y-4">
+        <KV rows={[[t('اليوم'), <span className="num">{o.businessDate}</span>], [t('اتفتح'), <span className="num">{time(o.createdAt)}</span>], [t('الويتر / الكاشير'), personName(null, o.serverName)], ...(d.guestCount ? [[t('الضيوف'), <span className="num">{d.guestCount}</span>] as [string, React.ReactNode]] : [])]} />
+        {d.lines ? (
+          <div className="rounded-xl surface-1 border line p-3 space-y-1.5 text-sm">
+            {d.lines.filter((l: any) => l.status !== 'REMOVED').map((l: any) => <div key={l.id} className={l.status === 'VOIDED' ? 'flex justify-between gap-2 line-through opacity-50' : 'flex justify-between gap-2'}><span><span className="num font-bold text-[var(--primary)]">{qty(l.quantity)}×</span> {L(l.name)}</span><span className="num">{money(l.lineTotal)}</span></div>)}
+            <div className="border-t line pt-2 mt-2 flex justify-between font-bold"><span>{t('الإجمالي')}</span><Money v={T.payable} /></div>
+            {d.settlement && <div className="flex justify-between text-xs text-dim"><span>{t('اتدفع')} <span className="num">{money(d.settlement.paid)}</span></span><span>{t('الباقي')} <span className="num">{money(d.settlement.remaining)}</span></span></div>}
+          </div>
+        ) : <EmptyState compact text={t('بنحمّل التفاصيل…')} />}
+      </div>
+    </Drawer>
   );
 }

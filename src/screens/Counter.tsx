@@ -1,11 +1,11 @@
 // Counter and takeaway: order, pay first (fire at confirm), receipt. Also the staff meal (D9, direction).
 import React, { useState } from 'react';
-import { Plus, ShoppingBag, Utensils, Coffee, Bike } from 'lucide-react';
+import { Plus, ShoppingBag, Utensils, Coffee, Bike, Wallet } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../app/hooks';
 import { OrderWorkspace, needsDialog } from './OrderScreen';
 import { MenuGrid } from './order/MenuGrid';
 import { ProductDialog, type LineDraft } from './order/ProductDialog';
-import { Section, StateBadge, Button, Banner, Money, Pill, Modal, Input, Field, Empty } from '../ui';
+import { PageHeader, StateBadge, Button, Banner, Money, Pill, Modal, Input, Field, EmptyState, Skeleton } from '../ui';
 import { t, L } from '../i18n';
 import { cn, money, qty } from '../lib/format';
 import { StatusPill } from './order/CheckPanel';
@@ -21,31 +21,31 @@ export default function Counter() {
     const o = await run<any>('Order.Create', { body: { channel } }, { success: channel === 'TAKEAWAY' ? t('طلب تيك أواي جديد') : t('طلب صالة كاونتر جديد') });
     if (o) nav('counter', { orderId: o.id });
   };
-  if (!terminal?.drawer) return <Banner tone="warning">{t('الجهاز ده من غير درج — البيع على الكاونتر محتاج جهاز كاشير.')}</Banner>;
-  if (session.loading && !session.data) return null;
+  if (!terminal?.drawer) return <EmptyState icon={<ShoppingBag />} title={t('الجهاز ده من غير درج')} text={t('البيع على الكاونتر والتيك أواي بيكون من جهاز الكاشير اللي فيه درج.')} />;
+  if (session.loading && !session.data) return <Skeleton className="h-64 rounded-2xl" />;
   if (!session.data) return (
     <div data-screen="C2" className="space-y-3">
-      <Section title={t('نقطة البيع')} badge={<StateBadge ops={['Order.Create', 'Session.Open']} />} />
-      <Banner tone="warning" action={<Button variant="primary" size="sm" onClick={() => nav('shift')}>{t('افتح وردية')}</Button>}>{t('مفيش وردية مفتوحة على الجهاز ده. البيع على الكاونتر والتيك أواي محتاج وردية درج (SESSION_NOT_OPEN).')}</Banner>
+      <PageHeader title={t('نقطة البيع')} ops={['Order.Create', 'Session.Open']} description={t('بيع التيك أواي والكاونتر من الدرج.')} />
+      <EmptyState icon={<Wallet />} title={t('مفيش وردية مفتوحة على الجهاز ده')} text={t('افتح الوردية الأول بالفلوس اللي في الدرج، وبعدها تقدر تبيع.')} action={<Button variant="primary" size="lg" onClick={() => nav('shift')} data-fb="counter-open-shift">{t('افتح وردية')}</Button>} />
     </div>
   );
   const orders: any[] = (open.data?.items ?? []).filter((o: any) => !o.visitId);
   return (
     <div data-screen="C2" className="h-full flex flex-col gap-3 min-h-0">
       <div className="flex items-center gap-2 flex-wrap">
-        <h1 className="text-xl font-bold me-2">{t('نقطة البيع')}</h1>
+        <h1 className="text-[22px] font-extrabold tracking-tight me-1">{t('نقطة البيع')}</h1>
         <StateBadge ops={['Order.Create', 'Order.AddLines', 'Order.Confirm', 'Payment.Capture', 'Order.Complete']} />
-        <Button variant="primary" onClick={() => create('TAKEAWAY')} loading={busy} data-fb="new-takeaway"><ShoppingBag className="w-4 h-4" />{t('تيك أواي جديد')}</Button>
-        <Button onClick={() => create('DINE_IN')} loading={busy}><Utensils className="w-4 h-4" />{t('صالة كاونتر')}</Button>
-        {can('delivery:create') && <Button onClick={() => nav('delivery-new')} data-fb="counter-delivery"><Bike className="w-4 h-4" />{t('دليفري')}</Button>}
-        <Button variant="ghost" onClick={() => setStaffMeal(true)}><Coffee className="w-4 h-4" />{t('وجبة موظف')} <StateBadge state="PROPOSED" /></Button>
+        <Button variant="primary" size="lg" onClick={() => create('TAKEAWAY')} loading={busy} data-fb="new-takeaway"><ShoppingBag className="w-4 h-4" />{t('تيك أواي جديد')}</Button>
+        <Button size="lg" onClick={() => create('DINE_IN')} loading={busy} data-fb="new-counter-dinein"><Utensils className="w-4 h-4" />{t('صالة كاونتر')}</Button>
+        {can('delivery:create') && <Button size="lg" onClick={() => nav('delivery-new')} data-fb="counter-delivery"><Bike className="w-4 h-4" />{t('دليفري')}</Button>}
+        <Button variant="ghost" size="lg" onClick={() => setStaffMeal(true)} data-fb="staff-meal"><Coffee className="w-4 h-4" />{t('وجبة موظف')} <StateBadge state="PROPOSED" /></Button>
         <div className="flex-1" />
-        <div className="flex gap-1.5 overflow-x-auto scrollbar-hide max-w-[50%]">
-          {orders.map((o) => <button key={o.id} onClick={() => nav('counter', { orderId: o.id })} className={cn('px-3 h-9 rounded-lg border text-xs whitespace-nowrap flex items-center gap-1.5', current === o.id ? 'border-[var(--primary)] bg-[var(--primary-container)]' : 'surface-1 border-[var(--glass-border)]')}><span className="num font-bold">#{o.number}</span>{o.channel === 'TAKEAWAY' ? t('تيك أواي') : o.channel === 'DELIVERY' ? t('دليفري') : t('صالة')} · <span className="num">{money(o.totals.payable, false)}</span></button>)}
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-hide max-w-full lg:max-w-[45%]" data-fb="counter-open-orders">
+          {orders.map((o) => <button key={o.id} onClick={() => nav('counter', { orderId: o.id })} className={cn('px-3 h-11 rounded-xl border text-xs whitespace-nowrap flex items-center gap-1.5', current === o.id ? 'border-[var(--primary)] bg-[var(--primary-container)] font-bold' : 'surface-1 border-[var(--glass-border)]')}><span className="num font-bold">#{o.number}</span>{o.channel === 'TAKEAWAY' ? t('تيك أواي') : o.channel === 'DELIVERY' ? t('دليفري') : t('صالة')} · <span className="num">{money(o.totals.payable, false)}</span></button>)}
         </div>
       </div>
       <div className="flex-1 min-h-0">
-        {current ? <OrderWorkspace key={current} orderId={current} mode="COUNTER" /> : <Empty icon={<ShoppingBag className="w-12 h-12" />} text={t('ابدأ طلب تيك أواي جديد. في التيك أواي الدفع الأول والإرسال للمطبخ وقت التأكيد (FireTimingPolicy TAKEAWAY AT_CONFIRM).')} />}
+        {current ? <OrderWorkspace key={current} orderId={current} mode="COUNTER" /> : <EmptyState icon={<ShoppingBag />} title={t('ابدأ طلب جديد')} text={t('في التيك أواي الزبون بيدفع الأول، والأصناف بتروح المطبخ أول ما الشيك يتأكد.')} action={<Button variant="primary" size="lg" onClick={() => create('TAKEAWAY')} loading={busy}><ShoppingBag className="w-4 h-4" />{t('تيك أواي جديد')}</Button>} />}
       </div>
       {staffMeal && <StaffMealDialog onClose={() => setStaffMeal(false)} />}
     </div>
@@ -58,7 +58,7 @@ function StaffMealDialog({ onClose }: { onClose: () => void }) {
   const [pick, setPick] = useState<any>(null);
   const [staff, setStaff] = useState('');
   return (
-    <Modal open onClose={onClose} xwide title={t('وجبة موظف')} badge={<StateBadge ops={['Order.CreateStaffMeal']} />} footer={<><div className="me-auto text-sm text-dim">{lines.map((l) => `${l.name} ×${l.quantity}`).join('، ')}</div><Button variant="primary" loading={busy} disabled={!lines.length || !staff} onClick={async () => { if (await run('Order.CreateStaffMeal', { body: { staffName: staff, lines: lines.map(({ name, ...l }) => l) } }, { success: t('وجبة الموظف اتسجلت واتبعتت للمطبخ') })) onClose(); }}>{t('سجّل')}</Button></>}>
+    <Modal open onClose={onClose} xwide title={t('وجبة موظف')} badge={<StateBadge ops={['Order.CreateStaffMeal']} />} footer={<><div className="me-auto text-sm text-dim">{lines.length ? lines.map((l) => `${l.name} ×${l.quantity}`).join('، ') : t('اختار الأصناف من المنيو')}</div><Button variant="primary" loading={busy} disabled={!lines.length || !staff} onClick={async () => { if (await run('Order.CreateStaffMeal', { body: { staffName: staff, lines: lines.map(({ name, ...l }) => l) } }, { success: t('وجبة الموظف اتسجلت واتبعتت للمطبخ') })) onClose(); }}>{t('سجّل')}</Button></>}>
       <div className="space-y-3">
         <Banner tone="info">{t('وجبة الموظف مش بيع: من غير إيصال ولا إيصال إلكتروني، وليها سطر لوحدها في التقارير. بتتبعت للمطبخ عادي.')}</Banner>
         <Field label={t('اسم الموظف')}><Input value={staff} onChange={(e) => setStaff(e.target.value)} /></Field>

@@ -101,9 +101,9 @@ export function Modal({ open, onClose, title, children, footer, wide, xwide, bad
   const w = size === 'sm' ? 'max-w-md' : size === 'lg' || (!size && wide) ? 'max-w-3xl' : size === 'xl' || (!size && xwide) ? 'max-w-6xl' : 'max-w-lg';
   // Portaled to <body>: a backdrop-filter (.glass) ancestor would otherwise clip a fixed overlay to that card.
   return <><span ref={anchor} hidden />{createPortal(
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4" role="dialog" aria-modal aria-labelledby={titleId} data-device={ctx.device} data-screen={ctx.screen}>
+    <div className="fixed inset-x-0 bottom-0 top-12 z-[70] flex items-center justify-center p-3 sm:p-4" role="dialog" aria-modal aria-labelledby={titleId} data-device={ctx.device} data-screen={ctx.screen}>
       <div className="absolute inset-0 glass-overlay animate-fade-in" onClick={onClose} />
-      <div ref={panel} tabIndex={-1} className={cn('relative overlay-panel rounded-2xl w-full max-h-[92vh] flex flex-col animate-scale-in outline-none', w)}>
+      <div ref={panel} tabIndex={-1} className={cn('relative overlay-panel rounded-2xl w-full max-h-[calc(100vh-5rem)] flex flex-col animate-scale-in outline-none', w)}>
         <div className="flex items-start justify-between gap-3 px-5 pt-4 pb-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2 min-w-0 flex-wrap"><h2 id={titleId} className="text-lg font-bold leading-snug min-w-0">{title}</h2>{badge}</div>
@@ -128,7 +128,7 @@ export function Drawer({ open, onClose, title, children, footer, badge, descript
   if (!open) return null;
   const w = { sm: 'w-[min(380px,100vw)]', md: 'w-[min(480px,100vw)]', lg: 'w-[min(640px,100vw)]', xl: 'w-[min(860px,100vw)]' }[width];
   return <><span ref={anchor} hidden />{createPortal(
-    <div className="fixed inset-0 z-[70]" role="dialog" aria-modal aria-labelledby={titleId} data-device={ctx.device} data-screen={ctx.screen}>
+    <div className="fixed inset-x-0 bottom-0 top-12 z-[70]" role="dialog" aria-modal aria-labelledby={titleId} data-device={ctx.device} data-screen={ctx.screen}>
       <div className="absolute inset-0 glass-overlay animate-fade-in" onClick={onClose} />
       <div ref={panel} tabIndex={-1} className={cn('absolute inset-y-0 end-0 overlay-panel drawer-panel flex flex-col outline-none rounded-none border-y-0 border-e-0', w)}>
         <div className="flex items-start justify-between gap-3 px-5 pt-4 pb-3 border-b line">

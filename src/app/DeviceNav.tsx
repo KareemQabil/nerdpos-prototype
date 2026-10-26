@@ -248,7 +248,7 @@ function CommandPalette({ sections, onClose }: { sections: NavSection[]; onClose
   };
   let lastGroup = '';
   return createPortal(
-    <div className="fixed inset-0 z-[75] flex items-start justify-center pt-[12vh] px-4" role="dialog" aria-modal aria-label={t('دوّر على شاشة')} data-device={id}>
+    <div className="fixed inset-x-0 bottom-0 top-12 z-[75] flex items-start justify-center pt-[10vh] px-4" role="dialog" aria-modal aria-label={t('دوّر على شاشة')} data-device={id}>
       <div className="absolute inset-0 glass-overlay animate-fade-in" onClick={onClose} />
       <div className="relative w-full max-w-xl overlay-panel rounded-2xl overflow-hidden animate-scale-in" onKeyDown={onKey}>
         <div className="flex items-center gap-3 px-4 h-14 border-b line">

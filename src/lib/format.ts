@@ -25,10 +25,10 @@ export function qty(v: string | number): string {
 
 export function time(iso: string | null | undefined): string {
   if (!iso) return '—';
-  return new Intl.DateTimeFormat(getLang() === 'ar' ? 'ar-EG' : 'en-GB', { timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+  return new Intl.DateTimeFormat(getLang() === 'ar' ? 'ar-EG-u-nu-latn' : 'en-GB', { timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
 }
 export function dateTime(iso: string | null | undefined): string {
   if (!iso) return '—';
-  return new Intl.DateTimeFormat(getLang() === 'ar' ? 'ar-EG' : 'en-GB', { timeZone: 'Africa/Cairo', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+  return new Intl.DateTimeFormat(getLang() === 'ar' ? 'ar-EG-u-nu-latn' : 'en-GB', { timeZone: 'Africa/Cairo', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
 }
 export const cn = (...xs: (string | false | null | undefined)[]) => xs.filter(Boolean).join(' ');
