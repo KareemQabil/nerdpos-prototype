@@ -40,7 +40,7 @@ export function VariantsEditor({ p }: { p: any }) {
     const r = await run('Catalog.SetPrice', { params: { productId: p.id }, body: { amount: own.amount.trim(), currency: 'EGP', branchId, channel: own.channel, variantId: own.variant.id } }, { success: t('سعر الحجم اتحفظ') });
     if (r) setOwn(null);
   };
-  const newDraft = (): Draft => ({ id: 'v_' + Math.random().toString(36).slice(2, 7), name: { ar: '', en: '' }, priceDelta: '0', modifierMultiplier: '1', active: true, sku: p.sku ? `${p.sku}-` : '', barcode: '', calories: '', isDefault: !vs.length, isNew: true });
+  const newDraft = (): Draft => ({ id: 'v_' + Math.random().toString(36).slice(2, 7), name: { ar: '', en: '' }, priceDelta: '0', modifierMultiplier: '1', active: true, sku: p.sku ? `${p.sku}-${vs.length + 1}` : '', barcode: '', calories: '', isDefault: !vs.length, isNew: true });
   return (
     <div className="space-y-4">
       <Card title={<span className="inline-flex items-center gap-2"><Ruler className="w-4 h-4" />{t('الأحجام')}</span>} badge={<StateBadge ops={['Variant.Upsert', 'Catalog.SetPrice']} />}

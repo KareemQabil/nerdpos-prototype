@@ -16,7 +16,7 @@ const COLS: { id: string; title: string; filter: (d: any) => boolean; tone: stri
   { id: 'assigned', title: 'مع الطيار', filter: (d) => d.state === 'ASSIGNED', tone: 'border-sky-400/50' },
   { id: 'road', title: 'في الطريق', filter: (d) => d.state === 'PICKED_UP', tone: 'border-purple-400/60' },
   { id: 'failed', title: 'محاولة فشلت', filter: (d) => d.state === 'FAILED', tone: 'border-red-400/60' },
-  { id: 'done', title: 'خلص النهارده', filter: (d) => d.state === 'DELIVERED' || d.state === 'CANCELLED', tone: 'border-white/20' },
+  { id: 'done', title: 'خلص النهارده', filter: (d) => d.state === 'DELIVERED' || d.state === 'CANCELLED', tone: 'border-[var(--glass-border)]' },
 ];
 
 export default function DeliveryBoard() {
@@ -105,7 +105,7 @@ function DeliveryCard({ d, onOpen }: { d: any; onOpen: () => void }) {
         <span className="flex items-center gap-1 text-dim">{PM && <PM.icon className="w-3.5 h-3.5" />}{t(PM?.ar ?? '')}</span>
         <span className="num font-bold">{unpaid ? <span className="text-[var(--warning)]">{t('يتحصّل')} {money(d.order.remaining)}</span> : <span className="text-[var(--success)]">{t('مدفوع')}</span>}</span>
       </div>
-      {d.driver && <div className="text-xs flex items-center gap-1 text-sky-300"><VehicleIcon v={d.driver.vehicle} className="w-3.5 h-3.5" />{d.driver.name}</div>}
+      {d.driver && <div className="text-xs flex items-center gap-1 text-[var(--info)]"><VehicleIcon v={d.driver.vehicle} className="w-3.5 h-3.5" />{d.driver.name}</div>}
       {d.cod && !d.cod.settled && d.state === 'DELIVERED' && <div className="text-[11px] text-[var(--warning)] flex items-center gap-1"><Banknote className="w-3 h-3" />{t('الفلوس لسه مع الطيار')}</div>}
       {d.order?.status === 'DRAFT' && <div className="text-[11px] text-[var(--warning)]">{t('الطلب لسه ما اتبعتش للمطبخ')}</div>}
       <DeliveryActions d={d} onOpen={onOpen} />

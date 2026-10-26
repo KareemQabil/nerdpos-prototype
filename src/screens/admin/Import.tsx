@@ -267,7 +267,7 @@ export default function Import() {
             </>}>
             {warnings.map((w, i) => <div key={i} className="mb-2"><Banner tone="warning">{w}</Banner></div>)}
             {!report && <div className="text-xs text-dim mb-2">{t('لازم تجرّب الأول. التطبيق كله أو لا شيء.')}</div>}
-            {report?.kind === 'DRY_RUN' && !report.ok && <div className="mb-2"><Banner tone="warning">{t('فيه غلطات: لو طبقت دلوقتي السيرفر هيرفض كله (VALIDATION_FAILED) ومفيش حاجة هتتكتب.')}</Banner></div>}
+            {report?.kind === 'DRY_RUN' && !report.ok && <div className="mb-2"><Banner tone="warning">{t('فيه غلطات في الشيت: لو طبقت دلوقتي هيترفض كله ومفيش حاجة هتتسجل. صلّح الغلطات اللي تحت وجرّب تاني.')}</Banner></div>}
             <Tabs<SheetId> value={view} onChange={setView} tabs={SHEET_IDS.map((s) => ({ id: s, label: <span className="inline-flex items-center gap-1.5">{sheetLabel(s)} <span className="num text-xs opacity-70">{data[s]?.length ?? 0}</span>{issuesBySheet.get(s)?.length ? <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold inline-flex items-center justify-center">{issuesBySheet.get(s)!.length}</span> : null}</span> }))} />
             <SheetPreview sheet={view} rows={data[view] ?? []} issues={issuesBySheet.get(view) ?? []} />
           </Card>

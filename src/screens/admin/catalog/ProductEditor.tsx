@@ -1,5 +1,6 @@
 // B1 product create form and product drawer: data (picture, description, calories, allergens), sizes, combo,
 // half-and-half, modifier groups, tax and branch availability (incl. "sold out today" and the menus it is on).
+import { unitLabel } from '../../inventory/common';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, CheckCircle2, Circle, Plus, Save, Pizza, Layers, Ruler, Package, AlertTriangle } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../../app/hooks';
@@ -112,7 +113,7 @@ export function ProductCreate({ open, onClose, onCreated }: { open: boolean; onC
           <NameCheckHint name={name} />
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Field label={t('القسم')}><Select data-fb="product-create:category" value={f.categoryId} onChange={(e) => setF({ ...f, categoryId: e.target.value })} options={cats.items.map((c) => ({ value: c.id, label: L(c.name) + (c.active ? '' : ` (${t('مخفي')})`) }))} /></Field>
-            <Field label={t('الوحدة')} hint={t('ثابتة بعد الإنشاء')}><Select data-fb="product-create:unit" value={f.unitId} onChange={(e) => setF({ ...f, unitId: e.target.value })} options={units.items.filter((u) => u.active).map((u) => ({ value: u.id, label: `${u.code} (${u.precision ? t('بالوزن') : t('بالقطعة')})` }))} /></Field>
+            <Field label={t('الوحدة')} hint={t('ثابتة بعد الإنشاء')}><Select data-fb="product-create:unit" value={f.unitId} onChange={(e) => setF({ ...f, unitId: e.target.value })} options={units.items.filter((u) => u.active).map((u) => ({ value: u.id, label: `${unitLabel(u.code)} (${u.precision ? t('بالوزن') : t('بالقطعة')})` }))} /></Field>
             <Field label={t('مجموعة الضريبة')} hint={hasDefault ? t('فاضي = الضريبة الافتراضية') : t('لازم تختار')}>
               <Select data-fb="product-create:tax" value={f.taxPolicyId} onChange={(e) => setF({ ...f, taxPolicyId: e.target.value })} options={[...(hasDefault ? [{ value: '', label: t('— الافتراضية —') }] : []), ...taxes.items.filter((x) => x.active).map((x) => ({ value: x.id, label: `${L(x.name)} · ${x.rate}%` }))]} />
             </Field>

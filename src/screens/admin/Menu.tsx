@@ -1,9 +1,10 @@
 // B1 Menu admin: products (sizes, combos, half-and-half, pictures), categories, units, modifier groups (required/optional,
 // defaults, order, sub-choices, ingredients no/less/extra, sold out today), menus & dayparts, and the "sold out today" board.
+import { unitLabel } from '../inventory/common';
 import React, { useState } from 'react';
 import { Plus, Pencil, Search, Image as ImageIcon, Save, ArrowUp, ArrowDown, Star, CircleSlash, RotateCcw, Layers, Pizza, Ruler } from 'lucide-react';
 import { useCommand } from '../../app/hooks';
-import { Banner, Button, Card, Field, Input, Modal, Money, Pill, Section, Select, StateBadge, Switch, Table, Tabs } from '../../ui';
+import { Banner, Button, Card, Field, Input, Modal, Money, Pill, Section, Select, StateBadge, Switch, Table, Tabs , EmptyState } from '../../ui';
 import { Tech } from '../../app/tech';
 import { t, L } from '../../i18n';
 import { LocInputs, PolicyChip, Radio, Swatch, allergenLabel, availabilityLabel, availabilityTone, useItems, usePolicy } from './catalog/common';
@@ -21,7 +22,7 @@ export default function Menu() {
   const reasons = usePolicy<Record<string, string>>('AvailabilityReasonPolicy');
   const nap = usePolicy<string>('NewProductAvailabilityPolicy');
   return (
-    <div>
+    <div className="space-y-4">
       <Section title={t('المنيو')} badge={<StateBadge ops={OPS} />} sub={t('الأصناف بأحجامها ووجباتها والنص ونص، الإضافات، المنيوهات ومواعيدها، واللي خلص النهارده')} />
       <Tech>
         <div className="flex flex-wrap gap-1.5 mb-3" data-fb="menu:policies">
@@ -32,7 +33,7 @@ export default function Menu() {
         </div>
       </Tech>
       <Banner tone="info">{t('تعديلات المنيو والأسعار والضرايب بتسري على الطلبات الجديدة بس؛ السطور اللي اتسجلت في الشيكات بتفضل بسعرها وضريبتها وإضافاتها.')}</Banner>
-      <Tabs<Tab> className="my-4" value={tab} onChange={setTab} tabs={[
+      <Tabs<Tab> variant="underline" value={tab} onChange={setTab} tabs={[
         { id: 'products', label: t('الأصناف') }, { id: 'categories', label: t('الأقسام') }, { id: 'modifiers', label: t('الإضافات') },
         { id: 'menus', label: t('المنيوهات والمواعيد') }, { id: 'soldout', label: t('خلص النهارده') }, { id: 'units', label: t('الوحدات') },
       ]} />
@@ -69,15 +70,17 @@ function Products() {
         <Button data-fb="products:new" variant="primary" onClick={() => setCreating(true)}><Plus className="w-4 h-4" />{t('صنف جديد')}</Button>
       </div>
       <div className="text-[11px] text-dim">{t('{n} صنف', { n: shown.length })}</div>
-      <Table head={['', t('الصنف'), t('الكود'), t('القسم'), t('الوحدة'), t('الضريبة'), t('الإضافات'), t('في الفرع'), '']} rows={shown.map((p) => [
+      <Table maxHeight={680} loading={list.loading && !list.items.length} onRowClick={(i) => setOpen({ id: shown[i].id })}
+        empty={<EmptyState compact title={t('مفيش أصناف بالبحث ده')} text={t('غيّر البحث أو ضيف صنف جديد.')} />}
+        head={['', t('الصنف'), t('الكود'), t('القسم'), t('الوحدة'), t('الضريبة'), t('الإضافات'), t('في الفرع'), '']} rows={shown.map((p) => [
         p.imageUrl ? <img src={p.imageUrl} alt="" className="w-10 h-10 rounded-lg object-cover" /> : <span className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: (p.colorCode ?? '#64748b') + '33' }}><ImageIcon className="w-4 h-4 text-dim" /></span>,
         <div className="min-w-[180px]">
           <div className="font-bold flex items-center gap-1.5 flex-wrap"><Swatch color={p.colorCode} className="w-3 h-3" />{L(p.name)} {!p.active && <Pill tone="neutral">{t('مؤرشف')}</Pill>} {p.direction && <StateBadge state="PROPOSED" />}</div>
           <div className="text-xs text-dim" dir="ltr" style={{ textAlign: 'start' }}>{p.name.en}</div>
           <div className="flex flex-wrap gap-1 mt-1">
-            {p.variants?.filter((v: any) => v.active).length > 0 && <button onClick={() => setOpen({ id: p.id, tab: 'sizes' })}><Pill tone="violet"><Ruler className="w-3 h-3" />{t('{n} أحجام', { n: p.variants.filter((v: any) => v.active).length })}</Pill></button>}
-            {p.halfAndHalf && <button onClick={() => setOpen({ id: p.id, tab: 'half' })}><Pill tone="violet"><Pizza className="w-3 h-3" />{t('نص ونص')}</Pill></button>}
-            {p.combo?.length > 0 && <button onClick={() => setOpen({ id: p.id, tab: 'combo' })}><Pill tone="info"><Layers className="w-3 h-3" />{t('وجبة · {n} اختيارات', { n: p.combo.length })}</Pill></button>}
+            {p.variants?.filter((v: any) => v.active).length > 0 && <button onClick={(e) => { e.stopPropagation(); setOpen({ id: p.id, tab: 'sizes' }); }}><Pill tone="violet"><Ruler className="w-3 h-3" />{t('{n} أحجام', { n: p.variants.filter((v: any) => v.active).length })}</Pill></button>}
+            {p.halfAndHalf && <button onClick={(e) => { e.stopPropagation(); setOpen({ id: p.id, tab: 'half' }); }}><Pill tone="violet"><Pizza className="w-3 h-3" />{t('نص ونص')}</Pill></button>}
+            {p.combo?.length > 0 && <button onClick={(e) => { e.stopPropagation(); setOpen({ id: p.id, tab: 'combo' }); }}><Pill tone="info"><Layers className="w-3 h-3" />{t('وجبة · {n} اختيارات', { n: p.combo.length })}</Pill></button>}
             {(p.chargeTags ?? []).includes('TABLE_TAX') && <Pill tone="violet">{t('ضريبة جدول')}</Pill>}
             {p.calories != null && <Pill tone="neutral">{p.calories} {t('سعر حراري')}</Pill>}
             {(p.allergens ?? []).map((a: string) => <Pill key={a} tone="warning">{allergenLabel(a)}</Pill>)}
@@ -88,11 +91,11 @@ function Products() {
         <span className="text-xs">{unitCode(p.unitId)}</span>,
         p.taxPolicyName ? <span className="text-xs">{L(p.taxPolicyName)}</span> : <Pill tone="error">{t('مفيش')}</Pill>,
         <span className="num">{p.modifierGroupIds.length}</span>,
-        <button data-fb={`products:availability:${p.id}`} onClick={() => setOpen({ id: p.id, tab: 'availability' })} className="text-start">
+        <button data-fb={`products:availability:${p.id}`} onClick={(e) => { e.stopPropagation(); setOpen({ id: p.id, tab: 'availability' }); }} className="text-start">
           <Pill tone={availabilityTone(p.availability.state)}>{availabilityLabel(p.availability.state)}{p.availability.soldOutFor ? ' · ' + t('النهارده') : ''}</Pill>
           {p.availability.reason && <div className="text-[11px] text-dim mt-0.5 max-w-[140px] truncate" title={p.availability.reason}>{p.availability.reason}</div>}
         </button>,
-        <Button size="sm" data-fb={`products:open:${p.id}`} onClick={() => setOpen({ id: p.id })}><Pencil className="w-3.5 h-3.5" />{t('فتح')}</Button>,
+        <Button size="sm" variant="ghost" data-fb={`products:open:${p.id}`} onClick={(e) => { e.stopPropagation(); setOpen({ id: p.id }); }}><Pencil className="w-3.5 h-3.5" />{t('فتح')}</Button>,
       ])} />
       <ProductCreate open={creating} onClose={() => setCreating(false)} onCreated={(id, tab) => { setCreating(false); setOpen({ id, tab }); }} />
       <ProductDrawer productId={open?.id ?? null} initialTab={open?.tab ?? 'data'} onClose={() => setOpen(null)} />
@@ -160,8 +163,8 @@ function Units() {
   };
   return (
     <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4">
-      <Table head={[t('الكود'), t('الخانات العشرية'), t('مستخدمة'), '']} rows={units.items.map((u) => [
-        <span className="num font-bold">{u.code}</span>,
+      <Table head={[t('الوحدة'), t('الخانات العشرية'), t('مستخدمة'), '']} rows={units.items.map((u) => [
+        <span><span className="font-bold">{unitLabel(u.code)}</span><Tech> <span className="num text-[11px] text-dim">{u.code}</span></Tech></span>,
         <span className="num">{u.precision}</span>,
         u.used ? <Pill tone="warning" title={t('الدقة اتقفلت لأن فيه أصناف عليها')}>{t('مستخدمة — الدقة مقفولة')}</Pill> : <Pill tone="neutral">{t('لسه')}</Pill>,
         <Button size="sm" data-fb={`unit:edit:${u.id}`} onClick={() => setEdit({ ...u, codeDraft: u.code, precisionDraft: String(u.precision) })}><Pencil className="w-3.5 h-3.5" />{t('تعديل')}</Button>,

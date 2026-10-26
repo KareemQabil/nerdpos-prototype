@@ -3,13 +3,16 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowRight, Copy, Printer, FileText } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { useDev, useQuery, useCommand } from '../app/hooks';
-import { Section, StateBadge, Banner, Button, Empty, Spinner, Switch, Pill } from '../ui';
+import { useDev, useQuery, useCommand, errorText } from '../app/hooks';
+import { Tech, useTech } from '../app/tech';
+import { Section, StateBadge, Banner, Button, Empty, Skeleton, Switch, Pill } from '../ui';
 import { t, L } from '../i18n';
 import { money, qty, dateTime, cn } from '../lib/format';
 import { ReprintDialog, ReprintRuleNote } from './admin/output/ReprintDialog';
 import { methodLabel, channelLabel, fiscalStateLabel } from './admin/output/labels';
 
+/** Server issue text without codes in brackets or tax-type codes (shown with technical details on). */
+const plainDetail = (x: string) => String(x ?? '').replace(/\s*\([A-Za-z0-9_.\-:=, ]+\)/g, '').replace(/\bT\d+(\s*أو\s*T\d+)?/g, t('نوع الضريبة')).replace(/\s{2,}/g, ' ');
 const nz = (v: string | null | undefined) => !!v && !/^-?0(\.0+)?$/.test(v);
 const pctText = (r: string | null | undefined) => (r ? `${qty(r)}%` : '');
 
@@ -24,6 +27,7 @@ const Rule = ({ dashed = true }: { dashed?: boolean }) => <div className={cn('my
 
 export default function ReceiptScreen() {
   const { params, nav, can, terminal } = useDev();
+  const tech = useTech();
   const orderId: string | undefined = params.orderId;
   const prebill = !!params.prebill;
   const [copy, setCopy] = useState<boolean>(!!params.copy);
@@ -48,7 +52,7 @@ export default function ReceiptScreen() {
   return (
     <div className="space-y-4" data-screen-id="G1">
       <Section title={isPrebill ? t('شيك مبدئي') : t('الإيصال')} badge={<StateBadge ops={['Receipt.Get', 'Print.Reprint']} />}
-        sub={t('الإيصال بيتبني من البيانات المحفوظة بس — مفيش أي حساب جديد. النسخة بيتكتب عليها "نسخة" ومش بتعمل إيصال جديد.')}
+        sub={t('الإيصال زي ما اتطبع بالظبط. النسخة بيتكتب عليها «نسخة» ومش بتعمل إيصال جديد.')}
         actions={<>
           <Button size="sm" variant="ghost" onClick={() => nav('checks')} data-fb="receipt:back"><ArrowRight className="w-4 h-4 ltr:rotate-180" />{t('رجوع للشيكات')}</Button>
           {!isPrebill && <Switch checked={copy} onChange={setCopy} label={t('اعرض كنسخة')} />}
@@ -56,8 +60,8 @@ export default function ReceiptScreen() {
           {isPrebill && r && (r.status === 'DRAFT' || r.status === 'CONFIRMED') && terminal && <Button size="sm" variant="outline" loading={busy} onClick={() => run('Print.PreBill', { params: { orderId }, body: { terminalId: terminal.id } }, { success: t('الشيك المبدئي اتبعت للطابعة — الشيك ما اتغيرش') })} data-fb="receipt:prebill-print"><Printer className="w-4 h-4" />{t('اطبع شيك مبدئي')} <StateBadge state="PROPOSED" /></Button>}
         </>} />
 
-      {q.loading && !r && <Spinner />}
-      {q.error && <Banner tone="error">{q.error.code}</Banner>}
+      {q.loading && !r && <div className="flex gap-6"><Skeleton className="h-[520px] w-[80mm] rounded-md" /><Skeleton className="h-40 flex-1 rounded-2xl" /></div>}
+      {q.error && <Banner tone="error">{errorText(q.error)}</Banner>}
       {r && (
         <div className="flex flex-wrap gap-6 items-start">
           <div className="paper relative overflow-hidden rounded-md shadow-2xl px-4 py-5 text-[12px] leading-relaxed" style={{ width: '80mm', direction: 'rtl' }} data-fb="receipt:paper">
@@ -69,7 +73,7 @@ export default function ReceiptScreen() {
             <div className="text-center space-y-0.5">
               <div className="text-base font-bold">{r.business.nameAr || r.business.name}</div>
               {r.business.legalName && <div className="text-[11px]">{r.business.legalName}</div>}
-              <div className="text-[11px]">{L(r.branch.name)} <span className="num">({r.branch.code})</span></div>
+              <div className="text-[11px]">{L(r.branch.name)}<Tech> <span className="num">({r.branch.code})</span></Tech></div>
               {r.business.address && <div className="text-[11px]">{r.business.address}</div>}
               {r.business.taxNumber && <div className="text-[11px]">{t('رقم التسجيل الضريبي')}: <span className="num">{r.business.taxNumber}</span></div>}
             </div>
@@ -134,7 +138,7 @@ export default function ReceiptScreen() {
               <>
                 <Rule />
                 <div className="text-center space-y-1" data-fb="receipt:qr">
-                  <div className="text-[11px] font-bold">{t('الإيصال الإلكتروني')}{fiscal?.mode === 'SANDBOX' ? ' (SANDBOX)' : ''}</div>
+                  <div className="text-[11px] font-bold">{t('الإيصال الإلكتروني')}{fiscal?.mode === 'SANDBOX' ? ` (${t('تجريبي')})` : ''}</div>
                   {fiscal?.qr ? (
                     <>
                       <div className="flex justify-center"><QRCodeSVG value={fiscal.qr} size={128} level="M" bgColor="#fffef8" /></div>
@@ -142,8 +146,8 @@ export default function ReceiptScreen() {
                     </>
                   ) : fiscal ? (
                     <div className="border border-dashed border-black/60 rounded px-2 py-3 text-[12px] font-bold">{fiscal.state === 'PENDING_DATA' ? t('مستني بيانات') : fiscalStateLabel(fiscal.state)}<div className="text-[10px] font-normal">{t('الـ QR هيظهر في النسخة بعد ما الإيصال يتبني')}</div></div>
-                  ) : <div className="text-[11px]">{t('الإيصال الإلكتروني مش مفعّل (FiscalDocumentPolicy = OFF)')}</div>}
-                  {r.serviceOffReceipt && <div className="text-[10px]">{t('الخدمة مش على الإيصال الإلكتروني لحد قرار المحاسب (OD-EG-4)')}</div>}
+                  ) : <div className="text-[11px]">{t('الإيصال الإلكتروني مش مفعّل')}<Tech> (FiscalDocumentPolicy = OFF)</Tech></div>}
+                  {r.serviceOffReceipt && <div className="text-[10px]">{t('الخدمة مش على الإيصال الإلكتروني لحد قرار المحاسب')}<Tech> (OD-EG-4)</Tech></div>}
                 </div>
               </>
             )}
@@ -152,12 +156,12 @@ export default function ReceiptScreen() {
           </div>
 
           <div className="flex-1 min-w-[260px] space-y-3">
-            <Banner tone="info">{t('ترتيب السطور: إجمالي الأصناف ← الخصم ← الخدمة ← ضريبة القيمة المضافة ← الإجمالي. الخدمة سطر لوحدها بين الإجمالي والضريبة.')}</Banner>
+            <Banner tone="info">{t('ترتيب الإيصال: الأصناف، بعدها الخصم، بعدها الخدمة، بعدها الضريبة، وفي الآخر الإجمالي.')}</Banner>
             {isPrebill && <Banner tone="warning">{t('الشيك المبدئي "ليست فاتورة ضريبية": مفيهوش QR، وطباعته مش بتغير الشيك ومش محتاجة موافقة.')}</Banner>}
             {fiscal && (
               <div className="glass rounded-xl p-3 text-sm space-y-1">
                 <div className="flex items-center gap-2"><span className="font-bold">{t('حالة الإيصال الإلكتروني')}</span><Pill tone={fiscal.state === 'ACCEPTED' ? 'success' : fiscal.state === 'PENDING_DATA' || fiscal.state === 'REJECTED' ? 'warning' : 'info'}>{fiscalStateLabel(fiscal.state)}</Pill></div>
-                {(fiscal.issues ?? []).map((i: any, k: number) => <div key={k} className="text-xs text-soft">• {i.detail} <span className="num text-dim">({i.code})</span></div>)}
+                {(fiscal.issues ?? []).map((i: any, k: number) => <div key={k} className="text-xs text-soft">• {tech ? i.detail : plainDetail(i.detail)}<Tech> <span className="num text-dim">({i.code})</span></Tech></div>)}
                 {can('compliance:read') && <Button size="sm" variant="ghost" onClick={() => nav('ereceipts')} data-fb="receipt:goto-ereceipts">{t('طابور الإيصالات الإلكترونية')}</Button>}
               </div>
             )}

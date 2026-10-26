@@ -119,11 +119,11 @@ export function PayPanel({ orderId, onBack }: { orderId: string; onBack: () => v
 function DueBox({ s, lastChange }: { s: any; lastChange: string | null }) {
   const paid = s.paid !== '0.0000';
   return (
-    <div className="rounded-2xl p-5 border border-[color-mix(in_srgb,var(--primary)_30%,transparent)] bg-[var(--primary-container)]" data-fb="pay-due">
+    <div className="rounded-2xl px-5 py-4 border border-[color-mix(in_srgb,var(--primary)_30%,transparent)] bg-[var(--primary-container)]" data-fb="pay-due">
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
           <div className="text-sm text-soft font-bold">{s.settled ? t('اتدفع بالكامل') : paid ? t('الباقي على الشيك') : t('المطلوب')}</div>
-          <Money v={s.cash?.increment && !s.settled ? s.cash.due : s.remaining} className={cn('text-5xl tracking-tight', s.settled ? 'text-[var(--success)]' : 'text-[var(--primary)]')} />
+          <Money v={s.cash?.increment && !s.settled ? s.cash.due : s.remaining} className={cn('tracking-tight text-[44px] leading-tight', s.settled ? 'text-[var(--success)]' : 'text-[var(--primary)]')} />
           {s.cash?.increment && !s.settled && <div className="text-xs text-dim mt-1">{t('كاش بعد التقريب لأقرب فكة — الفرق')} <span className="num">{money(s.cash.rounding)}</span><Tech> (CashRoundingPolicy {s.cash.increment})</Tech></div>}
         </div>
         <div className="text-sm space-y-0.5 text-end">
@@ -198,7 +198,7 @@ function TenderBox({ order, remaining, onChange }: { order: any; remaining: stri
     <Card padding="md" title={t('اختار طريقة الدفع')} badge={<StateBadge ops={['Payment.Capture']} />}>
       <div className="space-y-4">
         <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${Math.min(methods.length, 6)}, minmax(0, 1fr))` }} role="radiogroup">
-          {methods.map((m) => <button key={m.id} role="radio" aria-checked={method === m.id} onClick={() => setMethod(m.id)} data-fb={`tender-method:${m.id}`} className={cn('min-h-[56px] rounded-xl border flex flex-col items-center justify-center gap-0.5 text-xs font-bold [&>svg]:w-5 [&>svg]:h-5 transition-colors', method === m.id ? 'border-[var(--primary)] bg-[var(--primary-container)] text-[var(--primary)]' : 'surface-1 border-[var(--glass-border)] text-soft hover:bg-[var(--surface-2)]')}>{m.icon}{m.label}</button>)}
+          {methods.map((m) => <button key={m.id} role="radio" aria-checked={method === m.id} onClick={() => setMethod(m.id)} data-fb={`tender-method:${m.id}`} className={cn('min-h-[50px] rounded-xl border flex flex-col items-center justify-center gap-0.5 text-xs font-bold [&>svg]:w-5 [&>svg]:h-5 transition-colors', method === m.id ? 'border-[var(--primary)] bg-[var(--primary-container)] text-[var(--primary)]' : 'surface-1 border-[var(--glass-border)] text-soft hover:bg-[var(--surface-2)]')}>{m.icon}{m.label}</button>)}
         </div>
         {method === 'LOYALTY' && <LoyaltyRedeemBox order={order} />}
         {method === 'EXTERNAL' && <ExternalAuthBox order={order} remaining={remaining} />}
@@ -214,7 +214,7 @@ function TenderBox({ order, remaining, onChange }: { order: any; remaining: stri
             <div className="grid grid-cols-[minmax(0,3fr)_minmax(0,1.15fr)] gap-1.5">
               <div className="grid grid-cols-4 gap-1.5" data-fb="cash-keypad">
                 {['7', '8', '9', '<', '4', '5', '6', 'C', '1', '2', '3', '.', '0', '00'].map((k) => (
-                  <button key={k} onClick={() => (k === '00' ? (key('0'), key('0')) : key(k))} className={cn('h-12 rounded-xl border text-xl font-bold num flex items-center justify-center transition-colors active:scale-[.97]', k === 'C' || k === '<' ? 'surface-2 border-[var(--glass-border)] text-soft !text-sm' : 'bg-[var(--card-raised)] border-[var(--glass-border)] hover:bg-[var(--surface-2)]', k === '0' && 'col-span-2', k === '00' && 'col-span-2')} aria-label={k === '<' ? t('امسح رقم') : k === 'C' ? t('امسح الكل') : k}>
+                  <button key={k} onClick={() => (k === '00' ? (key('0'), key('0')) : key(k))} className={cn('h-11 rounded-xl border text-xl font-bold num flex items-center justify-center transition-colors active:scale-[.97]', k === 'C' || k === '<' ? 'surface-2 border-[var(--glass-border)] text-soft !text-sm' : 'bg-[var(--card-raised)] border-[var(--glass-border)] hover:bg-[var(--surface-2)]', k === '0' && 'col-span-2', k === '00' && 'col-span-2')} aria-label={k === '<' ? t('امسح رقم') : k === 'C' ? t('امسح الكل') : k}>
                     {k === '<' ? <Delete className="w-5 h-5 ltr:rotate-180" /> : k === 'C' ? t('مسح') : k}
                   </button>
                 ))}
@@ -239,10 +239,12 @@ function TenderBox({ order, remaining, onChange }: { order: any; remaining: stri
         )}
         {tipsOn && plainMethod && <Field label={<span className="flex items-center gap-1">{t('بقشيش')} <StateBadge state="PROPOSED" /></span>} hint={t('البقشيش فلوس لوحدها مش مبيعات، وبيظهر في تقرير الوردية.')}><Input value={tipAmt} onChange={(e) => setTipAmt(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" /></Field>}
         {plainMethod && (
+          <div className="sticky bottom-0 -mx-4 -mb-4 px-4 pb-4 pt-2 rounded-b-2xl bg-[linear-gradient(to_top,var(--glass-bg-strong)_70%,transparent)]">
           <Button variant="primary" size="xl" className="w-full !h-16 text-xl" loading={busy} disabled={(method === 'CARD' || method === 'DIGITAL_WALLET') && !ref.trim()} onClick={pay} data-fb="capture">
             {method === 'CASH' ? <Banknote className="w-6 h-6" /> : method === 'CARD' ? <CreditCard className="w-6 h-6" /> : <Smartphone className="w-6 h-6" />}
             {t('ادفع')} <span className="num">{method === 'CASH' ? money(String(Math.min(tenderN, remN))) : money(amount || rem)}</span>
           </Button>
+          </div>
         )}
       </div>
     </Card>

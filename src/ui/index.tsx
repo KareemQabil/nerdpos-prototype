@@ -84,7 +84,7 @@ function useFocusIn(open: boolean) {
     const id = requestAnimationFrame(() => {
       const el = ref.current;
       if (!el || el.contains(document.activeElement)) return;
-      const first = el.querySelector<HTMLElement>('[autofocus], input:not([type=hidden]):not([disabled]), select, textarea');
+      const first = el.querySelector<HTMLElement>('[autofocus], [data-autofocus]'); // inputs are not auto-focused (no surprise keyboard on tablets)
       (first ?? el).focus({ preventScroll: true });
     });
     return () => { cancelAnimationFrame(id); if (prev && document.contains(prev)) prev.focus?.({ preventScroll: true }); };

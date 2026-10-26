@@ -256,7 +256,7 @@ input, select, textarea { font: inherit; color: inherit; }
 ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--text-dim) 45%, transparent); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--primary) 50%, transparent); }
 * { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--text-dim) 40%, transparent) transparent; }
-*:focus-visible:not([tabindex="-1"]) { outline: 2px solid var(--primary); outline-offset: 2px; }
+*:focus-visible:not([tabindex="-1"]):not(.glass-input) { outline: 2px solid var(--primary); outline-offset: 2px; }
 .scrollbar-hide { scrollbar-width: none; }
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 

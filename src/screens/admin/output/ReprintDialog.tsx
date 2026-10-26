@@ -1,4 +1,6 @@
 // Reprint dialog shared by G1 (receipt) and G2 (print queue): Print.Reprint makes a REPRINT job ("نسخة").
+import { Tech } from '../../../app/tech';
+import { ruleSentence } from '../../../demo/policyText';
 import React, { useState } from 'react';
 import { Printer, Copy } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../../app/hooks';
@@ -21,7 +23,7 @@ export function ReprintDialog({ job, onClose, terminalId, onDone }: { job: { doc
         <div className="font-bold">{job.label ?? job.documentId} <span className="text-xs text-dim">· {docTypeLabel(job.documentType)}</span></div>
         <Banner tone="info">{t('النسخة بتتطبع من نفس البيانات المحفوظة ومكتوب عليها "نسخة". مش بتعمل إيصال جديد ولا إيصال إلكتروني جديد.')}</Banner>
         <ReprintRuleNote />
-        <Field label={<span className="flex items-center gap-2">{t('السبب')} <StateBadge state="PROPOSED" /></span>} hint={t('العقد الحالي لـ Print.Reprint مفيهوش سبب — مقترح (docs/30 §6)')}>
+        <Field label={<span className="flex items-center gap-2">{t('السبب')}<Tech><StateBadge state="PROPOSED" /></Tech></span>} hint={<>{t('اختياري — بيتسجل مع النسخة.')}<Tech> {t('العقد الحالي لـ Print.Reprint مفيهوش سبب — مقترح (docs/30 §6)')}</Tech></>}>
           <Select data-fb="reprint:reason" value={reasonCode} onChange={(e) => setReasonCode(e.target.value)} options={[{ value: '', label: t('من غير سبب') }, ...((reasons.data?.items ?? reasons.data ?? []) as any[]).map((r: any) => ({ value: r.code, label: L(r.label) }))]} />
         </Field>
         {!terminalId && <Banner tone="error">{t('الطباعة محتاجة جهاز — افتح الشاشة دي من جهاز فيه طابعة')}</Banner>}
@@ -36,12 +38,12 @@ export function ReprintRuleNote() {
   const branchId = me?.branchId ?? auth.branchId;
   const q = useQuery<any>(can('settings:read') && branchId ? 'Settings.Effective' : null, { query: { policyId: 'ApprovalRequirementPolicy', scopeType: 'BRANCH', scopeId: branchId } });
   const rule = q.data?.value?.RECEIPT_REPRINT;
-  const proposal = t('اقتراح docs/30 §6: أول نسخة مجانية، وأي نسخة بعدها محتاجة موافقة مدير (عدد النسخ السابقة > 0).');
+  const proposal = t('الاقتراح: أول نسخة من غير موافقة، وأي نسخة بعدها محتاجة موافقة مدير.');
   let text: string;
-  if (!rule) text = t('موافقة المدير على النسخة حسب السياسة (RECEIPT_REPRINT في ApprovalRequirementPolicy).');
-  else if (rule.mode === 'NEVER') text = t('السياسة الحالية: النسخة من غير موافقة مدير (RECEIPT_REPRINT = أبدًا).');
-  else if (rule.mode === 'ALWAYS') text = t('السياسة الحالية: كل نسخة محتاجة موافقة مدير.');
-  else if (rule.mode === 'ABOVE_THRESHOLD') text = t('السياسة الحالية: موافقة مدير لما عدد النسخ السابقة أكتر من {n}.', { n: rule.threshold });
-  else text = `RECEIPT_REPRINT: ${rule.mode}`;
-  return <Banner tone="warning"><div data-fb="reprint:rule">{text}</div><div className="text-[11px] text-dim mt-0.5">{proposal} {t('بتتغير من لوحة السياسات.')}</div></Banner>;
+  if (!rule) text = t('موافقة المدير على النسخة حسب إعدادات المطعم.');
+  else if (rule.mode === 'NEVER') text = t('دلوقتي: النسخة من غير موافقة مدير.');
+  else if (rule.mode === 'ALWAYS') text = t('دلوقتي: كل نسخة محتاجة موافقة مدير.');
+  else if (rule.mode === 'ABOVE_THRESHOLD') text = t('دلوقتي: موافقة مدير لما عدد النسخ اللي اتطبعت قبل كده يبقى أكتر من {n}.', { n: rule.threshold });
+  else text = ruleSentence('RECEIPT_REPRINT', rule);
+  return <Banner tone="warning"><div data-fb="reprint:rule">{text}</div><div className="text-[11px] text-dim mt-0.5">{proposal} {t('بتتغير من الإعدادات.')}</div></Banner>;
 }

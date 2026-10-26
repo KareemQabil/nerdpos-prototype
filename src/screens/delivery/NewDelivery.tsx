@@ -6,7 +6,7 @@ import { useDev, useQuery, useCommand } from '../../app/hooks';
 import { MenuGrid } from '../order/MenuGrid';
 import { ProductDialog, type LineDraft } from '../order/ProductDialog';
 import { needsDialog } from '../OrderScreen';
-import { Button, Card, Pill, Banner, Money, Field, Input, Textarea, Spinner, Empty, StateBadge, Modal, Switch, toast } from '../../ui';
+import { Button, Card, Pill, Banner, Money, Field, Input, Textarea, Spinner, Empty, StateBadge, Modal, Switch, Stepper, toast } from '../../ui';
 import { Tech } from '../../app/tech';
 import { t, L } from '../../i18n';
 import { cn, money, qty, time, dateTime } from '../../lib/format';
@@ -49,6 +49,15 @@ function Workspace({ params, set }: { params: Record<string, any>; set: (p: Reco
   const [note, setNote] = useState('');
   const [payOnline, setPayOnline] = useState(false);
   const ready = !!cust && !!address && !!zone && zone.active;
+  const rootRef = React.useRef<HTMLDivElement>(null);
+  const [wide, setWide] = useState(true);
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setWide(el.clientWidth >= 1080));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // pick the default address when a customer is chosen
   useEffect(() => {
@@ -81,16 +90,18 @@ function Workspace({ params, set }: { params: Record<string, any>; set: (p: Reco
   };
   const reset = () => nav('delivery-new', {});
 
+  const step = !cust ? 0 : !address ? 1 : !order?.lines?.length ? 2 : !delivery ? 3 : 4;
   return (
-    <div data-screen="DL1" className="h-full flex flex-col gap-3 min-h-0">
-      <div className="flex items-center gap-2 flex-wrap">
-        <h1 className="text-xl font-bold me-2 flex items-center gap-2"><PhoneCall className="w-5 h-5 text-[var(--primary)]" />{t('طلب دليفري جديد')}</h1>
+    <div data-screen="DL1" className="h-full flex flex-col gap-3 min-h-0" ref={rootRef}>
+      <div className="flex items-center gap-2 flex-wrap shrink-0">
+        <h1 className="text-[22px] font-extrabold tracking-tight me-2 flex items-center gap-2"><PhoneCall className="w-5 h-5 text-[var(--primary)]" />{t('طلب دليفري جديد')}</h1>
         <StateBadge ops={['Customer.Search', 'Customer.Create', 'CustomerAddress.Upsert', 'Order.Create', 'Delivery.Create', 'Order.Confirm', 'Payment.AuthorizeExternal']} />
         <div className="flex-1" />
         <Button variant="ghost" size="sm" onClick={() => nav('delivery-board')}><Bike className="w-4 h-4" />{t('لوحة الدليفري')}</Button>
         {(params.customerId || params.orderId) && !order?.lines?.length && <Button variant="ghost" size="sm" onClick={reset}><RotateCcw className="w-4 h-4" />{t('ابدأ من الأول')}</Button>}
       </div>
-      <div className="flex-1 min-h-0 grid gap-3" style={{ gridTemplateColumns: 'minmax(300px, 340px) minmax(0, 1fr) minmax(320px, 360px)' }}>
+      <Stepper className="shrink-0" current={step} steps={[{ label: t('العميل') }, { label: t('العنوان') }, { label: t('الأصناف') }, { label: t('مراجعة التوصيل') }, { label: t('ابعت للمطبخ') }]} />
+      <div className="flex-1 min-h-0 grid gap-3" style={{ gridTemplateColumns: wide ? 'minmax(290px, 330px) minmax(0, 1fr) minmax(310px, 350px)' : 'minmax(280px, 320px) minmax(0, 1fr)' }}>
         {/* customer, address, payment */}
         <div className="min-h-0 overflow-y-auto space-y-3 pe-1">
           <CustomerStep cust={cust} loading={customerQ.loading} locked={!!order?.lines?.length} onPick={(c) => set({ customerId: c.id, addressId: undefined })} />
@@ -112,6 +123,7 @@ function Workspace({ params, set }: { params: Record<string, any>; set: (p: Reco
               <Field label={t('ملاحظة للطيار / المطبخ')} className="mt-3"><Input value={note} onChange={(e) => setNote(e.target.value)} disabled={!!delivery} placeholder={t('مثلاً: الجرس بايظ — كلّمه')} /></Field>
             </Card>
           )}
+          {!wide && <div className="h-[520px]"><OrderSide order={order} zone={zone} delivery={delivery} busy={busy} onReview={review} onSend={send} cust={cust} /></div>}
         </div>
 
         {/* menu */}
@@ -125,7 +137,7 @@ function Workspace({ params, set }: { params: Record<string, any>; set: (p: Reco
         </div>
 
         {/* order */}
-        <OrderSide order={order} zone={zone} delivery={delivery} busy={busy} onReview={review} onSend={send} cust={cust} />
+        {wide && <OrderSide order={order} zone={zone} delivery={delivery} busy={busy} onReview={review} onSend={send} cust={cust} />}
       </div>
       {pick && <ProductDialog product={pick} channel="DELIVERY" onClose={() => setPick(null)} onAdd={addLine} />}
       {payOnline && order && <PayOnlineDialog order={order} onClose={(paid) => { setPayOnline(false); set({ doneDeliveryId: delivery?.id, orderId: undefined, paidOnline: paid ? '1' : undefined }); }} />}
@@ -224,7 +236,7 @@ function OrderSide({ order, zone, delivery, busy, onReview, onSend, cust }: { or
     return run('Order.UpdateLine', { params: { orderId: order.id, lineId: l.id }, body: { expectedVersion: order.version, expectedLineVersion: l.version, quantity: String(n) } });
   };
   return (
-    <div className="min-h-0 flex flex-col rounded-2xl overflow-hidden border border-[var(--glass-border)] bg-slate-900/70" data-fb="delivery-order">
+    <div className="min-h-0 flex flex-col rounded-2xl overflow-hidden border border-[var(--glass-border)] bg-[var(--glass-bg-strong)]" data-fb="delivery-order">
       <div className="px-4 py-3 border-b line">
         <div className="font-bold flex items-center gap-2"><ShoppingBag className="w-4 h-4" />{t('الطلب')}{order && <span className="text-dim text-xs num font-normal">#{order.number}</span>}</div>
         {cust && <div className="text-[11px] text-dim">{cust.name}{zone ? ` · ${L(zone.name)}` : ''}</div>}
@@ -234,7 +246,7 @@ function OrderSide({ order, zone, delivery, busy, onReview, onSend, cust }: { or
         {lines.map((l) => (
           <div key={l.id} className="rounded-xl surface-1 px-3 py-2 text-sm" data-fb={`dline:${l.sku}`}>
             <div className="flex items-start gap-2">
-              <div className="flex-1 min-w-0"><div className="font-bold leading-tight">{L(l.name)}</div>{(l.modifiers.length > 0 || l.variant) && <div className="text-[11px] text-orange-300">{[l.variant ? L(l.variant.name) : null, ...l.modifiers.map((m: any) => L(m.name))].filter(Boolean).join('، ')}</div>}{l.note && <div className="text-[11px] text-amber-300">✎ {l.note}</div>}</div>
+              <div className="flex-1 min-w-0"><div className="font-bold leading-tight">{L(l.name)}</div>{(l.modifiers.length > 0 || l.variant) && <div className="text-[11px] text-[var(--warning-text)]">{[l.variant ? L(l.variant.name) : null, ...l.modifiers.map((m: any) => L(m.name))].filter(Boolean).join('، ')}</div>}{l.note && <div className="text-[11px] text-[var(--warning-text)]">✎ {l.note}</div>}</div>
               <span className="num font-bold">{money(l.lineTotal)}</span>
             </div>
             {order.status === 'DRAFT' && (
@@ -247,14 +259,14 @@ function OrderSide({ order, zone, delivery, busy, onReview, onSend, cust }: { or
           </div>
         ))}
       </div>
-      <div className="border-t line bg-slate-950/60 p-4 space-y-1.5 text-sm">
+      <div className="border-t line surface-1 p-4 space-y-1.5 text-sm">
         {T ? (
           <>
             <Row k={t('الأصناف')} v={T.itemsSubtotal} />
             {T.discountTotal !== '0.0000' && <Row k={t('الخصم')} v={'-' + T.discountTotal} />}
             {T.charges.map((c: any) => <Row key={c.id} k={L(c.label)} v={c.amount} />)}
             {!delivery && zone && <div className="flex justify-between text-dim text-xs"><span>{t('رسوم التوصيل ({z}) — هتتضاف في المراجعة', { z: L(zone.name) })}</span><span className="num">{money(zone.fee)}</span></div>}
-            {T.taxLines.map((x: any, i: number) => <Row key={i} k={`${L(x.name)} ${x.rate}%`} v={x.amount} />)}
+            {T.taxLines.map((x: any, i: number) => <Row key={i} k={`${L(x.name)} ${qty(x.rate)}%`} v={x.amount} />)}
             <div className="border-t line pt-2 flex items-center justify-between"><span className="font-bold text-lg">{delivery ? t('الإجمالي') : t('الإجمالي (من غير التوصيل)')}</span><Money v={T.payable} big tone="primary" /></div>
             {zone && !delivery && (
               <div className="pt-1">
@@ -263,13 +275,13 @@ function OrderSide({ order, zone, delivery, busy, onReview, onSend, cust }: { or
               </div>
             )}
           </>
-        ) : <div className="text-xs text-dim text-center">{t('الأسعار والإجمالي بتيجي من السيرفر')}</div>}
+        ) : <div className="text-xs text-dim text-center">{t('الإجمالي بيظهر هنا أول ما تضيف أصناف')}</div>}
       </div>
       <div className="border-t line p-3 space-y-2">
         {order && order.status === 'DRAFT' && !delivery && <Button variant="primary" size="lg" className="w-full" disabled={!lines.length || busy || !zone} loading={busy} onClick={onReview} data-fb="delivery-review"><ClipboardCheck className="w-5 h-5" />{t('مراجعة (ضيف التوصيل)')}</Button>}
         {order && order.status === 'DRAFT' && delivery && (
           <>
-            <div className="text-xs rounded-lg surface-1 px-3 py-2"><b>{delivery.number}</b> · {t('الوصول خلال حوالي')} {Math.max(0, Math.round((delivery.promisedAtMs - Date.parse(delivery.createdAt)) / 60000))} {t('دقيقة')} · {t(PAYMENT_MODE[delivery.paymentMode]?.ar)}</div>
+            <div className="text-xs rounded-lg surface-1 px-3 py-2"><b className="num">{delivery.number}</b> · {t('الوصول خلال حوالي')} {Math.max(0, Math.round((delivery.promisedAtMs - Date.parse(delivery.createdAt)) / 60000))} {t('دقيقة')} · {t(PAYMENT_MODE[delivery.paymentMode]?.ar)}</div>
             <Button variant="success" size="xl" className="w-full" disabled={!lines.length || busy} loading={busy} onClick={onSend} data-fb="delivery-send"><Send className="w-5 h-5" />{t('ابعت للمطبخ')}</Button>
           </>
         )}

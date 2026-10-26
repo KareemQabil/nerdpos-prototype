@@ -48,9 +48,9 @@ export default function Home() {
           {branch.data && <Pill>{branchLabel(branch.data)}</Pill>}
           {daily.data?.provisional && <Pill tone="warning" title={t('الأرقام بتتحدث لحد ما اليوم يتقفل')}>{t('اليوم لسه مفتوح — الأرقام مبدئية')}</Pill>}
         </div>}
-        actions={<QuickHeaderActions />}
+        actions={<QuickHeaderActions next={fresh ? setup.steps.find((s) => s.status === false) : undefined} />}
       />
-      {!bd && !branch.loading && <Banner tone="info">{t('الجهاز ده مش متربط بفرع — اختار فرع من فوق عشان تشوف أرقام اليوم.')}</Banner>}
+      {!bd && !branch.loading && !fresh && <Banner tone="info">{t('الجهاز ده مش متربط بفرع — اختار فرع من فوق عشان تشوف أرقام اليوم.')}</Banner>}
       {fresh && <SetupPath setup={setup} />}
       {bd && <SalesToday bd={bd} daily={daily} />}
       {bd && (
@@ -67,14 +67,15 @@ export default function Home() {
   );
 }
 
-function QuickHeaderActions() {
+function QuickHeaderActions({ next }: { next?: Step }) {
   const { nav } = useDev();
   const approvals = useQuery<any>(screenById.get('approvals-inbox') ? 'ApprovalRequest.Find' : null, { query: { state: 'PENDING', limit: 50 } });
   const pending = approvals.data?.pending ?? 0;
   return (
     <>
       {pending > 0 && <Button variant="warning" onClick={() => nav('approvals-inbox')} data-fb="home:approvals"><BellRing className="w-4 h-4" />{t('{n} طلب موافقة مستني', { n: pending })}</Button>}
-      <Button variant={pending > 0 ? 'secondary' : 'primary'} onClick={() => nav('reports')} data-fb="home:reports"><TrendingUp className="w-4 h-4" />{t('التقارير')}</Button>
+      {next ? <Button variant="primary" onClick={() => nav(next.screen)} data-fb="home:next-step"><Sparkles className="w-4 h-4" />{t('الخطوة الجاية: {s}', { s: next.title })}</Button>
+        : <Button variant={pending > 0 ? 'secondary' : 'primary'} onClick={() => nav('reports')} data-fb="home:reports"><TrendingUp className="w-4 h-4" />{t('التقارير')}</Button>}
     </>
   );
 }

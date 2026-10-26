@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Award, Crown, Plus, Pencil, Star, Search } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';
-import { Section, StateBadge, Button, Card, Pill, Money, Modal, Field, Input, Switch, Tabs, Table, Spinner, Select } from '../../ui';
+import { PageHeader, StateBadge, Button, Card, Pill, Money, Modal, Field, Input, Switch, Tabs, Table, Spinner, Select, StatGrid, StatCard } from '../../ui';
 import { t, L } from '../../i18n';
 import { cn, money, dateTime } from '../../lib/format';
 import { PolicyCard } from './PolicyCard';
@@ -12,9 +12,9 @@ export default function Loyalty() {
   const [tab, setTab] = useState<'program' | 'tiers' | 'ledger'>('program');
   return (
     <div data-screen="CR3" className="space-y-4">
-      <Section title={t('برنامج الولاء')} badge={<StateBadge ops={['Loyalty.Balance', 'Loyalty.Adjust', 'Loyalty.Redeem', 'LoyaltyTier.Upsert', 'LoyaltyTier.List', 'Loyalty.Ledger']} />}
-        sub={t('العميل بيكسب نقاط على كل طلب بيتقفل، ويصرفها كدفع في التحصيل. المستوى بيزوّد النقاط اللي بيكسبها.')}
-        actions={<Tabs value={tab} onChange={setTab} tabs={[{ id: 'program', label: t('البرنامج') }, { id: 'tiers', label: t('المستويات') }, { id: 'ledger', label: t('سجل النقاط') }]} />} />
+      <PageHeader icon={<Award />} title={t('برنامج الولاء')} badge={<StateBadge ops={['Loyalty.Balance', 'Loyalty.Adjust', 'Loyalty.Redeem', 'LoyaltyTier.Upsert', 'LoyaltyTier.List', 'Loyalty.Ledger']} />}
+        description={t('العميل بيكسب نقاط على كل طلب بيتقفل، ويصرفها كدفع في التحصيل. المستوى بيزوّد النقاط اللي بيكسبها.')} />
+      <Tabs variant="underline" value={tab} onChange={setTab} tabs={[{ id: 'program', label: t('البرنامج') }, { id: 'tiers', label: t('المستويات') }, { id: 'ledger', label: t('سجل النقاط') }]} />
       {tab === 'program' && <Program />}
       {tab === 'tiers' && <Tiers />}
       {tab === 'ledger' && <Ledger />}
@@ -28,12 +28,12 @@ function Program() {
   return (
     <div className="space-y-4">
       {tt && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          <Tile label={t('نقاط اتكسبت')} v={String(tt.earned)} />
-          <Tile label={t('نقاط اتصرفت')} v={String(tt.redeemed)} />
-          <Tile label={t('رصيد العملاء دلوقتي')} v={String(tt.outstanding)} />
-          <Tile label={t('قيمتها بالجنيه (التزام)')} v={money(ledger.data.liabilityEgp)} />
-        </div>
+        <StatGrid>
+          <StatCard label={t('نقاط اتكسبت')} value={String(tt.earned)} icon={<Star />} tone="success" />
+          <StatCard label={t('نقاط اتصرفت')} value={String(tt.redeemed)} icon={<Award />} />
+          <StatCard label={t('رصيد العملاء دلوقتي')} value={String(tt.outstanding)} icon={<Crown />} tone="primary" />
+          <StatCard label={t('قيمتها بالجنيه')} value={money(ledger.data.liabilityEgp)} hint={t('فلوس ممكن العملاء يصرفوها')} tone="warning" />
+        </StatGrid>
       )}
       <PolicyCard policyId="LoyaltyProgramPolicy" title={t('قواعد النقاط')} explain={(v) => {
         const per = Number(v.egpPerPoint ?? 10) || 10;

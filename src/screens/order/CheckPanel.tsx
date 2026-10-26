@@ -1,7 +1,7 @@
 // C2–C4: the check. Lines by round («الدفعة»); sent lines are locked (only void with approval, move, or a kitchen
 // note); lines not sent yet stay editable (quick − / + and remove). Totals come from the server preview.
 import React, { useState } from 'react';
-import { ChefHat, Minus, Plus, Trash2, Ban, ArrowRightLeft, Send, Lock, Tag, Gift, XCircle, Printer, Wallet, Split, Merge, PenLine, Armchair, RefreshCw, History, CheckCircle2, Clock, AlertTriangle, Shuffle, Receipt, Users, StickyNote } from 'lucide-react';
+import { ChefHat, Minus, Plus, Trash2, Ban, ArrowRightLeft, Send, Lock, Tag, Gift, XCircle, Printer, Wallet, Split, Merge, PenLine, Armchair, RefreshCw, History, CheckCircle2, Clock, AlertTriangle, Shuffle, Receipt, Users, StickyNote, ChevronDown, ChevronUp, MoreHorizontal } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';
 import { Button, Pill, Modal, Field, Select, Input, Textarea, Money, StateBadge, Banner, EmptyState, Tabs, Timeline, Skeleton } from '../../ui';
 import { Tech } from '../../app/tech';
@@ -55,6 +55,19 @@ export function CheckPanel({ order, refetch, mode, onCheckSwitch }: { order: any
     if (n < 1) return run('Order.RemoveLine', { params: { orderId: order.id, lineId: l.id }, query: { expectedVersion: v, expectedLineVersion: l.version }, body: { expectedVersion: v, expectedLineVersion: l.version } });
     return run('Order.UpdateLine', { params: { orderId: order.id, lineId: l.id }, body: { expectedVersion: v, expectedLineVersion: l.version, quantity: String(n) } });
   };
+  const [showBreak, setShowBreak] = useState(() => typeof window === 'undefined' || window.innerHeight > 860);
+  const [moreOpen, setMoreOpen] = useState(false);
+  type ActDef = { icon: React.ReactElement; label: string; onClick: () => void; disabled?: boolean; danger?: boolean; proposed?: boolean };
+  const acts: ActDef[] = ([
+    can('order:applydiscount') && { icon: <Tag />, label: t('خصم'), onClick: () => setDlg({ k: 'discount' }), disabled: !active.length },
+    order.visitId && can('order:updateline') && { icon: <ArrowRightLeft />, label: t('نقل أصناف'), onClick: () => setDlg({ k: 'move' }), disabled: !active.length },
+    order.visitId && can('order:updateline') && { icon: <Split />, label: t('تقسيم'), onClick: () => setDlg({ k: 'split' }), disabled: !active.length, proposed: true },
+    { icon: <Printer />, label: t('شيك مبدئي'), onClick: () => run('Print.PreBill', { params: { orderId: order.id }, body: { terminalId: auth.terminalId } }, { success: t('الشيك المبدئي اتبعت للطابعة (مش فاتورة ضريبية)') }), disabled: !active.length, proposed: true },
+    can('order:comp') && { icon: <Gift />, label: t('ضيافة'), onClick: () => setDlg({ k: 'comp' }), disabled: !active.length },
+    order.visitId && siblings.length > 1 && can('order:updateline') && { icon: <Merge />, label: t('دمج'), onClick: () => setDlg({ k: 'merge' }), proposed: true },
+    can('order:changechannel') && { icon: <Shuffle />, label: t('تغيير القناة'), onClick: () => setDlg({ k: 'channel' }), proposed: true },
+    rounds.length === 0 ? can('order:cancel') && { icon: <XCircle />, label: t('إلغاء الشيك'), onClick: () => setDlg({ k: 'cancel' }), danger: true } : can('order:void') && { icon: <Ban />, label: t('إلغاء بعد الإرسال'), onClick: () => setDlg({ k: 'voidOrder' }), danger: true },
+  ] as (ActDef | false | null | undefined | '')[]).filter(Boolean) as ActDef[];
   const where = order.kind === 'STAFF_MEAL' ? t('وجبة موظف') : order.tableName ? `${t('ترابيزة')} ${order.tableName}` : order.channel === 'TAKEAWAY' ? t('تيك أواي') : order.channel === 'DELIVERY' ? t('دليفري') : t('صالة كاونتر');
 
   return (
@@ -112,34 +125,30 @@ export function CheckPanel({ order, refetch, mode, onCheckSwitch }: { order: any
       </div>
 
       {/* totals (server) */}
-      <div className="border-t line px-4 py-3 space-y-1 text-sm surface-1" data-fb="check-totals">
-        <Row k={<>{t('الأصناف')} <span className="num text-dim text-xs">({qty(String(items))})</span></>} v={T.itemsSubtotal} />
-        {T.discountTotal !== '0.0000' && !T.comp && <Row k={t('الخصم')} v={'-' + T.discountTotal} tone="error" />}
-        {T.serviceRate && <Row k={<>{t('خدمة')} <span className="num">{qty(T.serviceRate)}%</span></>} v={T.serviceCharge} />}
-        {!T.serviceRate && order.channel === 'DINE_IN' && order.service && <div className="text-[11px] text-dim">{t('مفيش خدمة على الشيك ده')}<Tech> ({order.service.origin})</Tech></div>}
-        {T.charges.map((c: any) => <Row key={c.id} k={<span className="flex items-center gap-1">{L(c.label)} <StateBadge state="PROPOSED" /></span>} v={c.amount} />)}
-        {T.tableTax !== '0.0000' && <Row k={<span className="flex items-center gap-1">{t('ضريبة الجدول')} <StateBadge state="PROPOSED" /></span>} v={T.tableTax} />}
-        {T.taxLines.map((x: any, i: number) => <Row key={i} k={<>{L(x.name)} <span className="num">{qty(x.rate)}%</span></>} v={x.amount} />)}
-        <div className="flex items-end justify-between gap-2 pt-1.5 mt-1 border-t line">
-          <span className="font-extrabold text-base">{t('الإجمالي')}</span>
+      <div className="border-t line px-4 py-2.5 space-y-1 text-sm surface-1" data-fb="check-totals">
+        {showBreak && <>
+          <Row k={<>{t('الأصناف')} <span className="num text-dim text-xs">({qty(String(items))})</span></>} v={T.itemsSubtotal} />
+          {T.discountTotal !== '0.0000' && !T.comp && <Row k={t('الخصم')} v={'-' + T.discountTotal} tone="error" />}
+          {T.serviceRate && <Row k={<>{t('خدمة')} <span className="num">{qty(T.serviceRate)}%</span></>} v={T.serviceCharge} />}
+          {!T.serviceRate && order.channel === 'DINE_IN' && order.service && <div className="text-[11px] text-dim">{t('مفيش خدمة على الشيك ده')}<Tech> ({order.service.origin})</Tech></div>}
+          {T.charges.map((c: any) => <Row key={c.id} k={<span className="flex items-center gap-1">{L(c.label)} <StateBadge state="PROPOSED" /></span>} v={c.amount} />)}
+          {T.tableTax !== '0.0000' && <Row k={<span className="flex items-center gap-1">{t('ضريبة الجدول')} <StateBadge state="PROPOSED" /></span>} v={T.tableTax} />}
+          {T.taxLines.map((x: any, i: number) => <Row key={i} k={<>{L(x.name)} <span className="num">{qty(x.rate)}%</span></>} v={x.amount} />)}
+        </>}
+        <div className={cn('flex items-end justify-between gap-2', showBreak && 'pt-1.5 mt-1 border-t line')}>
+          <button className="font-extrabold text-base flex items-center gap-1 text-start" onClick={() => setShowBreak(!showBreak)} data-fb="check-totals-toggle" title={showBreak ? t('اخفي التفاصيل') : t('اعرض التفاصيل')}>{t('الإجمالي')}<ChevronDown className={cn('w-4 h-4 text-dim transition-transform', showBreak && 'rotate-180')} /></button>
           <Money v={T.payable} className="text-[28px] leading-none tracking-tight text-[var(--primary)]" />
         </div>
         {order.settlement && order.settlement.paid !== '0.0000' && <div className="text-xs flex justify-between"><span className="text-dim">{t('اتدفع')} <span className="num">{money(order.settlement.paid)}</span></span><span>{t('الباقي')} <b className="num">{money(order.settlement.remaining)}</b></span></div>}
-        <div className="text-[10px] text-dim" title={optionText('PricingOrderPolicy', null, order.policy.pricingOrder).help}>{optionText('PricingOrderPolicy', null, order.policy.pricingOrder).label} · {t('التقريب لأقرب قرش')}<Tech><span className="num"> · {order.policy.pricingOrder} · {order.policy.rounding.mode}/{order.policy.rounding.scale}</span></Tech></div>
+        {showBreak && <div className="text-[10px] text-dim" title={optionText('PricingOrderPolicy', null, order.policy.pricingOrder).help}>{optionText('PricingOrderPolicy', null, order.policy.pricingOrder).label} · {t('التقريب لأقرب قرش')}<Tech><span className="num"> · {order.policy.pricingOrder} · {order.policy.rounding.mode}/{order.policy.rounding.scale}</span></Tech></div>}
       </div>
 
       {/* actions */}
       <div className="border-t line p-2.5 space-y-2">
-        {draft && order.kind !== 'STAFF_MEAL' && (
-          <div className="grid grid-cols-4 gap-1.5">
-            <Act icon={<Tag />} label={t('خصم')} onClick={() => setDlg({ k: 'discount' })} disabled={!active.length} perm={can('order:applydiscount')} />
-            <Act icon={<Gift />} label={t('ضيافة')} onClick={() => setDlg({ k: 'comp' })} disabled={!active.length} perm={can('order:comp')} />
-            {order.visitId && <Act icon={<ArrowRightLeft />} label={t('نقل أصناف')} onClick={() => setDlg({ k: 'move' })} disabled={!active.length} perm={can('order:updateline')} />}
-            {order.visitId && <Act icon={<Split />} label={t('تقسيم')} onClick={() => setDlg({ k: 'split' })} disabled={!active.length} perm={can('order:updateline')} proposed />}
-            {order.visitId && siblings.length > 1 && <Act icon={<Merge />} label={t('دمج')} onClick={() => setDlg({ k: 'merge' })} perm={can('order:updateline')} proposed />}
-            <Act icon={<Shuffle />} label={t('تغيير القناة')} onClick={() => setDlg({ k: 'channel' })} perm={can('order:changechannel')} proposed />
-            <Act icon={<Printer />} label={t('شيك مبدئي')} onClick={() => run('Print.PreBill', { params: { orderId: order.id }, body: { terminalId: auth.terminalId } }, { success: t('الشيك المبدئي اتبعت للطابعة (مش فاتورة ضريبية)') })} disabled={!active.length} proposed />
-            {rounds.length === 0 ? <Act icon={<XCircle />} label={t('إلغاء الشيك')} onClick={() => setDlg({ k: 'cancel' })} perm={can('order:cancel')} danger /> : <Act icon={<Ban />} label={t('إلغاء بعد الإرسال')} onClick={() => setDlg({ k: 'voidOrder' })} perm={can('order:void')} danger />}
+        {draft && order.kind !== 'STAFF_MEAL' && acts.length > 0 && (
+          <div className="grid grid-cols-4 gap-1.5" data-fb="check-actions">
+            {(moreOpen || acts.length <= 4 ? acts : acts.slice(0, 3)).map((x) => <Act key={x.label} {...x} />)}
+            {acts.length > 4 && <Act icon={moreOpen ? <ChevronUp /> : <MoreHorizontal />} label={moreOpen ? t('أقل') : t('المزيد')} onClick={() => setMoreOpen(!moreOpen)} />}
           </div>
         )}
         {order.status === 'CONFIRMED' && can('order:void') && <Button variant="danger" size="sm" className="w-full" onClick={() => setDlg({ k: 'voidOrder' })}><Ban className="w-4 h-4" />{t('إلغاء الشيك (موافقة مدير)')}</Button>}
@@ -178,10 +187,9 @@ function Row({ k, v, tone }: { k: React.ReactNode; v: string; tone?: 'error' }) 
   return <div className="flex items-center justify-between gap-2"><span className="text-soft">{k}</span><Money v={v} tone={tone} className="text-sm" /></div>;
 }
 
-function Act({ icon, label, onClick, disabled, perm = true, danger, proposed }: { icon: React.ReactElement; label: string; onClick: () => void; disabled?: boolean; perm?: boolean; danger?: boolean; proposed?: boolean }) {
-  if (!perm) return null;
+function Act({ icon, label, onClick, disabled, danger, proposed }: { icon: React.ReactElement; label: string; onClick: () => void; disabled?: boolean; danger?: boolean; proposed?: boolean }) {
   return (
-    <button data-fb={`check-action:${label}`} onClick={onClick} disabled={disabled} className={cn('relative min-h-[52px] rounded-xl flex flex-col items-center justify-center gap-0.5 px-1 text-[11px] font-bold border transition-colors disabled:opacity-30', danger ? 'border-[color-mix(in_srgb,var(--error)_35%,transparent)] text-[var(--error)] bg-[color-mix(in_srgb,var(--error)_8%,transparent)] hover:bg-[color-mix(in_srgb,var(--error)_16%,transparent)]' : 'border-[var(--glass-border)] surface-1 text-soft hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]')}>
+    <button data-fb={`check-action:${label}`} onClick={onClick} disabled={disabled} className={cn('relative min-h-[48px] rounded-xl flex flex-col items-center justify-center gap-0.5 px-1 text-[11px] font-bold border transition-colors disabled:opacity-30', danger ? 'border-[color-mix(in_srgb,var(--error)_35%,transparent)] text-[var(--error)] bg-[color-mix(in_srgb,var(--error)_8%,transparent)] hover:bg-[color-mix(in_srgb,var(--error)_16%,transparent)]' : 'border-[var(--glass-border)] surface-1 text-soft hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]')}>
       {React.cloneElement(icon as React.ReactElement<any>, { className: 'w-4 h-4' })}<span className="leading-tight text-center">{label}</span>
       {proposed && <span className="absolute top-1 end-1 w-1.5 h-1.5 rounded-full" style={{ background: 'var(--violet)' }} title={t('مقترح')} />}
     </button>

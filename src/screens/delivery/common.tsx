@@ -249,7 +249,7 @@ export function DeliveryDetail({ id, onClose }: { id: string; onClose: () => voi
             {d.customer?.allergies?.length ? <AllergyWarning allergies={d.customer.allergies} /> : null}
             {d.order && (
               <div className="rounded-xl border line p-3 text-sm space-y-1">
-                {(d.lines ?? []).map((l: any) => <div key={l.id} className="flex justify-between gap-2"><span>{qty(l.quantity)} × {L(l.name)}{l.modifiers?.length ? <span className="text-dim text-xs"> — {l.modifiers.map((m: any) => L(m)).join('، ')}</span> : null}{l.note ? <span className="text-amber-300 text-xs"> ✎ {l.note}</span> : null}</span><span className="num">{money(l.lineTotal)}</span></div>)}
+                {(d.lines ?? []).map((l: any) => <div key={l.id} className="flex justify-between gap-2"><span>{qty(l.quantity)} × {L(l.name)}{l.modifiers?.length ? <span className="text-dim text-xs"> — {l.modifiers.map((m: any) => L(m)).join('، ')}</span> : null}{l.note ? <span className="text-[var(--warning-text)] text-xs"> ✎ {l.note}</span> : null}</span><span className="num">{money(l.lineTotal)}</span></div>)}
                 {d.totals && <div className="border-t line pt-2 mt-2 space-y-0.5">
                   {d.totals.charges.map((c: any) => <div key={c.id} className="flex justify-between text-dim"><span>{L(c.label)}</span><span className="num">{money(c.amount)}</span></div>)}
                   <div className="flex justify-between font-bold"><span>{t('الإجمالي')}</span><Money v={d.order.payable} /></div>

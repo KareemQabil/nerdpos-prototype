@@ -72,7 +72,7 @@ function ExternalCard({ e }: { e: any }) {
           <div className="font-bold flex items-center gap-2">{e.customer.name}<span className="num text-xs text-dim font-normal" dir="ltr">{e.customer.phone}</span></div>
           {e.customer.address && <div className="text-xs text-soft mt-0.5 flex items-start gap-1"><MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />{addressText(e.customer.address)}</div>}
           {e.fulfillment === 'DELIVERY' && (e.zone ? <div className="text-[11px] text-dim mt-0.5">{t('منطقة')} {L(e.zone.name)} · {t('حوالي')} {e.zone.etaMinutes} {t('د')}</div> : <div className="text-[11px] text-[var(--error)] mt-0.5">{t('العنوان برة مناطق التوصيل')}</div>)}
-          {e.note && <div className="text-xs text-amber-300 mt-1">✎ {e.note}</div>}
+          {e.note && <div className="text-xs text-[var(--warning-text)] mt-1">✎ {e.note}</div>}
         </div>
         <div className="space-y-1.5">
           {e.items.map((it: any) => <ItemRow key={it.code} e={e} it={it} />)}
@@ -109,7 +109,7 @@ function ItemRow({ e, it }: { e: any; it: any }) {
         <span><b className="num">{qty(it.quantity)}×</b> {it.name}{it.productId && L(it.productName) !== it.name && <span className="text-xs text-dim"> ← {L(it.productName)}</span>}</span>
         <span className="text-xs num">{money(it.unitPrice)}{diff && <span className="block text-[10px] text-dim">{t('سعرنا')} {money(it.ourPrice)}</span>}</span>
       </div>
-      {it.note && <div className="text-[11px] text-amber-300">✎ {it.note}</div>}
+      {it.note && <div className="text-[11px] text-[var(--warning-text)]">✎ {it.note}</div>}
       {!it.productId && e.state === 'NEW' && (
         <div className="flex items-center gap-2 mt-1.5">
           <span className="text-[11px] text-[var(--warning)] flex items-center gap-1 shrink-0"><AlertTriangle className="w-3.5 h-3.5" />{t('مش متعرف')}</span>
