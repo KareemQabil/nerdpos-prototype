@@ -26,6 +26,7 @@ export const SEEDED_LABELS: Record<string, { ar: string; en: string; short: stri
   t_kds: { ar: 'شاشة المطبخ', en: 'Kitchen screen', short: 'K1' },
   t_admin: { ar: 'مكتب المدير', en: 'Manager office', short: 'ADM' },
   t_second_floor: { ar: 'تابلت الفرع التاني', en: 'Second branch tablet', short: 'B2' },
+  t_cash2: { ar: 'كاشير التيك أواي', en: 'Takeaway cashier', short: 'T3' },
   BO: { ar: 'باك أوفيس (من غير جهاز)', en: 'Back office (no terminal)', short: 'BO' },
 };
 

@@ -9,6 +9,7 @@ import { Tech } from '../../app/tech';
 import { cn, money, dateTime } from '../../lib/format';
 import { clock, businessDate } from '../../mock/clock';
 import { store } from '../../mock/store';
+import { branchLabel } from '../../demo/people';
 
 export const METHOD_AR: Record<string, string> = { CASH: 'كاش', CARD: 'كارت', DIGITAL_WALLET: 'محفظة', DEPOSIT: 'عربون', 'DIGITAL_WALLET:INSTAPAY': 'إنستاباي', 'DIGITAL_WALLET:VODAFONE_CASH': 'فودافون كاش', 'DIGITAL_WALLET:ORANGE_CASH': 'أورنج كاش', 'DIGITAL_WALLET:ETISALAT_CASH': 'اتصالات كاش', LOYALTY: 'نقاط', LOYALTY_POINTS: 'نقاط' };
 const addDays = (iso: string, n: number) => new Date(Date.parse(iso + 'T00:00:00Z') + n * 86_400_000).toISOString().slice(0, 10);
@@ -68,7 +69,7 @@ function DayHeader({ d }: { d: any }) {
       <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-400 to-violet-600 flex items-center justify-center text-white"><Moon className="w-7 h-7" /></div>
       <div className="flex-1 min-w-[220px]">
         <div className="text-2xl font-extrabold">{dayName(d.date)}</div>
-        <div className="text-xs text-dim">{t('من')} <span className="num">{d.cutoff}</span> {t('يوم')} <span className="num">{d.date}</span> {t('لحد')} <span className="num">{d.cutoff}</span> {t('يوم')} <span className="num">{d.nextBusinessDate}</span> · {d.branchName}</div>
+        <div className="text-xs text-dim">{t('من')} <span className="num">{d.cutoff}</span> {t('يوم')} <span className="num">{d.date}</span> {t('لحد')} <span className="num">{d.cutoff}</span> {t('يوم')} <span className="num">{d.nextBusinessDate}</span> · {branchLabel(store.db.branches.find((b) => b.id === d.branchId) ?? { name: d.branchName })}</div>
       </div>
       {d.closed ? <Pill tone="success" className="text-sm"><Lock className="w-3.5 h-3.5" />{t('اليوم مقفول')}</Pill>
         : d.blockers ? <Pill tone="error" className="text-sm"><XCircle className="w-3.5 h-3.5" />{t('{n} حاجة لازم تخلص قبل القفل', { n: d.blockers })}</Pill>

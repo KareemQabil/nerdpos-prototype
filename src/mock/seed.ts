@@ -18,7 +18,7 @@ export function buildSeed(nowMs: number): DB {
   const nowIso = new Date(nowMs).toISOString();
   const startOfPrices = nowMs - 30 * 86_400_000; // provisioning time: 30 days ago
   const db: DB = {
-    schema: 3,
+    schema: 4,
     seq: {},
     business: { id: 'biz', name: seed.business.name, nameAr: 'مطعم نيردبوس التجريبي', legalName: seed.business.legalName, currency: 'EGP', version: 1 },
     branches: seed.branches.map((b: any) => ({ id: b.key, code: b.code, name: b.name, timezone: b.timezone, businessDayCutoff: b.businessDayCutoff, active: b.active, version: 1 })),

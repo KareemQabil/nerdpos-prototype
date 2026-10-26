@@ -54,7 +54,7 @@ export function blockingCapability(db: DB, op: { id: string; module: string }, b
 const ACTIONS: typeof APPROVAL_ACTIONS = [
   { id: 'OUTBOX_REDRIVE', title: 'إعادة إرسال عملية واقفة', context: ['deliveryId', 'consumerId', 'attempts', 'deadLetter'], numeric: ['attempts'], boolean: ['deadLetter'], defaultRule: { mode: 'WHEN_TRUE', field: 'deadLetter' }, state: 'DIRECTION', permission: 'approve:outbox_redrive', commands: ['Outbox.Redrive'] },
   { id: 'ORDER_SESSION_TRANSFER', title: 'نقل شيك لوردية تانية', context: ['orderId', 'fromSessionId', 'toSessionId', 'payable'], numeric: ['payable'], boolean: [], defaultRule: { mode: 'NEVER' }, state: 'DIRECTION', permission: 'approve:order_session_transfer', commands: ['Order.TransferSession'] },
-  { id: 'BUSINESS_DAY_CLOSE', title: 'قفل اليوم التجاري مع تحذيرات', context: ['date', 'warnings'], numeric: ['warnings'], boolean: [], defaultRule: { mode: 'ABOVE_THRESHOLD', field: 'warnings', threshold: '0' }, state: 'DIRECTION', permission: 'approve:business_day_close', commands: ['BusinessDay.Close'] },
+  { id: 'BUSINESS_DAY_CLOSE', title: 'قفل اليوم التجاري مع تحذيرات', context: ['date', 'warnings'], numeric: ['warnings'], boolean: [], defaultRule: { mode: 'NEVER' }, state: 'DIRECTION', permission: 'approve:business_day_close', commands: ['BusinessDay.Close'] },
 ];
 for (const a of ACTIONS) if (!APPROVAL_ACTIONS.some((x) => x.id === a.id)) APPROVAL_ACTIONS.push(a);
 

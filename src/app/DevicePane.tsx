@@ -18,6 +18,7 @@ import { personName, deviceName, roleLabel, branchLabel } from '../demo/people';
 import { capabilityHiding, pendingApprovalCount } from '../screens/ops/capabilities-ui'; // operations & system area
 import { OfflineBar } from '../screens/ops/OfflineBar';
 import { RemoteApproval } from '../screens/ops/RemoteApproval';
+import { ruleSentence, contextFieldLabel, contextValueText } from '../demo/policyText';
 
 export function DevicePane({ id, compact }: { id: string; compact?: boolean }) {
   const ds = useDevicesState();
@@ -271,14 +272,15 @@ function ApprovalDialog({ req }: { req: ReturnType<typeof useApprovals>[number] 
       <div className="space-y-4" data-screen="C5">
         <div className="rounded-xl surface-1 p-3">
           <div className="text-xs text-dim">{t('العملية')}</div>
-          <div className="font-bold text-lg">{def?.title ?? d.action} <span className="num text-xs text-dim">{d.action}</span></div>
-          <div className="text-xs text-dim mt-1">{t('القاعدة الحالية')}: <span className="num">{ruleText}</span> · {d.opId}</div>
+          <div className="font-bold text-lg">{def?.title ? t(def.title) : t('عملية محتاجة موافقة')}<Tech><span className="num text-xs text-dim ms-1">{d.action}</span></Tech></div>
+          <div className="text-xs text-dim mt-1">{ruleSentence(d.action, rule)}<Tech><span className="num"> · {ruleText} · {d.opId}</span></Tech></div>
         </div>
         <div>
           <div className="text-xs font-bold text-soft mb-1">{t('بالظبط بتوافق على إيه')}</div>
-          <KV className="num text-xs" rows={[['targetType', d.targetType], ['targetId', d.targetId], ...Object.entries(d.context ?? {}).map(([k, v]) => [k, v === null ? 'null' : String(v)] as [string, string])]} />
+          <KV className="text-xs" rows={Object.entries(d.context ?? {}).filter(([k, v]) => v !== null && v !== '' && !/Id$|Version$|Hash$/.test(k)).map(([k, v]) => [contextFieldLabel(k), plainContextValue(k, v)] as [string, string])} />
+          <Tech><KV className="num text-[10px] mt-1" rows={[['targetType', d.targetType], ['targetId', d.targetId], ...Object.entries(d.context ?? {}).map(([k, v]) => [k, v === null ? 'null' : String(v)] as [string, string])]} /></Tech>
         </div>
-        <Banner tone="info">{t('الموافقة بتتستخدم مرة واحدة، ومربوطة بالسياق ده والطالب والفرع والجهاز، وبتنتهي حسب ApprovalTtlPolicy. صاحب الطلب مينفعش يوافق لنفسه.')}</Banner>
+        <Banner tone="info">{t('الموافقة بتتستخدم مرة واحدة للعملية دي بالظبط، ومن نفس الجهاز، وبتخلص بعد دقيقتين. صاحب الطلب مينفعش يوافق لنفسه.')}</Banner>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5"><div className="text-xs font-bold text-soft">{t('المدير')}</div>
             <Select value={approver} onChange={(e) => setApprover(e.target.value)} options={[{ value: '', label: t('اختار') }, ...approvers.map((a) => ({ value: a.id, label: `${a.displayName}${a.can ? '' : ' — ' + t('مالوش صلاحية')}` }))]} />
@@ -309,4 +311,13 @@ function UnknownHost() {
       </div>
     </Modal>
   );
+}
+
+/** Approval context values in words (reason labels, kinds); raw values stay in <Tech>. */
+const CTX_KIND: Record<string, string> = { PERCENTAGE: 'نسبة', FIXED_AMOUNT: 'مبلغ ثابت', CASH: 'كاش', CARD: 'كارت', DIGITAL_WALLET: 'محفظة', PAY_IN: 'إدخال فلوس للدرج', PAY_OUT: 'صرف من الدرج', SAFE_DROP: 'إيداع في الخزنة' };
+function plainContextValue(k: string, v: unknown): string {
+  if (k === 'reasonCode') return L(store.db.reasonCodes.find((r) => r.code === v)?.label) || t('سبب من القايمة');
+  if (typeof v === 'string' && CTX_KIND[v]) return t(CTX_KIND[v]);
+  if (typeof v === 'string' && /^[A-Z][A-Z_]{2,}$/.test(v)) return '—';
+  return contextValueText(k, v);
 }

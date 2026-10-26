@@ -31,7 +31,10 @@ export function SalesOverview() {
   const items: any[] = q.data?.items ?? [];
   const [hover, setHover] = useState<number | null>(null);
   if (!items.length) return null;
-  const today = items[items.length - 1], yday = items[items.length - 2], lastWeek = items[items.length - 8];
+  // early in the day (no sales yet) the cards show yesterday, compared with the day before and the same day last week
+  const quiet = n(items[items.length - 1].netSales) === 0;
+  const off = quiet ? 1 : 0;
+  const today = items[items.length - 1 - off], yday = items[items.length - 2 - off], lastWeek = items[items.length - 8 - off];
   const last14 = items.slice(-14);
   const max = Math.max(1, ...last14.map((x) => n(x.netSales)));
   const avgHour = Array.from({ length: 24 }, (_, h) => items.slice(-8, -1).reduce((a, x) => a + n(x.byHour?.[h]), 0) / 7);
@@ -46,14 +49,15 @@ export function SalesOverview() {
     <div className="glass rounded-xl p-4" data-fb="report-kpi">
       <div className="text-xs text-dim flex items-center gap-1.5">{icon}{label}</div>
       <div className="text-2xl font-extrabold num mt-1">{value}</div>
-      <div className="flex gap-3 mt-1"><Delta now={a} before={b} label={t('عن امبارح')} /><Delta now={a} before={c} label={t('عن نفس اليوم الأسبوع اللي فات')} /></div>
+      <div className="flex gap-3 mt-1"><Delta now={a} before={b} label={quiet ? t('عن اليوم اللي قبله') : t('عن امبارح')} /><Delta now={a} before={c} label={t('عن نفس اليوم الأسبوع اللي فات')} /></div>
     </div>
   );
   const avg = (x: any) => (x?.orders ? n(x.netSales) / x.orders : 0);
   return (
     <div className="space-y-3" data-fb="reports:overview">
+      {quiet && <div className="text-xs text-dim">{t('النهارده لسه مفيهوش بيع — الكروت دي أرقام امبارح.')}</div>}
       <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3">
-        {kpi(<TrendingUp className="w-3.5 h-3.5" />, t('صافي مبيعات النهارده'), `${fmt(n(today.netSales))} ${t('جنيه')}`, n(today.netSales), n(yday?.netSales), n(lastWeek?.netSales))}
+        {kpi(<TrendingUp className="w-3.5 h-3.5" />, quiet ? t('صافي مبيعات امبارح') : t('صافي مبيعات النهارده'), `${fmt(n(today.netSales))} ${t('جنيه')}`, n(today.netSales), n(yday?.netSales), n(lastWeek?.netSales))}
         {kpi(<Receipt className="w-3.5 h-3.5" />, t('عدد الشيكات'), String(today.orders), today.orders, yday?.orders ?? 0, lastWeek?.orders ?? 0)}
         {kpi(<Wallet className="w-3.5 h-3.5" />, t('متوسط الشيك'), `${fmt(avg(today))} ${t('جنيه')}`, avg(today), avg(yday), avg(lastWeek))}
         {kpi(<Users className="w-3.5 h-3.5" />, t('الضيوف'), String(today.guests), today.guests, yday?.guests ?? 0, lastWeek?.guests ?? 0)}

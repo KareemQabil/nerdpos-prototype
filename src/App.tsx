@@ -42,7 +42,7 @@ export default function App() {
 
   return (
     <div className={cn('h-full flex flex-col', fb.mode && 'fb-mode')}>
-      <div className="h-12 shrink-0 flex items-center gap-2 px-3 border-b line glass-strong z-40 overflow-x-auto scrollbar-hide" data-demo-chrome>
+      <div className="h-12 shrink-0 flex items-center gap-2 px-3 border-b line glass-strong z-[80] relative overflow-x-auto scrollbar-hide" data-demo-chrome>
         <div className="flex items-center gap-2 shrink-0" title={t('ده مطعم تجريبي: كل البيانات وهمية ومفيش فلوس حقيقية بتتحرك')}>
           <Box className="w-6 h-6 text-cyan-400" />
           <div className="leading-none"><div className="font-extrabold text-sm">NerdPOS</div><div className="text-[10px] text-dim">{t('مطعم تجريبي — بيانات وهمية')}</div></div>

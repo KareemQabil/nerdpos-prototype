@@ -93,7 +93,8 @@ function readiness(ctx: Ctx, branchId: string, date: string) {
   const br = db.branches.find((b) => b.id === branchId);
   const current = bdOf(ctx.now, br?.timezone ?? 'Africa/Cairo', br?.businessDayCutoff ?? '04:00');
   const checks: Check[] = [];
-  const add = (c: Omit<Check, 'level'> & { level?: Check['level'] }, bad: 'BLOCKER' | 'WARNING') => checks.push({ ...c, level: c.count ? bad : 'OK' } as Check);
+  const OK_TITLE: Record<string, string> = { OPEN_SESSIONS: 'كل الأدراج اتقفلت', OPEN_CHECKS: 'مفيش شيكات مفتوحة', PENDING_DELIVERIES: 'مفيش دليفري في الطريق', KITCHEN: 'شاشة المطبخ فاضية', KITCHEN_FAILED: 'كل الطلبات وصلت المطبخ', FAILED_PRINTS: 'الطباعة كلها تمام', ERECEIPTS: 'كل الإيصالات الإلكترونية اتقبلت', REFUNDS: 'مفيش مرتجعات مستنية', APPROVALS: 'مفيش طلبات موافقة مستنية', OFFLINE: 'مفيش عمليات أوفلاين مستنية قرار', RECON: 'كل فروقات المطابقة متفسرة' };
+  const add = (c: Omit<Check, 'level'> & { level?: Check['level'] }, bad: 'BLOCKER' | 'WARNING') => checks.push({ ...c, level: c.count ? bad : 'OK', title: c.count || !OK_TITLE[c.id] ? c.title : { ar: OK_TITLE[c.id], en: c.title.en } } as Check);
   if (date > current) checks.push({ id: 'NOT_STARTED', level: 'BLOCKER', title: { ar: 'اليوم ده لسه ما بدأش', en: 'This day has not started' }, detail: { ar: `اليوم التجاري الحالي ${current}`, en: `current business day is ${current}` }, count: 1, items: [] });
   const sessions = db.sessions.filter((s) => s.branchId === branchId && s.state === 'OPEN' && s.businessDate <= date);
   add({ id: 'OPEN_SESSIONS', title: { ar: 'أدراج لسه مفتوحة', en: 'Open drawers' }, detail: { ar: 'كل كاشير يقفل ورديته ويعد الدرج الأول', en: 'each cashier closes the shift and counts the drawer' }, count: sessions.length, screen: 'shift',

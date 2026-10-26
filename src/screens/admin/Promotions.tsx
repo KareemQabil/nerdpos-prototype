@@ -8,6 +8,7 @@ import { Banner, Button, Card, Field, Input, Modal, Money, Pill, Section, StateB
 import { t, L } from '../../i18n';
 import { Tech } from '../../app/tech';
 import { dateTime, cn } from '../../lib/format';
+import { branchLabel } from '../../demo/people';
 import { CHANNELS, Check, LocInputs, Radio, cairoLocal, cairoLocalToIso, channelLabel, useItems, usePolicy } from './catalog/common';
 
 const DAYS = [6, 0, 1, 2, 3, 4, 5];
@@ -56,7 +57,7 @@ export default function Promotions() {
   const stacking = usePolicy<{ mode: string; autoApply: boolean }>('DiscountStackingPolicy');
   const [form, setForm] = useState<Draft | null>(null);
   const [filter, setFilter] = useState<'all' | 'live' | 'off'>('all');
-  const branchName = (id: string) => branches.items.find((b) => b.id === id)?.name ?? id;
+  const branchName = (id: string) => branchLabel(branches.items.find((b) => b.id === id)) || id;
   const save = async () => {
     if (!form) return;
     const id = form.id ?? `promo_${Date.now().toString(36)}`;
@@ -167,7 +168,7 @@ function PromoForm({ d, set, branches, products, categories }: { d: Draft; set: 
           {d.kind === 'CODED' && <Field label={t('الأكواد')} hint={t('كود أو أكتر، بينهم فاصلة')}><Input data-fb="promotion-form:code" value={d.codes} onChange={(e) => set({ ...d, codes: e.target.value })} dir="ltr" placeholder="RAMADAN25, VIP10" /></Field>}
         </div>
         <Field label={t('على أنهي طلبات')}><div className="flex flex-wrap gap-1.5">{CHANNELS.map((c) => <Check key={c} fb={`promotion-form:channel:${c}`} checked={d.channels.includes(c)} onChange={(on) => set({ ...d, channels: toggleIn(d.channels, c as string, on) })}>{channelLabel(c)}</Check>)}</div></Field>
-        <Field label={t('الفروع')} hint={t('من غير اختيار = كل الفروع')}><div className="flex flex-wrap gap-1.5">{branches.map((b) => <Check key={b.id} fb={`promotion-form:branch:${b.id}`} checked={d.branchIds.includes(b.id)} onChange={(on) => set({ ...d, branchIds: toggleIn(d.branchIds, b.id, on) })}>{b.name}</Check>)}</div></Field>
+        <Field label={t('الفروع')} hint={t('من غير اختيار = كل الفروع')}><div className="flex flex-wrap gap-1.5">{branches.map((b) => <Check key={b.id} fb={`promotion-form:branch:${b.id}`} checked={d.branchIds.includes(b.id)} onChange={(on) => set({ ...d, branchIds: toggleIn(d.branchIds, b.id, on) })}>{branchLabel(b)}</Check>)}</div></Field>
         <Card title={<span className="inline-flex items-center gap-2"><Timer className="w-4 h-4" />{t('المواعيد')}</span>} actions={<Button size="sm" variant="ghost" onClick={() => set({ ...d, dayparts: [...d.dayparts, { days: [0, 1, 2, 3, 4, 5, 6], start: '13:00', end: '16:00' }] })} data-fb="promotion-form:add-daypart"><Plus className="w-3.5 h-3.5" />{t('فترة')}</Button>}>
           {d.dayparts.length === 0 ? <div className="text-sm text-dim">{t('شغال طول اليوم جوه فترة الصلاحية')}</div> : (
             <div className="space-y-3">{d.dayparts.map((dp, i) => (

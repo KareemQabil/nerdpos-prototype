@@ -13,7 +13,7 @@ function load(): DB {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as DB;
-      if (parsed.schema === 3) return parsed;
+      if (parsed.schema === 4) return parsed;
     }
   } catch { /* corrupted or blocked: reseed */ }
   return buildSeed(clock.now());
@@ -57,7 +57,7 @@ export const store = {
   },
   importJson(json: string) {
     const parsed = JSON.parse(json) as DB;
-    if (parsed.schema !== 3) throw new Error('schema mismatch');
+    if (parsed.schema !== 4) throw new Error('schema mismatch');
     db = parsed;
     store.commit();
   },
