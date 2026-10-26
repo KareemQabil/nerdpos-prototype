@@ -61,13 +61,17 @@ const PLAIN: Record<string, Plain> = {
   CredentialPolicy: { title: 'طول الرقم السري', explain: 'أقل طول للباسورد، وعدد أرقام الرقم السري (PIN).' },
 
   DirectionCatalogDemo: { title: 'أصناف تجريبية في المنيو', explain: 'يظهر قسم فيه أمثلة لأفكار جديدة: بيتزا بأحجام ونص ونص، وجبة كومبو، وشيشة عليها ضريبة جدول.' },
-  HalfAndHalfPricingPolicy: { title: 'سعر البيتزا نص ونص', explain: 'البيتزا النص ونص تتحسب بسعر النص الأغلى، ولا بمتوسط النصين.', question: 'المطاعم عندكم بتحسب النص ونص بالأغلى ولا بالمتوسط؟' },
+  HalfAndHalfPricingPolicy: { title: 'سعر البيتزا نص ونص', explain: 'البيتزا النص ونص تتحسب بسعر النص الأغلى، ولا بمتوسط النصين، ولا كل نص بنسبة من سعره والمجموع هو السعر.', question: 'المطاعم عندكم بتحسب النص ونص بالأغلى ولا بالمتوسط؟' },
+  MenuPriceDisplayPolicy: { title: 'عرض الأسعار على الكاشير', explain: 'الأسعار على شاشة البيع تظهر زي ما هي والضريبة تتضاف في الشيك، ولا تظهر شاملة الضريبة. ده عرض بس — الشيك بيتحسب بنفس الطريقة.', question: 'الزبون بيشوف الأسعار شاملة الضريبة ولا الضريبة بتتضاف في الآخر؟' },
+  SoldOutResetPolicy: { title: 'رجوع الأصناف اللي خلصت', explain: 'الصنف أو الإضافة اللي اتعلّمت «خلص النهارده» ترجع لوحدها أول اليوم التجاري الجاي، ولا تفضل لحد ما حد يرجّعها.' },
   SplitAllocationPolicy: { title: 'توزيع القروش عند تقسيم الشيك', explain: 'لما الشيك يتقسم على كذا حد والقسمة مش مظبوطة، القروش الزيادة تروح على مين. الخصم والخدمة بيتوزعوا بنفس الطريقة.' },
   TipDistributionPolicy: { title: 'توزيع البقشيش', explain: 'البقشيش للويتر صاحب الشيك، ولا يتجمع في صندوق ويتقسم على الكل آخر الوردية.', question: 'البقشيش بيتجمع ويتقسم، ولا كل ويتر ياخد بتاعه؟' },
   StackedTaxPolicy: { title: 'ضريبة الجدول (دخان ومكسرات)', explain: 'ضريبة زيادة على أصناف معينة زي الشيشة، تتحسب قبل ضريبة القيمة المضافة (فتدخل فيها) أو بعدها.', question: 'ضريبة الجدول بتدخل في حساب القيمة المضافة عندكم؟ وأنهي أصناف عليها؟' },
   MinimumChargePolicy: { title: 'الحد الأدنى للفرد (مينيمم تشارج)', explain: 'حد أدنى للطلب لكل فرد في الصالة؛ لو الأصناف أقل، الفرق بيتضاف سطر لوحده.', question: 'المينيمم تشارج للفرد ولا للترابيزة؟ وعليه ضريبة؟' },
   ChargeComponentsPolicy: { title: 'رسوم إضافية', explain: 'رسوم تغليف على التيك أواي، ورسوم دخول للفرد في الصالة، وهل عليها ضريبة.' },
   SeatsPolicy: { title: 'الكراسي', explain: 'الويتر يقدر يحدد كل صنف لأنهي كرسي، ويقسم الشيك بالكرسي.' },
+  TableTurnPolicy: { title: 'تنضيف الترابيزة بعد القعدة', explain: 'أول ما القعدة تتقفل الترابيزة بتبان «محتاجة تنضيف» على خريطة الصالة لحد ما حد يدوس «اتنضفت». ممكن تمنع حد يقعد عليها قبل التنضيف، أو تحذّر بس.', reacts: 'خريطة الصالة: الترابيزة بتبقى مقلّمة أصفر لحد ما تتنضف، وتنبيه لو اتأخرت.', question: 'الترابيزة لازم تتنضف قبل ما حد يقعد عليها، ولا الويتر يقرر؟' },
+  OfflineModePolicy: { title: 'الشغل من غير نت', explain: 'لما النت يقطع، الجهاز بيسجل العمليات المسموحة (إضافة أصناف، إرسال للمطبخ، تحصيل كاش) ويبعتها أول ما النت يرجع. ممكن تحدد أقصى عدد ومين يتحصل كاش بس.', reacts: 'شريط «أوفلاين» فوق الشاشة وشاشة المزامنة.', question: 'لو النت قطع، تسمحوا بتحصيل الكارت يدوي ولا كاش بس؟' },
   WalletProvidersPolicy: { title: 'المحافظ الإلكترونية', explain: 'إنستاباي وفودافون كاش وغيرهم كطرق دفع برقم العملية، وكل واحدة تظهر سطر لوحدها في تقرير قفلة الوردية.' },
 };
 
@@ -167,7 +171,9 @@ const OPTIONS: Record<string, Record<string, OptText>> = {
     SANDBOX: O('تجريبي', 'الإيصالات بتتبعت لبيئة تجربة، مش للضرايب بجد.'),
     PRODUCTION: O('شغال رسمي', 'بعد اعتماد المطعم في المنظومة بس.'),
   },
-  HalfAndHalfPricingPolicy: { HIGHER_HALF: O('بسعر النص الأغلى'), AVERAGE: O('بمتوسط النصين') },
+  HalfAndHalfPricingPolicy: { HIGHER_HALF: O('بسعر النص الأغلى'), AVERAGE: O('بمتوسط النصين'), SUM_OF_HALVES: O('مجموع النصين', 'كل نص بنسبة من سعره (عادةً نص السعر)، والسعر هو المجموع.') },
+  'MenuPriceDisplayPolicy.*': { AS_PRICED: O('السعر زي ما هو (الضريبة في الشيك)'), WITH_TAX: O('شامل الضريبة') },
+  SoldOutResetPolicy: { NEXT_BUSINESS_DAY: O('يرجع لوحده أول اليوم التجاري الجاي'), MANUAL: O('يفضل لحد ما حد يرجّعه') },
   'SplitAllocationPolicy.method': { LARGEST_REMAINDER: O('القروش تروح للي عنده أكبر كسر', 'الطريقة الثابتة الوحيدة دلوقتي.') },
   'SplitAllocationPolicy.residual': { LAST_SHARE: O('الفرق الأخير على آخر حد'), FIRST_SHARE: O('الفرق الأخير على أول حد') },
   TipDistributionPolicy: { PER_SERVER: O('للويتر صاحب الشيك'), POOLED: O('صندوق مشترك يتقسم آخر الوردية') },
@@ -193,6 +199,7 @@ export function optionText(policyId: string, fieldKey: string | null, value: unk
 // ───────── field labels and units
 const FIELD_LABEL: Record<string, string> = {
   'FloorIntakePolicy.DINE_IN': 'الصالة', 'FireTimingPolicy.DINE_IN': 'الصالة', 'FireTimingPolicy.TAKEAWAY': 'التيك أواي',
+  'MenuPriceDisplayPolicy.DINE_IN': 'الصالة', 'MenuPriceDisplayPolicy.TAKEAWAY': 'التيك أواي', 'MenuPriceDisplayPolicy.DELIVERY': 'الدليفري',
   'CheckCompositionPolicy.DINE_IN': 'الصالة', 'CollectionScopePolicy.DINE_IN': 'الصالة', 'ReceiptPrintPolicy.DINE_IN': 'الصالة', 'ReceiptPrintPolicy.TAKEAWAY': 'التيك أواي',
   'OrderNumberPolicy.prefix': 'بادئة قبل الرقم', 'OrderNumberPolicy.width': 'عدد الأرقام', 'OrderNumberPolicy.includeBranchCode': 'فيه كود الفرع',
   'LineVoidDispositionPolicy.beforeKitchenStart': 'لو اتلغى قبل ما المطبخ يبدأ', 'LineVoidDispositionPolicy.afterKitchenStart': 'لو اتلغى بعد ما المطبخ بدأ',
@@ -215,6 +222,8 @@ const FIELD_LABEL: Record<string, string> = {
   'ChargeComponentsPolicy.packaging.enabled': 'رسوم تغليف (تيك أواي)', 'ChargeComponentsPolicy.packaging.amount': 'مبلغ التغليف',
   'ChargeComponentsPolicy.cover.enabled': 'رسوم دخول للفرد (صالة)', 'ChargeComponentsPolicy.cover.amount': 'مبلغ الدخول', 'ChargeComponentsPolicy.taxable': 'الرسوم عليها ضريبة',
   'WalletProvidersPolicy.providers': 'المحافظ',
+  'TableTurnPolicy.markDirty': 'تتعلم «محتاجة تنضيف» بعد القعدة', 'TableTurnPolicy.blockSeating': 'ممنوع حد يقعد عليها قبل التنضيف', 'TableTurnPolicy.alertMinutes': 'ينبّه لو فضلت مش نضيفة بعد',
+  'OfflineModePolicy.maxQueued': 'أقصى عمليات مستنية على الجهاز', 'OfflineModePolicy.cashOnly': 'التحصيل من غير نت كاش بس',
 };
 const REASON_KIND: Record<string, string> = {
   ORDER_CANCEL: 'إلغاء شيك ما اتبعتش', ORDER_VOID: 'إلغاء شيك كامل', LINE_VOID: 'إلغاء صنف', DISCOUNT: 'خصم', COMP: 'ضيافة', REFUND: 'مرتجع',
@@ -227,6 +236,7 @@ const UNITS: Record<string, Unit> = {
   'OrderNumberPolicy.width': 'digit', 'RoundingPolicy.scale': 'digit', 'SkuGenerationPolicy.width': 'digit',
   'SessionDurationPolicy.maxHours': 'hour', 'SessionDurationPolicy.warningHours': 'hour', 'ApprovalTtlPolicy.seconds': 'sec',
   'KitchenTimingPolicy.targetMinutes': 'min', 'KitchenTimingPolicy.alertMinutes': 'min', 'LoginLockoutPolicy.maxFailedAttempts': 'try', 'LoginLockoutPolicy.lockMinutes': 'min',
+  'TableTurnPolicy.alertMinutes': 'min',
   'AuthSessionPolicy.maxHours': 'hour', 'AuthSessionPolicy.pinSessionMaxHours': 'hour', 'CredentialPolicy.passwordMinLength': 'char', 'CredentialPolicy.pinLength': 'digit',
 };
 export function fieldLabel(policyId: string, f: { key: string; label: string }): string {
@@ -363,6 +373,7 @@ const CONTEXT_FIELD: Record<string, [string, Unit]> = {
   points: ['عدد النقاط', 'none'], absPoints: ['عدد النقاط', 'none'], expected: ['المبلغ المتوقع', 'egp'], counted: ['المبلغ المعدود', 'egp'],
   warehouseId: ['المخزن', 'none'], quantityDelta: ['الكمية (زيادة أو نقص)', 'none'], reasonCode: ['السبب', 'none'], absVarianceValue: ['قيمة الفروقات', 'egp'], lineCount: ['عدد الأصناف', 'none'], value: ['القيمة بالتكلفة', 'egp'], // inventory area
   foodFired: ['الأكل كان اتبعت للمطبخ', 'none'], variance: ['الفرق', 'egp'], quantity: ['الكمية', 'none'], percent: ['النسبة', 'pct'],
+  orderId: ['الشيك', 'none'], fromSessionId: ['من وردية', 'none'], toSessionId: ['لوردية', 'none'], date: ['اليوم', 'none'], deliveryId: ['العملية', 'none'], consumerId: ['رايحة لـ', 'none'],
   attempts: ['عدد المحاولات', 'none'], warnings: ['عدد التحذيرات', 'none'], deadLetter: ['العملية وقفت بعد محاولات كتير', 'none'],
 };
 export const contextFieldLabel = (f: string) => t(CONTEXT_FIELD[f]?.[0] ?? f.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase());

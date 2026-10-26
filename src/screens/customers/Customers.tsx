@@ -37,7 +37,7 @@ export default function Customers() {
             <button onClick={() => setTag('')} className={cn('px-3 h-9 rounded-lg text-xs border', !tag ? 'bg-[var(--primary)] text-[var(--primary-foreground)] border-transparent font-bold' : 'surface-1 border-[var(--glass-border)]')}>{t('الكل')}</button>
             {Object.entries(TAGS).map(([k, v]) => <button key={k} onClick={() => setTag(k)} className={cn('px-3 h-9 rounded-lg text-xs border', tag === k ? 'bg-[var(--primary)] text-[var(--primary-foreground)] border-transparent font-bold' : 'surface-1 border-[var(--glass-border)]')}>{t(v.ar)}</button>)}
           </div>
-          <Select value={sort} onChange={(e) => setSort(e.target.value)} className="w-44" options={[{ value: 'RECENT', label: t('آخر طلب') }, { value: 'SPENT', label: t('الأكتر صرفًا') }, { value: 'POINTS', label: t('الأكتر نقاط') }, { value: 'NAME', label: t('الاسم') }]} />
+          <div className="w-44 shrink-0"><Select value={sort} onChange={(e) => setSort(e.target.value)} options={[{ value: 'RECENT', label: t('آخر طلب') }, { value: 'SPENT', label: t('الأكتر صرفًا') }, { value: 'POINTS', label: t('الأكتر نقاط') }, { value: 'NAME', label: t('الاسم') }]} /></div>
         </div>
         {res.loading && !items.length ? <Spinner /> : (
           <Table head={[t('العميل'), t('الموبايل'), t('المنطقة'), t('المستوى'), t('النقاط'), t('الطلبات'), t('إجمالي الصرف'), t('آخر طلب')]} empty={<Empty icon={<Users className="w-10 h-10" />} text={t('مفيش عملاء بالبحث ده')} />}

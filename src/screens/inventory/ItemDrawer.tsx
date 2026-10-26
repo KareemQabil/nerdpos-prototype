@@ -7,7 +7,7 @@ import { Tech } from '../../app/tech';
 import { Banner, Button, Field, Input, KV, Modal, Money, Pill, Select, Spinner, StateBadge, Switch, Table, Tabs, Textarea } from '../../ui';
 import { t, L } from '../../i18n';
 import { dateTime, money } from '../../lib/format';
-import { ADJUST_REASONS, ADJUST_REASON_TEXT, LevelPill, MovementTable, Qty, WH_KIND, fmtQty, unitLabel, useList } from './common';
+import { ADJUST_REASONS, ADJUST_REASON_TEXT, LevelPill, MovementTable, Qty, WH_KIND, fmtQty, unitLabel, useList, Inp } from './common';
 import { WasteDialog } from './WasteDialog';
 
 type Tab = 'stock' | 'setup' | 'levels' | 'lots' | 'cost' | 'recipes' | 'moves';
@@ -173,8 +173,8 @@ function LevelsTab({ it }: { it: any }) {
       <Table head={[t('المخزن'), t('الرصيد'), t('الحد الأدنى'), t('المستهدف')]} rows={rows.map((r: any, i: number) => [
         <span><span className="font-bold">{r.name}</span> <span className="text-xs text-dim">{t(WH_KIND[r.kind] ?? r.kind)} · {r.branch}</span></span>,
         <Qty v={r.qty} unit={it.unit} />,
-        <Input data-fb={`levels:min:${r.warehouseId}`} className="w-28" inputMode="decimal" value={r.min} placeholder={t('مفيش')} onChange={(e) => setRows(rows.map((x: any, j: number) => (j === i ? { ...x, min: e.target.value } : x)))} />,
-        <Input data-fb={`levels:par:${r.warehouseId}`} className="w-28" inputMode="decimal" value={r.par} onChange={(e) => setRows(rows.map((x: any, j: number) => (j === i ? { ...x, par: e.target.value } : x)))} />,
+        <Inp data-fb={`levels:min:${r.warehouseId}`} className="w-28" inputMode="decimal" value={r.min} placeholder={t('مفيش')} onChange={(e) => setRows(rows.map((x: any, j: number) => (j === i ? { ...x, min: e.target.value } : x)))} />,
+        <Inp data-fb={`levels:par:${r.warehouseId}`} className="w-28" inputMode="decimal" value={r.par} onChange={(e) => setRows(rows.map((x: any, j: number) => (j === i ? { ...x, par: e.target.value } : x)))} />,
       ])} />
       <div className="flex justify-end"><Button variant="primary" data-fb="levels:save" loading={busy} onClick={save}><Scale className="w-4 h-4" />{t('حفظ الحدود')}</Button></div>
     </div>

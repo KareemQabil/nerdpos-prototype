@@ -7,7 +7,7 @@ import { Tech } from '../../app/tech';
 import { Banner, Button, Empty, Field, Input, KV, Modal, Money, Pill, Section, Select, Spinner, StateBadge, Table, Tabs, Textarea } from '../../ui';
 import { t, L } from '../../i18n';
 import { dateTime, money } from '../../lib/format';
-import { BandPill, ItemPicker, Pct, fmtQty, newKey, unitIdLabel, unitLabel, unitOptions, useItemsCatalog, useList } from './common';
+import { BandPill, ItemPicker, Pct, fmtQty, newKey, unitIdLabel, unitLabel, unitOptions, useItemsCatalog, useList, Inp, Sel } from './common';
 import { FoodBar } from './Dashboard';
 
 const OPS = ['Recipe.Define', 'Recipe.Find', 'Recipe.Get', 'Recipe.Cost'];
@@ -39,8 +39,8 @@ export default function Recipes() {
       ]} />
       {tab !== 'MISSING' && (
         <div className="flex flex-wrap gap-2 mb-3">
-          <Input className="w-60" data-fb="recipes:search" value={text} onChange={(e) => setText(e.target.value)} placeholder={t('دوّر بالاسم')} />
-          {tab === 'MENU' && <Select className="w-48" value={band} onChange={(e) => setBand(e.target.value)} options={[{ value: '', label: t('كل النسب') }, { value: 'HIGH', label: t('عالية (فوق 40%)') }, { value: 'WATCH', label: t('خلي بالك (30–40%)') }, { value: 'GOOD', label: t('كويسة (لحد 30%)') }]} />}
+          <Inp className="w-60" data-fb="recipes:search" value={text} onChange={(e) => setText(e.target.value)} placeholder={t('دوّر بالاسم')} />
+          {tab === 'MENU' && <Sel className="w-48" value={band} onChange={(e) => setBand(e.target.value)} options={[{ value: '', label: t('كل النسب') }, { value: 'HIGH', label: t('عالية (فوق 40%)') }, { value: 'WATCH', label: t('خلي بالك (30–40%)') }, { value: 'GOOD', label: t('كويسة (لحد 30%)') }]} />}
         </div>
       )}
       {q.loading && !q.raw ? <Spinner /> : tab === 'MISSING' ? (
@@ -83,7 +83,7 @@ function RecipeView({ id, onClose, onEdit }: { id: string | null; onClose: () =>
             {r.outputKind === 'MENU' && cost.prices.map((p: any) => <Box key={p.channel} l={t('نسبة التكلفة — {c} ({p})', { c: t(CH[p.channel] ?? p.channel), p: money(p.net) })} v={<Pct v={p.foodCostPercent} band={p.band} />} />)}
           </div>
           {r.outputKind === 'MENU' && cost.band === 'HIGH' && <Banner tone="error">{t('التكلفة عالية: كل 100 جنيه بيع منهم {p} جنيه خامات. راجع البورشن أو السعر.', { p: cost.foodCostPercent })}</Banner>}
-          <div className="flex items-center gap-2"><span className="text-xs text-soft">{t('النسخة')}</span><Select className="w-64" value={ver} onChange={(e) => setVer(e.target.value)} options={[{ value: '', label: t('الشغالة دلوقتي (نسخة {n})', { n: r.activeVersion.version }) }, ...r.versions.map((v: any) => ({ value: v.id, label: `${t('نسخة {n}', { n: v.version })} — ${dateTime(v.effectiveFrom)}` }))]} /></div>
+          <div className="flex items-center gap-2"><span className="text-xs text-soft">{t('النسخة')}</span><Sel className="w-64" value={ver} onChange={(e) => setVer(e.target.value)} options={[{ value: '', label: t('الشغالة دلوقتي (نسخة {n})', { n: r.activeVersion.version }) }, ...r.versions.map((v: any) => ({ value: v.id, label: `${t('نسخة {n}', { n: v.version })} — ${dateTime(v.effectiveFrom)}` }))]} /></div>
           <Table head={[t('المكوّن'), t('الكمية'), t('هالك التحضير'), t('الكمية الفعلية'), t('سعر الوحدة'), t('التكلفة'), t('من التكلفة')]} rows={cost.lines.map((l: any) => [
             <span className="font-bold">{L(l.name)}</span>,
             <span className="num">{fmtQty(l.enteredQuantity)} {unitIdLabel(l.enteredUnit)}</span>,
@@ -162,9 +162,9 @@ function RecipeEditor({ init, onClose, onSaved }: { init: any; onClose: () => vo
           const c = it && Number(l.quantity) > 0 ? Number(l.quantity) * f * (1 + Number(l.wastePercent || 0) / 100) * Number(it.avgCost) : null;
           return [
             <ItemPicker fb={`recipe-edit:item:${i}`} className="min-w-[200px]" items={items.items.filter((x) => x.id !== output)} value={l.itemId} exclude={lines.filter((_, j) => j !== i).map((x) => x.itemId)} onChange={(id, item) => setLines(lines.map((x, j) => (j === i ? { ...x, itemId: id, unit: item.unit === 'KG' ? 'unit_g' : item.unit === 'L' ? 'unit_ml' : item.stockUnitId } : x)))} />,
-            <Input data-fb={`recipe-edit:qty:${i}`} className="w-24" inputMode="decimal" value={l.quantity} onChange={(e) => setLines(lines.map((x, j) => (j === i ? { ...x, quantity: e.target.value.replace(/[^\d.]/g, '') } : x)))} />,
-            opts.length ? <Select className="w-32" value={l.unit} onChange={(e) => setLines(lines.map((x, j) => (j === i ? { ...x, unit: e.target.value } : x)))} options={opts.map((o) => ({ value: o.value, label: o.label }))} /> : '—',
-            <Input className="w-20" inputMode="decimal" value={l.wastePercent} placeholder="0" onChange={(e) => setLines(lines.map((x, j) => (j === i ? { ...x, wastePercent: e.target.value.replace(/[^\d.]/g, '') } : x)))} />,
+            <Inp data-fb={`recipe-edit:qty:${i}`} className="w-24" inputMode="decimal" value={l.quantity} onChange={(e) => setLines(lines.map((x, j) => (j === i ? { ...x, quantity: e.target.value.replace(/[^\d.]/g, '') } : x)))} />,
+            opts.length ? <Sel className="w-32" value={l.unit} onChange={(e) => setLines(lines.map((x, j) => (j === i ? { ...x, unit: e.target.value } : x)))} options={opts.map((o) => ({ value: o.value, label: o.label }))} /> : '—',
+            <Inp className="w-20" inputMode="decimal" value={l.wastePercent} placeholder="0" onChange={(e) => setLines(lines.map((x, j) => (j === i ? { ...x, wastePercent: e.target.value.replace(/[^\d.]/g, '') } : x)))} />,
             c !== null ? <span className="num text-xs">{money(c.toFixed(4))}</span> : '—',
             <Button size="sm" variant="ghost" onClick={() => setLines(lines.length > 1 ? lines.filter((_, j) => j !== i) : [{ itemId: '', quantity: '', unit: '', wastePercent: '' }])}><Trash2 className="w-3.5 h-3.5" /></Button>,
           ];

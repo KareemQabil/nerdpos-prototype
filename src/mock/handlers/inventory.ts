@@ -163,6 +163,17 @@ function recipeOutputName(db: DB, r: Recipe) {
 }
 function recipeCost(db: DB, r: Recipe, v: RecipeVersion, branchId: string | null, atMs: number) {
   const c = versionCost(db, v);
+  // a combo meal also carries the default choice of every slot (sandwich + fries + drink)
+  const product = r.outputKind === 'MENU' ? db.products.find((p) => p.id === r.outputProductId) : null;
+  for (const slot of product?.combo ?? []) {
+    const sub = menuRecipeOf(invOf(db), slot.defaultProductId);
+    if (!sub) continue;
+    const sc = versionCost(db, activeVersion(sub, atMs));
+    const per = sc.perUnit;
+    c.lines.push({ itemId: slot.defaultProductId, name: { ar: `ضمن الوجبة: ${nameOf(db, slot.defaultProductId).ar}`, en: `In the meal: ${nameOf(db, slot.defaultProductId).en}` }, quantity: '1', grossQuantity: '1', enteredQuantity: '1', enteredUnit: '', wastePercent: '0', stockUnitId: '', unitCost: m4(per), cost: m4(per) });
+    c.total = m4(D(c.total).plus(per));
+    c.perUnit = c.perUnit.plus(per.dividedBy(v.outputQuantityPerBatch || '1'));
+  }
   const prices: { channel: Channel; net: string | null; foodCostPercent: string | null; band: string }[] = [];
   if (r.outputKind === 'MENU' && branchId) {
     for (const ch of ['DINE_IN', 'TAKEAWAY', 'DELIVERY'] as Channel[]) {
@@ -241,7 +252,7 @@ export function inventoryOnOrderChange(ctx: Ctx, order: Order) {
       }
       const wh = prev?.warehouseId ? warehouseOf(db, prev.warehouseId) ?? null : salesWarehouse(db, order.branchId);
       const effect: OrderEffect = prev ?? { orderId: order.id, lineId: l.id, state: 'NONE', warehouseId: null, movementIds: [], at: ctx.nowIso };
-      const label = `${order.number} · ${l.name.ar}`;
+      const label = l.name.ar;
       const source = { module: 'orders', command: ctx.op.id, id: order.id, number: order.number, orderId: order.id, lineId: l.id, label };
       if (have === 'SALE') {
         // undo the consumption exactly (same quantities and costs)

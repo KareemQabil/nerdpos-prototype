@@ -6,7 +6,7 @@ import { Banner, Button, Field, Input, Modal, Select, StateBadge, Textarea } fro
 import { t, L } from '../../i18n';
 import { money } from '../../lib/format';
 import { cn } from '../../lib/format';
-import { ItemPicker, WASTE_REASONS, WASTE_REASON_TEXT, WarehouseSelect, unitOptions, useItemsCatalog, useList, useWarehouses } from './common';
+import { ItemPicker, WASTE_REASONS, WASTE_REASON_TEXT, WarehouseSelect, unitOptions, useItemsCatalog, useList, useWarehouses, Sel } from './common';
 
 export function WasteDialog({ open, onClose, presetItemId, presetWarehouseId, presetProductId }: { open: boolean; onClose: () => void; presetItemId?: string; presetWarehouseId?: string; presetProductId?: string }) {
   const { run, busy } = useCommand();
@@ -55,7 +55,7 @@ export function WasteDialog({ open, onClose, presetItemId, presetWarehouseId, pr
           <Field label={t('المخزن')}><WarehouseSelect fb="waste:warehouse" value={wh} onChange={setWh} warehouses={whs.items} /></Field>
           <Field label={t('الكمية')}>
             <div className="flex gap-2"><Input data-fb="waste:qty" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value.replace(/[^\d.]/g, ''))} />
-              {mode === 'ITEM' && opts.length > 1 && <Select className="w-36" data-fb="waste:unit" value={unit} onChange={(e) => setUnit(e.target.value)} options={opts.map((o) => ({ value: o.value, label: o.label }))} />}
+              {mode === 'ITEM' && opts.length > 1 && <Sel className="w-36" data-fb="waste:unit" value={unit} onChange={(e) => setUnit(e.target.value)} options={opts.map((o) => ({ value: o.value, label: o.label }))} />}
               {mode === 'DISH' && <span className="self-center text-sm text-dim">{t('طبق')}</span>}
             </div>
           </Field>

@@ -7,7 +7,7 @@ import { Tech } from '../../app/tech';
 import { Banner, Button, Empty, Field, Input, KV, Modal, Money, Pill, Section, Select, Spinner, StateBadge, Table, Textarea } from '../../ui';
 import { t, L } from '../../i18n';
 import { dateTime, money } from '../../lib/format';
-import { BranchScope, ItemPicker, PO_STATE, Qty, StatePill, WarehouseSelect, fmtQty, unitLabel, useBranchScope, useItemsCatalog, useList, useWarehouses } from './common';
+import { BranchScope, ItemPicker, PO_STATE, Qty, StatePill, WarehouseSelect, fmtQty, unitLabel, useBranchScope, useItemsCatalog, useList, useWarehouses, Inp, Sel } from './common';
 import { ReceiveDialog } from './Receipts';
 
 const OPS = ['PurchaseOrder.Create', 'PurchaseOrder.Update', 'PurchaseOrder.Issue', 'PurchaseOrder.Find', 'PurchaseOrder.Get', 'PurchaseOrder.Close', 'PurchaseOrder.Cancel', 'Inventory.LowStock'];
@@ -28,8 +28,8 @@ export default function PurchaseOrders() {
       <Section title={t('أوامر الشراء')} badge={<StateBadge ops={OPS} />} sub={t('اطلب من المورد: مسودة ← اتبعت للمورد ← اتستلم جزء أو كله ← اتقفل. ممكن تعمل الأوامر أوتوماتيك من النواقص.')}
         actions={<><BranchScope scope={scope} /><Button data-fb="po:suggest" onClick={() => setSuggest(true)}><Wand2 className="w-4 h-4" />{t('من النواقص')}</Button><Button data-fb="po:new" variant="primary" onClick={() => setEditor({})}><Plus className="w-4 h-4" />{t('أمر شراء جديد')}</Button></>} />
       <div className="flex gap-2 mb-3 flex-wrap">
-        <Select className="w-48" data-fb="po:state" value={state} onChange={(e) => setState(e.target.value)} options={[{ value: '', label: t('كل الحالات') }, { value: 'DRAFT,ISSUED,PARTIALLY_RECEIVED', label: t('المفتوحة بس') }, ...Object.entries(PO_STATE).map(([k, v]) => ({ value: k, label: t(v.ar) }))]} />
-        <Select className="w-60" value={supplier} onChange={(e) => setSupplier(e.target.value)} options={[{ value: '', label: t('كل الموردين') }, ...suppliers.items.map((s) => ({ value: s.id, label: s.name }))]} />
+        <Sel className="w-48" data-fb="po:state" value={state} onChange={(e) => setState(e.target.value)} options={[{ value: '', label: t('كل الحالات') }, { value: 'DRAFT,ISSUED,PARTIALLY_RECEIVED', label: t('المفتوحة بس') }, ...Object.entries(PO_STATE).map(([k, v]) => ({ value: k, label: t(v.ar) }))]} />
+        <Sel className="w-60" value={supplier} onChange={(e) => setSupplier(e.target.value)} options={[{ value: '', label: t('كل الموردين') }, ...suppliers.items.map((s) => ({ value: s.id, label: s.name }))]} />
       </div>
       {q.loading && !q.raw ? <Spinner /> : q.items.length === 0 ? <Empty icon={<ShoppingBag className="w-10 h-10" />} text={t('مفيش أوامر شراء')} /> : (
         <Table head={[t('الرقم'), t('المورد'), t('يستلم في'), t('الحالة'), t('القيمة'), t('اتستلم'), t('ميعاد التوريد'), '']} rows={q.items.map((p) => [
@@ -93,9 +93,9 @@ function Suggestions({ branchId, onClose, onDone }: { branchId?: string; onClose
               <input type="checkbox" data-fb={`po-suggest:on:${r.item.id}`} checked={p.on} onChange={(e) => set({ on: e.target.checked })} />,
               <span className="font-bold">{L(r.item.name)}</span>, <span className="text-xs">{r.warehouse.name}</span>,
               <span className="text-xs"><Qty v={r.onHand} unit={r.item.unit} hint={false} /> / <span className="num">{fmtQty(r.min)}</span></span>,
-              <Select className="w-44" value={p.supplier} onChange={(e) => set({ supplier: e.target.value })} options={[{ value: '', label: t('اختار') }, ...suppliers.items.map((s) => ({ value: s.id, label: s.name }))]} />,
-              <div className="flex items-center gap-1"><Input className="w-20" inputMode="decimal" value={p.packs} onChange={(e) => set({ packs: e.target.value })} /><span className="text-[11px] text-dim">{r.pack ? L(r.pack.name) : unitLabel(r.item.unit)}</span></div>,
-              <Input className="w-24" inputMode="decimal" value={p.cost} onChange={(e) => set({ cost: e.target.value })} />,
+              <Sel className="w-44" value={p.supplier} onChange={(e) => set({ supplier: e.target.value })} options={[{ value: '', label: t('اختار') }, ...suppliers.items.map((s) => ({ value: s.id, label: s.name }))]} />,
+              <div className="flex items-center gap-1"><Inp className="w-20" inputMode="decimal" value={p.packs} onChange={(e) => set({ packs: e.target.value })} /><span className="text-[11px] text-dim">{r.pack ? L(r.pack.name) : unitLabel(r.item.unit)}</span></div>,
+              <Inp className="w-24" inputMode="decimal" value={p.cost} onChange={(e) => set({ cost: e.target.value })} />,
               <span className="num text-xs">{money((Number(p.packs) * Number(p.cost)).toFixed(4))}</span>,
             ];
           })} />
@@ -146,9 +146,9 @@ function PoEditor({ init, onClose, onSaved }: { init: any; onClose: () => void; 
           const set = (patch: Partial<PLine>) => setLines(lines.map((x, j) => (j === i ? { ...x, ...patch } : x)));
           return [
             <ItemPicker fb={`po-edit:item:${i}`} className="min-w-[200px]" items={showAll ? items.items : supplierItems} value={l.itemId} exclude={lines.filter((_, j) => j !== i).map((x) => x.itemId)} onChange={(id, item) => { const pk = item.packs?.find((p: any) => p.id === item.purchasePackId) ?? item.packs?.[0]; set({ itemId: id, packId: pk?.id ?? '', orderedUnitCost: (Number(item.avgCost) * Number(pk?.factor ?? 1)).toFixed(2) }); }} />,
-            it ? <Select className="w-40" value={l.packId} onChange={(e) => { const pk = it.packs.find((p: any) => p.id === e.target.value); set({ packId: e.target.value, orderedUnitCost: (Number(it.avgCost) * Number(pk?.factor ?? 1)).toFixed(2) }); }} options={[{ value: '', label: unitLabel(it.unit) }, ...(it.packs ?? []).map((p: any) => ({ value: p.id, label: L(p.name) }))]} /> : '—',
-            <Input data-fb={`po-edit:qty:${i}`} className="w-20" inputMode="decimal" value={l.orderedQuantity} onChange={(e) => set({ orderedQuantity: e.target.value.replace(/[^\d.]/g, '') })} />,
-            <Input data-fb={`po-edit:cost:${i}`} className="w-24" inputMode="decimal" value={l.orderedUnitCost} onChange={(e) => set({ orderedUnitCost: e.target.value.replace(/[^\d.]/g, '') })} />,
+            it ? <Sel className="w-40" value={l.packId} onChange={(e) => { const pk = it.packs.find((p: any) => p.id === e.target.value); set({ packId: e.target.value, orderedUnitCost: (Number(it.avgCost) * Number(pk?.factor ?? 1)).toFixed(2) }); }} options={[{ value: '', label: unitLabel(it.unit) }, ...(it.packs ?? []).map((p: any) => ({ value: p.id, label: L(p.name) }))]} /> : '—',
+            <Inp data-fb={`po-edit:qty:${i}`} className="w-20" inputMode="decimal" value={l.orderedQuantity} onChange={(e) => set({ orderedQuantity: e.target.value.replace(/[^\d.]/g, '') })} />,
+            <Inp data-fb={`po-edit:cost:${i}`} className="w-24" inputMode="decimal" value={l.orderedUnitCost} onChange={(e) => set({ orderedUnitCost: e.target.value.replace(/[^\d.]/g, '') })} />,
             <span className="num text-xs">{money((Number(l.orderedQuantity || 0) * Number(l.orderedUnitCost || 0)).toFixed(4))}</span>,
             <Button size="sm" variant="ghost" onClick={() => setLines(lines.length > 1 ? lines.filter((_, j) => j !== i) : [{ itemId: '', packId: '', orderedQuantity: '', orderedUnitCost: '' }])}><Trash2 className="w-3.5 h-3.5" /></Button>,
           ];

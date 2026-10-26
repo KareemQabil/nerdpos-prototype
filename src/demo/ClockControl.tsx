@@ -34,7 +34,9 @@ export function ClockControl() {
           <Button size="sm" title={t('بعد بداية اليوم الجديد بـ 5 دقايق')} onClick={() => go(() => clock.setCairoTime(4, 5))}>04:05</Button>
           <Button size="sm" title={t('2 بالليل — لسه على اليوم اللي فات')} onClick={() => go(() => clock.setCairoTime(2, 0))}>02:00</Button>
           <Button size="sm" onClick={() => go(() => clock.setCairoTime(16, 0))}>{t('هابي أور')} 16:00</Button>
-          <Button size="sm" onClick={() => go(() => clock.setCairoTime(13, 0))}>13:00</Button>
+          <Button size="sm" data-fb="clock:13" onClick={() => go(() => clock.setCairoTime(13, 0))}>13:00</Button>
+          <Button size="sm" data-fb="clock:breakfast" title={t('وقت الفطار')} onClick={() => go(() => clock.setCairoTime(9, 0))}>{t('فطار')} 09:00</Button>
+          <Button size="sm" data-fb="clock:dinner" title={t('وقت العشا')} onClick={() => go(() => clock.setCairoTime(20, 0))}>{t('عشا')} 20:00</Button>
           <Button size="sm" onClick={() => go(() => clock.advance(86_400_000))}>+1 {t('يوم')}</Button>
         </div>
         <Button size="sm" variant="ghost" onClick={() => go(() => clock.reset())}>{t('رجّع الساعة للوقت الحقيقي')}</Button>

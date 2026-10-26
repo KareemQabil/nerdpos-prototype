@@ -9,6 +9,7 @@ import { Banner, Button, Card, Empty, Pill, Section, StateBadge, Table, Tabs, to
 import { t } from '../../i18n';
 import { cn } from '../../lib/format';
 import { useItems } from './catalog/common';
+import { Tech } from '../../app/tech';
 
 // Columns exactly as importCatalog (mock/handlers/catalog.ts) reads them.
 const SHEETS = {
@@ -17,12 +18,18 @@ const SHEETS = {
   modifierGroups: ['key', 'name_ar', 'name_en', 'min', 'max', 'selection'],
   modifierOptions: ['group', 'name_ar', 'name_en', 'priceDelta'],
   products: ['key', 'name_ar', 'name_en', 'category', 'unit', 'sku', 'tax', 'modifier_groups', 'color', 'image'],
-  prices: ['product', 'branch', 'channel', 'amount'],
+  prices: ['product', 'branch', 'channel', 'amount', 'variant'],
   availability: ['product', 'branch', 'state', 'reason'],
+  // menu area (proposed sheets)
+  variants: ['product', 'key', 'name_ar', 'name_en', 'price_delta', 'multiplier', 'sku', 'barcode', 'default'],
+  comboSlots: ['product', 'slot', 'name_ar', 'name_en', 'required'],
+  comboOptions: ['product', 'slot', 'option_product', 'variant', 'upcharge', 'default', 'sub_group'],
+  dayparts: ['key', 'name_ar', 'name_en', 'start', 'end', 'days'],
+  menus: ['key', 'name_ar', 'name_en', 'channels', 'dayparts', 'all_categories', 'categories', 'exclude_categories'],
 } as const;
 type SheetId = keyof typeof SHEETS;
 const SHEET_IDS = Object.keys(SHEETS) as SheetId[];
-const sheetLabel = (s: string) => ({ units: t('الوحدات'), categories: t('الأقسام'), modifierGroups: t('مجموعات الإضافات'), modifierOptions: t('اختيارات الإضافات'), products: t('الأصناف'), prices: t('الأسعار'), availability: t('التوفر') } as Record<string, string>)[s] ?? s;
+const sheetLabel = (s: string) => ({ units: t('الوحدات'), categories: t('الأقسام'), modifierGroups: t('مجموعات الإضافات'), modifierOptions: t('اختيارات الإضافات'), products: t('الأصناف'), prices: t('الأسعار'), availability: t('التوفر'), variants: t('الأحجام'), comboSlots: t('اختيارات الوجبات'), comboOptions: t('أصناف الوجبات'), dayparts: t('فترات اليوم'), menus: t('المنيوهات') } as Record<string, string>)[s] ?? s;
 
 type Row = Record<string, string>;
 type Data = Partial<Record<SheetId, Row[]>>;
@@ -37,6 +44,11 @@ const EXAMPLE: Record<SheetId, Row> = {
   products: { key: 'kofta', name_ar: 'كفتة حاتي', name_en: 'Hati kofta', category: 'grill', unit: 'DEMO_EA', sku: 'GRL-001', tax: 'tax_demo', modifier_groups: 'spice', color: '#f97316', image: '' },
   prices: { product: 'kofta', branch: 'DEMO-MAIN', channel: 'DINE_IN', amount: '185.00' },
   availability: { product: 'kofta', branch: 'DEMO-MAIN', state: 'AVAILABLE', reason: '' },
+  variants: { product: 'mango', key: 'v_l', name_ar: 'كبير', name_en: 'Large', price_delta: '15', multiplier: '1', sku: 'MANGO-L', barcode: '', default: '' },
+  comboSlots: { product: 'kofta_meal', slot: 'drink', name_ar: 'المشروب', name_en: 'Drink', required: 'yes' },
+  comboOptions: { product: 'kofta_meal', slot: 'drink', option_product: 'mango', variant: '', upcharge: '0', default: 'yes', sub_group: '' },
+  dayparts: { key: 'dp_late', name_ar: 'سهرة', name_en: 'Late night', start: '22:00', end: '03:00', days: '4;5' },
+  menus: { key: 'menu_late', name_ar: 'منيو السهرة', name_en: 'Late menu', channels: 'DINE_IN;TAKEAWAY', dayparts: 'dp_late', all_categories: '', categories: 'juices', exclude_categories: '' },
 };
 
 function sampleValid(n: number): Data {
@@ -56,6 +68,7 @@ function sampleValid(n: number): Data {
       { key: 'lamb', name_ar: 'ريش ضاني بالكيلو' + sfx, name_en: 'Lamb chops per kg' + sfx, category: 'grill', unit: 'KG', sku: 'IMP-LAMB' + k, tax: 'tax_demo', modifier_groups: 'sides', color: '#dc2626' },
       { key: 'mango', name_ar: 'عصير مانجا' + sfx, name_en: 'Mango juice' + sfx, category: 'juices', unit: 'DEMO_EA', sku: 'IMP-MANGO' + k, tax: 'tax_demo', color: '#facc15' },
       { key: 'cane', name_ar: 'عصير قصب' + sfx, name_en: 'Sugarcane juice' + sfx, category: 'juices', unit: 'DEMO_EA', sku: 'IMP-CANE' + k, tax: 'tax_demo', color: '#a3e635' },
+      { key: 'kofta_meal', name_ar: 'وجبة كفتة' + sfx, name_en: 'Kofta meal' + sfx, category: 'grill', unit: 'DEMO_EA', sku: 'IMP-KMEAL' + k, tax: 'tax_demo', color: '#ea580c' },
     ],
     prices: [
       { product: 'kofta', branch: 'DEMO-MAIN', channel: 'DINE_IN', amount: '185' }, { product: 'kofta', branch: 'DEMO-MAIN', channel: 'TAKEAWAY', amount: '175' },
@@ -63,8 +76,26 @@ function sampleValid(n: number): Data {
       { product: 'lamb', branch: 'DEMO-MAIN', channel: 'DINE_IN', amount: '950.50' },
       { product: 'mango', branch: 'DEMO-MAIN', channel: 'DINE_IN', amount: '55' }, { product: 'mango', branch: 'DEMO-MAIN', channel: 'TAKEAWAY', amount: '50' },
       { product: 'cane', branch: 'DEMO-MAIN', channel: 'DINE_IN', amount: '25' },
+      { product: 'mango', branch: 'DEMO-MAIN', channel: 'DINE_IN', amount: '75', variant: 'v_l' },
+      { product: 'kofta_meal', branch: 'DEMO-MAIN', channel: 'DINE_IN', amount: '230' }, { product: 'kofta_meal', branch: 'DEMO-MAIN', channel: 'TAKEAWAY', amount: '220' },
     ],
     availability: [{ product: 'mango', branch: 'DEMO-MAIN', state: 'SOLD_OUT', reason: 'المانجا خلصت النهارده' }, { product: 'cane', branch: 'DEMO-MAIN', state: 'BLOCKED', reason: 'المكنة في الصيانة' }],
+    variants: [
+      { product: 'mango', key: 'v_m', name_ar: 'وسط', name_en: 'Medium', price_delta: '0', multiplier: '1', sku: 'IMP-MANGO-M' + k, default: 'yes' },
+      { product: 'mango', key: 'v_l', name_ar: 'كبير', name_en: 'Large', price_delta: '15', multiplier: '1', sku: 'IMP-MANGO-L' + k },
+    ],
+    comboSlots: [
+      { product: 'kofta_meal', slot: 'main', name_ar: 'الطبق', name_en: 'Main', required: 'yes' },
+      { product: 'kofta_meal', slot: 'drink', name_ar: 'المشروب', name_en: 'Drink', required: 'yes' },
+    ],
+    comboOptions: [
+      { product: 'kofta_meal', slot: 'main', option_product: 'kofta', upcharge: '0', default: 'yes', sub_group: 'spice' },
+      { product: 'kofta_meal', slot: 'main', option_product: 'tawook', upcharge: '0' },
+      { product: 'kofta_meal', slot: 'drink', option_product: 'cane', upcharge: '0', default: 'yes' },
+      { product: 'kofta_meal', slot: 'drink', option_product: 'mango', variant: 'v_l', upcharge: '25' },
+    ],
+    dayparts: [{ key: 'dp_late', name_ar: 'سهرة', name_en: 'Late night', start: '22:00', end: '03:00', days: '4;5' }],
+    menus: [{ key: 'menu_late', name_ar: 'منيو السهرة', name_en: 'Late menu', channels: 'DINE_IN;TAKEAWAY', dayparts: 'dp_late', categories: 'juices' }],
   };
 }
 
@@ -98,6 +129,11 @@ function downloadTemplate() {
     ['products', SHEETS.products.join(', '), 'sku فاضي = أوتوماتيك لو SkuGenerationPolicy = AUTO_IF_EMPTY؛ modifier_groups مفصولة بـ ;'],
     ['prices', SHEETS.prices.join(', '), 'branch = كود الفرع (DEMO-MAIN)؛ channel = DINE_IN / TAKEAWAY / DELIVERY؛ amount لحد 4 خانات عشرية'],
     ['availability', SHEETS.availability.join(', '), 'state = AVAILABLE / SOLD_OUT / BLOCKED؛ السبب مطلوب حسب AvailabilityReasonPolicy'],
+    ['variants', SHEETS.variants.join(', '), 'أحجام الصنف: key كود الحجم (v_l)، price_delta فرق السعر، multiplier مضاعف الإضافات، default = yes للحجم الافتراضي. سعر خاص للحجم: عمود variant في شيت prices'],
+    ['comboSlots', SHEETS.comboSlots.join(', '), 'اختيارات الوجبة (الساندوتش، المشروب…): product مفتاح الوجبة، slot كود الاختيار'],
+    ['comboOptions', SHEETS.comboOptions.join(', '), 'أصناف كل اختيار: option_product الصنف، variant حجمه (اختياري)، upcharge فرق الترقية، default = yes، sub_group مجموعة إضافات تتسأل'],
+    ['dayparts', SHEETS.dayparts.join(', '), 'فترات اليوم بتوقيت القاهرة 07:00؛ النهاية قبل البداية = بتعدي نص الليل؛ days أرقام 0 (الحد) لـ 6 مفصولة بـ ;'],
+    ['menus', SHEETS.menus.join(', '), 'المنيوهات: channels و dayparts و categories مفصولة بـ ;؛ all_categories = yes لكل الأقسام'],
     [''],
     ['الاستيراد كله أو لا شيء: لو فيه أي غلطة مفيش حاجة بتتكتب. جرّب الأول (Dry run).'],
   ];
@@ -226,7 +262,7 @@ export default function Import() {
           <Card title={<span className="flex items-center gap-2"><FileSpreadsheet className="w-4 h-4" />{source}</span>} badge={<Pill tone="neutral">{t('{n} صف', { n: total })}</Pill>}
             actions={<>
               <Button size="sm" variant="ghost" onClick={() => { setData(null); setReport(null); }}><Trash2 className="w-3.5 h-3.5" />{t('شيل')}</Button>
-              <Button data-fb="import:dry-run" loading={busy} onClick={dryRun}><PlayCircle className="w-4 h-4" />{t('جرّب (Dry run)')}</Button>
+              <Button data-fb="import:dry-run" loading={busy} onClick={dryRun}><PlayCircle className="w-4 h-4" />{t('جرّب من غير حفظ')}</Button>
               <Button data-fb="import:apply" variant={report?.kind === 'DRY_RUN' && report.ok ? 'success' : 'outline'} loading={busy} disabled={!report || report.kind === 'APPLIED'} onClick={apply}><CheckCircle2 className="w-4 h-4" />{t('طبّق الكل')}</Button>
             </>}>
             {warnings.map((w, i) => <div key={i} className="mb-2"><Banner tone="warning">{w}</Banner></div>)}
@@ -270,14 +306,14 @@ function ReportCard({ report, onOpenMenu }: { report: Report; onOpenMenu: () => 
   const tone = report.kind === 'APPLIED' || report.ok ? 'success' : 'error';
   return (
     <Card title={<span className="flex items-center gap-2">{tone === 'success' ? <CheckCircle2 className="w-4 h-4 text-[var(--success)]" /> : <XCircle className="w-4 h-4 text-[var(--error)]" />}{title}</span>}
-      badge={<Pill tone={report.kind === 'DRY_RUN' ? 'info' : tone}>{report.kind === 'DRY_RUN' ? 'dryRun: true' : 'dryRun: false'}</Pill>}
+      badge={<Pill tone={report.kind === 'DRY_RUN' ? 'info' : tone}>{report.kind === 'DRY_RUN' ? t('تجربة من غير حفظ') : report.kind === 'APPLIED' ? t('اتحفظ') : t('ما اتحفظش')}</Pill>}
       actions={report.kind === 'APPLIED' ? <Button size="sm" variant="primary" onClick={onOpenMenu}>{t('افتح المنيو')}</Button> : undefined}>
       <div className="flex flex-wrap gap-1.5 mb-3">
         {Object.entries(report.summary ?? {}).map(([k, v]) => <Pill key={k} tone="neutral">{sheetLabel(k)} <span className="num">{v}</span></Pill>)}
       </div>
       {report.issues.length > 0 ? (
         <Table head={[t('الشيت'), t('الصف'), t('العمود'), t('الكود'), t('المشكلة')]} rows={report.issues.map((i) => [
-          sheetLabel(i.sheet), <span className="num">{i.row}</span>, <span className="num text-xs">{i.field}</span>, <span className="num text-[11px] text-[var(--error)]">{i.code}</span>, i.message,
+          sheetLabel(i.sheet), <span className="num">{i.row}</span>, <span className="num text-xs">{i.field}</span>, <Tech fallback={<span className="text-[11px] text-dim">—</span>}><span className="num text-[11px] text-[var(--error)]">{i.code}</span></Tech>, i.message,
         ])} />
       ) : report.kind === 'APPLIED'
         ? <Banner tone="success">{t('كل الصفوف اتكتبت في معاملة واحدة. الأصناف اللي ليها سعر في فرع بقت على منيو الفرع ده إلا لو شيت التوفر قال غير كده.')}</Banner>

@@ -6,6 +6,14 @@ import { ArrowDownLeft, ArrowUpRight, Search, X, Link2 } from 'lucide-react';
 import { useDev, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
 import { Input, KV, Modal, Money, Pill, Select, Spinner, StateBadge, Table } from '../../ui';
+
+/** Fixed-width input / select (the kit's Input and Select always take the full width). */
+export function Inp(props: React.InputHTMLAttributes<HTMLInputElement>) {
+  return <input {...props} className={cn('glass-input', props.inputMode === 'decimal' || props.type === 'number' ? 'num' : '', props.className)} />;
+}
+export function Sel({ className, ...props }: React.ComponentProps<typeof Select>) {
+  return <div className={cn('shrink-0', className)}><Select {...props} /></div>;
+}
 import { t, L } from '../../i18n';
 import { cn, dateTime, money } from '../../lib/format';
 

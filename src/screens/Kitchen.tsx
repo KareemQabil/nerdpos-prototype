@@ -10,8 +10,8 @@ import { cn, qty, time } from '../lib/format';
 import { ALLERGEN_AR } from './order/MenuGrid';
 import { Tech } from '../app/tech';
 
-const STATION_AR: Record<string, string> = { GRILL: 'الشوّاية', COLD: 'البارد والسلطات', BAR: 'البار والمشروبات', HOT: 'السخن', PASTRY: 'الحلويات', FRYER: 'القلاية' };
-export const stationLabel = (n?: string | null) => (n ? STATION_AR[n] ?? n : '');
+import { stationName } from '../demo/humanLog';
+export const stationLabel = (n?: string | null) => stationName(n);
 const OPS = ['Kitchen.Board', 'Kitchen.AdvanceTicket', 'TicketItem.Bump', 'Ticket.SetPriority', 'Ticket.Refire', 'Ticket.TransferStation', 'Ticket.Recall'];
 
 type Tone = 'ok' | 'warn' | 'late';

@@ -7,7 +7,7 @@ import { Tech } from '../../app/tech';
 import { Banner, Button, Empty, Field, Input, KV, Modal, Money, Section, Select, Spinner, StateBadge, Table, Textarea } from '../../ui';
 import { t, L } from '../../i18n';
 import { dateTime } from '../../lib/format';
-import { BranchScope, ItemPicker, Qty, StatePill, TRANSFER_STATE, WarehouseSelect, fmtQty, unitOptions, useBranchScope, useList, useWarehouses } from './common';
+import { BranchScope, ItemPicker, Qty, StatePill, TRANSFER_STATE, WarehouseSelect, fmtQty, unitOptions, useBranchScope, useList, useWarehouses, Inp, Sel } from './common';
 
 const OPS = ['Transfer.Create', 'Stock.Transfer', 'Transfer.Receive', 'Transfer.Cancel', 'Transfer.Find', 'Transfer.Get'];
 
@@ -23,7 +23,7 @@ export default function Transfers() {
     <div>
       <Section title={t('التحويلات')} badge={<StateBadge ops={OPS} />} sub={t('نقل بضاعة من مخزن لمخزن: من المخزن الرئيسي للمطبخ، أو لفرع تاني. البضاعة بتطلع من المخزن أول ما تتبعت، وبتدخل لما تتستلم.')}
         actions={<><BranchScope scope={scope} /><Button data-fb="transfers:new" variant="primary" onClick={() => setCreating(true)}><Plus className="w-4 h-4" />{t('تحويل جديد')}</Button></>} />
-      <div className="flex gap-2 mb-3"><Select className="w-52" value={state} onChange={(e) => setState(e.target.value)} options={[{ value: '', label: t('كل الحالات') }, ...Object.entries(TRANSFER_STATE).map(([k, v]) => ({ value: k, label: t(v.ar) }))]} /></div>
+      <div className="flex gap-2 mb-3"><Sel className="w-52" value={state} onChange={(e) => setState(e.target.value)} options={[{ value: '', label: t('كل الحالات') }, ...Object.entries(TRANSFER_STATE).map(([k, v]) => ({ value: k, label: t(v.ar) }))]} /></div>
       {list.loading && !list.raw ? <Spinner /> : list.items.length === 0 ? <Empty icon={<ArrowLeftRight className="w-10 h-10" />} text={t('مفيش تحويلات')} /> : (
         <Table head={[t('الرقم'), t('من'), t('إلى'), t('الحالة'), t('الأصناف'), t('القيمة'), t('آخر تحديث'), '']} rows={list.items.map((tr) => [
           <button className="num font-bold hover:text-[var(--primary)]" data-fb={`transfers:open:${tr.id}`} onClick={() => setOpen(tr.id)}>{tr.number}</button>,
@@ -82,7 +82,7 @@ function CreateTransfer({ onClose, onCreated }: { onClose: () => void; onCreated
           return [
             <ItemPicker fb={`transfer-new:item:${i}`} className="min-w-[220px]" items={stock.items} value={l.itemId} exclude={lines.filter((_, j) => j !== i).map((x) => x.itemId)} onChange={(id, item) => setLines(lines.map((x, j) => (j === i ? { ...x, itemId: id, unit: item.stockUnitId } : x)))} />,
             it ? <Qty v={have} unit={it.unit} /> : '—',
-            <div className="flex gap-1"><Input data-fb={`transfer-new:qty:${i}`} className="w-24" inputMode="decimal" value={l.quantity} onChange={(e) => setLines(lines.map((x, j) => (j === i ? { ...x, quantity: e.target.value.replace(/[^\d.]/g, '') } : x)))} />{opts.length > 1 && <Select className="w-32" value={l.unit} onChange={(e) => setLines(lines.map((x, j) => (j === i ? { ...x, unit: e.target.value } : x)))} options={opts.map((o) => ({ value: o.value, label: o.label }))} />}</div>,
+            <div className="flex gap-1"><Inp data-fb={`transfer-new:qty:${i}`} className="w-24" inputMode="decimal" value={l.quantity} onChange={(e) => setLines(lines.map((x, j) => (j === i ? { ...x, quantity: e.target.value.replace(/[^\d.]/g, '') } : x)))} />{opts.length > 1 && <Sel className="w-32" value={l.unit} onChange={(e) => setLines(lines.map((x, j) => (j === i ? { ...x, unit: e.target.value } : x)))} options={opts.map((o) => ({ value: o.value, label: o.label }))} />}</div>,
             <Button size="sm" variant="ghost" onClick={() => setLines(lines.length > 1 ? lines.filter((_, j) => j !== i) : [{ itemId: '', quantity: '', unit: '' }])}><Trash2 className="w-3.5 h-3.5" /></Button>,
           ];
         })} />
@@ -125,7 +125,7 @@ function TransferView({ id, onClose }: { id: string | null; onClose: () => void 
           <Table head={[t('الصنف'), t('اتبعت'), ...(tr.state === 'DISPATCHED' ? [t('وصل فعلًا')] : tr.state === 'RECEIVED' ? [t('وصل'), t('العجز')] : []), t('التكلفة'), t('الدفعات')]} rows={tr.lines.map((l: any) => [
             <span className="font-bold">{L(l.item?.name)}</span>,
             <Qty v={l.quantity} unit={l.item?.unit} />,
-            ...(tr.state === 'DISPATCHED' ? [<Input data-fb={`transfer:recv:${l.itemId}`} className="w-28" inputMode="decimal" value={recv[l.itemId] ?? l.quantity} onChange={(e) => setRecv({ ...recv, [l.itemId]: e.target.value.replace(/[^\d.]/g, '') })} />] : tr.state === 'RECEIVED' ? [<Qty v={l.receivedQuantity} unit={l.item?.unit} />, Number(l.shortQuantity) > 0 ? <Qty v={l.shortQuantity} unit={l.item?.unit} className="text-[var(--error)]" /> : '—'] : []),
+            ...(tr.state === 'DISPATCHED' ? [<Inp data-fb={`transfer:recv:${l.itemId}`} className="w-28" inputMode="decimal" value={recv[l.itemId] ?? l.quantity} onChange={(e) => setRecv({ ...recv, [l.itemId]: e.target.value.replace(/[^\d.]/g, '') })} />] : tr.state === 'RECEIVED' ? [<Qty v={l.receivedQuantity} unit={l.item?.unit} />, Number(l.shortQuantity) > 0 ? <Qty v={l.shortQuantity} unit={l.item?.unit} className="text-[var(--error)]" /> : '—'] : []),
             l.value ? <Money v={l.value} className="text-xs" /> : <span className="text-xs text-dim">{t('بتتحدد وقت البعت')}</span>,
             <span className="text-[11px] text-dim">{l.lots?.map((x: any) => `${x.lotCode}${x.expiryDate ? ' (' + x.expiryDate + ')' : ''}`).join('، ') || '—'}</span>,
           ])} />

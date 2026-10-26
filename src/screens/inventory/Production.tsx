@@ -7,7 +7,7 @@ import { Tech } from '../../app/tech';
 import { Banner, Button, Card, Empty, Field, Input, Money, Pill, Section, Select, Spinner, StateBadge, Table } from '../../ui';
 import { t, L } from '../../i18n';
 import { dateTime, money } from '../../lib/format';
-import { BranchScope, Qty, WarehouseSelect, fmtQty, unitLabel, useBranchScope, useList, useWarehouses } from './common';
+import { BranchScope, Qty, WarehouseSelect, fmtQty, unitLabel, useBranchScope, useList, useWarehouses, Inp } from './common';
 
 const OPS = ['Production.Preview', 'Production.Post', 'Production.Find', 'Recipe.Find'];
 
@@ -81,7 +81,7 @@ function NewRun() {
                 <span className="font-bold">{L(i.item.name)}</span>,
                 <Qty v={i.required} unit={i.item.unit} />,
                 <span className={i.shortage ? 'text-[var(--error)]' : ''}><Qty v={i.onHand} unit={i.item.unit} hint={false} />{i.shortage && <Pill tone="error" className="ms-1">{t('ناقص {q}', { q: fmtQty(i.shortage) })}</Pill>}</span>,
-                <div className="flex items-center gap-1"><Input data-fb={`production:actual:${i.item.id}`} className="w-24" inputMode="decimal" value={actual[i.item.id] ?? i.required} onChange={(e) => setActual({ ...actual, [i.item.id]: e.target.value.replace(/[^\d.]/g, '') })} /><span className="text-xs text-dim">{unitLabel(i.item.unit)}</span></div>,
+                <div className="flex items-center gap-1"><Inp data-fb={`production:actual:${i.item.id}`} className="w-24" inputMode="decimal" value={actual[i.item.id] ?? i.required} onChange={(e) => setActual({ ...actual, [i.item.id]: e.target.value.replace(/[^\d.]/g, '') })} /><span className="text-xs text-dim">{unitLabel(i.item.unit)}</span></div>,
                 <Money v={i.value} className="text-xs" />,
               ])} />
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">

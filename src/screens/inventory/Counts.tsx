@@ -7,7 +7,7 @@ import { Tech } from '../../app/tech';
 import { Banner, Button, Card, Empty, Field, Input, KV, Modal, Money, Pill, Section, Select, Spinner, StateBadge, Switch, Table, Textarea } from '../../ui';
 import { t, L } from '../../i18n';
 import { cn, dateTime, money } from '../../lib/format';
-import { BranchScope, COUNT_STATE, Qty, StatePill, WarehouseSelect, fmtQty, unitLabel, unitOptions, useBranchScope, useItemsCatalog, useList, useWarehouses } from './common';
+import { BranchScope, COUNT_STATE, Qty, StatePill, WarehouseSelect, fmtQty, unitLabel, unitOptions, useBranchScope, useItemsCatalog, useList, useWarehouses, Inp, Sel } from './common';
 
 const OPS = ['StockCount.Start', 'StockCount.RecordObservations', 'StockCount.Submit', 'Stock.Count', 'StockCount.Cancel', 'StockCount.Find', 'StockCount.Get'];
 
@@ -23,7 +23,7 @@ export default function Counts() {
     <div>
       <Section title={t('الجرد')} badge={<StateBadge ops={OPS} />} sub={t('ابدأ جرد لمخزن، اعدّوا (أكتر من حد ينفع يعد في نفس الوقت)، سلّم، راجع الفروقات بقيمتها، واعتمدها.')}
         actions={<><BranchScope scope={scope} /><Button data-fb="counts:new" variant="primary" onClick={() => setStarting(true)}><Plus className="w-4 h-4" />{t('جرد جديد')}</Button></>} />
-      <div className="flex gap-2 mb-3"><Select className="w-52" value={state} onChange={(e) => setState(e.target.value)} options={[{ value: '', label: t('كل الحالات') }, ...Object.entries(COUNT_STATE).map(([k, v]) => ({ value: k, label: t(v.ar) }))]} /></div>
+      <div className="flex gap-2 mb-3"><Sel className="w-52" value={state} onChange={(e) => setState(e.target.value)} options={[{ value: '', label: t('كل الحالات') }, ...Object.entries(COUNT_STATE).map(([k, v]) => ({ value: k, label: t(v.ar) }))]} /></div>
       {list.loading && !list.raw ? <Spinner /> : list.items.length === 0 ? <Empty icon={<ClipboardCheck className="w-10 h-10" />} text={t('مفيش جرد لسه. ابدأ أول جرد.')} /> : (
         <Table head={[t('رقم الجرد'), t('المخزن'), t('بدأ'), t('الحالة'), t('اتعد'), t('الفروقات'), '']} rows={list.items.map((c) => [
           <button className="num font-bold hover:text-[var(--primary)]" data-fb={`counts:open:${c.id}`} onClick={() => setOpen(c.id)}>{c.number}</button>,
@@ -128,7 +128,7 @@ function CountSheet({ id, onClose }: { id: string | null; onClose: () => void })
           {c.state === 'CANCELLED' && <Banner tone="error">{t('الجرد اتلغى')}: {c.cancelReason}</Banner>}
           {c.state === 'SUBMITTED' && <Banner tone="warning">{t('راجع الفروقات: بالأحمر عجز، بالأخضر زيادة. الاعتماد بيعمل حركة "فرق جرد" لكل صنف بقيمته بالتكلفة، وبيحتاج موافقة مدير لو فيه أي فرق.')}</Banner>}
           <div className="flex flex-wrap gap-2 items-center">
-            <Input className="w-60" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={t('دوّر في الورقة')} />
+            <Inp className="w-60" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={t('دوّر في الورقة')} />
             {draft && <Button size="sm" variant="ghost" data-fb="count:blind" onClick={() => setBlind(!blind)}>{blind ? <><Eye className="w-3.5 h-3.5" />{t('اعرض الرصيد المتوقع')}</> : <><EyeOff className="w-3.5 h-3.5" />{t('عد أعمى')}</>}</Button>}
             {draft && <span className="text-xs text-dim">{t('اكتب الكمية واضغط Enter تنزل على اللي بعده — بيتحفظ لوحده.')}</span>}
           </div>
@@ -145,7 +145,7 @@ function CountSheet({ id, onClose }: { id: string | null; onClose: () => void })
                     value={v ? v.q : l.countedQty ?? ''} placeholder={l.countedQty === null ? '—' : ''}
                     onChange={(e) => setVals({ ...vals, [l.itemId]: { q: e.target.value.replace(/[^\d.]/g, ''), unit: v?.unit ?? l.item?.stockUnitId } })}
                     onKeyDown={(e) => { if (e.key === 'Enter') { saveLine(l.itemId); next(idx); } }} onBlur={() => saveLine(l.itemId)} />
-                  {opts.length > 1 ? <Select className="w-28 h-9 text-xs" value={v?.unit ?? l.item?.stockUnitId} onChange={(e) => setVals({ ...vals, [l.itemId]: { q: v?.q ?? '', unit: e.target.value } })} options={opts.map((o) => ({ value: o.value, label: o.label }))} /> : <span className="text-xs text-dim">{unitLabel(unit)}</span>}
+                  {opts.length > 1 ? <Sel className="w-28 h-9 text-xs" value={v?.unit ?? l.item?.stockUnitId} onChange={(e) => setVals({ ...vals, [l.itemId]: { q: v?.q ?? '', unit: e.target.value } })} options={opts.map((o) => ({ value: o.value, label: o.label }))} /> : <span className="text-xs text-dim">{unitLabel(unit)}</span>}
                 </div>
               ) : <Qty v={l.countedQty} unit={unit} hint={false} />,
               ...(draft ? [] : [<Qty v={l.varianceQty} unit={unit} signed hint={false} />, <Money v={l.varianceValue} tone={Number(l.varianceValue) < 0 ? 'error' : Number(l.varianceValue) > 0 ? 'success' : 'dim'} className="text-xs" />]),

@@ -8,6 +8,7 @@ import { t, L } from '../../i18n';
 import { Tech } from '../../app/tech';
 import { money, dateTime, cn } from '../../lib/format';
 import { store } from '../../mock/store';
+import { deviceName } from '../../demo/people';
 
 const FIELD: Record<string, string> = {
   amount: 'المبلغ', lineAmount: 'قيمة الصنف', payable: 'إجمالي الشيك', discountPercent: 'نسبة الخصم', absVariance: 'الفرق', countedCash: 'المعدود', expectedCash: 'المتوقع',
@@ -46,7 +47,7 @@ function RequestCard({ r }: { r: any }) {
   const { run, busy } = useCommand();
   const [rejecting, setRejecting] = useState(false);
   const [note, setNote] = useState('');
-  const decide = (decision: 'APPROVE' | 'REJECT') => run('ApprovalRequest.Decide', { params: { requestId: r.id }, body: { decision, note: note || undefined, expectedVersion: r.version } }, { success: decision === 'APPROVE' ? t('وافقت — العملية هتكمل على جهاز {d}', { d: r.terminalCode ?? '' }) : t('الطلب اترفض') });
+  const decide = (decision: 'APPROVE' | 'REJECT') => run('ApprovalRequest.Decide', { params: { requestId: r.id }, body: { decision, note: note || undefined, expectedVersion: r.version } }, { success: decision === 'APPROVE' ? t('وافقت — العملية هتكمل على {d}', { d: deviceName(r.terminalId) || t('جهازه') }) : t('الطلب اترفض') });
   const ctxRows = Object.entries(r.context ?? {}).filter(([k]) => FIELD[k]).map(([k, v]) => [t(FIELD[k]), plainValue(k, v)] as [string, string]);
   const pending = r.state === 'PENDING';
   const left = r.secondsLeft ?? 0;
@@ -58,7 +59,7 @@ function RequestCard({ r }: { r: any }) {
         {r.summary?.ar && <div className="text-lg font-bold">{L(r.summary)}</div>}
         <div className="flex flex-wrap gap-2 text-xs text-soft">
           <span className="flex items-center gap-1"><User className="w-3.5 h-3.5" />{r.requesterName}</span>
-          <span className="flex items-center gap-1"><Monitor className="w-3.5 h-3.5" />{r.terminalName ?? r.terminalCode ?? t('من غير جهاز')}</span>
+          <span className="flex items-center gap-1"><Monitor className="w-3.5 h-3.5" />{r.terminalId ? deviceName(r.terminalId, null, r.terminalName) : t('من غير جهاز')}</span>
           <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{dateTime(r.createdAt)}{pending ? ` · ${t('مستني من')} ${r.minutesWaiting} ${t('دقيقة')}` : ''}</span>
         </div>
         {ctxRows.length > 0 && <KV rows={ctxRows} />}

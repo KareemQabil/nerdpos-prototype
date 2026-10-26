@@ -4,7 +4,7 @@
 import React, { useMemo, useState } from 'react';
 import { Plus, Pencil, Archive, RotateCcw, History, Save, Link2, Eye, Search } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../app/hooks';
-import { Banner, Button, Card, Field, Input, KV, Modal, Money, Pill, Section, Select, StateBadge, Switch, Tabs } from '../../ui';
+import { Banner, Button, Card, Field, Input, KV, Modal, Money, Pill, Section, Select, StateBadge, Switch, Tabs, toast } from '../../ui';
 import { Tech } from '../../app/tech';
 import { t, L } from '../../i18n';
 import { cn, dateTime } from '../../lib/format';
@@ -150,7 +150,7 @@ function Mapping() {
     }
     setProgress(null);
     if (n) { setSel([]); }
-    if (n === todo.length && n) run('TaxPolicy.List', {}, { success: t('{n} صنف اتنقلوا للمجموعة الجديدة', { n }) });
+    if (n === todo.length && n) toast('success', t('{n} صنف اتنقلوا للمجموعة الجديدة', { n }));
   };
   return (
     <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-4">

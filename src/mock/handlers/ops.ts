@@ -18,6 +18,7 @@ import { handlers } from './index';
 import { outputHandlers } from './output';
 import { CAPABILITIES, capabilityOn, blockingCapability, OFFLINE_ALLOWLIST } from '../ops-registry';
 import { nextRun } from '../seed-ops';
+import { deviceName } from '../../demo/people';
 import type { DB, Order, ApprovalGrant } from '../types';
 import type { ApprovalRequestRec, BusinessDaySummary, OfflineItem, ReconResult, ReportSchedule, WebhookDelivery, CapabilityState } from '../types-ops';
 
@@ -96,7 +97,7 @@ function readiness(ctx: Ctx, branchId: string, date: string) {
   if (date > current) checks.push({ id: 'NOT_STARTED', level: 'BLOCKER', title: { ar: 'اليوم ده لسه ما بدأش', en: 'This day has not started' }, detail: { ar: `اليوم التجاري الحالي ${current}`, en: `current business day is ${current}` }, count: 1, items: [] });
   const sessions = db.sessions.filter((s) => s.branchId === branchId && s.state === 'OPEN' && s.businessDate <= date);
   add({ id: 'OPEN_SESSIONS', title: { ar: 'أدراج لسه مفتوحة', en: 'Open drawers' }, detail: { ar: 'كل كاشير يقفل ورديته ويعد الدرج الأول', en: 'each cashier closes the shift and counts the drawer' }, count: sessions.length, screen: 'shift',
-    items: sessions.map((s) => ({ id: s.id, label: `${db.terminals.find((t) => t.id === s.terminalId)?.code ?? ''} · ${userName(db, s.userId)}`, sub: `من ${new Date(s.openedAt).toLocaleTimeString('ar-EG', { timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit' })}` })) }, 'BLOCKER');
+    items: sessions.map((s) => ({ id: s.id, label: `${deviceName(s.terminalId)} · ${userName(db, s.userId)}`, sub: `من ${new Date(s.openedAt).toLocaleTimeString('ar-EG', { timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit' })}` })) }, 'BLOCKER');
   const open = db.orders.filter((o) => o.branchId === branchId && OPEN(o) && o.businessDate <= date);
   add({ id: 'OPEN_CHECKS', title: { ar: 'شيكات مفتوحة', en: 'Open checks' }, detail: { ar: 'اتحصلت أو اتلغت أو اتنقلت قبل القفل', en: 'pay, cancel or move them before closing' }, count: open.length, screen: 'checks',
     items: open.map((o) => ({ id: o.id, label: `#${o.number}${o.tableId ? ' · ترابيزة ' + (db.tables.find((t) => t.id === o.tableId)?.name ?? '') : o.channel === 'TAKEAWAY' ? ' · تيك أواي' : o.channel === 'DELIVERY' ? ' · دليفري' : ''}`, sub: userName(db, o.serverUserId), amount: computeTotals(o).payable })) }, 'BLOCKER');
@@ -115,7 +116,7 @@ function readiness(ctx: Ctx, branchId: string, date: string) {
   const reqs = (db.approvalRequests ?? []).filter((r) => r.state === 'PENDING' && r.branchId === branchId);
   add({ id: 'APPROVALS', title: { ar: 'طلبات موافقة مستنية', en: 'Approval requests waiting' }, detail: { ar: 'وافق أو ارفض من صندوق الموافقات', en: 'decide them in the inbox' }, count: reqs.length, screen: 'approvals-inbox', items: reqs.map((r) => ({ id: r.id, label: r.actionTitle, sub: userName(db, r.requesterUserId) })) }, 'WARNING');
   const conflicts = (db.offlineItems ?? []).filter((x) => x.state === 'CONFLICT' && db.terminals.find((t) => t.id === x.terminalId)?.branchId === branchId);
-  add({ id: 'OFFLINE', title: { ar: 'عمليات أوفلاين محتاجة قرار', en: 'Offline items needing a decision' }, detail: { ar: 'من شاشة المزامنة', en: 'from the Sync screen' }, count: conflicts.length, screen: 'sync', items: conflicts.map((x) => ({ id: x.offlineCommandId, label: x.label, sub: x.deviceLabel })) }, 'WARNING');
+  add({ id: 'OFFLINE', title: { ar: 'عمليات أوفلاين محتاجة قرار', en: 'Offline items needing a decision' }, detail: { ar: 'من شاشة المزامنة', en: 'from the Sync screen' }, count: conflicts.length, screen: 'sync', items: conflicts.map((x) => ({ id: x.offlineCommandId, label: x.label, sub: deviceName(x.terminalId) })) }, 'WARNING');
   const recon = (db.reconResults ?? []).filter((r) => r.status === 'UNEXPLAINED_DIFFERENCE' && r.businessDate <= date && (db.reconRuns ?? []).find((x) => x.id === r.runId)?.branchId === branchId);
   add({ id: 'RECON', title: { ar: 'فروقات مطابقة من غير تفسير', en: 'Unexplained reconciliation differences' }, detail: { ar: 'اكتب سبب كل فرق من شاشة المطابقة', en: 'explain them in Reconciliation' }, count: recon.length, screen: 'reconciliation', items: recon.map((r) => ({ id: r.id, label: r.title.ar, amount: r.difference })) }, 'WARNING');
   if (date === current) checks.push({ id: 'CUTOFF', level: 'WARNING', title: { ar: 'اليوم التجاري لسه شغال لحد 4 الفجر', en: 'The business day runs until 04:00' }, detail: { ar: 'أي بيع بعد القفل وقبل 4 الفجر هيتسجل على اليوم ده ويظهر "بعد القفل" في الملخص', en: 'sales after closing and before 04:00 still belong to this day and show as late' }, count: 1, items: [] });
@@ -232,7 +233,7 @@ function evaluateRule(ctx: Ctx, ruleId: string, branchId: string, from: string, 
   if (ruleId === 'DRAWER_CASH') {
     for (const s of db.sessions.filter((x) => x.branchId === branchId && x.businessDate >= from && x.businessDate <= to)) {
       const code = db.terminals.find((t) => t.id === s.terminalId)?.code ?? '';
-      const title = { ar: `درج ${code} — ${userName(db, s.userId)} (${s.businessDate})`, en: `Drawer ${code} ${s.businessDate}` };
+      const title = { ar: `درج ${deviceName(s.terminalId)} — ${userName(db, s.userId)} (${s.businessDate})`, en: `Drawer ${code} ${s.businessDate}` };
       const entries = db.cashEntries.filter((e) => e.sessionId === s.id).map((e) => ({ kind: 'CASH', id: e.id, label: e.kind, amount: e.amount }));
       if (!s.close) out.push(mk({ key: `DRAWER:${s.id}`, title, businessDate: s.businessDate, expected: m4(0), actual: m4(0), drilldown: entries, note: { ar: 'الوردية لسه مفتوحة — مفيش عد للدرج لسه', en: 'shift still open' }, status: 'MISSING' }));
       else out.push(mk({ key: `DRAWER:${s.id}`, title, businessDate: s.businessDate, expected: s.close.expectedCash, actual: s.close.countedCash, drilldown: entries, note: s.close.reason ? { ar: `ملاحظة الكاشير: ${s.close.reason}`, en: s.close.reason } : null }));
@@ -409,8 +410,8 @@ export const opsHandlers: Record<string, Handler> = {
     need(to.id !== o.sessionId, 'VALIDATION_FAILED', { field: 'toSessionId', rule: 'already on this shift' });
     const from = ctx.db.sessions.find((s) => s.id === o.sessionId);
     const g = ctx.requireApproval({ action: 'ORDER_SESSION_TRANSFER', targetType: 'orders.Order', targetId: o.id, context: { orderId: o.id, fromSessionId: o.sessionId, toSessionId: to.id, payable: computeTotals(o).payable }, grantId: ctx.body.approvalGrantId });
-    const fromTerm = ctx.db.terminals.find((t) => t.id === from?.terminalId)?.code ?? '';
-    const toTerm = ctx.db.terminals.find((t) => t.id === to.terminalId)?.code ?? '';
+    const fromTerm = deviceName(from?.terminalId);
+    const toTerm = deviceName(to.terminalId);
     o.sessionId = to.id;
     o.terminalId = to.terminalId;
     if (ctx.body.toServer) o.serverUserId = to.userId;

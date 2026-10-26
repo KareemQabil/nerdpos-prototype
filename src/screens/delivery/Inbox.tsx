@@ -28,7 +28,7 @@ export default function Inbox() {
         actions={<>
           <div className="flex items-center gap-1.5 rounded-xl border border-dashed line px-2 py-1">
             <span className="text-[11px] text-dim flex items-center gap-1"><Sparkles className="w-3.5 h-3.5" />{t('تجربة')}</span>
-            <Select value={source} onChange={(e) => setSource(e.target.value)} options={Object.entries(sources).map(([k, v]: any) => ({ value: k, label: v.ar }))} className="h-8 text-xs w-36" />
+            <div className="w-48"><Select value={source} onChange={(e) => setSource(e.target.value)} options={Object.entries(sources).map(([k, v]: any) => ({ value: k, label: v.ar }))} className="text-sm" /></div>
             <Button size="sm" variant="outline" loading={busy} onClick={simulate} data-fb="simulate-online">{t('محاكاة طلب جديد')}</Button>
           </div>
           <Button variant="ghost" onClick={() => nav('delivery-board')}><Bike className="w-4 h-4" />{t('لوحة الدليفري')}</Button>

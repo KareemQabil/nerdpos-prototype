@@ -13,7 +13,7 @@ export const ZONE_SEED: Omit<DeliveryZone, 'version' | 'branchId'>[] = [
   { id: 'zone_zamalek', name: { ar: 'الزمالك ووسط البلد', en: 'Zamalek & Downtown' }, areas: ['الزمالك', 'جاردن سيتي', 'وسط البلد', 'المنيل'], fee: m4('45'), minOrder: m4('300'), etaMinutes: 60, active: true, color: '#f59e0b', map: { x: 4, y: 8, w: 34, h: 32 } },
 ];
 /** Where the restaurant sits on the simple map (0..100 × 0..70). */
-export const RESTAURANT_XY = { x: 72, y: 46 };
+export const RESTAURANT_XY = { x: 63, y: 55 };
 
 export const TIER_SEED: Omit<LoyaltyTier, 'version'>[] = [
   { id: 'tier_silver', name: { ar: 'فضي', en: 'Silver' }, minPoints: 0, multiplier: '1', color: '#94a3b8', perks: { ar: 'نقطة على كل 10 جنيه', en: '1 point per 10 EGP' }, active: true, sortOrder: 10 },
@@ -77,7 +77,7 @@ export function seedCrm(db: DB, nowMs: number) {
   db.loyaltyTiers = TIER_SEED.map((x) => ({ ...x, version: 1 }));
   db.drivers = DRIVERS.map(([name, phone, vehicle, plate, onShift], i) => ({
     id: `drv_${i + 1}`, branchId: 'branch_main', name, phone, vehicle, plate, onShift, active: true, version: 1, createdAt: iso(nowMs - 200 * DAY),
-    location: onShift ? { x: 70 + i * 2, y: 44 + i, at: iso(nowMs) } : null, owed: m4(i === 2 ? '35' : '0'), userId: null,
+    location: onShift ? { x: RESTAURANT_XY.x, y: RESTAURANT_XY.y, at: iso(nowMs) } : null, owed: m4(i === 2 ? '35' : '0'), userId: null,
   }));
 
   // delivery orders are priced like takeaway; the confirmation policy must list the channel

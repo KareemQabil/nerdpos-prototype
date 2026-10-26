@@ -11,6 +11,7 @@ import { promotionLive } from '../promo-engine';
 import { upsertPromotion, promotionView, findByCode } from './promotions';
 import { effectiveAvailability, menuCheck, menuState, optionSoldOut, branchBusinessDate, activeVariants } from '../menu-engine';
 import { planPriceWindow, applyPriceWindow } from '../menu-prices';
+import { menuSheetsOf, validateMenuSheets, applyMenuSheets } from '../menu-import';
 
 /** nextId, skipping ids the seed already uses (seed price rules are pr_1…pr_N and promotions promo_1, promo_2). */
 function freshId(db: DB, prefix: string): string {
@@ -511,7 +512,7 @@ function importCatalog(ctx: Ctx) {
     if (!catNames.has(p.category) && !db.categories.some((c) => c.id === p.category)) issues.push({ sheet: 'products', row, field: 'category', code: 'CATALOG_CATEGORY_NOT_FOUND', message: `القسم "${p.category}" مش موجود` });
     if (!unitCodes.has(p.unit)) issues.push({ sheet: 'products', row, field: 'unit', code: 'CATALOG_UNIT_NOT_FOUND', message: `الوحدة "${p.unit}" مش موجودة` });
     if (p.sku) { if (skus.has(p.sku)) issues.push({ sheet: 'products', row, field: 'sku', code: 'CATALOG_SKU_TAKEN', message: `الكود ${p.sku} مستخدم` }); skus.add(p.sku); }
-    else if (sp !== 'AUTO_IF_EMPTY') issues.push({ sheet: 'products', row, field: 'sku', code: 'VALIDATION_FAILED', message: 'الكود مطلوب (السياسة MANUAL)' });
+    else if (sp !== 'AUTO_IF_EMPTY') issues.push({ sheet: 'products', row, field: 'sku', code: 'VALIDATION_FAILED', message: 'كود الصنف مطلوب (الإعدادات بتقول المدير يكتبه)' });
     if (p.tax && !db.taxPolicies.some((t) => t.id === p.tax && t.active)) issues.push({ sheet: 'products', row, field: 'tax', code: 'TAX_POLICY_NOT_FOUND', message: `الضريبة "${p.tax}" مش موجودة` });
     for (const g of String(p.modifier_groups ?? '').split(/[;,|]/).map((x) => x.trim()).filter(Boolean)) if (!groupKeys.has(g)) issues.push({ sheet: 'products', row, field: 'modifier_groups', code: 'MODIFIER_DEFINITION_NOT_FOUND', message: `مجموعة "${g}" مش موجودة` });
     if (p.key && prodKeys.has(p.key)) issues.push({ sheet: 'products', row, field: 'key', code: 'VALIDATION_FAILED', message: 'مفتاح صنف مكرر في الملف' });
@@ -533,7 +534,7 @@ function importCatalog(ctx: Ctx) {
     const row = i + 2;
     if (!prodKeys.has(r.product) && !db.products.some((p) => p.id === r.product)) issues.push({ sheet: 'prices', row, field: 'product', code: 'CATALOG_PRODUCT_NOT_FOUND', message: `الصنف "${r.product}" مش موجود` });
     if (!db.branches.some((b2) => b2.id === r.branch || b2.code === r.branch)) issues.push({ sheet: 'prices', row, field: 'branch', code: 'ORGANIZATION_BRANCH_NOT_FOUND', message: `الفرع "${r.branch}" مش موجود` });
-    if (!['DINE_IN', 'TAKEAWAY', 'DELIVERY'].includes(r.channel)) issues.push({ sheet: 'prices', row, field: 'channel', code: 'VALIDATION_FAILED', message: 'القناة لازم DINE_IN أو TAKEAWAY أو DELIVERY' });
+    if (!['DINE_IN', 'TAKEAWAY', 'DELIVERY'].includes(r.channel)) issues.push({ sheet: 'prices', row, field: 'channel', code: 'VALIDATION_FAILED', message: 'القناة لازم DINE_IN (صالة) أو TAKEAWAY (تيك أواي) أو DELIVERY (دليفري)' });
     if (!isMoney(r.amount)) issues.push({ sheet: 'prices', row, field: 'amount', code: 'VALIDATION_FAILED', message: 'السعر مش رقم صحيح (4 خانات عشرية بحد أقصى)' });
     else if (D(r.amount).isZero() && policy<string>('ZeroPricePolicy') === 'DENY') issues.push({ sheet: 'prices', row, field: 'amount', code: 'PRICE_ZERO_NOT_ALLOWED', message: 'السعر صفر ممنوع' });
   });
@@ -545,9 +546,12 @@ function importCatalog(ctx: Ctx) {
     if (!db.branches.some((b2) => b2.id === a.branch || b2.code === a.branch)) issues.push({ sheet: 'availability', row, field: 'branch', code: 'ORGANIZATION_BRANCH_NOT_FOUND', message: `الفرع "${a.branch}" مش موجود` });
     const st = a.state ?? 'AVAILABLE';
     if (!['AVAILABLE', 'SOLD_OUT', 'BLOCKED'].includes(st)) issues.push({ sheet: 'availability', row, field: 'state', code: 'VALIDATION_FAILED', message: 'الحالة لازم AVAILABLE أو SOLD_OUT أو BLOCKED' });
-    else if (st !== 'AVAILABLE' && reasonRule[st] === 'REQUIRED' && !String(a.reason ?? '').trim()) issues.push({ sheet: 'availability', row, field: 'reason', code: 'REASON_REQUIRED', message: 'السبب مطلوب للحالة دي (AvailabilityReasonPolicy)' });
+    else if (st !== 'AVAILABLE' && reasonRule[st] === 'REQUIRED' && !String(a.reason ?? '').trim()) issues.push({ sheet: 'availability', row, field: 'reason', code: 'REASON_REQUIRED', message: 'السبب مطلوب للحالة دي' });
   });
-  const summary = { units: units.length, categories: categories.length, modifierGroups: groups.length, modifierOptions: options.length, products: products.length, prices: prices.length, availability: availability.length };
+  // menu area (proposed sheets): variants, comboSlots, comboOptions, dayparts, menus — menu-import.ts
+  const ms = menuSheetsOf(b);
+  validateMenuSheets(db, ms, prices, prodKeys, catNames, groupKeys, issues);
+  const summary = { units: units.length, categories: categories.length, modifierGroups: groups.length, modifierOptions: options.length, products: products.length, prices: prices.length, availability: availability.length, variants: ms.variants.length, comboSlots: ms.comboSlots.length, comboOptions: ms.comboOptions.length, dayparts: ms.dayparts.length, menus: ms.menus.length };
   if (!b.dryRun && issues.length) throw new ApiError('VALIDATION_FAILED', { issues, summary, rule: 'import is all-or-nothing: nothing was applied' });
   if (b.dryRun) return { status: 200, body: { dryRun: true, applied: false, ok: issues.length === 0, issues, summary } };
   // apply all-or-nothing (the kernel snapshot guarantees atomicity on any refusal)
@@ -567,7 +571,7 @@ function importCatalog(ctx: Ctx) {
   }
   for (const r of prices) {
     const pid = keyMap['prod:' + r.product] ?? r.product;
-    db.priceRules.push({ id: freshId(ctx.db, 'pr'), productId: pid, branchId: branchOf(r.branch), channel: r.channel, amount: m4(r.amount), currency: 'EGP', effectiveFrom: ctx.now, effectiveTo: null, createdAt: ctx.nowIso, createdBy: ctx.user!.id, version: 1, replacesRuleId: null });
+    db.priceRules.push({ id: freshId(ctx.db, 'pr'), productId: pid, branchId: branchOf(r.branch), channel: r.channel, amount: m4(r.amount), currency: 'EGP', effectiveFrom: ctx.now, effectiveTo: null, createdAt: ctx.nowIso, createdBy: ctx.user!.id, version: 1, replacesRuleId: null, ...(r.variant ? { variantId: r.variant } : {}) });
   }
   const avKeys = new Set<string>();
   for (const a of availability) {
@@ -582,6 +586,7 @@ function importCatalog(ctx: Ctx) {
     const bid = branchOf(r.branch);
     if (!avKeys.has(pid + bid) && !db.availability.some((a) => a.productId === pid && a.branchId === bid)) db.availability.push({ productId: pid, branchId: bid, state: 'AVAILABLE', reason: null, updatedAt: ctx.nowIso, updatedBy: ctx.user!.id });
   }
+  applyMenuSheets(db, ms, keyMap, ctx.nowIso, ctx.user!.id);
   ctx.audit(`catalog import: ${products.length} products, ${prices.length} prices`, 'catalog', true);
   return { status: 200, body: { dryRun: false, applied: true, ok: true, issues: [], summary, keyMap } };
 }

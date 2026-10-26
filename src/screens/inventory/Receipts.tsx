@@ -7,7 +7,7 @@ import { Tech } from '../../app/tech';
 import { Banner, Button, Empty, Field, Input, KV, Modal, Money, Pill, Section, Select, Spinner, StateBadge, Table, Tabs, Textarea } from '../../ui';
 import { t, L } from '../../i18n';
 import { dateTime, money } from '../../lib/format';
-import { BranchScope, ItemPicker, Qty, WarehouseSelect, fmtQty, unitLabel, useBranchScope, useItemsCatalog, useList, useWarehouses } from './common';
+import { BranchScope, ItemPicker, Qty, WarehouseSelect, fmtQty, unitLabel, useBranchScope, useItemsCatalog, useList, useWarehouses, Inp, Sel } from './common';
 
 const OPS = ['GoodsReceipt.Post', 'GoodsReceipt.Find', 'GoodsReceipt.Get', 'GoodsReceipt.Reverse', 'SupplierReturn.Post', 'SupplierReturn.Find'];
 
@@ -98,12 +98,12 @@ export function ReceiveDialog({ po, onClose, onDone }: { po?: any; onClose: () =
           const set = (patch: Partial<RLine>) => setLines(lines.map((x, j) => (j === i ? { ...x, ...patch } : x)));
           return [
             l.poLineId ? <span className="font-bold">{L(it?.name)}</span> : <ItemPicker fb={`receive:item:${i}`} className="min-w-[180px]" items={items.items} value={l.itemId} exclude={lines.filter((_, j) => j !== i).map((x) => x.itemId)} onChange={(id, item) => { const p = item.packs?.find((x: any) => x.id === item.purchasePackId) ?? item.packs?.[0]; set({ itemId: id, packId: p?.id ?? '', unitCost: (Number(item.lastCost || item.avgCost) * Number(p?.factor ?? 1)).toFixed(2) }); }} />,
-            it ? <Select className="w-36" disabled={!!l.poLineId} value={l.packId} onChange={(e) => set({ packId: e.target.value })} options={[{ value: '', label: unitLabel(it.unit) }, ...(it.packs ?? []).map((p: any) => ({ value: p.id, label: L(p.name) }))]} /> : '—',
-            <div><Input data-fb={`receive:qty:${i}`} className="w-20" inputMode="decimal" value={l.quantity} onChange={(e) => set({ quantity: e.target.value.replace(/[^\d.]/g, '') })} />{pk && Number(l.quantity) > 0 && <div className="text-[10px] text-dim mt-0.5">= {fmtQty(Number(l.quantity) * Number(pk.factor))} {unitLabel(it.unit)}</div>}</div>,
-            <Input data-fb={`receive:cost:${i}`} className="w-24" inputMode="decimal" value={l.unitCost} onChange={(e) => set({ unitCost: e.target.value.replace(/[^\d.]/g, '') })} />,
+            it ? <Sel className="w-36" disabled={!!l.poLineId} value={l.packId} onChange={(e) => set({ packId: e.target.value })} options={[{ value: '', label: unitLabel(it.unit) }, ...(it.packs ?? []).map((p: any) => ({ value: p.id, label: L(p.name) }))]} /> : '—',
+            <div><Inp data-fb={`receive:qty:${i}`} className="w-20" inputMode="decimal" value={l.quantity} onChange={(e) => set({ quantity: e.target.value.replace(/[^\d.]/g, '') })} />{pk && Number(l.quantity) > 0 && <div className="text-[10px] text-dim mt-0.5">= {fmtQty(Number(l.quantity) * Number(pk.factor))} {unitLabel(it.unit)}</div>}</div>,
+            <Inp data-fb={`receive:cost:${i}`} className="w-24" inputMode="decimal" value={l.unitCost} onChange={(e) => set({ unitCost: e.target.value.replace(/[^\d.]/g, '') })} />,
             <span className="num text-xs">{money((Number(l.quantity || 0) * Number(l.unitCost || 0)).toFixed(4))}</span>,
-            <Input className="w-24" value={l.lotCode} placeholder={t('اختياري')} onChange={(e) => set({ lotCode: e.target.value })} />,
-            it?.trackLots ? <Input data-fb={`receive:expiry:${i}`} className="w-36" type="date" value={l.expiryDate} onChange={(e) => set({ expiryDate: e.target.value })} /> : <span className="text-dim text-xs">—</span>,
+            <Inp className="w-24" value={l.lotCode} placeholder={t('اختياري')} onChange={(e) => set({ lotCode: e.target.value })} />,
+            it?.trackLots ? <Inp data-fb={`receive:expiry:${i}`} className="w-36" type="date" value={l.expiryDate} onChange={(e) => set({ expiryDate: e.target.value })} /> : <span className="text-dim text-xs">—</span>,
             <Button size="sm" variant="ghost" onClick={() => setLines(lines.length > 1 ? lines.filter((_, j) => j !== i) : lines)}><Trash2 className="w-3.5 h-3.5" /></Button>,
           ];
         })} />
@@ -210,8 +210,8 @@ function SupplierReturnDialog({ receipt, onClose }: { receipt?: any; onClose: ()
           const set = (patch: any) => setLines(lines.map((x, j) => (j === i ? { ...x, ...patch } : x)));
           return [
             <ItemPicker fb={`supplier-return:item:${i}`} className="min-w-[200px]" items={choices} value={l.itemId} onChange={(id, item) => { const g = rc?.lines.find((x: any) => x.itemId === id); set({ itemId: id, unitCost: Number(g?.unitCost ?? item.avgCost).toFixed(2) }); }} />,
-            <div className="flex items-center gap-1"><Input data-fb={`supplier-return:qty:${i}`} className="w-24" inputMode="decimal" value={l.quantity} onChange={(e) => set({ quantity: e.target.value.replace(/[^\d.]/g, '') })} /><span className="text-xs text-dim">{unitLabel(it?.unit)}</span></div>,
-            <Input className="w-24" inputMode="decimal" value={l.unitCost} onChange={(e) => set({ unitCost: e.target.value.replace(/[^\d.]/g, '') })} />,
+            <div className="flex items-center gap-1"><Inp data-fb={`supplier-return:qty:${i}`} className="w-24" inputMode="decimal" value={l.quantity} onChange={(e) => set({ quantity: e.target.value.replace(/[^\d.]/g, '') })} /><span className="text-xs text-dim">{unitLabel(it?.unit)}</span></div>,
+            <Inp className="w-24" inputMode="decimal" value={l.unitCost} onChange={(e) => set({ unitCost: e.target.value.replace(/[^\d.]/g, '') })} />,
             <Button size="sm" variant="ghost" onClick={() => setLines(lines.length > 1 ? lines.filter((_, j) => j !== i) : lines)}><Trash2 className="w-3.5 h-3.5" /></Button>,
             ...(rc ? [gl ? <Qty v={gl.quantity} unit={it?.unit} /> : '—'] : []),
           ];

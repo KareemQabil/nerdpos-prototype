@@ -6,7 +6,7 @@ import { Tech } from '../../app/tech';
 import { Button, Card, Empty, Field, Input, KV, Modal, Money, Pill, Section, Spinner, StateBadge, Switch, Table, Tabs, Textarea } from '../../ui';
 import { t, L } from '../../i18n';
 import { dateTime } from '../../lib/format';
-import { PO_STATE, StatePill, newKey, unitLabel, useList } from './common';
+import { PO_STATE, StatePill, newKey, unitLabel, useList, Inp } from './common';
 
 const OPS = ['Supplier.Upsert', 'Supplier.List', 'Supplier.Get'];
 
@@ -21,7 +21,7 @@ export default function Suppliers() {
     <div>
       <Section title={t('الموردين')} badge={<StateBadge ops={OPS} />} sub={t('بيانات كل مورد وشروط الدفع، والأصناف اللي بيوردها، وأوامر الشراء والاستلامات.')}
         actions={<Button data-fb="suppliers:new" variant="primary" onClick={() => setForm({ active: true })}><Plus className="w-4 h-4" />{t('مورد جديد')}</Button>} />
-      <div className="flex gap-2 items-center mb-3"><Input className="w-64" data-fb="suppliers:search" value={text} onChange={(e) => setText(e.target.value)} placeholder={t('دوّر بالاسم أو التليفون')} /><label className="text-xs flex items-center gap-1.5"><input type="checkbox" checked={inactive} onChange={(e) => setInactive(e.target.checked)} />{t('اعرض الموقوفين')}</label></div>
+      <div className="flex gap-2 items-center mb-3"><Inp className="w-64" data-fb="suppliers:search" value={text} onChange={(e) => setText(e.target.value)} placeholder={t('دوّر بالاسم أو التليفون')} /><label className="text-xs flex items-center gap-1.5"><input type="checkbox" checked={inactive} onChange={(e) => setInactive(e.target.checked)} />{t('اعرض الموقوفين')}</label></div>
       {q.loading && !q.raw ? <Spinner /> : q.items.length === 0 ? <Empty icon={<Truck className="w-10 h-10" />} text={t('مفيش موردين')} /> : (
         <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-3">
           {q.items.map((s) => (

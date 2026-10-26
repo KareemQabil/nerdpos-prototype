@@ -55,7 +55,7 @@ export function Eta({ d, className }: { d: any; className?: string }) {
 
 // ───────── map (zones as areas, no tiles)
 export function MiniMap({ zones, drivers = [], deliveries = [], restaurant, height = 340, onZone, selectedZone }: { zones: any[]; drivers?: any[]; deliveries?: any[]; restaurant?: { x: number; y: number }; height?: number; onZone?: (z: any) => void; selectedZone?: string | null }) {
-  const R = restaurant ?? { x: 72, y: 46 };
+  const R = restaurant ?? { x: 63, y: 55 };
   const zoneCenter = (z: any) => ({ x: z.map.x + z.map.w / 2, y: z.map.y + z.map.h / 2 });
   return (
     <div className="rounded-xl border line overflow-hidden" style={{ background: 'radial-gradient(circle at 70% 60%, rgba(34,211,238,.06), transparent 60%), var(--surface-1, rgba(255,255,255,.03))' }}>
@@ -68,8 +68,8 @@ export function MiniMap({ zones, drivers = [], deliveries = [], restaurant, heig
         {zones.map((z) => (
           <g key={z.id} onClick={() => onZone?.(z)} style={{ cursor: onZone ? 'pointer' : 'default', opacity: z.active ? 1 : 0.35 }}>
             <rect x={z.map.x} y={z.map.y} width={z.map.w} height={z.map.h} rx="2" fill={`${z.color}22`} stroke={z.color} strokeWidth={selectedZone === z.id ? 0.8 : 0.35} strokeDasharray={z.active ? undefined : '1 1'} />
-            <text x={z.map.x + 1.5} y={z.map.y + 3.6} fontSize="2.6" fontWeight="700" fill={z.color}>{L(z.name)}</text>
-            <text x={z.map.x + 1.5} y={z.map.y + 6.6} fontSize="1.9" fill="rgba(226,232,240,.75)">{money(z.fee)} · {z.etaMinutes} {t('د')}</text>
+            <text x={z.map.x + z.map.w - 1.5} y={z.map.y + 3.6} fontSize="2.6" fontWeight="700" fill={z.color} direction="rtl" textAnchor="start">{L(z.name)}</text>
+            <text x={z.map.x + z.map.w - 1.5} y={z.map.y + 6.6} fontSize="1.9" fill="rgba(226,232,240,.75)" direction="rtl" textAnchor="start">{money(z.fee)} · {z.etaMinutes} {t('د')}</text>
           </g>
         ))}
         {deliveries.filter((d) => d.zoneId && d.state !== 'DELIVERED' && d.state !== 'CANCELLED').map((d, i) => {
@@ -77,15 +77,21 @@ export function MiniMap({ zones, drivers = [], deliveries = [], restaurant, heig
           if (!z) return null;
           const c = zoneCenter(z);
           const px = c.x + ((i * 7) % 11) - 5, py = c.y + ((i * 5) % 7) - 2;
-          return <g key={d.id}><circle cx={px} cy={py} r="1.4" fill={d.late ? '#ef4444' : '#f8fafc'} stroke={z.color} strokeWidth="0.5" /><text x={px + 1.8} y={py + 0.8} fontSize="1.8" fill="rgba(248,250,252,.85)">{d.number}</text></g>;
+          return <g key={d.id}><circle cx={px} cy={py} r="1.4" fill={d.late ? '#ef4444' : '#f8fafc'} stroke={z.color} strokeWidth="0.5" /><text x={px + 1.8} y={py + 0.8} fontSize="1.8" fill="rgba(248,250,252,.85)" direction="ltr" textAnchor="start">{d.number}</text></g>;
         })}
-        <g><circle cx={R.x} cy={R.y} r="2.4" fill="#22d3ee" stroke="#0f172a" strokeWidth="0.5" /><text x={R.x + 3} y={R.y + 1} fontSize="2.2" fontWeight="700" fill="#22d3ee">{t('المطعم')}</text></g>
-        {drivers.filter((d) => d.location && d.onShift).map((d) => (
-          <g key={d.id} style={{ transition: 'transform 1s linear' }} transform={`translate(${d.location.x} ${d.location.y})`}>
-            <circle r="1.9" fill={d.status === 'ON_TRIP' ? '#a855f7' : d.status === 'ASSIGNED' ? '#38bdf8' : '#22c55e'} stroke="#0f172a" strokeWidth="0.45" />
-            <text x="2.4" y="-1.2" fontSize="1.9" fontWeight="700" fill="#f8fafc">{d.name.split(' ')[0]}</text>
-          </g>
-        ))}
+        <g><circle cx={R.x} cy={R.y} r="2.4" fill="#22d3ee" stroke="#0f172a" strokeWidth="0.5" /><text x={R.x} y={R.y + 5} fontSize="2.2" fontWeight="700" fill="#22d3ee" textAnchor="middle">{t('المطعم')}</text></g>
+        {drivers.filter((d) => d.location && d.onShift).map((d, i, all) => {
+          // drivers standing at the same spot (e.g. waiting at the restaurant) fan out so each one stays readable
+          const same = all.filter((o) => Math.abs(o.location.x - d.location.x) < 4 && Math.abs(o.location.y - d.location.y) < 4);
+          const k = same.indexOf(d);
+          const dx = same.length > 1 ? (k - (same.length - 1) / 2) * 7 : 0, dy = same.length > 1 ? -5 : 0;
+          return (
+            <g key={d.id} style={{ transition: 'transform 1s linear' }} transform={`translate(${d.location.x + dx} ${d.location.y + dy})`}>
+              <circle r="1.9" fill={d.status === 'ON_TRIP' ? '#a855f7' : d.status === 'ASSIGNED' ? '#38bdf8' : '#22c55e'} stroke="#0f172a" strokeWidth="0.45" />
+              <text x="0" y="-2.6" fontSize="1.8" fontWeight="700" fill="#f8fafc" textAnchor="middle">{d.name.split(' ')[0]}</text>
+            </g>
+          );
+        })}
       </svg>
     </div>
   );
