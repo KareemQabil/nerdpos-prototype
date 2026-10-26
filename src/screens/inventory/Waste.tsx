@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, SlidersHorizontal, Undo2 } from 'lucide-react';
 import { useCommand, useQuery } from '../../app/hooks';
-import { Banner, Button, Empty, Field, Input, Modal, Money, Pill, Section, Select, Spinner, StateBadge, Table, Tabs } from '../../ui';
+import { Banner, Button, Empty, Field, Input, Modal, Money, Pill, Section, Select, Spinner, StateBadge, Table, Tabs, EmptyState } from '../../ui';
 import { t, L } from '../../i18n';
 import { dateTime } from '../../lib/format';
 import { BranchScope, ItemPicker, MovementTable, Qty, WASTE_REASONS, WASTE_REASON_TEXT, WarehouseSelect, reasonText, useBranchScope, useItemsCatalog, useList, useWarehouses } from './common';
@@ -45,8 +45,7 @@ function WasteTab({ branchId }: { branchId?: string }) {
         <Button variant="warning" data-fb="waste-list:new" onClick={() => setOpen(true)}><Trash2 className="w-4 h-4" />{t('تسجيل هالك')}</Button>
       </div>
       {byReason.size > 0 && <div className="flex flex-wrap gap-1.5">{[...byReason].sort((a, b) => b[1] - a[1]).map(([r, v]) => <Pill key={r} tone="warning">{reasonText(r)} · <span className="num">{v.toFixed(2)}</span></Pill>)}</div>}
-      {q.loading && !q.raw ? <Spinner /> : q.items.length === 0 ? <Empty icon={<Trash2 className="w-10 h-10" />} text={t('مفيش هالك متسجل')} /> : (
-        <Table head={[t('إمتى'), t('الصنف'), t('الكمية'), t('السبب'), t('المخزن'), t('القيمة'), t('مين'), t('وافق')]} rows={q.items.map((w) => [
+      <Table loading={q.loading && !q.raw} empty={<EmptyState compact icon={<Trash2 />} title={t('مفيش هالك متسجل')} />} head={[t('إمتى'), t('الصنف'), t('الكمية'), t('السبب'), t('المخزن'), t('القيمة'), t('مين'), t('وافق')]} rows={q.items.map((w) => [
           <span className="text-xs">{dateTime(w.at)} <span className="num text-dim">{w.number}</span></span>,
           <div><div className="font-bold">{L(w.name)} {w.itemKind === 'PRODUCT' && <Pill tone="info">{t('طبق')}</Pill>}</div>{w.lines?.length > 0 && <div className="text-[11px] text-dim">{w.lines.map((x: any) => `${L(x.name)} ${x.quantity}`).join('، ')}</div>}{w.note && <div className="text-[11px] text-dim">{w.note}</div>}</div>,
           w.itemKind === 'PRODUCT' ? <span className="num">{w.quantity} {t('طبق')}</span> : <Qty v={w.quantity} unit={w.unit} />,
@@ -56,7 +55,6 @@ function WasteTab({ branchId }: { branchId?: string }) {
           <span className="text-xs">{w.userName}</span>,
           <span className="text-xs text-dim">{w.approverName ?? '—'}</span>,
         ])} />
-      )}
       <WasteDialog open={open} onClose={() => setOpen(false)} />
     </div>
   );

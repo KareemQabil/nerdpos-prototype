@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Plus, ArrowLeftRight, Truck, PackageCheck, XCircle, Trash2, ArrowLeft } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
-import { Banner, Button, Empty, Field, Input, KV, Modal, Money, Section, Select, Spinner, StateBadge, Table, Textarea } from '../../ui';
+import { Banner, Button, Empty, Field, Input, KV, Modal, Money, Section, Select, Spinner, StateBadge, Table, Textarea, EmptyState } from '../../ui';
 import { t, L } from '../../i18n';
 import { dateTime } from '../../lib/format';
 import { BranchScope, ItemPicker, Qty, StatePill, TRANSFER_STATE, WarehouseSelect, fmtQty, unitOptions, useBranchScope, useList, useWarehouses, Inp, Sel } from './common';
@@ -24,8 +24,7 @@ export default function Transfers() {
       <Section title={t('التحويلات')} badge={<StateBadge ops={OPS} />} sub={t('نقل بضاعة من مخزن لمخزن: من المخزن الرئيسي للمطبخ، أو لفرع تاني. البضاعة بتطلع من المخزن أول ما تتبعت، وبتدخل لما تتستلم.')}
         actions={<><BranchScope scope={scope} /><Button data-fb="transfers:new" variant="primary" onClick={() => setCreating(true)}><Plus className="w-4 h-4" />{t('تحويل جديد')}</Button></>} />
       <div className="flex gap-2 mb-3"><Sel className="w-52" value={state} onChange={(e) => setState(e.target.value)} options={[{ value: '', label: t('كل الحالات') }, ...Object.entries(TRANSFER_STATE).map(([k, v]) => ({ value: k, label: t(v.ar) }))]} /></div>
-      {list.loading && !list.raw ? <Spinner /> : list.items.length === 0 ? <Empty icon={<ArrowLeftRight className="w-10 h-10" />} text={t('مفيش تحويلات')} /> : (
-        <Table head={[t('الرقم'), t('من'), t('إلى'), t('الحالة'), t('الأصناف'), t('القيمة'), t('آخر تحديث'), '']} rows={list.items.map((tr) => [
+      <Table loading={list.loading && !list.raw} empty={<EmptyState compact icon={<ArrowLeftRight />} title={t('مفيش تحويلات')} />} head={[t('الرقم'), t('من'), t('إلى'), t('الحالة'), t('الأصناف'), t('القيمة'), t('آخر تحديث'), '']} rows={list.items.map((tr) => [
           <button className="num font-bold hover:text-[var(--primary)]" data-fb={`transfers:open:${tr.id}`} onClick={() => setOpen(tr.id)}>{tr.number}</button>,
           <span>{tr.from.name} <span className="text-[11px] text-dim">{tr.from.branchName}</span></span>,
           <span>{tr.to.name} <span className="text-[11px] text-dim">{tr.to.branchName}</span></span>,
@@ -35,7 +34,6 @@ export default function Transfers() {
           <span className="text-xs text-dim">{dateTime(tr.receivedAt ?? tr.dispatchedAt ?? tr.cancelledAt ?? tr.createdAt)}</span>,
           <Button size="sm" onClick={() => setOpen(tr.id)}>{tr.state === 'DRAFT' ? t('ابعت') : tr.state === 'DISPATCHED' ? t('استلم') : t('اعرض')}</Button>,
         ])} />
-      )}
       {creating && <CreateTransfer onClose={() => setCreating(false)} onCreated={(id) => { setCreating(false); setOpen(id); }} />}
       <TransferView id={open} onClose={() => setOpen(null)} />
     </div>

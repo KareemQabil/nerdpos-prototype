@@ -54,7 +54,7 @@ export default function Home() {
       {fresh && <SetupPath setup={setup} />}
       {bd && <SalesToday bd={bd} daily={daily} />}
       {bd && (
-        <div className="grid xl:grid-cols-[1fr_380px] gap-4 items-start">
+        <div className="grid min-[1400px]:grid-cols-[1fr_380px] gap-4 items-start">
           <div className="space-y-4 min-w-0">
             <LiveService />
             <QuickLinks />
@@ -259,8 +259,8 @@ function LiveService() {
   const anyLoaded = tables.data || kitchen.data || delivery.data || sessions.data;
   return (
     <Card title={<span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[var(--success)] animate-pulse" />{t('الشغل دلوقتي')}</span>} description={t('بيتحدث لوحده مع كل حركة على أي جهاز.')}>
-      {!anyLoaded ? <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-24" />)}</div> : (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {!anyLoaded ? <div className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-24" />)}</div> : (
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3">
           {tables.data && <LiveTile fb="home:live:tables" icon={<Armchair className="w-4 h-4" />} label={t('الترابيزات المشغولة')} onClick={() => nav('floor')}
             value={<>{visits.items.length}<span className="text-sm text-dim font-normal"> / {activeTables}</span></>}
             sub={visits.items.length ? t('{g} ضيف قاعدين دلوقتي', { g: guests }) : t('الصالة فاضية')} />}
@@ -343,7 +343,7 @@ function QuickLinks() {
   if (!list.length) return null;
   return (
     <Card title={t('اختصارات')}>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-2">
         {list.map((d) => {
           const Icon = d.icon;
           return (

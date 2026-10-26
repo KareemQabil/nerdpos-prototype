@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, ClipboardCheck, Send, CheckCheck, XCircle, Eye, EyeOff, Save } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
-import { Banner, Button, Card, Empty, Field, Input, KV, Modal, Drawer, Money, Pill, Section, Select, Spinner, StateBadge, Switch, Table, Textarea } from '../../ui';
+import { Banner, Button, Card, Empty, Field, Input, KV, Modal, Drawer, Money, Pill, Section, Select, Spinner, StateBadge, Switch, Table, Textarea, EmptyState } from '../../ui';
 import { t, L } from '../../i18n';
 import { cn, dateTime, money } from '../../lib/format';
 import { BranchScope, COUNT_STATE, Qty, StatePill, WarehouseSelect, fmtQty, unitLabel, unitOptions, useBranchScope, useItemsCatalog, useList, useWarehouses, Inp, Sel } from './common';
@@ -24,8 +24,7 @@ export default function Counts() {
       <Section title={t('الجرد')} badge={<StateBadge ops={OPS} />} sub={t('ابدأ جرد لمخزن، اعدّوا (أكتر من حد ينفع يعد في نفس الوقت)، سلّم، راجع الفروقات بقيمتها، واعتمدها.')}
         actions={<><BranchScope scope={scope} /><Button data-fb="counts:new" variant="primary" onClick={() => setStarting(true)}><Plus className="w-4 h-4" />{t('جرد جديد')}</Button></>} />
       <div className="flex gap-2 mb-3"><Sel className="w-52" value={state} onChange={(e) => setState(e.target.value)} options={[{ value: '', label: t('كل الحالات') }, ...Object.entries(COUNT_STATE).map(([k, v]) => ({ value: k, label: t(v.ar) }))]} /></div>
-      {list.loading && !list.raw ? <Spinner /> : list.items.length === 0 ? <Empty icon={<ClipboardCheck className="w-10 h-10" />} text={t('مفيش جرد لسه. ابدأ أول جرد.')} /> : (
-        <Table head={[t('رقم الجرد'), t('المخزن'), t('بدأ'), t('الحالة'), t('اتعد'), t('الفروقات'), '']} rows={list.items.map((c) => [
+      <Table loading={list.loading && !list.raw} empty={<EmptyState compact icon={<ClipboardCheck />} title={t('مفيش جرد لسه. ابدأ أول جرد.')} />} head={[t('رقم الجرد'), t('المخزن'), t('بدأ'), t('الحالة'), t('اتعد'), t('الفروقات'), '']} rows={list.items.map((c) => [
           <button className="num font-bold hover:text-[var(--primary)]" data-fb={`counts:open:${c.id}`} onClick={() => setOpen(c.id)}>{c.number}</button>,
           <span>{c.warehouse.name} <span className="text-xs text-dim">{c.warehouse.branchName}</span></span>,
           <span className="text-xs">{dateTime(c.startedAt)} · {c.startedByName}</span>,
@@ -34,7 +33,6 @@ export default function Counts() {
           c.state === 'POSTED' ? <Money v={c.varianceValue} tone={Number(c.varianceValue) < 0 ? 'error' : 'success'} className="text-sm" /> : c.previewVarianceValue !== null && c.state !== 'CANCELLED' ? <span className="text-xs text-dim">{t('متوقع')} <Money v={c.previewVarianceValue} className="text-xs" /></span> : '—',
           <Button size="sm" onClick={() => setOpen(c.id)}>{c.state === 'DRAFT' ? t('كمّل العد') : c.state === 'SUBMITTED' ? t('راجع واعتمد') : t('اعرض')}</Button>,
         ])} />
-      )}
       {starting && <StartDialog onClose={() => setStarting(false)} onStarted={(id) => { setStarting(false); setOpen(id); }} />}
       <CountSheet id={open} onClose={() => setOpen(null)} />
     </div>

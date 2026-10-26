@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { ChefHat, Factory, CheckCircle2 } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
-import { Banner, Button, Card, Empty, Field, Input, Money, Pill, Section, Select, Spinner, StateBadge, Table } from '../../ui';
+import { Banner, Button, Card, Empty, Field, Input, Money, Pill, Section, Select, Spinner, StateBadge, Table, EmptyState } from '../../ui';
 import { t, L } from '../../i18n';
 import { dateTime, money } from '../../lib/format';
 import { BranchScope, Qty, WarehouseSelect, fmtQty, unitLabel, useBranchScope, useList, useWarehouses, Inp } from './common';

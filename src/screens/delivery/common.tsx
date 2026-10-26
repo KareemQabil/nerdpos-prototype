@@ -60,7 +60,7 @@ export function MiniMap({ zones, drivers = [], deliveries = [], restaurant, heig
   return (
     <div className="rounded-xl border line overflow-hidden" style={{ background: 'radial-gradient(circle at 70% 60%, rgba(34,211,238,.06), transparent 60%), var(--surface-1, rgba(255,255,255,.03))' }}>
       <svg viewBox="0 0 100 70" style={{ width: '100%', height }} preserveAspectRatio="xMidYMid meet" role="img" aria-label={t('خريطة مناطق التوصيل')}>
-        <defs><pattern id="grid" width="5" height="5" patternUnits="userSpaceOnUse"><path d="M 5 0 L 0 0 0 5" fill="none" stroke="rgba(148,163,184,.08)" strokeWidth="0.2" /></pattern></defs>
+        <defs><pattern id="grid" width="5" height="5" patternUnits="userSpaceOnUse"><path d="M 5 0 L 0 0 0 5" fill="none" stroke="rgba(148,163,184,.16)" strokeWidth="0.2" /></pattern></defs>
         <rect x="0" y="0" width="100" height="70" fill="url(#grid)" />
         {/* the Nile, for orientation */}
         <path d="M 40 0 C 36 14, 42 26, 38 38 S 30 56, 33 70" fill="none" stroke="rgba(56,189,248,.35)" strokeWidth="2.2" strokeLinecap="round" />
@@ -69,7 +69,7 @@ export function MiniMap({ zones, drivers = [], deliveries = [], restaurant, heig
           <g key={z.id} onClick={() => onZone?.(z)} style={{ cursor: onZone ? 'pointer' : 'default', opacity: z.active ? 1 : 0.35 }}>
             <rect x={z.map.x} y={z.map.y} width={z.map.w} height={z.map.h} rx="2" fill={`${z.color}22`} stroke={z.color} strokeWidth={selectedZone === z.id ? 0.8 : 0.35} strokeDasharray={z.active ? undefined : '1 1'} />
             <text x={z.map.x + z.map.w - 1.5} y={z.map.y + 3.6} fontSize="2.6" fontWeight="700" fill={z.color} direction="rtl" textAnchor="start">{L(z.name)}</text>
-            <text x={z.map.x + z.map.w - 1.5} y={z.map.y + 6.6} fontSize="1.9" fill="rgba(226,232,240,.75)" direction="rtl" textAnchor="start">{money(z.fee)} · {z.etaMinutes} {t('د')}</text>
+            <text x={z.map.x + z.map.w - 1.5} y={z.map.y + 6.6} fontSize="1.9" style={{ fill: 'var(--text-soft)' }} direction="rtl" textAnchor="start">{money(z.fee)} · {z.etaMinutes} {t('د')}</text>
           </g>
         ))}
         {deliveries.filter((d) => d.zoneId && d.state !== 'DELIVERED' && d.state !== 'CANCELLED').map((d, i) => {
@@ -77,7 +77,7 @@ export function MiniMap({ zones, drivers = [], deliveries = [], restaurant, heig
           if (!z) return null;
           const c = zoneCenter(z);
           const px = c.x + ((i * 7) % 11) - 5, py = c.y + ((i * 5) % 7) - 2;
-          return <g key={d.id}><circle cx={px} cy={py} r="1.4" fill={d.late ? '#ef4444' : '#f8fafc'} stroke={z.color} strokeWidth="0.5" /><text x={px + 1.8} y={py + 0.8} fontSize="1.8" fill="rgba(248,250,252,.85)" direction="ltr" textAnchor="start">{d.number}</text></g>;
+          return <g key={d.id}><circle cx={px} cy={py} r="1.4" fill={d.late ? '#ef4444' : '#f8fafc'} stroke={z.color} strokeWidth="0.5" /><text x={px + 1.8} y={py + 0.8} fontSize="1.8" style={{ fill: 'var(--foreground)' }} direction="ltr" textAnchor="start">{d.number}</text></g>;
         })}
         <g><circle cx={R.x} cy={R.y} r="2.4" fill="#22d3ee" stroke="#0f172a" strokeWidth="0.5" /><text x={R.x} y={R.y + 5} fontSize="2.2" fontWeight="700" fill="#22d3ee" textAnchor="middle">{t('المطعم')}</text></g>
         {drivers.filter((d) => d.location && d.onShift).map((d, i, all) => {
@@ -88,7 +88,7 @@ export function MiniMap({ zones, drivers = [], deliveries = [], restaurant, heig
           return (
             <g key={d.id} style={{ transition: 'transform 1s linear' }} transform={`translate(${d.location.x + dx} ${d.location.y + dy})`}>
               <circle r="1.9" fill={d.status === 'ON_TRIP' ? '#a855f7' : d.status === 'ASSIGNED' ? '#38bdf8' : '#22c55e'} stroke="#0f172a" strokeWidth="0.45" />
-              <text x="0" y="-2.6" fontSize="1.8" fontWeight="700" fill="#f8fafc" textAnchor="middle">{d.name.split(' ')[0]}</text>
+              <text x="0" y="-2.6" fontSize="1.8" fontWeight="700" style={{ fill: 'var(--foreground)' }} textAnchor="middle">{d.name.split(' ')[0]}</text>
             </g>
           );
         })}

@@ -25,10 +25,19 @@ export function qty(v: string | number): string {
 
 export function time(iso: string | null | undefined): string {
   if (!iso) return '—';
-  return new Intl.DateTimeFormat(getLang() === 'ar' ? 'ar-EG-u-nu-latn' : 'en-GB', { timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+  return clock(new Date(iso));
+}
+// Arabic: "07:05 م" with Western digits and a colon (some ICU builds print "07.05" for ar-EG).
+function clock(d: Date, withDate = false): string {
+  const ar = getLang() === 'ar';
+  const parts = new Intl.DateTimeFormat(ar ? 'ar-EG-u-nu-latn' : 'en-GB', { timeZone: 'Africa/Cairo', ...(withDate ? { day: '2-digit', month: 'short' } : {}), hour: '2-digit', minute: '2-digit', hour12: ar }).formatToParts(d);
+  const get = (k: string) => parts.find((p) => p.type === k)?.value ?? '';
+  const hm = `${get('hour')}:${get('minute')}`;
+  const tm = ar ? `${hm} ${get('dayPeriod')}`.trim() : hm;
+  return withDate ? `${get('day')} ${get('month')} ${tm}` : tm;
 }
 export function dateTime(iso: string | null | undefined): string {
   if (!iso) return '—';
-  return new Intl.DateTimeFormat(getLang() === 'ar' ? 'ar-EG-u-nu-latn' : 'en-GB', { timeZone: 'Africa/Cairo', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+  return clock(new Date(iso), true);
 }
 export const cn = (...xs: (string | false | null | undefined)[]) => xs.filter(Boolean).join(' ');

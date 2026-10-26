@@ -42,7 +42,7 @@ export function OrderWorkspace({ orderId, mode, back }: { orderId: string; mode:
   );
   const editable = order.status === 'DRAFT';
   return (
-    <div className="h-full flex gap-3 min-h-0">
+    <div className="@container/ow h-full flex gap-3 min-h-0">
       <div className="flex-1 min-w-0 flex flex-col gap-2 min-h-0">
         <div className="flex items-center gap-2 min-h-9">
           {back && <Button size="sm" variant="ghost" onClick={back} data-fb="order-back"><ArrowRight className="w-4 h-4 ltr:rotate-180" />{t('رجوع')}</Button>}
@@ -52,7 +52,7 @@ export function OrderWorkspace({ orderId, mode, back }: { orderId: string; mode:
         </div>
         <div className="flex-1 min-h-0"><MenuGrid channel={order.channel} disabled={!editable} onPick={(p) => (needsDialog(p) ? setPick(p) : add({ productId: p.id, quantity: '1', modifierOptionIds: [] }))} /></div>
       </div>
-      <div className="w-[min(360px,42%)] xl:w-[390px] shrink-0 min-h-0"><CheckPanel order={order} refetch={o.refetch} mode={mode} onCheckSwitch={(id) => nav('order', { ...params, orderId: id })} /></div>
+      <div className="w-[46%] @[760px]/ow:w-[340px] @[1100px]/ow:w-[390px] shrink-0 min-h-0"><CheckPanel order={order} refetch={o.refetch} mode={mode} onCheckSwitch={(id) => nav('order', { ...params, orderId: id })} /></div>
       {pick && <ProductDialog product={pick} channel={order.channel} onClose={() => setPick(null)} onAdd={add} seatsEnabled={!!seatsP.data?.value && mode === 'FLOOR'} guestCount={order.guestCount} />}
     </div>
   );

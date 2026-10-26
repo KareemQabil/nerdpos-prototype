@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Bike, PhoneCall, ChefHat, AlertTriangle, Clock, Map as MapIcon, LayoutGrid, Navigation, Globe, Banknote } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';
 import { call } from '../../api/client';
-import { Section, StateBadge, Button, Pill, Empty, Tabs, Money, Card, Switch, useNow } from '../../ui';
+import { PageHeader, StateBadge, Button, Pill, Empty, EmptyState, SegmentedControl, Money, Card, Switch, useNow } from '../../ui';
 import { t, L } from '../../i18n';
 import { cn, money } from '../../lib/format';
 import { STATE, KITCHEN, PAYMENT_MODE, DRIVER_STATUS, Eta, MiniMap, DeliveryActions, DeliveryDetail, VehicleIcon } from './common';
@@ -32,17 +32,19 @@ export default function DeliveryBoard() {
   const s = board.data?.summary;
   const grace = board.data?.rules?.graceMinutes ?? 10;
   const newOnline = inbox.data?.counts?.NEW ?? 0;
+  // the four live columns always show; "failed" and "done today" only when they have orders
+  const shownCols = COLS.filter((c) => ['kitchen', 'ready', 'assigned', 'road'].includes(c.id) || list.some(c.filter));
   return (
     <div data-screen="DL2" className="h-full flex flex-col gap-3 min-h-0">
-      <Section title={t('لوحة الدليفري')} badge={<StateBadge ops={['Delivery.Board', 'Delivery.Assign', 'Delivery.Dispatch', 'Delivery.Complete', 'Delivery.FailAttempt', 'Delivery.Cancel']} />}
-        sub={t('كل طلبات التوصيل المفتوحة: من المطبخ لحد ما توصل للعميل. الطلب بيبقى متأخر لو عدّى الوقت المتوقع + {g} دقيقة سماح.', { g: grace })}
+      <PageHeader className="!mb-0" title={t('لوحة الدليفري')} ops={['Delivery.Board', 'Delivery.Assign', 'Delivery.Dispatch', 'Delivery.Complete', 'Delivery.FailAttempt', 'Delivery.Cancel']}
+        description={t('كل طلبات التوصيل من المطبخ لحد باب العميل. الطلب بيتحسب متأخر بعد الوقت المتوقع بـ {g} دقيقة.', { g: grace })}
         actions={<>
           {newOnline > 0 && <Button variant="warning" onClick={() => nav('online-orders')} data-fb="go-inbox"><Globe className="w-4 h-4" />{t('طلبات أونلاين جديدة')} ({newOnline})</Button>}
           {can('delivery:create') && <Button variant="primary" onClick={() => nav('delivery-new')} data-fb="new-delivery"><PhoneCall className="w-4 h-4" />{t('طلب دليفري جديد')}</Button>}
-          <Tabs value={view} onChange={setView} tabs={[{ id: 'board', label: <span className="flex items-center gap-1"><LayoutGrid className="w-4 h-4" />{t('اللوحة')}</span> }, { id: 'map', label: <span className="flex items-center gap-1"><MapIcon className="w-4 h-4" />{t('الخريطة')}</span> }]} />
+          <SegmentedControl value={view} onChange={setView} options={[{ id: 'board', label: t('اللوحة'), icon: <LayoutGrid />, fb: 'dl-view:board' }, { id: 'map', label: t('الخريطة'), icon: <MapIcon />, fb: 'dl-view:map' }]} />
         </>} />
       {s && (
-        <div className="grid grid-cols-3 lg:grid-cols-6 gap-2">
+        <div className="grid grid-cols-3 xl:grid-cols-6 gap-2 shrink-0">
           <Stat label={t('في المطبخ / جديد')} v={s.pending} />
           <Stat label={t('جاهز ومستني طيار')} v={s.readyWaiting} tone={s.readyWaiting ? 'warning' : undefined} hint={t('أكتر من {m} دقيقة', { m: board.data?.rules?.readyWaitMinutes ?? 10 })} />
           <Stat label={t('مع الطيارين')} v={s.onRoad} />
@@ -52,10 +54,10 @@ export default function DeliveryBoard() {
         </div>
       )}
       {view === 'board' && !board.loading && !list.length ? (
-        <Empty icon={<Bike className="w-12 h-12" />} text={t('مفيش طلبات دليفري مفتوحة دلوقتي')}>{can('delivery:create') && <Button variant="primary" onClick={() => nav('delivery-new')}><PhoneCall className="w-4 h-4" />{t('ابدأ طلب دليفري')}</Button>}</Empty>
+        <EmptyState icon={<Bike />} title={t('مفيش طلبات دليفري مفتوحة دلوقتي')} text={t('أول ما تاخد طلب بالتليفون أو يوصل طلب أونلاين هيظهر هنا.')} action={can('delivery:create') && <Button variant="primary" onClick={() => nav('delivery-new')}><PhoneCall className="w-4 h-4" />{t('ابدأ طلب دليفري')}</Button>} />
       ) : view === 'board' ? (
-        <div className="flex-1 min-h-0 grid gap-3 overflow-x-auto" style={{ gridTemplateColumns: 'repeat(6, minmax(230px, 1fr))' }}>
-          {COLS.map((c) => {
+        <div className="flex-1 min-h-0 grid gap-3 overflow-x-auto" style={{ gridTemplateColumns: `repeat(${shownCols.length}, minmax(210px, 1fr))` }}>
+          {shownCols.map((c) => {
             const items = list.filter(c.filter);
             return (
               <div key={c.id} className={cn('rounded-2xl border-t-4 surface-1 flex flex-col min-h-0', c.tone)} data-fb={`col:${c.id}`}>
@@ -78,7 +80,7 @@ export default function DeliveryBoard() {
 
 function Stat({ label, v, tone, hint }: { label: string; v: number; tone?: 'error' | 'warning' | 'success'; hint?: string }) {
   const c = tone === 'error' ? 'text-[var(--error)]' : tone === 'warning' ? 'text-[var(--warning)]' : tone === 'success' ? 'text-[var(--success)]' : '';
-  return <div className="glass rounded-xl px-3 py-2" title={hint}><div className="text-[11px] text-dim">{label}</div><div className={cn('text-2xl font-bold num', c)}>{v}</div></div>;
+  return <div className="glass rounded-xl px-3 py-2" title={hint}><div className="text-[11px] text-soft font-bold truncate">{label}</div><div className={cn('text-2xl font-extrabold num', c)} style={{ textAlign: 'start' }}>{v}</div></div>;
 }
 
 function DeliveryCard({ d, onOpen }: { d: any; onOpen: () => void }) {
@@ -89,7 +91,7 @@ function DeliveryCard({ d, onOpen }: { d: any; onOpen: () => void }) {
       <div className="flex items-start justify-between gap-2">
         <button onClick={onOpen} className="text-start min-w-0">
           <div className="font-bold text-sm truncate">{d.customerName || t('عميل')}</div>
-          <div className="text-[11px] text-dim num">{d.number} · #{d.orderNumber}</div>
+          <div className="text-[11px] text-dim"><span className="num">{d.number}</span> · <span className="num">#{d.orderNumber}</span></div>
         </button>
         <Eta d={d} />
       </div>

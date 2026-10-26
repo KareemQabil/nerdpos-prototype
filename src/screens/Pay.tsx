@@ -39,13 +39,13 @@ export function PayPanel({ orderId, onBack }: { orderId: string; onBack: () => v
   const complete = async () => { await run('Order.Complete', { params: { orderId }, body: { expectedVersion: order.version } }, { success: t('الشيك اتقفل') }); };
   const step = order.status === 'DRAFT' ? 0 : order.status === 'CONFIRMED' ? (s?.settled ? 2 : 1) : 3;
   return (
-    <div data-screen="D1" className="space-y-4">
+    <div data-screen="D1" className="@container/pay space-y-4">
       <PageHeader title={<>{t('التحصيل')} <span className="num text-soft text-lg font-bold">#{order.number}</span></>} ops={['Order.Confirm', 'Payment.Capture', 'Payment.GetSettlement', 'Order.Complete']} description={where(order)}
         actions={<Button variant="ghost" onClick={onBack} data-fb="pay-back"><ArrowRight className="w-4 h-4 ltr:rotate-180" />{t('رجوع')}</Button>} className="!mb-0" />
       {order.status !== 'VOIDED' && order.status !== 'CANCELLED' && <Stepper steps={[{ label: t('تأكيد الشيك') }, { label: t('الدفع') }, { label: t('إنهاء') }]} current={step} className="max-w-xl" />}
-      <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-4 items-start">
+      <div className="grid @[880px]/pay:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-4 items-start">
         {/* the check */}
-        <Card title={<span className="flex items-center gap-2">{t('الشيك')} <StatusPill s={order.status} /></span>} className="lg:order-none">
+        <Card title={<span className="flex items-center gap-2">{t('الشيك')} <StatusPill s={order.status} /></span>} className="order-2 @[880px]/pay:order-none">
           {order.kind !== 'STAFF_MEAL' && <div className="mb-3"><CustomerChip order={order} editable={order.status !== 'COMPLETED'} /></div>}
           <div className="space-y-1.5 text-sm max-h-[38vh] overflow-y-auto pe-1">
             {order.lines.filter((l: any) => l.status === 'ACTIVE' || l.status === 'VOIDED').map((l: any) => (

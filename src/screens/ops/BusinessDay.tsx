@@ -13,7 +13,7 @@ import { branchLabel } from '../../demo/people';
 
 export const METHOD_AR: Record<string, string> = { CASH: 'كاش', CARD: 'كارت', DIGITAL_WALLET: 'محفظة', DEPOSIT: 'عربون', 'DIGITAL_WALLET:INSTAPAY': 'إنستاباي', 'DIGITAL_WALLET:VODAFONE_CASH': 'فودافون كاش', 'DIGITAL_WALLET:ORANGE_CASH': 'أورنج كاش', 'DIGITAL_WALLET:ETISALAT_CASH': 'اتصالات كاش', LOYALTY: 'نقاط', LOYALTY_POINTS: 'نقاط' };
 const addDays = (iso: string, n: number) => new Date(Date.parse(iso + 'T00:00:00Z') + n * 86_400_000).toISOString().slice(0, 10);
-const dayName = (iso: string) => new Intl.DateTimeFormat('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(iso + 'T12:00:00Z'));
+const dayName = (iso: string) => new Intl.DateTimeFormat('ar-EG-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(iso + 'T12:00:00Z'));
 
 export default function BusinessDay() {
   const { auth, me, nav } = useDev();

@@ -118,11 +118,11 @@ export function MenuGrid({ channel, onPick, disabled }: { channel: string; onPic
   const running = (overview.data?.dayparts ?? []).filter((d: any) => d.runningNow);
   const nextUp = (overview.data?.dayparts ?? []).filter((d: any) => !d.runningNow && d.active && d.nextStart).sort((a: any, b: any) => a.nextStart.localeCompare(b.nextStart))[0];
   return (
-    <div className="flex flex-col gap-3 min-h-0 h-full">
+    <div className="@container/menu flex flex-col gap-3 min-h-0 h-full">
       <div className="flex items-center gap-2 shrink-0">
         <div className="relative flex-1"><Search className="w-4 h-4 absolute top-1/2 -translate-y-1/2 start-3 text-dim" /><Input data-fb="menu-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('دوّر على صنف أو كود…')} className="ps-9 h-11" /></div>
         <button data-fb="menu:soldout-board" onClick={() => setBoard(true)} title={t('خلص النهارده')} className={cn('shrink-0 h-11 px-3 rounded-xl border text-sm inline-flex items-center gap-1.5', soldOutCount ? 'border-[color-mix(in_srgb,var(--error)_45%,transparent)] text-[var(--error)] bg-[color-mix(in_srgb,var(--error)_10%,transparent)]' : 'border-[var(--glass-border)] text-soft surface-1')}>
-          <PackageX className="w-4 h-4" /><span className="hidden sm:inline">{t('خلص النهارده')}</span>{soldOutCount > 0 && <span className="num text-xs font-bold">{soldOutCount}</span>}
+          <PackageX className="w-4 h-4" /><span className="hidden @[460px]/menu:inline">{t('خلص النهارده')}</span>{soldOutCount > 0 && <span className="num text-xs font-bold">{soldOutCount}</span>}
         </button>
         <StateBadge ops={['Category.List', 'Catalog.Search', 'ModifierGroup.List', 'Pricing.QuoteItem', 'Menu.Overview']} />
       </div>

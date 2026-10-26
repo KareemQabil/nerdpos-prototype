@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Plus, PackageCheck, Undo2, RotateCcw, Trash2, Save } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
-import { Banner, Button, Empty, Field, Input, KV, Modal, Drawer, Money, Pill, Section, Select, Spinner, StateBadge, Table, Tabs, Textarea } from '../../ui';
+import { Banner, Button, Empty, Field, Input, KV, Modal, Drawer, Money, Pill, Section, Select, Spinner, StateBadge, Table, Tabs, Textarea, EmptyState } from '../../ui';
 import { t, L } from '../../i18n';
 import { dateTime, money } from '../../lib/format';
 import { BranchScope, ItemPicker, Qty, WarehouseSelect, fmtQty, unitLabel, useBranchScope, useItemsCatalog, useList, useWarehouses, Inp, Sel } from './common';
@@ -42,14 +42,12 @@ function ReceiptList({ branchId, autoNew }: { branchId?: string; autoNew: boolea
         <div className="flex-1" />
         <Button variant="primary" data-fb="receipts:new" onClick={() => setCreating(true)}><PackageCheck className="w-4 h-4" />{t('استلام جديد')}</Button>
       </div>
-      {q.loading && !q.raw ? <Spinner /> : q.items.length === 0 ? <Empty icon={<PackageCheck className="w-10 h-10" />} text={t('مفيش استلامات')} /> : (
-        <Table head={[t('الإذن'), t('المورد'), t('أمر الشراء'), t('فاتورة المورد'), t('المخزن'), t('القيمة'), t('إمتى'), '']} rows={q.items.map((r) => [
+      <Table loading={q.loading && !q.raw} empty={<EmptyState compact icon={<PackageCheck />} title={t('مفيش استلامات')} />} head={[t('الإذن'), t('المورد'), t('أمر الشراء'), t('فاتورة المورد'), t('المخزن'), t('القيمة'), t('إمتى'), '']} rows={q.items.map((r) => [
           <button className="num font-bold hover:text-[var(--primary)]" data-fb={`receipts:open:${r.id}`} onClick={() => setOpen(r.id)}>{r.number}</button>,
           <span className="font-bold">{r.supplierName}</span>, <span className="num text-xs">{r.purchaseOrderNumber ?? t('من غير أمر')}</span>, <span className="num text-xs">{r.supplierInvoiceNo ?? '—'}</span>,
           <span className="text-xs">{r.warehouse.name}</span>, <Money v={r.total} className="text-xs" />, <span className="text-xs">{dateTime(r.at)} · {r.userName}</span>,
           r.state === 'REVERSED' ? <Pill tone="error">{t('اتلغى')}</Pill> : Number(r.returnedValue) > 0 ? <Pill tone="warning">{t('فيه مرتجع')}</Pill> : <Pill tone="success">{t('متسجل')}</Pill>,
         ])} />
-      )}
       {creating && <ReceiveDialog onClose={() => setCreating(false)} onDone={(id) => { setCreating(false); setOpen(id); }} />}
       <ReceiptView id={open} onClose={() => setOpen(null)} />
     </div>
@@ -163,12 +161,10 @@ function ReturnList({ branchId }: { branchId?: string }) {
   return (
     <div className="space-y-3">
       <div className="flex justify-end"><Button variant="primary" data-fb="supplier-returns:new" onClick={() => setOpen(true)}><Undo2 className="w-4 h-4" />{t('مرتجع جديد')}</Button></div>
-      {q.loading && !q.raw ? <Spinner /> : q.items.length === 0 ? <Empty icon={<Undo2 className="w-10 h-10" />} text={t('مفيش مرتجعات للموردين')} /> : (
-        <Table head={[t('الرقم'), t('المورد'), t('من إذن'), t('الأصناف'), t('السبب'), t('القيمة'), t('إمتى')]} rows={q.items.map((r) => [
+      <Table loading={q.loading && !q.raw} empty={<EmptyState compact icon={<Undo2 />} title={t('مفيش مرتجعات للموردين')} />} head={[t('الرقم'), t('المورد'), t('من إذن'), t('الأصناف'), t('السبب'), t('القيمة'), t('إمتى')]} rows={q.items.map((r) => [
           <span className="num font-bold">{r.number}</span>, <span className="font-bold">{r.supplierName}</span>, <span className="num text-xs">{r.receiptNumber ?? '—'}</span>,
           <span className="text-xs">{r.lines.map((l: any) => `${L(l.name)} ${fmtQty(l.quantity)} ${unitLabel(l.unit)}`).join('، ')}</span>, <span className="text-xs">{r.reason}</span>, <Money v={r.total} className="text-xs" />, <span className="text-xs">{dateTime(r.at)} · {r.userName}</span>,
         ])} />
-      )}
       {open && <SupplierReturnDialog onClose={() => setOpen(false)} />}
     </div>
   );
