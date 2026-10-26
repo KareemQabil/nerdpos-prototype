@@ -9,6 +9,8 @@ import { t, L } from '../../i18n';
 import { money, dateTime, cn } from '../../lib/format';
 import { clock, businessDate } from '../../mock/clock';
 import { metricLabel, isMetricId, SECTION_COLUMNS, codeLabel } from './output/labels';
+import { SalesOverview, ExportButtons, Schedules } from '../ops/ReportExtras';
+import { Tech } from '../../app/tech';
 
 const MONEY_RE = /^-?\d+\.\d{4}$/;
 const NA = 'CAPABILITY_NOT_AVAILABLE';
@@ -30,7 +32,7 @@ function ReportSection({ s }: { s: any }) {
   const cols: string[] = s.columns ?? SECTION_COLUMNS[s.id] ?? Array.from({ length: width }, (_, i) => String(i + 1));
   const isSummary = !s.columns && rows.length > 0 && rows.every((r) => r.length === 2 && isMetricId(r[0]));
   return (
-    <Card title={<span>{L(s.title)} <span className="num text-[11px] text-dim font-normal">{s.id}</span></span>} className="min-w-0">
+    <Card title={<span>{L(s.title)} <Tech><span className="num text-[11px] text-dim font-normal">{s.id}</span></Tech></span>} className="min-w-0">
       {rows.length === 0 ? <div className="text-sm text-dim py-2">{t('مفيش بيانات في الفترة دي')}</div> : isSummary ? (
         <div className="grid sm:grid-cols-2 gap-2">
           {rows.map((r, i) => (
@@ -80,12 +82,14 @@ export default function Reports() {
 
   return (
     <div className="space-y-4" data-screen-id="H1">
-      <Section title={t('التقارير')} badge={<StateBadge ops={['Report.List', 'Report.Run']} />}
+      <Section title={t('التقارير')} badge={<StateBadge ops={['Report.List', 'Report.Run', 'Report.Trend', 'Report.Export', 'Report.Schedule']} />}
         sub={t('تقارير اليوم التجاري (من 04:00 لـ 04:00 بتوقيت القاهرة) — قراءة بس، عمرها ما بتغير حاجة. التقارير اللي بتظهر هي اللي صلاحيتك بتسمح بيها.')}
         actions={<>
           <Button size="sm" variant="outline" loading={exporting} onClick={exportCsv} data-fb="reports:accountant-export"><Download className="w-4 h-4" />{t('ملف المحاسب (CSV)')} <StateBadge state="PROPOSED" /></Button>
           <Button size="sm" variant="ghost" onClick={() => run.refetch()} data-fb="reports:refresh"><RefreshCw className="w-4 h-4" />{t('تحديث')}</Button>
         </>} />
+
+      <SalesOverview />
 
       <Card>
         {list.loading && !list.data ? <Spinner /> : reports.length === 0 ? <Empty text={t('مفيش تقارير مسموحة للمستخدم ده')} /> : (
@@ -107,7 +111,7 @@ export default function Reports() {
         )}
       </Card>
 
-      {run.error && <Banner tone="error">{errorText(run.error)} <span className="num text-xs">({run.error.code})</span></Banner>}
+      {run.error && <Banner tone="error">{errorText(run.error)} <Tech><span className="num text-xs">({run.error.code})</span></Tech></Banner>}
       {run.loading && !r && <Spinner />}
       {r && (
         <div className="space-y-3" data-fb="reports:result">
@@ -117,6 +121,8 @@ export default function Reports() {
             <Pill tone="neutral"><span className="num">{r.period.from}{r.period.to !== r.period.from ? ` → ${r.period.to}` : ''}</span></Pill>
             {r.provisional ? <Pill tone="warning" title="provisional">{t('مبدئي — اليوم لسه ما خلصش أو فيه وردية مفتوحة')}</Pill> : <Pill tone="success">{t('نهائي للفترة')}</Pill>}
             <span className="text-xs text-dim">{t('لحد')} {dateTime(r.asOf)}</span>
+            <span className="flex-1" />
+            <ExportButtons reportId={reportId} from={from} to={isRange ? to : from} />
           </div>
           {r.provisional && <Banner tone="warning"><span className="flex items-center gap-1"><AlertTriangle className="w-4 h-4" />{t('الأرقام ممكن تتغير: فيه وردية مفتوحة أو اليوم التجاري لسه ما انتهاش بتوقيت الفرع. تقرير Z بتاع الوردية هو المرجع.')}</span></Banner>}
           {r.note && <Banner tone="info"><span className="flex items-center gap-1"><Info className="w-4 h-4" />{L(r.note)}</span></Banner>}
@@ -126,6 +132,7 @@ export default function Reports() {
           <div className="text-[11px] text-dim">{t('الخدمة مقياس لوحده ومش جوه صافي المبيعات. وسائل الدفع عمرها ما بتتسمى مبيعات. المرتجعات بتتحسب يوم صرفها. أي مقياس مش متاح بيظهر "مش متاح" مش صفر.')}</div>
         </div>
       )}
+      {reports.length > 0 && <Schedules reports={reports} />}
     </div>
   );
 }

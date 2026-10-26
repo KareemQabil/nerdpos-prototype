@@ -41,7 +41,7 @@ function OpenShift() {
         <Field label={t('رصيد الفكة الافتتاحي')}><Input value={float} onChange={(e) => setFloat(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" className="text-xl w-40" data-fb="opening-float" /></Field>
         <Button variant="primary" size="lg" loading={busy} onClick={() => run('Session.Open', { body: { terminalId: terminal!.id, openingFloat: float } }, { success: t('الوردية اتفتحت') })} data-fb="open-shift">{t('افتح الوردية')}</Button>
       </div>
-      <div className="text-[11px] text-dim mt-2">{t('وردية واحدة مفتوحة لكل جهاز درج (SESSION_ALREADY_OPEN). شيكات الصالة ممكن تتحصل على أي درج مفتوح في الفرع.')}</div>
+      <div className="text-[11px] text-dim mt-2">{t('كل جهاز درج عليه وردية واحدة مفتوحة بس. شيكات الصالة ممكن تتحصل على أي درج مفتوح في الفرع.')}</div>
     </Card>
   );
 }
@@ -64,7 +64,7 @@ function OpenSession({ sid, onZ }: { sid: string; onZ: (id: string) => void }) {
             <Button variant="warning" className="col-span-2" onClick={() => setDlg('close')} data-fb="close-shift"><Lock className="w-4 h-4" />{t('قفل الوردية (عد الدرج)')}</Button>
           </div>
         </div>
-        {ses.durationWarning && <Banner tone="warning"><AlertTriangle className="w-4 h-4 inline" /> {t('الوردية مفتوحة من وقت طويل (SessionDurationPolicy)')}</Banner>}
+        {ses.durationWarning && <Banner tone="warning"><AlertTriangle className="w-4 h-4 inline" /> {t('الوردية مفتوحة من وقت طويل — اقفلها وافتح وردية جديدة')}</Banner>}
         <OpenOrders sid={ses.id} />
         <div className="mt-3">
           <Table head={[t('الوقت'), t('النوع'), t('المبلغ'), t('السبب'), t('المرجع')]} rows={ses.cashEntries.slice().reverse().map((e: any) => [<span className="num text-xs">{time(e.at)}</span>, kindLabel(e.kind), <Money v={e.amount} />, e.reasonCode ?? '', <span className="num text-xs">{e.ref ?? ''}{e.approvalGrantId ? ' · ✓' : ''}</span>])} />
@@ -95,7 +95,7 @@ function CashMoveDialog({ ses, onClose }: { ses: any; onClose: () => void }) {
         <Field label={t('المبلغ')}><Input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" /></Field>
         <Field label={t('السبب')}><Select value={rc} onChange={(e) => setRc(e.target.value)} options={[{ value: '', label: t('اختار') }, ...reasons.map((r) => ({ value: r.code, label: `${L(r.label)}${r.requiresNote ? ' *' : ''}` }))]} /></Field>
         <Field label={t('ملاحظة')}><Input value={note} onChange={(e) => setNote(e.target.value)} /></Field>
-        <div className="text-[11px] text-dim">{t('الموافقة حسب CASH_MOVE (الافتراضي: أي مبلغ فوق 0.00 محتاج مدير).')}</div>
+        <div className="text-[11px] text-dim">{t('أي حركة فلوس من الدرج محتاجة موافقة مدير (حسب إعدادات الموافقات).')}</div>
       </div>
     </Modal>
   );
@@ -111,7 +111,7 @@ function NoSaleDialog({ ses, onClose }: { ses: any; onClose: () => void }) {
       <div className="space-y-3">
         <Field label={t('السبب')}><Select value={rc} onChange={(e) => setRc(e.target.value)} options={[{ value: '', label: t('اختار') }, ...reasons.map((r) => ({ value: r.code, label: L(r.label) }))]} /></Field>
         <Field label={t('ملاحظة')}><Input value={note} onChange={(e) => setNote(e.target.value)} /></Field>
-        <div className="text-[11px] text-dim">{t('مفيش فلوس بتتحرك، بس الفتحة بتتسجل في تقرير الاستثناءات. الموافقة حسب DRAWER_NO_SALE (الافتراضي: مش محتاجة).')}</div>
+        <div className="text-[11px] text-dim">{t('مفيش فلوس بتتحرك، بس الفتحة بتتسجل في تقرير الاستثناءات. الموافقة حسب إعدادات الموافقات (الافتراضي: مش محتاجة).')}</div>
       </div>
     </Modal>
   );
@@ -164,11 +164,11 @@ function CloseDialog({ ses, onClose, onZ }: { ses: any; onClose: () => void; onZ
   return (
     <Modal open onClose={onClose} title={t('قفل الوردية')} badge={<StateBadge ops={['Session.Close', 'Approval.Grant']} />} footer={<Button variant="warning" loading={busy} disabled={!counted} onClick={close}>{t('اقفل')}</Button>}>
       <div className="space-y-3">
-        {blind.data?.value !== false ? <Banner tone="info">{t('إقفال أعمى: اعد الدرج واكتب المبلغ من غير ما تشوف المتوقع (BlindClosePolicy). الفرق بيطلع من السيرفر بعد القفل.')}</Banner> : <Banner tone="warning">{t('الإقفال الأعمى مقفول: المتوقع')} {x.data?.expectedCash ? money(x.data.expectedCash) : '—'}</Banner>}
+        {blind.data?.value !== false ? <Banner tone="info">{t('إقفال أعمى: اعد الدرج واكتب المبلغ من غير ما تشوف المتوقع . الفرق بيطلع من السيرفر بعد القفل.')}</Banner> : <Banner tone="warning">{t('الإقفال الأعمى مقفول: المتوقع')} {x.data?.expectedCash ? money(x.data.expectedCash) : '—'}</Banner>}
         <Field label={t('الكاش المعدود في الدرج')}><Input value={counted} onChange={(e) => setCounted(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" className="text-2xl" data-fb="counted-cash" /></Field>
         <Field label={t('ملاحظة (لو في فرق)')}><Textarea value={note} onChange={(e) => setNote(e.target.value)} /></Field>
         <OpenOrders sid={ses.id} warn />
-        <div className="text-[11px] text-dim">{t('الفرق فوق حد SESSION_VARIANCE بيطلب موافقة مدير. شيكات الصالة المأكدة والمش مدفوعة مش بتمنع القفل — بتظهر في Z كشيكات مفتوحة. طلبات التيك أواي المفتوحة على الوردية دي بتمنع (SESSION_HAS_OPEN_ORDERS).')}</div>
+        <div className="text-[11px] text-dim">{t('لو فيه فرق في العد، لازم مدير يوافق. شيكات الصالة المأكدة والمش مدفوعة مش بتمنع القفل — بتظهر في Z كشيكات مفتوحة. طلبات التيك أواي المفتوحة على الوردية دي بتمنع (SESSION_HAS_OPEN_ORDERS).')}</div>
       </div>
     </Modal>
   );
@@ -180,7 +180,7 @@ function TipsDialog({ ses, onClose }: { ses: any; onClose: () => void }) {
   return (
     <Modal open onClose={onClose} title={t('توزيع البقشيش')} badge={<StateBadge ops={['Tip.Distribute']} />} footer={<Button variant="primary" loading={busy} onClick={async () => setRes(await run('Tip.Distribute', { params: { sessionId: ses.id }, body: {} }, { success: t('البقشيش اتوزع') }))}>{t('وزّع')}</Button>}>
       <div className="space-y-3 text-sm">
-        <Banner tone="info">{t('البقشيش فلوس لوحدها مش مبيعات. TipPolicy لازم تكون ON (من لوحة الإعدادات) عشان يظهر في الدفع. التوزيع حسب TipDistributionPolicy (لكل ويتر أو صندوق مشترك).')}</Banner>
+        <Banner tone="info">{t('البقشيش فلوس لوحدها مش مبيعات. لازم البقشيش يكون شغال من الإعدادات عشان يظهر في الدفع. التوزيع حسب TipDistributionPolicy (لكل ويتر أو صندوق مشترك).')}</Banner>
         {res && <div><b>{res.mode}</b> · {t('الإجمالي')} <Money v={res.total} />{res.lines.map((l: any) => <div key={l.userId} className="flex justify-between"><span>{l.name}</span><Money v={l.amount} /></div>)}</div>}
       </div>
     </Modal>

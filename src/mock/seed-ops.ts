@@ -156,6 +156,10 @@ export function seedOps(db: DB, nowMs: number) {
     sched('rs_1', 'daily_sales', 'مبيعات اليوم', 'Daily sales', 'DAILY', null, '04:30', ['أ. محمود (المالك)', 'أ. هاني (المحاسب)'], 'XLSX'),
     sched('rs_2', 'products', 'الأصناف', 'Products', 'WEEKLY', 6, '10:00', ['شيف حسن'], 'CSV'),
   ];
+  // promotions with the full model (buy X get Y with a code, item discount at night)
+  const P = db.promotions as any[];
+  if (!P.some((x) => x.id === 'promo_bxgy')) P.push({ id: 'promo_bxgy', name: { ar: 'اشتري 2 شاورما والتالتة ببلاش', en: 'Buy 2 shawarma, 3rd free' }, kind: 'CODED', code: 'SHAWARMA3', codes: ['SHAWARMA3'], benefitType: 'PERCENTAGE', benefitValue: '100', branchIds: ['branch_main'], channels: ['DINE_IN', 'TAKEAWAY', 'DELIVERY'], minSubtotal: null, schedule: null, dayparts: [], validFrom: null, validTo: null, active: true, version: 1, mechanic: 'BUY_X_GET_Y', productIds: ['p_chicken_shawarma'], categoryIds: [], buyQty: 2, getQty: 1, getPercent: '100', getProductIds: [], getCategoryIds: [], maxDiscount: null, maxUses: null, maxUsesPerDay: 30, stacking: 'EXCLUSIVE', priority: 50 });
+  if (!P.some((x) => x.id === 'promo_late_desserts')) P.push({ id: 'promo_late_desserts', name: { ar: 'حلويات آخر الليل 15%', en: 'Late-night desserts 15%' }, kind: 'AUTOMATIC', code: null, codes: [], benefitType: 'PERCENTAGE', benefitValue: '15', branchIds: ['branch_main'], channels: ['DINE_IN', 'TAKEAWAY'], minSubtotal: null, schedule: { days: [0, 1, 2, 3, 4, 5, 6], start: '22:00', end: '02:00' }, dayparts: [{ days: [0, 1, 2, 3, 4, 5, 6], start: '22:00', end: '02:00' }], validFrom: null, validTo: null, active: true, version: 1, mechanic: 'ITEMS', productIds: [], categoryIds: ['cat_desserts'], buyQty: 1, getQty: 1, getPercent: '100', getProductIds: [], getCategoryIds: [], maxDiscount: null, maxUses: null, maxUsesPerDay: null, stacking: 'EXCLUSIVE', priority: 80 });
   db.reportExports = [];
   db.approvalRequests = [];
   db.offlineItems = [];
