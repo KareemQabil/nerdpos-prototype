@@ -7,6 +7,7 @@ import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Banner, Button, Card, Field, Input, KV, Money, Pill, Section, Select, StateBadge, Switch, Table, Tabs } from '../../ui';
 import { Tech } from '../../app/tech';
 import { t, L } from '../../i18n';
+import { branchLabel } from '../../demo/people';
 import { cn, dateTime, money } from '../../lib/format';
 import { CHANNELS, Check, PolicyChip, Radio, cairoLocal, cairoLocalToIso, channelLabel, ruleText, serverNow, useItems, usePolicy, type ChannelId } from './catalog/common';
 
@@ -39,9 +40,9 @@ export default function Prices() {
       <div className="flex flex-wrap gap-3 items-end my-4">
         <Tabs<Tab> value={tab} onChange={setTab} tabs={[{ id: 'product', label: t('سعر صنف') }, { id: 'bulk', label: <span className="inline-flex items-center gap-1"><Wand2 className="w-3.5 h-3.5" />{t('تغيير جماعي')}</span> }, { id: 'batches', label: t('التغييرات الجماعية') }]} />
         <div className="flex-1" />
-        <Field label={t('الفرع')} className="w-56"><Select data-fb="prices:branch" value={branchId} onChange={(e) => setBranchId(e.target.value)} options={branches.items.map((b) => ({ value: b.id, label: b.name }))} /></Field>
+        <Field label={t('الفرع')} className="w-56"><Select data-fb="prices:branch" value={branchId} onChange={(e) => setBranchId(e.target.value)} options={branches.items.map((b) => ({ value: b.id, label: branchLabel(b) }))} /></Field>
       </div>
-      {tab === 'product' && branchId && <ProductPrices branchId={branchId} branchName={branches.items.find((b) => b.id === branchId)?.name} sched={sched} />}
+      {tab === 'product' && branchId && <ProductPrices branchId={branchId} branchName={branchLabel(branches.items.find((b) => b.id === branchId))} sched={sched} />}
       {tab === 'bulk' && <BulkChange branchId={branchId} branches={branches.items} sched={sched} onDone={() => setTab('batches')} />}
       {tab === 'batches' && <Batches />}
     </div>
@@ -250,7 +251,7 @@ function BulkChange({ branchId, branches, sched, onDone }: { branchId: string; b
         <div className="space-y-3">
           <Field label={t('الأقسام')} hint={t('ولا واحد = كل الأقسام')}><div className="flex flex-wrap gap-1.5">{cats.items.map((c) => <Check key={c.id} fb={`bulk:cat:${c.id}`} checked={catIds.includes(c.id)} onChange={(on) => setCatIds(on ? [...catIds, c.id] : catIds.filter((x) => x !== c.id))}>{L(c.name)}</Check>)}</div></Field>
           <Field label={t('القنوات')}><div className="flex flex-wrap gap-1.5">{CHANNELS.map((c) => <Check key={c} fb={`bulk:channel:${c}`} checked={channels.includes(c)} onChange={(on) => setChannels(on ? [...channels, c] : channels.filter((x) => x !== c))}>{channelLabel(c)}</Check>)}</div></Field>
-          <Field label={t('الفروع')}><div className="flex flex-wrap gap-1.5">{branches.map((b) => <Check key={b.id} checked={branchIds.includes(b.id)} onChange={(on) => setBranchIds(on ? [...branchIds, b.id] : branchIds.filter((x) => x !== b.id))}>{b.name}</Check>)}</div></Field>
+          <Field label={t('الفروع')}><div className="flex flex-wrap gap-1.5">{branches.map((b) => <Check key={b.id} checked={branchIds.includes(b.id)} onChange={(on) => setBranchIds(on ? [...branchIds, b.id] : branchIds.filter((x) => x !== b.id))}>{branchLabel(b)}</Check>)}</div></Field>
           <Switch checked={includeVariants} onChange={setIncludeVariants} label={t('يشمل الأسعار الخاصة بالأحجام')} />
           <div className="grid grid-cols-2 gap-3">
             <Field label={t('النوع')}><Radio<'PERCENT' | 'FIXED'> fb="bulk:mode" value={mode} onChange={setMode} options={[{ value: 'PERCENT', label: t('نسبة %') }, { value: 'FIXED', label: t('مبلغ') }]} /></Field>
@@ -285,7 +286,7 @@ function BulkChange({ branchId, branches, sched, onDone }: { branchId: string; b
                 <tbody>
                   {rows.map((r: any, i: number) => (
                     <tr key={i} className={cn('border-t line', r.skipped && 'opacity-50')}>
-                      <td className="px-3 py-1.5">{L(r.name)}{r.variantName ? <span className="text-dim"> · {L(r.variantName)}</span> : null}{branchIds.length > 1 && <div className="text-[10px] text-dim">{branches.find((b) => b.id === r.branchId)?.name}</div>}</td>
+                      <td className="px-3 py-1.5">{L(r.name)}{r.variantName ? <span className="text-dim"> · {L(r.variantName)}</span> : null}{branchIds.length > 1 && <div className="text-[10px] text-dim">{branchLabel(branches.find((b) => b.id === r.branchId))}</div>}</td>
                       <td className="px-3 py-1.5 text-xs">{channelLabel(r.channel)}</td>
                       <td className="px-3 py-1.5 num">{money(r.oldAmount, false)}</td>
                       <td className="px-3 py-1.5 num font-bold">{money(r.newAmount, false)}</td>

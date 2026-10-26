@@ -8,6 +8,9 @@ import { t, L } from '../i18n';
 import { money, time, dateTime } from '../lib/format';
 import { useReasons } from './order/CheckPanel';
 import { TransferSessionDialog } from './ops/TransferSessionDialog';
+import { METHOD_AR } from './ops/BusinessDay';
+import { deviceName } from '../demo/people';
+import { store } from '../mock/store';
 import { ArrowRightLeft } from 'lucide-react';
 
 export default function Shift() {
@@ -17,11 +20,11 @@ export default function Shift() {
   const [z, setZ] = useState<string | null>(null);
   return (
     <div data-screen="E1–E3" className="space-y-4">
-      <Section title={t('الوردية والدرج')} badge={<StateBadge ops={['Session.Open', 'Cash.Move', 'Drawer.OpenNoSale', 'Session.XReport', 'Session.Close', 'Session.ZReport']} />} sub={terminal?.drawer ? `${terminal.code} · ${terminal.name}` : t('الجهاز ده من غير درج — تقارير الورديات بس')} />
+      <Section title={t('الوردية والدرج')} badge={<StateBadge ops={['Session.Open', 'Cash.Move', 'Drawer.OpenNoSale', 'Session.XReport', 'Session.Close', 'Session.ZReport']} />} sub={terminal?.drawer ? deviceName(terminal.id, terminal.kind, terminal.name) : t('الجهاز ده من غير درج — تقارير الورديات بس')} />
       {terminal?.drawer && (cur.data ? <OpenSession sid={cur.data.id} onZ={setZ} /> : !cur.loading && <OpenShift />)}
       <Card title={t('الورديات')}>
         <Table head={[t('الجهاز'), t('الكاشير'), t('الحالة'), t('اليوم التجاري'), t('فتحت'), t('اتقفلت'), t('الفرق'), '']} rows={(past.data?.items ?? []).map((s: any) => [
-          <span className="num">{s.terminalCode}</span>, s.cashierName, <Pill tone={s.state === 'OPEN' ? 'success' : 'neutral'}>{s.state === 'OPEN' ? t('مفتوحة') : t('مقفولة')}</Pill>, <span className="num">{s.businessDate}</span>, <span className="num text-xs">{dateTime(s.openedAt)}</span>, <span className="num text-xs">{dateTime(s.closedAt)}</span>,
+          deviceName(s.terminalId), s.cashierName, <Pill tone={s.state === 'OPEN' ? 'success' : 'neutral'}>{s.state === 'OPEN' ? t('مفتوحة') : t('مقفولة')}</Pill>, <span className="num">{s.businessDate}</span>, <span className="num text-xs">{dateTime(s.openedAt)}</span>, <span className="num text-xs">{dateTime(s.closedAt)}</span>,
           s.close ? <Money v={s.close.variance} tone={s.close.variance === '0.0000' ? 'success' : 'error'} /> : '—',
           s.state === 'CLOSED' && <Button size="sm" onClick={() => setZ(s.id)}><FileText className="w-3.5 h-3.5" />Z</Button>,
         ])} />
@@ -67,7 +70,7 @@ function OpenSession({ sid, onZ }: { sid: string; onZ: (id: string) => void }) {
         {ses.durationWarning && <Banner tone="warning"><AlertTriangle className="w-4 h-4 inline" /> {t('الوردية مفتوحة من وقت طويل — اقفلها وافتح وردية جديدة')}</Banner>}
         <OpenOrders sid={ses.id} />
         <div className="mt-3">
-          <Table head={[t('الوقت'), t('النوع'), t('المبلغ'), t('السبب'), t('المرجع')]} rows={ses.cashEntries.slice().reverse().map((e: any) => [<span className="num text-xs">{time(e.at)}</span>, kindLabel(e.kind), <Money v={e.amount} />, e.reasonCode ?? '', <span className="num text-xs">{e.ref ?? ''}{e.approvalGrantId ? ' · ✓' : ''}</span>])} />
+          <Table head={[t('الوقت'), t('النوع'), t('المبلغ'), t('السبب'), t('المرجع')]} rows={ses.cashEntries.slice().reverse().map((e: any) => [<span className="num text-xs">{time(e.at)}</span>, kindLabel(e.kind), <Money v={e.amount} />, e.reasonCode ? (L(store.db.reasonCodes.find((x) => x.code === e.reasonCode)?.label) || e.reason || '') : (e.reason ?? ''), <span className="num text-xs">{e.ref ?? ''}{e.approvalGrantId ? ' · ✓' : ''}</span>])} />
         </div>
       </Card>
       {dlg === 'move' && <CashMoveDialog ses={ses} onClose={() => setDlg(null)} />}
@@ -120,9 +123,9 @@ function NoSaleDialog({ ses, onClose }: { ses: any; onClose: () => void }) {
 export function ReportView({ r, z }: { r: any; z?: boolean }) {
   return (
     <div className="space-y-3 text-sm">
-      <KV rows={[[t('الجهاز'), <span className="num">{r.terminalCode}</span>], [t('الكاشير'), r.cashierName], [t('اليوم التجاري'), <span className="num">{r.businessDate}</span>], [t('الفكة'), <Money v={r.openingFloat} />]]} />
-      <div><b>{t('وسائل الدفع')}</b>{Object.keys(r.tenderBreakdown).length === 0 && <div className="text-dim text-xs">—</div>}{Object.entries(r.tenderBreakdown).map(([k, v]) => <div key={k} className="flex justify-between"><span>{k}</span><Money v={v as string} /></div>)}</div>
-      {Object.keys(r.refundBreakdown ?? {}).length > 0 && <div><b>{t('المرتجعات')}</b>{Object.entries(r.refundBreakdown).map(([k, v]) => <div key={k} className="flex justify-between"><span>{k}</span><Money v={v as string} /></div>)}</div>}
+      <KV rows={[[t('الجهاز'), deviceName(r.terminalCode)], [t('الكاشير'), r.cashierName], [t('اليوم التجاري'), <span className="num">{r.businessDate}</span>], [t('الفكة'), <Money v={r.openingFloat} />]]} />
+      <div><b>{t('وسائل الدفع')}</b>{Object.keys(r.tenderBreakdown).length === 0 && <div className="text-dim text-xs">—</div>}{Object.entries(r.tenderBreakdown).map(([k, v]) => <div key={k} className="flex justify-between"><span>{t(METHOD_AR[k] ?? k)}</span><Money v={v as string} /></div>)}</div>
+      {Object.keys(r.refundBreakdown ?? {}).length > 0 && <div><b>{t('المرتجعات')}</b>{Object.entries(r.refundBreakdown).map(([k, v]) => <div key={k} className="flex justify-between"><span>{t(METHOD_AR[k] ?? k)}</span><Money v={v as string} /></div>)}</div>}
       <div><b>{t('حركات الكاش')}</b>{Object.entries(r.cashByKind).map(([k, v]) => <div key={k} className="flex justify-between"><span>{kindLabel(k)}</span><Money v={v as string} /></div>)}</div>
       {r.tips && r.tips !== '0.0000' && <div className="flex justify-between"><span>{t('البقشيش (مش مبيعات)')}</span><Money v={r.tips} /></div>}
       <div className="border-t line pt-2 space-y-1">
@@ -168,7 +171,7 @@ function CloseDialog({ ses, onClose, onZ }: { ses: any; onClose: () => void; onZ
         <Field label={t('الكاش المعدود في الدرج')}><Input value={counted} onChange={(e) => setCounted(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" className="text-2xl" data-fb="counted-cash" /></Field>
         <Field label={t('ملاحظة (لو في فرق)')}><Textarea value={note} onChange={(e) => setNote(e.target.value)} /></Field>
         <OpenOrders sid={ses.id} warn />
-        <div className="text-[11px] text-dim">{t('لو فيه فرق في العد، لازم مدير يوافق. شيكات الصالة المأكدة والمش مدفوعة مش بتمنع القفل — بتظهر في Z كشيكات مفتوحة. طلبات التيك أواي المفتوحة على الوردية دي بتمنع (SESSION_HAS_OPEN_ORDERS).')}</div>
+        <div className="text-[11px] text-dim">{t('لو فيه فرق في العد، لازم مدير يوافق. شيكات الصالة المأكدة والمش مدفوعة مش بتمنع القفل — بتظهر في Z كشيكات مفتوحة. طلبات التيك أواي المفتوحة على الوردية دي لازم تتحصل أو تتنقل لدرج تاني الأول.')}</div>
       </div>
     </Modal>
   );
@@ -180,8 +183,8 @@ function TipsDialog({ ses, onClose }: { ses: any; onClose: () => void }) {
   return (
     <Modal open onClose={onClose} title={t('توزيع البقشيش')} badge={<StateBadge ops={['Tip.Distribute']} />} footer={<Button variant="primary" loading={busy} onClick={async () => setRes(await run('Tip.Distribute', { params: { sessionId: ses.id }, body: {} }, { success: t('البقشيش اتوزع') }))}>{t('وزّع')}</Button>}>
       <div className="space-y-3 text-sm">
-        <Banner tone="info">{t('البقشيش فلوس لوحدها مش مبيعات. لازم البقشيش يكون شغال من الإعدادات عشان يظهر في الدفع. التوزيع حسب TipDistributionPolicy (لكل ويتر أو صندوق مشترك).')}</Banner>
-        {res && <div><b>{res.mode}</b> · {t('الإجمالي')} <Money v={res.total} />{res.lines.map((l: any) => <div key={l.userId} className="flex justify-between"><span>{l.name}</span><Money v={l.amount} /></div>)}</div>}
+        <Banner tone="info">{t('البقشيش فلوس لوحدها مش مبيعات. لازم البقشيش يكون شغال من الإعدادات عشان يظهر في الدفع. التوزيع حسب الإعدادات: لكل ويتر بتاعه أو صندوق مشترك.')}</Banner>
+        {res && <div><b>{res.mode === 'POOLED' ? t('صندوق مشترك') : t('لكل ويتر بتاعه')}</b> · {t('الإجمالي')} <Money v={res.total} />{res.lines.map((l: any) => <div key={l.userId} className="flex justify-between"><span>{l.name}</span><Money v={l.amount} /></div>)}</div>}
       </div>
     </Modal>
   );

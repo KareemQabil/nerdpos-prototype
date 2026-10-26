@@ -6,6 +6,7 @@ import { useCommand, useDev, useQuery } from '../../../app/hooks';
 import { Banner, Button, Card, Field, Input, KV, Modal, Money, Pill, Select, Spinner, StateBadge, Switch, Textarea, Tabs, toast } from '../../../ui';
 import { Tech } from '../../../app/tech';
 import { t, L } from '../../../i18n';
+import { branchLabel } from '../../../demo/people';
 import { dateTime } from '../../../lib/format';
 import { ALLERGENS, Check, LocInputs, Radio, Swatch, allergenLabel, availabilityLabel, availabilityTone, channelLabel, useDebounced, useItems, usePolicy } from './common';
 import { ImageInput } from '../../menu/parts';
@@ -347,7 +348,7 @@ function AvailabilityTab({ p }: { p: any }) {
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div className="space-y-3">
         <KV rows={[
-          [t('الفرع'), branch?.name ?? '—'],
+          [t('الفرع'), branch ? branchLabel(branch) : '—'],
           [t('الحالة دلوقتي'), <Pill tone={availabilityTone(p.availability?.state)}>{availabilityLabel(p.availability?.state)}{p.availability?.soldOutFor ? ' · ' + t('النهارده بس') : ''}</Pill>],
           [t('السبب'), p.availability?.reason ?? '—'],
         ]} />

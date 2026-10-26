@@ -7,6 +7,7 @@ import { useCommand, useQuery } from '../../app/hooks';
 import { Banner, Button, Card, Field, Input, Modal, Pill, StateBadge, Switch, Tabs } from '../../ui';
 import { Tech } from '../../app/tech';
 import { t, L } from '../../i18n';
+import { branchLabel } from '../../demo/people';
 import { cn } from '../../lib/format';
 import { CHANNELS, Check, LocInputs, Radio, channelLabel, useItems } from '../admin/catalog/common';
 import { dayName, daysText, timeText } from './parts';
@@ -91,7 +92,7 @@ export function MenusAdmin() {
               </div>
               <div className="flex flex-wrap gap-1">{m.channels.map((c: string) => <Pill key={c} tone="primary">{channelLabel(c)}</Pill>)}</div>
               <div className="text-xs text-soft flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-dim" />{m.daypartIds.length ? m.daypartIds.map(dpName).join('، ') : t('طول اليوم')}</div>
-              <div className="text-xs text-soft flex items-center gap-1.5"><Store className="w-3.5 h-3.5 text-dim" />{m.branchIds.length ? m.branchIds.map((b: string) => branches.items.find((x) => x.id === b)?.name ?? b).join('، ') : t('كل الفروع')}</div>
+              <div className="text-xs text-soft flex items-center gap-1.5"><Store className="w-3.5 h-3.5 text-dim" />{m.branchIds.length ? m.branchIds.map((b: string) => branchLabel(branches.items.find((x) => x.id === b)) || b).join('، ') : t('كل الفروع')}</div>
               <div className="text-xs text-dim">{content(m)}</div>
             </div>
           ))}
@@ -124,7 +125,7 @@ export function MenusAdmin() {
               <LocInputs value={menu.name} onChange={(name) => setMenu({ ...menu, name })} fb="menu" />
               <Field label={t('القنوات')}><div className="flex flex-wrap gap-1.5">{CHANNELS.map((c) => <Check key={c} fb={`menu:channel:${c}`} checked={menu.channels.includes(c)} onChange={(on) => setMenu({ ...menu, channels: on ? [...menu.channels, c] : menu.channels.filter((x) => x !== c) })}>{channelLabel(c)}</Check>)}</div></Field>
               <Field label={t('الفترات')} hint={t('ولا واحدة = طول اليوم')}><div className="flex flex-wrap gap-1.5">{dayparts.map((x) => <Check key={x.id} fb={`menu:daypart:${x.id}`} checked={menu.daypartIds.includes(x.id)} onChange={(on) => setMenu({ ...menu, daypartIds: on ? [...menu.daypartIds, x.id] : menu.daypartIds.filter((y) => y !== x.id) })}>{L(x.name)} <span className="num text-[10px]">{x.start}–{x.end}</span></Check>)}</div></Field>
-              <Field label={t('الفروع')} hint={t('ولا واحد = كل الفروع')}><div className="flex flex-wrap gap-1.5">{branches.items.map((b) => <Check key={b.id} checked={menu.branchIds.includes(b.id)} onChange={(on) => setMenu({ ...menu, branchIds: on ? [...menu.branchIds, b.id] : menu.branchIds.filter((y) => y !== b.id) })}>{b.name}</Check>)}</div></Field>
+              <Field label={t('الفروع')} hint={t('ولا واحد = كل الفروع')}><div className="flex flex-wrap gap-1.5">{branches.items.map((b) => <Check key={b.id} checked={menu.branchIds.includes(b.id)} onChange={(on) => setMenu({ ...menu, branchIds: on ? [...menu.branchIds, b.id] : menu.branchIds.filter((y) => y !== b.id) })}>{branchLabel(b)}</Check>)}</div></Field>
               <Switch checked={menu.active} onChange={(v) => setMenu({ ...menu, active: v })} label={menu.active ? t('شغال') : t('مقفول')} />
             </div>
             <div className="space-y-3">
