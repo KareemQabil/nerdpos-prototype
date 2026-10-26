@@ -5,7 +5,7 @@
 
 Legend: **[CONTRACT]** missing or inconsistent in `operations.json` / `errors.json` / `openapi` ·
 **[PROPOSED]** invented by the prototype (badge مقترح) · **[ASSUMED]** a reading of an ambiguous rule ·
-**[DEMO]** shortcut that exists only for the demo.
+**[DEMO]** shortcut that exists only for the demo · **[QUESTION]** needs a product decision.
 
 ---
 
@@ -93,7 +93,7 @@ None of these exist in the contract; each screen that needs them shows the مق�
 
 ## 8. Catalog (from the catalog screens review)
 
-- `Variant.Upsert` contract only has attributes/barcode: no name, price delta or modifier multiplier (sizes/half-and-half shown as مقترح).
+- `Variant.Upsert` contract only has attributes/barcode: no name, price delta or modifier multiplier (now implemented with proposed fields — see section 12).
 - ModifierOption `name` is plain text in the contract while the bilingual UI sends `{ar, en}`.
 - Fields with no contract: category colour, product allergens, `TABLE_TAX` tag, tax exemption, availability across other branches.
 - No product search by name (list filters on the client).
@@ -112,9 +112,73 @@ None of these exist in the contract; each screen that needs them shows the مق�
 - `User.ManageAccess` refuses to remove the last owner (`LAST_OWNER_PROTECTED`); the last active MANAGED reason code of a kind cannot be deactivated.
 - `CONCURRENCY_CONFLICT` has one message for every entity; the Arabic text was made generic ("البيانات دي") instead of naming a check.
 
-## 10. Prototype limitations
+## 10. Inventory & purchasing (round 2)
+
+All 53 inventory/purchasing operations (SPECIFIED / BUILT_ON_MAIN) are simulated.
+
+| # | Gap | What the prototype does |
+|---|---|---|
+| I1 | **[CONTRACT]** A stock item must point at a catalog product; ingredients are not products. | Ingredients are stock-only items whose `productId` points at themselves (never on the menu). Resale items (cans, water) link to a real menu product. |
+| I2 | **[CONTRACT]** `InventoryItem.Configure` has no name, category, purchase packs or shelf life; `SetLevels`, `LowStock`, `Expiring`, `Recipe.Cost`, `Production.Preview` have empty inputs. | Accepted as extra fields / inputs defined by the prototype. |
+| I3 | **[PROPOSED]** No item list and no dashboard read. | `InventoryItem.Find` (GET /inventory/items), `Inventory.Dashboard` (GET /inventory/dashboard). |
+| I4 | **[ASSUMED]** When sales consume stock. | `InventoryEffectTimingPolicy` (proposed, default on confirm) from the branch sales warehouse; idempotent reconcile per order line; void before kitchen start → `SALE_REVERSAL`; after → per `LineVoidDispositionPolicy` as waste. Branch without a sales warehouse → skipped with a dashboard warning. |
+| I5 | **[ASSUMED]** Negative stock. | Sales are never refused (movement flagged). Manual movements follow `NegativeStockPolicy` (proposed, default BLOCK) with a per-item override. |
+| I6 | **[CONTRACT]** Costing method not ratified. | Moving-average cost across all warehouses; lots consumed first-expiry-first-out. |
+| I7 | **[ASSUMED]** Count variance. | counted − (start balance + movements since start), valued at average cost. |
+| I8 | **[CONTRACT]** Transfer shortage rules (PD-V4-06) not available. | Single receive; shortage recorded on the transfer, no movement. |
+| I9 | **[PROPOSED]** Approvals. | `INVENTORY_ADJUST`, `STOCK_COUNT_POST`, `STOCK_WASTE`; `OverReceiptPolicy` REQUIRE_APPROVAL reuses `INVENTORY_ADJUST`. |
+| I10 | **[PROPOSED]** Recipe extensions. | Modifier-option recipes, size scaling by the size's multiplier, combo slots consume the chosen products' recipes. "No/less/extra" levels are not applied to consumption. |
+| I11 | **[ASSUMED]** Customer returns. | RESTOCK puts the recipe back; DISCARD records the return with no movement. |
+| I12 | **[ASSUMED]** Branch scope. | Reads default to the device's branch (with an all-branches toggle); writes are not branch-restricted. |
+
+## 11. Customers, delivery, drivers, loyalty, online orders (round 2)
+
+| # | Gap | What the prototype does |
+|---|---|---|
+| C1 | **[CONTRACT]** Drivers are `access.User` "until PD-V4-13". | Drivers are their own records. |
+| C2 | **[CONTRACT]** `Driver.SettleCash`, `DeliveryZone.Upsert`, `Driver.Upsert`, `LoyaltyTier.Upsert`, `Loyalty.Redeem` are PD_HELD with no inputs. | Inputs designed by the prototype. |
+| C3 | **[PROPOSED]** Missing reads/actions. | `DeliveryZone.List`, `Driver.List`, `LoyaltyTier.List`, `Loyalty.Ledger`, `ExternalOrder.Find/Accept/Reject`, `ChannelItemMap.Set`, `Payment.AuthorizationFind`. |
+| C4 | **[CONTRACT]** INTERNAL permissions. | Mapped to `customer:update`, `delivery:configure`, `delivery:dispatch`, `delivery:settlecash`, `payment:capture`, `loyalty:configure`, `channel:ingest`. |
+| C5 | **[ASSUMED]** Delivery fee & minimum. | `Delivery.Create` adds the zone fee to the check (taxable is a setting) and must run before confirm; the minimum order is checked there. |
+| C6 | **[ASSUMED]** Delivery states. | Contract states (PENDING/ASSIGNED/PICKED_UP/DELIVERED/FAILED/CANCELLED); kitchen stage derived from tickets. Extensions: re-assign from ASSIGNED, `Dispatch` with `driverId` assigns + dispatches, fixed reason codes for `FailAttempt`. |
+| C7 | **[ASSUMED]** Cash on delivery. | The driver holds the cash; settlement records a CASH payment into the settling drawer and closes the order; shortage = drawer pay-out owed by the driver, overage = pay-in. Shift close is blocked while a driver holds cash. |
+| C8 | **[PROPOSED]** Approvals. | `DELIVERY_CANCEL` (after kitchen), `LOYALTY_ADJUST` (> 200 points), `DRIVER_CASH_VARIANCE` (any difference). A paid cancelled order is flagged "refund needed". |
+| C9 | **[PROPOSED]** `LoyaltyProgramPolicy`. | Earn 1 point / 10 EGP of item value after discount (no fee, tax or points-paid part) × tier multiplier; redeem 1 point = 0.25 EGP, min 100 points, max 50% of the check; tiers by lifetime points; redemption is a proposed `LOYALTY` tender (VAT on the full amount). Not handled: expiry, clawback on refund, refunding a points tender. |
+| C10 | **[ASSUMED]** Online/aggregator orders. | Priced from our DELIVERY prices (app price shown for comparison); app-paid = proposed `ONLINE` tender; accepting needs an open drawer on that terminal; required single choices default to the first option. Source names are generic. |
+| C11 | **[ASSUMED]** `Customer.Merge`. | Keeps the customer in the path and folds `sourceCustomerId` in; audited as sensitive, no approval. |
+| C12 | **[PROPOSED]** Validation & errors. | Egyptian mobile validation (`01[0125]` + 8 digits, +20 and Arabic digits normalised) and error codes `CUSTOMER_PHONE_*`, `DELIVERY_*`, `DRIVER_*`, `LOYALTY_*`, `EXTERNAL_*`, `PAYMENT_AUTHORIZATION_*`. |
+
+## 12. Menu & pricing (round 2)
+
+| # | Gap | What the prototype does |
+|---|---|---|
+| M1 | **[PROPOSED]** Operations. | `Menu.Overview`, `Menu.Upsert`, `Daypart.Upsert`, `SoldOut.Board`, `ModifierOption.SetAvailability`, `ModifierGroup.ReorderOptions`, `Product.SetCombo`, `Product.SetHalfAndHalf`, `Catalog.PriceList`, `Catalog.BulkPriceChange` (dry run), `Catalog.PriceChangeBatches`. |
+| M2 | **[CONTRACT]** Fields missing on existing ops. | `Variant.Upsert`: name, priceDelta, modifierMultiplier, sku, calories, isDefault, sortOrder · `Catalog.SetPrice/PriceHistory`: `variantId` · `Product.SetAvailability`: `until: END_OF_BUSINESS_DAY` · `Product.Create/Configure`: calories, image (data URL ≤ 300 KB) · ModifierGroup: kind INGREDIENTS, scalesWithSize, allowHalfPlacement · ModifierOption: isDefault, sortOrder, nestedGroupId, extraPriceDelta · `Catalog.Search`: channel, q · `Pricing.QuoteItem` in: modifierLevels, modifierPlacement, nestedOptionIds, size inside meals; out: variantPrices, taxSplit, display, halfAndHalf, menu · `Catalog.Import`: 5 new sheets. |
+| M3 | **[ASSUMED]** Combo pricing. | The meal price is split over its parts by their own prices (largest remainder) so each part is taxed in its own group; the meal's own add-ons stay on the meal's tax group. |
+| M4 | **[ASSUMED]** Half-and-half. | `HalfAndHalfPricingPolicy` gains `SUM_OF_HALVES`; half toppings cost half. |
+| M5 | **[ASSUMED]** Menus by time/channel. | With menus defined, an item outside every running menu is refused by the server; with no menus, nothing is restricted. |
+| M6 | **[PROPOSED]** Policies. | `SoldOutResetPolicy` (sold-out resets next business day), `MenuPriceDisplayPolicy` (shown as priced / with tax per channel). |
+| M7 | **[ASSUMED]** Tax-inclusive groups. | Tax is extracted from the price (previously it was wrongly added on top); service charge on a tax-inclusive check is still taxed on top. |
+| M8 | **[ASSUMED]** Bulk price change approval. | One `PRICE_CHANGE` approval per batch; context changePercent = the biggest absolute change; target `bulk:<hash>`. |
+
+## 13. Operations & system (round 2)
+
+| # | Gap | What the prototype does |
+|---|---|---|
+| O1 | **[CONTRACT]** `Floor.Upsert`, `Table.MarkClean` are PD_HELD. | Floor plans with sections and positions, table cleaning cycle (`TableTurnPolicy`, proposed; default: opening a table counts as cleaning). |
+| O2 | **[CONTRACT]** INTERNAL permissions. | `Floor.Upsert` table:upsert · `Table.MarkClean` table:release · `Order.TransferSession` session:close · `BusinessDay.Close` session:zreport · `ApprovalRequest.Create` any signed-in user · `Promotion.Upsert` catalog:setprice · `Sync.ResolveConflict` sync:replay · `Report.Export/Schedule` report:run · `Profile.SetCapability` settings:updatepolicy. |
+| O3 | **[PROPOSED]** Operations. | `Floor.List`, `BusinessDay.Readiness`, `BusinessDay.Find`, `ApprovalRequest.Find/Get/Decide/Cancel`, `Report.Trend`, `Report.ScheduleFind`, `Report.ScheduleUpdate`. |
+| O4 | **[ASSUMED]** `Order.TransferSession`. | Only drawer-bound checks; floor checks are refused (collectable at any drawer). Approval action `ORDER_SESSION_TRANSFER` defaults to NEVER. |
+| O5 | **[QUESTION]** Item / buy-X-get-Y promotions. | Allocated over items and service like any check discount — should item promotions skip the service charge? Usage counts open + completed checks per business date. |
+| O6 | **[ASSUMED]** Business day close. | Sales after close and before 04:00 are allowed and shown as "after closing"; days close in order; closing with warnings needs an acknowledgement (approval default NEVER). |
+| O7 | **[DEMO]** Offline mode. | Simulated in the client: a cut device keeps reading its last answers and queues allowed commands (add/update lines, send to kitchen, kitchen moves, cash payment, open table, mark clean, drawer moves) with their command ids; replayed via `Sync.Replay` with conflict resolution. |
+| O8 | **[ASSUMED]** Remote approval. | Accepting issues the same one-use grant as a PIN, bound to the requester and the requesting device; the waiting command retries with the same command id. |
+| O9 | **[DEMO]** Reconciliation. | The bank settlement file is simulated (with ≥ 3 card payments the last is missing to create a difference); acknowledging needs a reason and never changes numbers. |
+| O10 | **[PROPOSED]** Capabilities. | 12 switches (business/branch); off hides the screens and the server refuses their operations with `CAPABILITY_NOT_AVAILABLE`. |
+
+## 14. Prototype limitations
 
 - Single-browser simulation: "devices" share one localStorage database; no real concurrency, only simulated races.
-- Offline mode is simulated as network failures; there is no offline queue (contracts don't define one).
+- Offline mode is simulated per device in the client (queue + replay); there is no real service worker or local database.
 - The e-receipt platform (ETA) is a simulator; documents are not signed.
 - Not every one of the 1000 situations is executable; they are browsable and can be filed as feedback. N1–N12 and the journeys are executable.
