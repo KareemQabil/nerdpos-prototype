@@ -15,13 +15,15 @@ const FIELD: Record<string, string> = {
   reasonCode: 'السبب', fireRound: 'الجولة', kind: 'النوع', method: 'طريقة الدفع', priorReprintCount: 'طبع قبل كده', oldUnitPrice: 'السعر القديم', newUnitPrice: 'السعر الجديد', attempts: 'المحاولات', warnings: 'التحذيرات', date: 'اليوم',
 };
 const MONEY = new Set(['amount', 'lineAmount', 'payable', 'absVariance', 'countedCash', 'expectedCash', 'oldUnitPrice', 'newUnitPrice', 'currentEffectivePaid']);
-const KIND: Record<string, string> = { PERCENTAGE: 'نسبة', FIXED_AMOUNT: 'مبلغ ثابت', CASH: 'كاش', CARD: 'كارت', DIGITAL_WALLET: 'محفظة' };
+const KIND: Record<string, string> = { PERCENTAGE: 'نسبة', FIXED_AMOUNT: 'مبلغ ثابت', CASH: 'كاش', CARD: 'كارت', DIGITAL_WALLET: 'محفظة', PAY_IN: 'إدخال فلوس للدرج', PAY_OUT: 'صرف من الدرج', SAFE_DROP: 'إيداع في الخزنة' };
+const isCode = (v: unknown) => typeof v === 'string' && /^[A-Z][A-Z_]{2,}$/.test(v);
 function plainValue(k: string, v: unknown): string {
   if (v === null || v === undefined || v === '') return '—';
   if (MONEY.has(k)) return money(String(v));
   if (k === 'discountPercent') return `${v}%`;
   if (k === 'reasonCode') return L(store.db.reasonCodes.find((r) => r.code === v)?.label) || String(v);
   if (typeof v === 'string' && KIND[v]) return t(KIND[v]);
+  if (isCode(v)) return t('—');
   return String(v);
 }
 
@@ -60,7 +62,7 @@ function RequestCard({ r }: { r: any }) {
         <div className="flex flex-wrap gap-2 text-xs text-soft">
           <span className="flex items-center gap-1"><User className="w-3.5 h-3.5" />{r.requesterName}</span>
           <span className="flex items-center gap-1"><Monitor className="w-3.5 h-3.5" />{r.terminalId ? deviceName(r.terminalId, null, r.terminalName) : t('من غير جهاز')}</span>
-          <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{dateTime(r.createdAt)}{pending ? ` · ${t('مستني من')} ${r.minutesWaiting} ${t('دقيقة')}` : ''}</span>
+          <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{dateTime(r.createdAt)}{pending ? ` · ${r.minutesWaiting ? t('مستني من {n} دقيقة', { n: r.minutesWaiting }) : t('لسه واصل')}` : ''}</span>
         </div>
         {ctxRows.length > 0 && <KV rows={ctxRows} />}
         <Tech><KV className="num text-[11px]" rows={[['action', r.action], ['target', `${r.targetType} ${r.targetId}`], ['op', r.opId], ['X-Command-Id', r.commandId ?? '—'], ['grant', r.grantId ?? '—']]} /></Tech>

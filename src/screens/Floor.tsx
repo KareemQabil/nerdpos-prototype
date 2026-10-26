@@ -3,7 +3,7 @@
 // Joined tables (direction), table turn (clean after the visit closes; TableTurnPolicy).
 import React, { useMemo, useState } from 'react';
 import { Users, Clock, Plus, ArrowRightLeft, Link2, Unlink, DoorClosed, Wallet, ClipboardList, UserCog, CalendarClock, Minus, Sparkles, Map as MapIcon, LayoutGrid, Brush } from 'lucide-react';
-import { useDev, useQuery, useCommand } from '../app/hooks';
+import { useDev, useQuery, useCommand, errorText } from '../app/hooks';
 import { Section, StateBadge, Pill, Modal, Button, Field, Select, Banner, Money, Empty, Tabs, KV, useNow } from '../ui';
 import { t, L } from '../i18n';
 import { cn, money, time } from '../lib/format';
@@ -41,7 +41,7 @@ export default function Floor() {
         <div className="flex-1" />
         <Legend c={{ FREE: count('FREE'), OCCUPIED: count('OCCUPIED'), DIRTY: count('DIRTY'), RESERVED: count('RESERVED') }} />
       </div>
-      {tables.error && <Banner tone="error">{tables.error.code}</Banner>}
+      {tables.error && <Banner tone="error">{errorText(tables.error)}</Banner>}
       {view === 'map' && current ? (
         <FloorCanvas width={current.width} height={current.height} decor={current.decor ?? []} tables={shown.map((tb) => ({ id: tb.id, name: tb.name, ...tb.layout }))}
           renderTable={(ct) => { const tb = items.find((x) => x.id === ct.id); return tb ? <MapTable tb={tb} onClick={() => open(tb)} /> : null; }} />

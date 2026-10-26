@@ -2,7 +2,8 @@
 // sends a request that appears on the manager's device. On accept, the waiting command continues with the same
 // command id and the grant the manager issued.
 import React, { useEffect, useRef, useState } from 'react';
-import { BellRing, Loader2, XCircle, Clock, Send } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { BellRing, Loader2, XCircle, Clock, Send, Maximize2, Minimize2 } from 'lucide-react';
 import { useQuery, errorText } from '../../app/hooks';
 import { call } from '../../api/client';
 import { store } from '../../mock/store';
@@ -12,11 +13,14 @@ import { t } from '../../i18n';
 import { Tech } from '../../app/tech';
 
 interface Req { id: number; deviceId: string; auth: any; details: any; resolve: (g: string | null) => void }
+/** request id per waiting popup, so the request survives switching between the popup and the small floating card */
+const sent = new Map<number, string>();
 
-export function RemoteApproval({ req }: { req: Req }) {
+export function RemoteApproval({ req, floating, onExpand, onBackground }: { req: Req; floating?: boolean; onExpand?: () => void; onBackground?: () => void }) {
   const d = req.details ?? {};
   const branchId = req.auth.branchId ?? store.db.terminals.find((x) => x.id === req.auth.terminalId)?.branchId ?? null;
-  const [requestId, setRequestId] = useState<string | null>(null);
+  const [requestId, setRequestIdState] = useState<string | null>(sent.get(req.id) ?? null);
+  const setRequestId = (id: string | null) => { if (id) sent.set(req.id, id); else sent.delete(req.id); setRequestIdState(id); };
   const [busy, setBusy] = useState(false);
   const q = useQuery<any>(requestId ? 'ApprovalRequest.Get' : null, { params: { requestId } });
   const r = q.data;
@@ -26,6 +30,7 @@ export function RemoteApproval({ req }: { req: Req }) {
     if (r?.state === 'APPROVED' && r.grantId && !resolved.current) {
       resolved.current = true;
       toast('success', t('{n} وافق — بنكمّل نفس العملية', { n: r.decidedByName ?? t('المدير') }), `grant ${r.grantId}`, req.auth.label);
+      sent.delete(req.id);
       req.resolve(r.grantId);
     }
   }, [r?.state, r?.grantId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -44,6 +49,16 @@ export function RemoteApproval({ req }: { req: Req }) {
     req.resolve(null);
   };
 
+  if (floating) {
+    return createPortal(
+      <div className="fixed bottom-4 end-4 z-[65] w-[320px] glass-strong rounded-2xl p-3 shadow-2xl border border-[color-mix(in_srgb,var(--warning)_45%,transparent)]" data-fb="approval-remote-floating" data-state={r?.state ?? 'PENDING'}>
+        <div className="flex items-center gap-2">
+          {r?.state === 'PENDING' || !r ? <Loader2 className="w-4 h-4 animate-spin text-[var(--warning)]" /> : r.state === 'APPROVED' ? <BellRing className="w-4 h-4 text-[var(--success)]" /> : <XCircle className="w-4 h-4 text-[var(--error)]" />}
+          <div className="flex-1 min-w-0"><div className="text-sm font-bold truncate">{r?.state === 'REJECTED' ? t('المدير رفض الطلب') : r?.state === 'EXPIRED' ? t('الطلب خلص وقته') : t('مستني موافقة المدير')}</div><div className="text-[11px] text-dim truncate">{r?.actionTitle ?? ''}{r?.summary?.ar ? ` · ${r.summary.ar}` : ''}</div></div>
+          <Button size="sm" variant="ghost" onClick={onExpand} title={t('افتح')}><Maximize2 className="w-4 h-4" /></Button>
+        </div>
+      </div>, document.body);
+  }
   if (!requestId || !r) {
     return (
       <div className="rounded-xl border border-dashed border-[color-mix(in_srgb,var(--primary)_45%,transparent)] p-3 flex items-center gap-3 flex-wrap" data-fb="approval-remote">
@@ -73,7 +88,7 @@ export function RemoteApproval({ req }: { req: Req }) {
       )}
       <div className="flex items-center justify-between gap-2">
         <Tech><span className="num text-[10px] text-dim">{r.id} · {r.commandId?.slice(0, 8)}</span></Tech>
-        {r.state === 'PENDING' && <Button size="sm" variant="ghost" onClick={cancel} data-fb="approval-remote-cancel">{t('اسحب الطلب وإلغي العملية')}</Button>}
+        {r.state === 'PENDING' && <div className="flex gap-1">{onBackground && <Button size="sm" variant="outline" onClick={onBackground} data-fb="approval-remote-background"><Minimize2 className="w-3.5 h-3.5" />{t('استنى في الخلفية')}</Button>}<Button size="sm" variant="ghost" onClick={cancel} data-fb="approval-remote-cancel">{t('اسحب الطلب وإلغي العملية')}</Button></div>}
       </div>
     </div>
   );

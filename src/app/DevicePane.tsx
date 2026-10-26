@@ -249,6 +249,7 @@ function ApprovalDialog({ req }: { req: ReturnType<typeof useApprovals>[number] 
   const [pin, setPin] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [waitInBackground, setWaitInBackground] = useState(false); // remote approval: let the user switch devices while waiting
   const rule = d.rule;
   const ruleText = rule?.mode === 'ALWAYS' ? t('دايمًا') : rule?.mode === 'ABOVE_THRESHOLD' ? `${rule.field} > ${rule.threshold}` : rule?.mode === 'WHEN_TRUE' ? `${rule.field} = true` : rule?.mode === 'ANY_OF' ? 'ANY_OF' : rule?.mode;
   const grant = async () => {
@@ -263,6 +264,7 @@ function ApprovalDialog({ req }: { req: ReturnType<typeof useApprovals>[number] 
       setPin('');
     } finally { setBusy(false); }
   };
+  if (waitInBackground) return <RemoteApproval req={req} floating onExpand={() => setWaitInBackground(false)} />;
   return (
     <Modal open onClose={() => req.resolve(null)} title={<span className="flex items-center gap-2"><ShieldAlert className="w-5 h-5 text-[var(--warning)]" />{t('موافقة مدير مطلوبة')}</span>} badge={<StateBadge ops={['Approval.Grant']} />}
       footer={<><Button variant="ghost" onClick={() => req.resolve(null)}>{t('إلغاء — مفيش حاجة هتتكتب')}</Button><Button variant="primary" loading={busy} disabled={!approver || pin.length < 4} onClick={grant}>{t('موافقة')}</Button></>}>
@@ -284,7 +286,7 @@ function ApprovalDialog({ req }: { req: ReturnType<typeof useApprovals>[number] 
           <div className="space-y-1.5"><div className="text-xs font-bold text-soft">PIN</div><Input type="password" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="••••••" onKeyDown={(e) => e.key === 'Enter' && grant()} /></div>
         </div>
         {err && <Banner tone="error">{err}</Banner>}
-        <RemoteApproval req={req} />
+        <RemoteApproval req={req} onBackground={() => setWaitInBackground(true)} />
         <div className="text-[11px] text-dim">{t('بيانات عرض: الرقم السري')} <span className="num">{demo.pin}</span></div>
       </div>
     </Modal>

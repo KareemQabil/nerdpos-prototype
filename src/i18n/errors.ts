@@ -232,6 +232,19 @@ export const errorsAr: Record<string, string> = {
   UNIT_NOT_FOUND: 'الوحدة دي مش موجودة.',
   WAREHOUSES_WAREHOUSE_NOT_FOUND: 'المخزن ده مش موجود.',
   INVENTORY_CAPABILITY_UNAVAILABLE: 'المخزن مش متفعّل.',
+  // operations & system area
+  TABLE_NEEDS_CLEANING: 'الترابيزة دي لسه محتاجة تنضيف. علّمها "اتنضفت" الأول أو اختار ترابيزة تانية.',
+  BUSINESS_DAY_ALREADY_CLOSED: 'اليوم ده اتقفل قبل كده.',
+  BUSINESS_DAY_NOT_READY: 'لسه فيه حاجات لازم تخلص قبل قفل اليوم (أدراج أو شيكات مفتوحة، أو يوم قبله لسه ما اتقفلش).',
+  BUSINESS_DAY_NOT_STARTED: 'اليوم ده لسه ما بدأش.',
+  APPROVAL_REQUEST_NOT_PENDING: 'الطلب ده اتردّ عليه أو خلص وقته.',
+  APPROVAL_REQUEST_NOT_FOUND: 'الطلب ده مش موجود.',
+  OFFLINE_COMMAND_NOT_ALLOWED: 'العملية دي مينفعش تتعمل من غير نت.',
+  OFFLINE_COMMAND_NOT_FOUND: 'العملية دي مش موجودة.',
+  OFFLINE: 'مفيش نت على الجهاز ده دلوقتي.',
+  CONSUMER_DELIVERY_NOT_FOUND: 'العملية دي مش موجودة.',
+  RECONCILIATION_NOT_ACKNOWLEDGEABLE: 'النتيجة دي مفيهاش فرق يتفسر.',
+  RECONCILIATION_RESULT_NOT_FOUND: 'النتيجة دي مش موجودة.',
 };
 
 export const errorsEn: Record<string, string> = {
@@ -465,4 +478,17 @@ export const errorsEn: Record<string, string> = {
   UNIT_NOT_FOUND: 'Unit not found.',
   WAREHOUSES_WAREHOUSE_NOT_FOUND: 'Warehouse not found.',
   INVENTORY_CAPABILITY_UNAVAILABLE: 'Inventory is not enabled.',
+  // operations & system area
+  TABLE_NEEDS_CLEANING: 'This table still needs cleaning. Mark it clean first or pick another table.',
+  BUSINESS_DAY_ALREADY_CLOSED: 'This business day is already closed.',
+  BUSINESS_DAY_NOT_READY: 'Some things must be finished before closing the day (open drawers or checks, or an earlier day still open).',
+  BUSINESS_DAY_NOT_STARTED: 'This day has not started yet.',
+  APPROVAL_REQUEST_NOT_PENDING: 'This request was already answered or expired.',
+  APPROVAL_REQUEST_NOT_FOUND: 'Request not found.',
+  OFFLINE_COMMAND_NOT_ALLOWED: 'This action cannot be done offline.',
+  OFFLINE_COMMAND_NOT_FOUND: 'Offline item not found.',
+  OFFLINE: 'This device has no network right now.',
+  CONSUMER_DELIVERY_NOT_FOUND: 'Delivery not found.',
+  RECONCILIATION_NOT_ACKNOWLEDGEABLE: 'This result has no difference to explain.',
+  RECONCILIATION_RESULT_NOT_FOUND: 'Result not found.',
 };

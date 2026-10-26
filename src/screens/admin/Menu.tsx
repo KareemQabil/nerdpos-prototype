@@ -57,7 +57,7 @@ function Products() {
   const units = useItems<any>('Unit.List');
   const list = useItems<any>('Catalog.Search', { query: { categoryId: cat || undefined, active: active === 'all' ? undefined : active, q: qText.trim() || undefined } });
   const catName = (id: string) => L(cats.items.find((c) => c.id === id)?.name) || id;
-  const unitCode = (id: string) => units.items.find((u) => u.id === id)?.code ?? id;
+  const unitCode = (id: string) => { const u = units.items.find((x) => x.id === id); return u ? <>{u.precision ? t('بالوزن') : t('بالقطعة')}<Tech> · {u.code}</Tech></> : '—'; };
   const shown = list.items;
   return (
     <div className="space-y-3">
@@ -85,7 +85,7 @@ function Products() {
         </div>,
         <span className="num text-xs">{p.sku}</span>,
         catName(p.categoryId),
-        <span className="num text-xs">{unitCode(p.unitId)}</span>,
+        <span className="text-xs">{unitCode(p.unitId)}</span>,
         p.taxPolicyName ? <span className="text-xs">{L(p.taxPolicyName)}</span> : <Pill tone="error">{t('مفيش')}</Pill>,
         <span className="num">{p.modifierGroupIds.length}</span>,
         <button data-fb={`products:availability:${p.id}`} onClick={() => setOpen({ id: p.id, tab: 'availability' })} className="text-start">

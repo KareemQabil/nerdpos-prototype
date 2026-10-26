@@ -99,6 +99,8 @@ export function seedMenu(db: DB, nowMs: number) {
     // delivery menu prices (+10 %, rounded to 5) for the meals and pizzas
     if (p.categoryId === 'cat_meals' || p.categoryId === 'cat_pizza' || p.id === 'p_pepsi' || p.id === 'p_water') db.priceRules.push(rule(p.id, 'DELIVERY', String(Math.ceil((Number(price[p.id]) * 1.1) / 5) * 5)));
   }
+  // e-receipt item codes for the new items (the demo keeps a few older items unmapped on purpose)
+  prods.forEach((p, i) => db.itemMappings.push({ productId: p.id, codeType: 'EGS', itemCode: `EG-DEMO-${String(100 + i).padStart(4, '0')}`, unitType: 'EA' }));
   // own Large prices (a size price rule overrides product price + size delta)
   for (const pid of ['p_pizza_chicken_ranch', 'p_pizza_veggie', 'p_pizza_sausage']) for (const ch of ['DINE_IN', 'TAKEAWAY'] as Channel[]) db.priceRules.push(rule(pid, ch, String(Number(price[pid]) + 55), 'v_l'));
 

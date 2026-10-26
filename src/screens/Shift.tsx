@@ -11,6 +11,7 @@ import { TransferSessionDialog } from './ops/TransferSessionDialog';
 import { METHOD_AR } from './ops/BusinessDay';
 import { deviceName } from '../demo/people';
 import { store } from '../mock/store';
+import { Tech } from '../app/tech';
 import { ArrowRightLeft } from 'lucide-react';
 
 export default function Shift() {
@@ -70,7 +71,7 @@ function OpenSession({ sid, onZ }: { sid: string; onZ: (id: string) => void }) {
         {ses.durationWarning && <Banner tone="warning"><AlertTriangle className="w-4 h-4 inline" /> {t('الوردية مفتوحة من وقت طويل — اقفلها وافتح وردية جديدة')}</Banner>}
         <OpenOrders sid={ses.id} />
         <div className="mt-3">
-          <Table head={[t('الوقت'), t('النوع'), t('المبلغ'), t('السبب'), t('المرجع')]} rows={ses.cashEntries.slice().reverse().map((e: any) => [<span className="num text-xs">{time(e.at)}</span>, kindLabel(e.kind), <Money v={e.amount} />, e.reasonCode ? (L(store.db.reasonCodes.find((x) => x.code === e.reasonCode)?.label) || e.reason || '') : (e.reason ?? ''), <span className="num text-xs">{e.ref ?? ''}{e.approvalGrantId ? ' · ✓' : ''}</span>])} />
+          <Table head={[t('الوقت'), t('النوع'), t('المبلغ'), t('السبب'), t('المرجع')]} rows={ses.cashEntries.slice().reverse().map((e: any) => [<span className="num text-xs">{time(e.at)}</span>, kindLabel(e.kind), <Money v={e.amount} />, e.reasonCode ? (L(store.db.reasonCodes.find((x) => x.code === e.reasonCode)?.label) || e.reason || '') : (e.reason ?? ''), <span className="text-xs">{e.approvalGrantId ? t('بموافقة مدير') : ''}<Tech><span className="num"> {e.ref ?? ''}</span></Tech></span>])} />
         </div>
       </Card>
       {dlg === 'move' && <CashMoveDialog ses={ses} onClose={() => setDlg(null)} />}
