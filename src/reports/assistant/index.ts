@@ -11,7 +11,9 @@ import { eodBridge } from '../recon';
 import { compare, decompose, menuMatrix } from '../analysis';
 import { metricById, METRICS } from '../registry/metrics';
 import { dimensionById } from '../registry/dimensions';
-import { addDays, weekOf } from '../facts';
+import { addDays, weekOf, BUILDERS } from '../facts';
+import { capabilityOn } from '../../mock/ops-registry';
+const capOn = (db: DB, id: string, caller: Caller) => caller.accessibleBranchIds.some((b) => capabilityOn(db, id, b));
 import { norm, has, METRIC_PHRASES, DIM_PHRASES, MONTHS } from './lexicon';
 import bank from './question-bank.json';
 
@@ -42,6 +44,7 @@ function parsePeriod(q: string, today: string, fallback: 'TODAY' | 'LAST_7', rul
   if (has(q, 'اول امبارح', 'day before yesterday')) { rules.push('period:day-before'); return { from: addDays(today, -2), to: addDays(today, -2), label: L('أول امبارح', 'Day before yesterday'), defaulted: false }; }
   if (has(q, 'امبارح', 'امس', 'yesterday', 'مردود امس')) { rules.push('period:yesterday'); return { from: yday, to: yday, label: L('امبارح', 'Yesterday'), defaulted: false }; }
   if (has(q, 'النهارده', 'النهاردة', 'اليوم ده', 'today', 'tonight', 'الليله')) { rules.push('period:today'); return { from: today, to: today, label: L('النهارده', 'Today'), defaulted: false }; }
+  if (has(q, 'ايام الاسبوع', 'weekdays')) { rules.push('period:last-28'); return { from: addDays(today, -27), to: today, label: L('آخر 4 أسابيع', 'Last 4 weeks'), defaulted: false }; }
   if (has(q, 'الاسبوع اللي فات', 'last week', 'الاسبوع الماضي', 'باللي قبله')) { const ws = weekOf(today); rules.push('period:last-week'); return { from: addDays(ws, -7), to: addDays(ws, -1), label: L('الأسبوع اللي فات (من السبت)', 'Last week (from Saturday)'), defaulted: false }; }
   if (has(q, 'الاسبوع ده', 'this week', 'اول الاسبوع', 'الاسبوع')) { rules.push('period:this-week'); return { from: weekOf(today), to: today, label: L('الأسبوع ده (من السبت)', 'This week (from Saturday)'), defaulted: false }; }
   const m = q.match(/(?:اخر|last)\s*(\d+)\s*(?:ايام|يوم|days|اسابيع|weeks|اسبوع)/);
@@ -51,10 +54,21 @@ function parsePeriod(q: string, today: string, fallback: 'TODAY' | 'LAST_7', rul
   for (const [ps, mo] of MONTHS) if (has(q, ...ps) && !has(q, 'فرع اكتوبر', 'october branch')) {
     let y = Number(today.slice(0, 4)); if (mo > Number(today.slice(5, 7))) y--;
     const from = `${y}-${String(mo).padStart(2, '0')}-01`; const lastDay = addDays(new Date(Date.UTC(y, mo, 1)).toISOString().slice(0, 10), -1);
-    rules.push('period:month'); return { from, to: lastDay < today ? lastDay : today, label: L(`شهر ${ps[0]} ${y}`, `${ps[1]} ${y}`), defaulted: false };
+    rules.push('period:month'); return { from, to: lastDay < today ? lastDay : today, label: L(`${ps[0].startsWith('شهر') ? ps[0] : 'شهر ' + ps[0]} ${y}`, `${ps[1]} ${y}`), defaulted: false };
   }
   rules.push(`period:default-${fallback}`);
   return fallback === 'TODAY' ? { from: today, to: today, label: L('النهارده (افتراضي)', 'Today (default)'), defaulted: true } : { from: addDays(today, -6), to: today, label: L('آخر 7 أيام (افتراضي)', 'Last 7 days (default)'), defaulted: true };
+}
+
+/** Has the business date any completed sale in the caller's branches? */
+function hasSales(db: DB, caller: Caller, date: string) { return db.orders.some((o) => o.status === 'COMPLETED' && o.completedBusinessDate === date && caller.accessibleBranchIds.includes(o.branchId)); }
+/** A defaulted period never silently shows an empty open day or pre-launch days: it moves, and says so (chip). */
+function adjustDefault(db: DB, caller: Caller, p: Period, today: string, rules: string[], salesDomain: boolean): Period {
+  if (!p.defaulted) return p;
+  if (p.from === today && p.to === today && !hasSales(db, caller, today)) { const y = addDays(today, -1); if (hasSales(db, caller, y)) { rules.push('period:fallback-yesterday'); return { from: y, to: y, label: L('امبارح (النهارده لسه مفيهوش بيع)', 'Yesterday (no sales today yet)'), defaulted: true }; } }
+  const launch = launchDate(db);
+  if (salesDomain && p.from < launch && p.to >= launch) { rules.push('period:clip-launch'); return { ...p, from: launch, label: L(`من ${launch} (أول يوم فيه بيانات تفصيلية) لحد النهارده`, `From ${launch} (first event-level day)`) }; }
+  return p;
 }
 
 function entities(db: DB, q: string, caller: Caller, rules: string[]) {
@@ -78,12 +92,13 @@ function entities(db: DB, q: string, caller: Caller, rules: string[]) {
   if (!f.product && has(q, 'البيتزا', 'pizza')) { const p = db.products.find((x) => norm(x.name.en).includes('pizza')); if (p) f.product = p.id; }
   if (!f.product && has(q, 'المشروبات', 'beverages')) { const c = db.categories.find((x) => /مشروب|drink|beverage/i.test(x.name.ar + x.name.en)); if (c) f.category = c.id; }
   const inv = (db as any).inv;
-  if (inv) for (const it of inv.items) { const n = norm(it.name.ar).replace(/^ال/, ''); if (n.length >= 3 && words.some((w) => w === n)) { f.inventory_item = it.id; rules.push(`entity:item:${it.id}`); break; } }
+  if (inv) for (const it of inv.items) { const n = norm(it.name.ar).replace(/^ال/, ''); const first = n.split(' ')[0]; if (n.length >= 3 && words.some((w) => w === n || (first.length >= 3 && w === first))) { f.inventory_item = it.id; rules.push(`entity:item:${it.id}`); break; } }
+  if (has(q, 'كومبو', 'combo')) { const ids = db.products.filter((p) => p.combo?.length || /وجبه|كومبو|combo|meal/.test(norm(p.name.ar) + ' ' + norm(p.name.en))).map((p) => p.id); if (ids.length) { f.product = ids.join(','); rules.push('entity:combos'); } }
   const tm = q.match(/(?:الترابيزه|table)\s*(\d+)/);
   if (tm) { const t = db.tables.find((x) => x.name === tm[1] && caller.accessibleBranchIds.includes(x.branchId)); if (t) f.table = t.id; }
   const hm = q.match(/(?:الساعه|at)\s*(\d{1,2})(?:\s*(?:بالليل|pm|مساء))?/);
   if (hm) { let h = Number(hm[1]); if ((/بالليل|pm|مساء|الليل/.test(q)) && h < 12) h += 12; if (h >= 0 && h < 24) f.hour = String(h).padStart(2, '0'); }
-  if (/بعد العشره بالليل|after 10|late-night/.test(q)) rules.push('entity:late-night');
+  if (/بعد العشره بالليل|after 10|late-night/.test(q)) { f.hour = '22,23,00,01,02,03'; rules.push('entity:late-night'); }
   return { f, unknown };
 }
 
@@ -136,7 +151,7 @@ export function ask(db: DB, caller: Caller, input: { question: string; clarify?:
 
   // ───── 2. engine / meta explanations
   const explainA = (ar: string, en: string, data?: any, intent = 'EXPLAIN'): Answer => ({ ...base(question, rules), status: 'EXPLAINED', shape: 'explanation', text: L(ar, en), data, parsed: { ...base(question, rules).parsed, intent } });
-  if (has(q, 'نهائي', 'مبدئي', 'final', 'provisional', 'لسه ما قفلناش')) {
+  if (has(q, 'نهائي', 'مبدئي', 'final', 'provisional', 'لسه ما قفلناش') && !has(q, 'شيك مبدئي', 'preliminary bill')) {
     rules.push('meta:provisional');
     const r = query(db, caller, { metrics: ['net_item_sales'], from: today });
     const d = r.meta.days[0];
@@ -153,7 +168,7 @@ export function ask(db: DB, caller: Caller, input: { question: string; clarify?:
     return { ...explainA(`${m.label.ar}: ${m.definition.ar} المعادلة: ${m.formula}. المصدر: سطور الشيكات المقفولة (يوم القفل) + المرتجعات المصروفة (يوم الصرف). دوس على أي رقم في التقارير يفتحلك الشيكات والسطور اللي وراه.`, `${m.label.en}: ${m.definition.en} Formula: ${m.formula}.`, { metric: m }), chips: [{ kind: 'definition', label: L(`${m.label.ar} (نسخة ${m.version})`, `${m.label.en} v${m.version}`), detail: m.definition }, { kind: 'version', label: L(m.history.map((h) => `${h.version}: ${h.change}`).join(' — '), m.history.map((h) => `${h.version}`).join(', ')) }] };
   }
   if (has(q, 'x و z', 'x and z')) { rules.push('meta:xz'); return explainA('تقرير X = لقطة للدرج والوردية مفتوحة (ما بيقفلش حاجة). تقرير Z = قفلة الوردية: المتوقع والمعدود والفرق بيتجمدوا وبيبقوا المرجع. المحرك بيتأكد إن Z = مجموع حركات الدرج.', 'X = a snapshot while open; Z = the frozen close, the reference.'); }
-  if (has(q, 'sandbox', 'انتاج', 'production')) { rules.push('meta:eta-mode'); const modes = [...new Set(db.fiscalDocuments.map((f) => f.mode))]; return explainA(`الإيصالات اللي اتعملت في البيئة: ${modes.length ? modes.map((m) => (m === 'SANDBOX' ? 'تجريبي (SANDBOX)' : 'حقيقي')).join(' و') : 'مفيش إيصالات لسه'}. التجريبي مش قبول حقيقي من منظومة الضرايب.`, `E-receipt environment: ${modes.join(', ') || 'none yet'}. Sandbox is not production acceptance.`, { modes }); }
+  if (has(q, 'sandbox', 'ولا انتاج', 'or production')) { rules.push('meta:eta-mode'); const modes = [...new Set(db.fiscalDocuments.map((f) => f.mode))]; return explainA(`الإيصالات اللي اتعملت في البيئة: ${modes.length ? modes.map((m) => (m === 'SANDBOX' ? 'تجريبي (SANDBOX)' : 'حقيقي')).join(' و') : 'مفيش إيصالات لسه'}. التجريبي مش قبول حقيقي من منظومة الضرايب.`, `E-receipt environment: ${modes.join(', ') || 'none yet'}. Sandbox is not production acceptance.`, { modes }); }
   if (has(q, 'مين يقدر يشوف', 'who can view')) { rules.push('meta:pii'); return explainA('بيانات العملاء الشخصية بتحتاج صلاحية «عرض بيانات العملاء»؛ والتقارير ما بتعرضش أسماء أو تليفونات، وتحليل العملاء مقفول لحد قرار الموافقة والخصوصية.', 'Customer PII needs a dedicated permission; reports show no PII; customer analytics are disabled until consent is decided.'); }
   if (has(q, 'id ثابت', 'stable id')) { rules.push('meta:id'); return explainA('أيوه: كل شيك ليه رقم عملية ثابت ما بيتغيرش وبيتطبع دايمًا، والرقم القصير للنداء اختياري وبيتصفر. الأوردر على الترابيزة = القعدة، حتى لو اتقسمت لكذا شيك.', 'Yes: an immutable transaction id; the short call-out number is optional.'); }
   if (has(q, 'محطه تانيه', 'another station')) { rules.push('meta:kds'); return explainA('كل شاشة مطبخ مشتركة في محطاتها بس؛ شاشة التسليم بس هي اللي بتشوف «جاهز للتسليم». ده إعداد للمكان مش رقم في التقارير.', 'Each kitchen screen subscribes to its stations; only dispatch screens see ready-for-pickup.'); }
@@ -200,14 +215,57 @@ export function ask(db: DB, caller: Caller, input: { question: string; clarify?:
     return pick('session', 'أنهي وردية؟', 'Which drawer session?', ss.map((s) => ({ id: s.id, label: dimLabel(db, 'drawer', s.id) })), (id) => { const s = db.sessions.find((x) => x.id === id)!; const br = eodBridge(db, caller, { from: s.businessDate, branchIds: [s.branchId] }); const d = br.drawers.find((x) => x.sessionId === id); return { ...explainA(d ? `الوردية: المتوقع ${fmtVal(d.expected)} والمعدود ${fmtVal(d.counted ?? null)} والفرق ${fmtVal(d.variance ?? null)}. ${d.reason ? 'سبب الكاشير: ' + d.reason : ''}` : 'مش موجودة', 'Drawer bridge', { drawer: d }, 'BRIDGE'), shape: 'drawer' }; });
   }
 
-  // ───── 4. metric intent
-  const { ids: metricIds, genericOnly } = detectMetrics(q, rules);
-  if (!metricIds.length) { rules.push('unparsed'); return { ...base(question, rules), status: 'UNPARSED', shape: 'unparsed', text: L('مش فاهم السؤال ده لسه. جرب: «صافي المبيعات امبارح»، «أكتر 5 أصناف الأسبوع ده»، «عجز الدرج عند مين»، «الكاش كام والفيزا كام».', 'I did not understand. Try: "net sales yesterday", "top 5 items this week".') }; }
-  const primary = metricIds[0];
-  const m = metricById.get(primary)!;
-  // not-available sources first (labor, customers, forecast, aggregator…) — never 0, never a guess
-  const naIds = metricIds.filter((id) => metricById.get(id)?.status === 'NOT_AVAILABLE');
-  if (naIds.length && (metricById.get(primary)!.status === 'NOT_AVAILABLE')) { rules.push('na:source'); return na(question, rules, naIds); }
+  // ───── 3b. reconciliation, bridge and data-semantics questions (answered from the certified checks)
+  const lastWeekP = (): Period => ({ from: launchDate(db) > addDays(today, -6) ? launchDate(db) : addDays(today, -6), to: today, label: L('من أول يوم فيه بيانات تفصيلية لحد النهارده', 'Since the first event-level day'), defaulted: true });
+  const checkAnswer = (ids: string[] | null, intro: Loc): Answer => {
+    rules.push(`exec:recon:${ids?.join('+') ?? 'all'}`);
+    const p = parsePeriod(q, today, 'LAST_7', []) as Period; const per = p.defaulted ? lastWeekP() : p;
+    const br = eodBridge(db, caller, { from: per.from, to: per.to });
+    const cs = br.checks.filter((c) => !ids || ids.some((i) => c.id.startsWith(i)));
+    const bad = cs.filter((c) => c.status === 'UNEXPLAINED');
+    return { ...explainA(`${intro.ar} ${cs.length} قاعدة اتشغلت (${per.from}${per.to !== per.from ? '→' + per.to : ''}): ${bad.length ? `${bad.length} فيها فرق مش متشرح — ${bad.map((c) => c.title.ar).join('، ')}` : 'كلها متطابقة أو الفرق متشرح بحركات'}.`, `${intro.en} ${cs.length} rule(s): ${bad.length} unexplained.`, { checks: cs, bridge: { gap: br.gap } }, 'RECON'), shape: 'recon', chips: [{ kind: 'period' as const, label: L(`${per.from} → ${per.to}`, `${per.from} → ${per.to}`) }, { kind: 'asOf' as const, label: L(`لحد ${br.scope.asOf.slice(0, 16)}`, `As of ${br.scope.asOf.slice(0, 16)}`) }, { kind: 'definition' as const, label: L('قواعد المطابقة المعتمدة (doc 27 §5 + 06)', 'Certified reconciliation rules'), detail: L('كل فرق يا صفر، يا متشرح بحركات مربوطة، يا بيتعلم «مش متشرح».', 'Every difference is zero, explained by linked events, or flagged.') }] };
+  };
+  if (has(q, 'اعلي من الاصلي', 'exceed the original', 'سبب واصل فاتوره', 'reason and original check')) return checkAnswer(['refunds_have_origin'], L('كل مرتجع لازم يبقى ليه شيك أصلي وسبب ومايزيدش عن المدفوع.', 'Every refund needs an original check, a reason, and ≤ paid.'));
+  if (has(q, 'اتسجلت مرتين', 'recorded twice', 'اتحسبت مرتين', 'double count')) return checkAnswer(['no_duplicate_payments'], L('نفس رقم العملية (Command) عمره ما بيتسجل مرتين — حتى بعد الأوفلاين.', 'The same command is never recorded twice, even after offline replay.'));
+  if (has(q, 'فرق قرش', 'piaster discrepancy', 'سبليت ومجموعه مختلف', 'split checks fail')) return checkAnswer(['split_allocation'], L('أنصبة التقسيم بتتوزع بأكبر باقي والباقي على آخر نصيب.', 'Split shares by largest remainder, residual on the last share.'));
+  if (has(q, 'متوازن', 'postings balance', 'متطابقه مع الدفعات', 'reconcile to successful')) return checkAnswer(['billed_identity', 'tenders_by_method', 'billed_vs_collected', 'sales_bridge'], L('الأرقام بتتطابق بمعادلات ثابتة.', 'The numbers reconcile by fixed equations.'));
+  if (has(q, 'الاختبارات اللي اتفشلت', 'failed reporting')) return checkAnswer(null, L('كل قواعد المطابقة على الفترة:', 'All reconciliation rules for the period:'));
+  if (has(q, 'تقريرين', 'two reports disagree')) { rules.push('clarify:which-reports'); return clarifyA(question, rules, 'أنهي تقريرين؟ (أغلب الاختلافات بتيجي من فلتر مختلف أو asOf مختلف أو مقياس مختلف زي صافي مقابل الفواتير)', 'Which two reports? (usually a different filter, asOf or metric)', [{ id: 'pick=net_item_sales', label: L('مبيعات اليوم مقابل المتحصل', 'Daily sales vs collected') }, { id: 'pick=recognized_sales_total', label: L('الفواتير مقابل Z', 'Billed vs Z') }]); }
+  if (has(q, 'تقرير نهايه اليوم', 'eod pack', 'end of day') || has(q, 'z مختلف', 'differ from dashboard', 'dashboard')) {
+    rules.push('exec:eod-pack');
+    const p = parsePeriod(q, today, 'TODAY', []) as Period; const per = p.defaulted ? adjustDefault(db, caller, p, today, rules, true) : p;
+    const br = eodBridge(db, caller, { from: per.from, to: per.to });
+    const item = br.sales.find((x) => x.id === 'item_net')!;
+    const dash = has(q, 'dashboard', 'z مختلف');
+    return { ...base(question, rules), status: 'ANSWERED', shape: 'bridge', data: br, text: L(`${dash ? 'Z بيتقرا بالوردية (كل الكاش اللي دخل الدرج في الوردية حتى لو عدّت 4 الفجر)، والداشبورد بيتقرا باليوم التجاري (صافي من غير ضريبة وخدمة). ' : ''}يوم ${per.from}: صافي الأصناف ${fmtVal(item.amount)} → الفواتير ${fmtVal(br.gap.billed)} → المتحصل ${fmtVal(br.gap.collected)} (الفرق ${fmtVal(br.gap.difference)}، غير مفسَّر ${fmtVal(br.gap.unexplained)}). ${br.drawers.length} درج، والمطابقة: ${br.status === 'MATCHED' ? 'متطابق' : br.status === 'EXPLAINED' ? 'الفرق متشرح' : 'فيه فرق مش متشرح'}.`, `Day ${per.from}: item net ${item.amount} → billed ${br.gap.billed} → collected ${br.gap.collected}.`), chips: [{ kind: 'definition', label: L('جسر نهاية اليوم للمحاسب', 'Accountant EOD bridge') }, { kind: 'period', label: L(`${per.label.ar}: ${per.from}`, `${per.label.en}: ${per.from}`) }, { kind: 'asOf', label: L(`لحد ${br.scope.asOf.slice(0, 16)}`, `As of ${br.scope.asOf.slice(0, 16)}`) }], parsed: { intent: 'BRIDGE', metrics: ['recognized_sales_total', 'tender_collected', 'cash_variance'], dimensions: [], filters: {}, period: per, rules } };
+  }
+  if (has(q, 'اوردر واحد', 'one order have three checks', 'one order')) { rules.push('meta:order-vs-check'); return explainA('القعدة على الترابيزة = أوردر واحد. لما الضيوف يقسموا الحساب بيطلع كذا شيك (لحد عدد الضيوف)، كل شيك بيتدفع لوحده — بس عدد الأوردرات والضيوف ما بيتكررش، والأنصبة مجموعها بالقرش = الأصل.', 'A table visit is one order; splitting creates checks (up to the guest count); orders and guests never multiply.'); }
+  if (has(q, 'عربون', 'deposit')) { rules.push('meta:deposits'); const ds = db.deposits.filter((d) => caller.accessibleBranchIds.includes(d.branchId)); const byState = ds.reduce((a: Record<string, number>, d) => ((a[d.state] = (a[d.state] ?? 0) + 1), a), {}); return explainA(`العربون فلوس الزبون عندنا (التزام) مش مبيعات: بيتسجل في الدرج كـ«عربون» ويتخصم من الشيك لما يتطبق. عندنا ${ds.length} عربون: ${Object.entries(byState).map(([k, n]) => `${k === 'HELD' ? 'محجوز' : k === 'APPLIED' ? 'اتطبق' : k === 'REFUNDED' ? 'اترد' : 'اتصادر'} ${n}`).join('، ') || '—'}.${has(q, 'اترد', 'refunded') ? ' العربون اللي اترد بيظهر يوم ما اترد.' : ''}`, `Deposits are liabilities, not sales: ${ds.length} on record.`, { deposits: ds.length, byState }); }
+  if (has(q, 'مرتجعات من اسبوع قديم', 'returns from old weeks')) {
+    rules.push('exec:returns-old-weeks');
+    const ws = weekOf(today);
+    const r = query(db, caller, { metrics: ['tender_refunded', 'return_sales_adjustment', 'refund_count'], dimensions: ['stage'], from: ws, to: today });
+    const e = explain(db, caller, { metric: 'tender_refunded', from: ws, to: today });
+    const old = e.parts[0].evidence.filter((x) => (db.refunds.find((rf) => rf.id === x.id)?.originalBusinessDate ?? '') < ws);
+    return { ...explainA(`أيوه، المرتجع بيتحسب يوم صرفه: الأسبوع ده (من ${ws}) فيه ${e.parts[0].evidence.length} مرتجع بـ ${fmtVal(r.totals.tender_refunded.value)}، منهم ${old.length} على شيكات من أسابيع قديمة (${old.map((x) => x.label).join('، ') || '—'}). صافي مبيعات الأسبوع بيتقل بيهم والأسابيع القديمة ما بتتغيرش.`, `Yes: ${old.length} refund(s) this week relate to older weeks; old weeks are never restated.`, { query: r, evidence: e }), chips: chipsFor(r, ['return_sales_adjustment'], {}, { from: ws, to: today, label: L('الأسبوع ده', 'This week'), defaulted: false }, db) };
+  }
+  if (has(q, 'بعد ما اليوم اتقفل', 'after business-day close', 'بعد قفل اليوم')) { rules.push('exec:after-close'); const per = lastWeekP(); return runQuery(db, caller, question, rules, ['refund_count', 'tender_refunded'], ['approval_actor'], { stage: 'S3' }, per, undefined, 'QUERY'); }
+  if (has(q, 'شيك مبدئي', 'preliminary bill')) { rules.push('exec:after-prebill'); return explainAnswer(db, caller, question, rules, { metric: 'void_line_count', filters: { stage: 'S1' }, ...lastWeekP() }, lastWeekP()); }
+  if (has(q, 'as of', 'asof', 'اخر داتا', 'last sync')) {
+    rules.push('meta:freshness');
+    const last = Math.max(0, ...db.orders.filter((o) => caller.accessibleBranchIds.includes(o.branchId)).map((o) => o.completedAtMs ?? o.createdAtMs), ...db.captures.filter((c) => caller.accessibleBranchIds.includes(c.branchId)).map((c) => c.atMs));
+    const sync = (db.syncTerminals ?? []).map((t) => `${dimLabel(db, 'device', t.terminalId).ar}: ${t.lastReplayAt ?? t.lastChangesAt ?? 'ما اتزامنش'}`).join('، ');
+    return explainA(`التقرير محسوب لحد ${new Date(caller.nowMs).toISOString().slice(0, 16).replace('T', ' ')} UTC (asOf). آخر حركة بيع اتسجلت ${last ? new Date(last).toISOString().slice(0, 16).replace('T', ' ') + ' UTC' : '—'} — يعني من ${last ? Math.round((caller.nowMs - last) / 60000) : '—'} دقيقة.${sync ? ' آخر مزامنة للأجهزة: ' + sync + '.' : ' مفيش أجهزة شغالة أوفلاين.'}`, `Computed as of now; last sale event ${last ? Math.round((caller.nowMs - last) / 60000) + ' min ago' : '—'}.`, { lastEventAt: last ? new Date(last).toISOString() : null }, 'META');
+  }
+  if (has(q, 'شيفتات ملهاش قفل', 'shifts without closeout', 'ورديه مفتوحه')) { rules.push('meta:open-sessions'); const open = db.sessions.filter((x) => caller.accessibleBranchIds.includes(x.branchId) && x.state === 'OPEN'); return explainA(open.length ? `${open.length} وردية مفتوحة: ${open.map((x) => `${dimLabel(db, 'drawer', x.id).ar} من ${Math.round((caller.nowMs - x.openedAtMs) / 3_600_000)} ساعة`).join('، ')}. الوردية المفتوحة بتخلي التقرير «مبدئي».` : 'مفيش ولا وردية مفتوحة دلوقتي — كل الأدراج اتقفلت وليها تقرير Z.', `${open.length} open session(s).`, { open: open.map((x) => x.id) }, 'META'); }
+  if (has(q, 'حجز', 'reservation') && has(q, 'اتلغي', 'canceled', 'cancelled')) { rules.push('meta:reservations-cancelled'); const rs = db.reservations.filter((r) => caller.accessibleBranchIds.includes(r.branchId)); return explainA(`الحجوزات: ${rs.length} — اتلغى منها ${rs.filter((r) => r.state === 'CANCELLED').length}، وعدم حضور ${rs.filter((r) => r.state === 'NO_SHOW').length}. (من سجل الحجوزات)`, `Reservations ${rs.length}, cancelled ${rs.filter((r) => r.state === 'CANCELLED').length}.`, { reservations: rs.length }); }
+  if (has(q, 'هتقول صفر', 'will you return zero', 'مقفول وبيطلع صفر', 'incorrectly showing zero')) { rules.push('meta:na-not-zero'); const inv = capOn(db, 'INVENTORY', caller), res = capOn(db, 'RESERVATIONS', caller); return explainA(`لأ. لو الموديول مقفول أو مصدره مش موجود، الرقم بيطلع «مش متاح» ومعاه السبب — عمره ما بيطلع صفر. دلوقتي: المخزن ${inv ? 'شغال' : 'مقفول (أرقامه «مش متاح»)'}، والحجوزات ${res ? 'شغالة' : 'مقفولة'}. جرب تقفل الموديول من «تشغيل الموديولات» وشوف التقرير.`, 'No: an off module or missing source is NOT AVAILABLE with a reason, never 0.', { inventory: inv, reservations: res }, 'META'); }
+  if (has(q, 'فرق ضريبه المبيعات', 'vat differs')) { rules.push('meta:vat-vs-eta'); const per = lastWeekP(); const r = query(db, caller, { metrics: ['tax_amount', 'recognized_sales_total', 'eta_receipt_count', 'check_count'], from: per.from, to: per.to }); const accepted = db.fiscalDocuments.filter((f) => f.state === 'ACCEPTED' && caller.accessibleBranchIds.includes(f.branchId)); const covered = new Set(accepted.map((f) => f.orderId)); const missing = db.orders.filter((o) => o.kind === 'SALE' && o.status === 'COMPLETED' && !o.comp && o.completedBusinessDate! >= per.from && o.completedBusinessDate! <= per.to && caller.accessibleBranchIds.includes(o.branchId) && !covered.has(o.id)); return { ...explainA(`ضريبة الشيكات ${fmtVal(r.totals.tax_amount.value)} على ${fmtVal(r.totals.check_count.value, 'count')} شيك؛ ${missing.length} شيك من غير إيصال مقبول (${missing.slice(0, 5).map((o) => '#' + o.number).join('، ')}${missing.length > 5 ? ' …' : ''}). الإيصالات «تجريبي» مش قبول حقيقي.`, `VAT ${r.totals.tax_amount.value} on ${r.totals.check_count.value} checks; ${missing.length} without an accepted receipt.`, { query: r, missing: missing.map((o) => o.id) }, 'RECON'), chips: chipsFor(r, ['tax_amount', 'eta_receipt_count'], {}, per, db) }; }
+  if (has(q, 'اتاخر عن النافذه', 'outside the allowed window')) { rules.push('meta:eta-late'); const late = db.fiscalDocuments.filter((f) => caller.accessibleBranchIds.includes(f.branchId) && ((f.submittedAt ? Date.parse(f.submittedAt) : caller.nowMs) - f.createdAtMs) > 24 * 3_600_000 && f.state !== 'ACCEPTED'); return explainA(`${late.length} إيصال عدّى 24 ساعة من غير قبول${late.length ? ': ' + late.map((f) => '#' + f.orderNumber).join('، ') : ''}. المهلة 24 ساعة من الإصدار (docs/19 R5) والتنبيه بيطلع عند 12 و20 ساعة.`, `${late.length} receipt(s) beyond 24 h.`, { late: late.map((f) => f.id) }, 'META'); }
+  if (has(q, 'اقترح', 'suggest') && has(q, 'متنفذوش', 'do not execute')) { rules.push('exec:draft-only'); const ent0 = entities(db, q, caller, rules); const per = lastWeekP(); const a = runQuery(db, caller, question, rules, ['item_net_sales', 'sold_quantity', 'menu_contribution'], [], ent0.f.product ? { product: ent0.f.product } : {}, per, undefined, 'DRAFT_ONLY'); return { ...a, text: L(`${a.text.ar} مش هنفذ أي عرض: المساعد بيقرا بس، والعرض بيتعمل من «العروض» وبيعدي على الموافقات (L5 مقفول في البروتوتايب).`, `${a.text.en} No offer is created: the assistant is read-only.`), chips: [...a.chips, { kind: 'refusal', label: L('مسودة بس — مفيش تنفيذ', 'Draft only — nothing executed') }] }; }
+  if (has(q, 'لما غيرنا سعر', 'price changed')) { rules.push('exec:price-change-trend'); const ent0 = entities(db, q, caller, rules); if (!ent0.f.product) return na(question, rules, ['sold_quantity'], L('مش لاقي الصنف في السؤال.', 'Item not found.')); const per = lastWeekP(); const tr = query(db, caller, { metrics: ['sold_quantity', 'item_net_sales'], dimensions: ['business_date'], filters: { product: ent0.f.product }, from: per.from, to: per.to }); const changes = db.priceRules.filter((r) => r.productId === ent0.f.product && r.branchId === 'branch_main' && r.replacesRuleId).length; return { ...base(question, rules), status: 'ANSWERED', shape: 'chart', data: tr, text: L(`${dimLabel(db, 'product', ent0.f.product).ar} يوم بيوم: ${tr.rows.map((x) => `${x.dims.business_date}: ${fmtVal(x.values.sold_quantity.value, 'unit')} قطعة / ${fmtVal(x.values.item_net_sales.value)}`).join('، ') || '—'}. تغييرات السعر المتسجلة: ${changes}. ده وصف قبل/بعد مش إثبات سبب.`, `${dimLabel(db, 'product', ent0.f.product).en} by day; ${changes} price change(s) recorded.`), chips: chipsFor(tr, ['sold_quantity', 'item_net_sales'], { product: ent0.f.product }, per, db), parsed: { intent: 'TREND', metrics: ['sold_quantity', 'item_net_sales'], dimensions: ['business_date'], filters: { product: ent0.f.product }, period: per, rules } }; }
+  if (has(q, 'جاي النهارده', 'reserved for')) { rules.push('exec:reservations-today'); const ent0 = entities(db, q, caller, rules); const rs = db.reservations.filter((r) => caller.accessibleBranchIds.includes(r.branchId) && bdOf(Date.parse(r.at)) === today && (!ent0.f.hour || String(new Date(Date.parse(r.at) + 2 * 3_600_000).getUTCHours()).padStart(2, '0') === ent0.f.hour)); return explainA(rs.length ? `${rs.length} حجز: ${rs.map((r) => `${r.customer} (${r.partySize} أفراد، ${r.state === 'BOOKED' ? 'محجوز' : r.state})`).join('، ')}.` : 'مفيش حجوزات في الميعاد ده النهارده.', `${rs.length} reservation(s).`, { reservations: rs.map((r) => r.id) }, 'EVIDENCE'); }
+
   // causal questions about promotions → descriptive only
   if (has(q, 'زود المبيعات', 'increase sales', 'حقيقيه ولا', 'genuine or', 'cannibal', 'بيرجع فلوسه', 'pay off')) { rules.push('na:causal'); return na(question, rules, ['sales_forecast'], L('أثر العرض الحقيقي محتاج مجموعة مقارنة (control) — عندنا وصف بس (قبل/بعد)، مش إثبات سبب.', 'True promotion lift needs a control group — descriptive only.')); }
   if (has(q, 'اعاده تجهيز', 'refire')) { rules.push('na:refire'); return na(question, rules, ['waste_value'], L('إعادة التجهيز لسه مش مقياس معتمد (بتظهر في شاشة المطبخ) — مش هنعدها من الهالك.', 'Refires are not a certified metric yet.')); }
@@ -217,12 +275,25 @@ export function ask(db: DB, caller: Caller, input: { question: string; clarify?:
   if (has(q, 'الفواتير اللي مش مطابقه', 'invoices do not match')) { rules.push('na:3way'); return na(question, rules, ['goods_received_value'], L('مطابقة فاتورة المورد مع الاستلام (3-way) لسه مش مقياس معتمد — الفاتورة بتتسجل كرقم على إذن الاستلام بس.', 'Supplier invoice matching is not certified yet.')); }
   if (has(q, 'النقاط', 'points') && has(q, 'متسجله صح', 'reconciled')) { rules.push('na:points'); return na(question, rules, ['repeat_rate'], L('مطابقة النقاط مش ضمن المحرك لسه.', 'Points reconciliation is not in the engine yet.')); }
 
+  if (has(q, 'منطقه بتطلب', 'which zone buys')) { rules.push('na:zone-item'); return na(question, rules, ['sold_quantity'], L('الأصناف حسب منطقة التوصيل لسه مش تقاطع معتمد (منطقة التوصيل مش متسجلة على سطور البيع).', 'Items by delivery zone is not a certified combination yet.')); }
+  if (has(q, 'التنظيف', 'cleaning')) { rules.push('na:cleaning'); return na(question, rules, ['table_turns'], L('وقت تنظيف الترابيزة بيتشاف في خريطة الصالة؛ لسه مش مقياس معتمد في التقارير.', 'Table cleaning time is not a certified metric yet.')); }
+  if (has(q, 'وقت انتظار', 'reserved guests wait')) { rules.push('na:wait'); return na(question, rules, ['avg_dining_minutes'], L('ميعاد وصول الضيف مقابل ميعاد قعدته مش متسجل — مش هنحسب انتظار.', 'Arrival vs seating time is not recorded.')); }
+  if (has(q, 'ايصال مرتجع', 'return receipt', 'اتلغت ومفيش اصل', 'without originals')) { rules.push('na:return-receipt'); return na(question, rules, ['eta_receipt_count'], L('إيصالات المرتجع الإلكترونية لسه مستنية قرار «نية المرتجع» (docs/19 §7) — مفيش إيصالات مرتجع اتبعتت.', 'Return e-receipts wait for the refund intent gate (docs/19 §7).')); }
+  if (has(q, 'يكفينا كام يوم', 'how many days will')) { rules.push('na:days-of-stock'); return na(question, rules, ['sales_forecast'], L('عدد الأيام محتاج توقع استهلاك — مفيش توقع معتمد. بنعرض الرصيد والحد الأدنى بس.', 'Days of stock need a demand forecast.')); }
+  if (has(q, 'رمضان', 'ramadan') && !cl.year) { rules.push('clarify:ramadan'); return clarifyA(question, rules, 'أنهي رمضان؟ (السيستم شغال من ' + launchDate(db) + ' وعنده إجماليات يومية من 28 يوم قبله بس)', 'Which Ramadan?', [{ id: 'year=2026', label: L('رمضان 2026', 'Ramadan 2026') }, { id: 'year=2027', label: L('رمضان 2027 (لسه ما جاش)', 'Ramadan 2027') }]); }
+  if (cl.year) { rules.push('na:ramadan-out-of-range'); return na(question, rules, ['net_item_sales'], L(`رمضان ${cl.year} برة البيانات المتاحة (من ${addDays(launchDate(db), -28)}) — مش هنخمّن.`, `Ramadan ${cl.year} is outside the available data.`)); }
+  // ───── 4. metric intent
+  const { ids: metricIds, genericOnly } = detectMetrics(q, rules);
+  if (!metricIds.length) { rules.push('unparsed'); return { ...base(question, rules), status: 'UNPARSED', shape: 'unparsed', text: L('مش فاهم السؤال ده لسه. جرب: «صافي المبيعات امبارح»، «أكتر 5 أصناف الأسبوع ده»، «عجز الدرج عند مين»، «الكاش كام والفيزا كام».', 'I did not understand. Try: "net sales yesterday", "top 5 items this week".') }; }
+  const primary = metricIds[0];
+  const m = metricById.get(primary)!;
+  // not-available sources first (labor, customers, forecast, aggregator…) — never 0, never a guess
+  const naIds = metricIds.filter((id) => metricById.get(id)?.status === 'NOT_AVAILABLE');
+  if (naIds.length && (metricById.get(primary)!.status === 'NOT_AVAILABLE')) { rules.push('na:source'); return na(question, rules, naIds); }
   // ambiguity → one clarifying question
   const ent = entities(db, q, caller, rules);
   if (ent.unknown.length) { rules.push('clarify:unknown-entity'); return clarifyA(question, rules, `${ent.unknown.map((x) => x.ar).join('، ')}. تقصد أنهي فرع؟`, `${ent.unknown.map((x) => x.en).join(', ')}. Which branch do you mean?`, caller.accessibleBranchIds.map((b) => ({ id: `branch=${b}`, label: dimLabel(db, 'branch', b) }))); }
   if (cl.branch) ent.f.branch = cl.branch;
-  if (has(q, 'رمضان', 'ramadan') && !cl.year) { rules.push('clarify:ramadan'); return clarifyA(question, rules, 'أنهي رمضان؟ (السيستم شغال من ' + launchDate(db) + ' وعنده إجماليات يومية من 28 يوم قبله بس)', 'Which Ramadan?', [{ id: 'year=2026', label: L('رمضان 2026', 'Ramadan 2026') }, { id: 'year=2027', label: L('رمضان 2027 (لسه ما جاش)', 'Ramadan 2027') }]); }
-  if (cl.year) { rules.push('na:ramadan-out-of-range'); return na(question, rules, [primary], L(`رمضان ${cl.year} برة البيانات المتاحة (من ${addDays(launchDate(db), -28)}) — مش هنخمّن.`, `Ramadan ${cl.year} is outside the available data.`)); }
   const isCompare = has(q, 'مقارنه', 'قارن', 'compared', 'compare', 'versus', ' vs', 'نفس يوم', 'same weekday', 'باللي قبله', 'اعلي من');
   const isWhy = has(q, 'ليه', 'why');
   const change = has(q, 'زاد', 'زادت', 'زود', 'وقعت', 'قلت', 'نزلت', 'increase', 'increased', 'drop', 'dropped', 'decreas');
@@ -244,31 +315,44 @@ export function ask(db: DB, caller: Caller, input: { question: string; clarify?:
   const extraMetrics = metricIds.slice(1, 3).filter((id) => metricById.get(id)?.status === 'AVAILABLE' && metricById.get(id)?.family === metricById.get(metric!)?.family && id !== metric);
   if (has(q, 'وخدمه', 'and service')) extraMetrics.push('service_charge');
   if (has(q, 'اتعد', 'counted')) extraMetrics.push('cash_counted');
+  if (metric === 'menu_contribution') extraMetrics.push('item_net_sales', 'food_theoretical_cost');
   const metrics = [...new Set([metric, ...extraMetrics])];
 
   // dimensions and period
+  if (metric === 'net_item_sales' && detectDims(q).some((d) => ['hour', 'daypart', 'product', 'category', 'staff'].includes(d))) { rules.push('metric:item-net-for-dims'); metric = 'item_net_sales'; }
   let dims = detectDims(q).filter((d) => metricById.get(metric!)?.dimensions.includes(d));
   if (dims.includes('payment_method') && !metricById.get(metric)!.dimensions.includes('payment_method')) dims = dims.filter((d) => d !== 'payment_method');
   if (metric === 'stock_on_hand' || metric === 'stock_waste_qty' || metric === 'stock_variance_qty') dims = ent.f.inventory_item ? [] : ['inventory_item'];
   if (metric === 'supplier_price_change' && !dims.length) dims = ['inventory_item'];
   if (dims.includes('branch')) delete ent.f.branch;
-  const tableish = ['table', 'chart', 'timeline'].includes((bank as any[]).find((b) => norm(b.ar) === q)?.shape ?? '') || dims.length > 0;
+  for (const d of dims) if (d !== 'branch') delete (ent.f as any)[d];
+  const tableish = dims.length > 0 || has(q, 'اكتر', 'اعلي', 'اقل', 'مين', 'كل ', 'most', 'top', 'which', 'list', 'هات', 'وريني');
   const pp = parsePeriod(q, today, tableish || isCompare ? 'LAST_7' : 'TODAY', rules);
   if ('clarify' in pp) return clarifyA(question, rules, 'أنهي رمضان؟', 'Which Ramadan?', [{ id: 'year=2026', label: L('2026', '2026') }]);
-  let period = pp;
+  let period = adjustDefault(db, caller, pp, today, rules, metricById.get(metric)?.fact !== 'stock' && !['po', 'grn', 'waste', 'count', 'reservation', 'delivery', 'open_check'].includes(metricById.get(metric)?.fact ?? ''));
   const branchIds = ent.f.branch ? [ent.f.branch] : dims.includes('branch') ? caller.accessibleBranchIds : undefined;
   const filters: Record<string, string> = { ...ent.f }; delete filters.branch;
   for (const k of Object.keys(filters)) if (!metricById.get(metric)!.dimensions.includes(k)) { rules.push(`filter-dropped:${k}`); delete filters[k]; }
 
   // ───── 5. execution kinds
   try {
+    if (metric === 'stock_on_hand' && has(q, 'ناقص', 'low', 'اعاده الطلب', 'reorder', 'نطلبها', 'نفاد', 'stock-out')) {
+      rules.push('exec:low-stock');
+      const facts = (BUILDERS.stock as any)(db, { branchIds: caller.accessibleBranchIds, from: today, to: today, asOfMs: caller.nowMs }) as any[];
+      const per = new Map<string, { item: string; qty: any; min: any; par: any }>();
+      for (const f of facts) { const k = f.dims.inventory_item; const x = per.get(k) ?? { item: k, qty: D(0), min: D(0), par: D(0) }; x.qty = x.qty.plus(f.n.qty); if (f.n.min) x.min = x.min.plus(f.n.min); if (f.n.par) x.par = x.par.plus(f.n.par); per.set(k, x); }
+      let list = [...per.values()].filter((x) => x.min.gt(0) && x.qty.lt(x.min)).map((x) => ({ item: x.item, label: dimLabel(db, 'inventory_item', x.item), onHand: x.qty.toString(), min: x.min.toString(), par: x.par.toString(), suggested: (x.par.minus(x.qty).gt(0) ? x.par.minus(x.qty) : D(0)).toString() }));
+      if (filters.inventory_item) list = [...per.values()].filter((x) => x.item === filters.inventory_item).map((x) => ({ item: x.item, label: dimLabel(db, 'inventory_item', x.item), onHand: x.qty.toString(), min: x.min.toString(), par: x.par.toString(), suggested: (x.par.minus(x.qty).gt(0) ? x.par.minus(x.qty) : D(0)).toString() }));
+      const draft = has(q, 'نطلبها', 'reorder', 'اعاده الطلب');
+      return { ...base(question, rules), status: 'ANSWERED', shape: 'table', data: { items: list }, text: L(`${filters.inventory_item ? '' : `${list.length} خامة تحت الحد الأدنى: `}${list.map((x) => `${x.label.ar} ${Number(x.onHand)} (الحد ${Number(x.min)}، المقترح ${Number(x.suggested)})`).join('، ') || 'مفيش خامة تحت الحد الأدنى'}. الرصيد لقطة لحد دلوقتي، والمقترح = المستوى المستهدف − الرصيد (قابل للتعديل).${draft ? ' مش هنعمل أمر شراء: المسودة بتتعمل من «طلبات الشراء» وبتعدي على الموافقة.' : ''}`, `${list.length} item(s) below minimum; suggested = par − on hand.`), chips: [{ kind: 'definition', label: L('الرصيد (لقطة asOf) — نسخة 1.0', 'Stock on hand (asOf) v1.0'), detail: metricById.get('stock_on_hand')!.definition }, { kind: 'asOf', label: L(`لحد ${new Date(caller.nowMs).toISOString().slice(0, 16)}`, `As of ${new Date(caller.nowMs).toISOString().slice(0, 16)}`) }, ...(draft ? [{ kind: 'refusal' as const, label: L('مسودة بس — مفيش أمر شراء', 'Draft only — no PO') }] : [])], parsed: { intent: draft ? 'DRAFT_ONLY' : 'QUERY', metrics: ['stock_on_hand'], dimensions: ['inventory_item'], filters, period: null, rules } };
+    }
     if (metric === 'menu_contribution_pct' && has(q, 'النجوم', 'الخيول', 'stars', 'horses', 'menu matrix', 'هندسه')) {
       rules.push('exec:menu-matrix');
       const mm = menuMatrix(db, caller, { from: period.from, to: period.to, branchIds, filters });
       const by = (c: string) => mm.items.filter((i) => i.class === c).map((i) => i.label.ar);
       return { ...base(question, rules), status: 'ANSWERED', shape: 'matrix', text: L(`نجوم: ${by('STAR').join('، ') || '—'}. خيول: ${by('PLOWHORSE').join('، ') || '—'}. ألغاز: ${by('PUZZLE').join('، ') || '—'}. كلاب: ${by('DOG').join('، ') || '—'}. التكلفة مش متاحة لـ ${by('COST_UNAVAILABLE').length} صنف (بنعرض شعبيتهم بس).`, `Stars: ${by('STAR').length}, plowhorses: ${by('PLOWHORSE').length}…`), data: mm, chips: chipsFor({ meta: mm.meta }, ['menu_contribution', 'menu_popularity'], filters, period, db), parsed: { intent: 'MENU_MATRIX', metrics: ['menu_contribution', 'sold_quantity'], dimensions: ['product'], filters, period, rules } };
     }
-    if (metric === 'menu_contribution' && has(q, 'ملهاش', 'missing recipe', 'lack a recipe', 'مالهاش')) {
+    if (metric === 'menu_contribution' && has(q, 'وصفه', 'recipe')) {
       rules.push('exec:no-recipe');
       const r = query(db, caller, { metrics: ['sold_quantity', 'food_theoretical_cost'], dimensions: ['product'], from: period.from, to: period.to, branchIds, filters });
       const missing = r.rows.filter((x) => x.values.food_theoretical_cost.availability !== 'AVAILABLE');

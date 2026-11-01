@@ -407,7 +407,10 @@ function BulkResult({ result, onHistory, pname, cname }: { result: any; onHistor
   const sig = (a: any[]) => a.filter((r) => !r.skipped).map((r) => `${r.key}=${r.newAmount}`).sort().join(',');
   const same = pv.length > 0 && sig(pv) === sig(rows);
   const ex = result.exclusions ?? result.batch?.exclusions;
+  const ref = React.useRef<HTMLDivElement>(null);
+  useEffect(() => { ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, [result]);
   return (
+    <div ref={ref}>
     <Card tone="success" title={<span className="inline-flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />{t('اتطبق التغيير')}</span>} data-fb="bulk:result"
       actions={<Button size="sm" variant="ghost" data-fb="bulk:to-history" onClick={onHistory}>{t('سجل التغييرات الجماعية')}</Button>}>
       <div className="space-y-3">
@@ -422,6 +425,7 @@ function BulkResult({ result, onHistory, pname, cname }: { result: any; onHistor
         <div className="text-[11px] text-dim">{t('التغيير اتسجل في سجل النشاط باسمك. تقدر تحط سعر خاص لصنف واحد بعد كده من «سعر صنف» وتثبته.')}</div>
       </div>
     </Card>
+    </div>
   );
 }
 

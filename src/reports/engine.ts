@@ -373,7 +373,7 @@ export function query(db: DB, caller: Caller, q: QuerySpec): QueryResult {
     const g = evalMetric(totalsCtx, m).get('') ?? evalMetric(totalsCtx, m).get('*');
     totals[m.id] = g?.value ?? zeroOrNA(m, c);
     if (preLaunchDays.length && !hasHistory(m) && totals[m.id].availability === 'AVAILABLE') totals[m.id] = { ...totals[m.id], reason: { ar: `الأيام قبل ${c.launch} مفيهاش بيانات تفصيلية — مش داخلة في الرقم.`, en: `Days before ${c.launch} have no event-level data — excluded.` } };
-    if (preLaunchDays.length === datesOf(from, to).length && !hasHistory(m) && m.fact !== 'stock' && m.fact !== 'open_check') totals[m.id] = NOT_AVAIL({ ar: `الفترة كلها قبل تشغيل السيستم (${c.launch}) — عندنا إجماليات يومية بس.`, en: `Whole period precedes launch (${c.launch}) — daily aggregates only.` });
+    if (preLaunchDays.length === datesOf(from, to).length && !hasHistory(m)) totals[m.id] = NOT_AVAIL({ ar: `الفترة كلها قبل تشغيل السيستم (${c.launch}) — عندنا إجماليات يومية بس.`, en: `Whole period precedes launch (${c.launch}) — daily aggregates only.` });
   }
   for (const id of notAvailable.map((x) => x.metric)) totals[id] = NOT_AVAIL(notAvailable.find((x) => x.metric === id)!.reason);
   for (const r of refused) totals[r.metric] = { value: null, availability: 'REFUSED', reason: r.reason };
@@ -409,10 +409,13 @@ export function query(db: DB, caller: Caller, q: QuerySpec): QueryResult {
   };
   return { meta, dimensions: dims, metrics: q.metrics, rows, totals };
 }
-const hasHistory = (m: MetricDef) => !!HISTORY[m.id] || !!m.terms?.every((t) => HISTORY[t.metric]) || (!!m.numerator && !!HISTORY[m.numerator] && !!HISTORY[m.denominator!]);
+const SALES_FACTS = new Set<string>(['check', 'line', 'payment', 'refund', 'drawer', 'cash_entry', 'removal', 'discount', 'comp', 'staff_meal', 'kitchen', 'fiscal', 'approval', 'visit', 'recon', 'composite']);
+/** Only sales-domain facts start at launch; inventory, purchasing, reservations and delivery have their own history. */
+const preLaunchApplies = (m: MetricDef) => SALES_FACTS.has(m.fact) && !(m.fact === 'composite' && [m.numerator, m.terms?.[0]?.metric].some((x) => x && !SALES_FACTS.has(metricById.get(x)?.fact ?? '')));
+const hasHistory = (m: MetricDef) => !preLaunchApplies(m) || !!HISTORY[m.id] || !!m.terms?.every((t) => HISTORY[t.metric]) || (!!m.numerator && !!HISTORY[m.numerator] && !!HISTORY[m.denominator!]);
 function zeroOrNA(m: MetricDef, c: Ctx): MetricValue {
   if (m.additivity === 'WEIGHTED_RATIO') return { value: null, availability: 'NOT_DEFINED', reason: { ar: 'مفيش بيانات في النطاق — النسبة مش متعرفة.', en: 'No data in scope — ratio undefined.' } };
-  if (m.id === 'guest_count') return NOT_AVAIL({ ar: 'مفيش عدد ضيوف متسجل في النطاق.', en: 'No guest count recorded.' });
+  if (m.id === 'guest_count') return { value: '0.0000', availability: 'AVAILABLE', evidenceCount: 0, reason: { ar: 'مفيش قعدات صالة في الفترة دي.', en: 'No dine-in visits in this period.' } };
   if (m.id === 'data_freshness_minutes') return NOT_AVAIL({ ar: 'مفيش أي حركة اتسجلت في النطاق — مش عارفين آخر تحديث.', en: 'No event in scope.' });
   return { value: '0.0000', availability: 'AVAILABLE', evidenceCount: 0, reason: { ar: 'المصدر شغال ومفيش حركات في الفترة دي.', en: 'Source live; no events in this period.' } };
 }
