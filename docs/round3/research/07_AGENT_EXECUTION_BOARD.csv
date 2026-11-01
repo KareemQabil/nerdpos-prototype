@@ -1,0 +1,18 @@
+﻿id,lane,priority,task,acceptance
+R-INIT,BASELINE,P0,"Read repo and pin sha; inspect docs/pack/reference/27_OPERATOR_REPORTS.md and related 25/19, verify report UI + mocks/API + existing tests",No modifications until pin/authorization/ownership
+R-01,CONTRACTS,P0,Inventory actual Report.Run/List/Export/Schedule code vs SPECIFIED-only claim; extract all real report shapes and business rules,Current repo proof; do not assume prior 8+28 status
+R-02,SEMANTICS,P0,"Register canonical metrics, business-date rules, unit/money invariants and dimension relation graph",Reject unknown metrics and illegal joins; version definitions
+R-03,RECON,P0,"Build EOD money bridge for gross, discount, net, service, VAT, tender, refund, drawer and prior-day correction",Every difference explained by source-linked signed events
+R-04,CATALOG,P0,Build 10–15 operator-validated pilot report templates from catalog and make them exportable,No template computed proprietary invented metric
+R-05,PERMISSIONS,P0,"Server-enforce metric, branch, role, sensitive dimensions on report/list/export/AI",Cross-tenant negative test + denial audit
+R-06,LINEAGE,P0,"Metric result points to run id, asOf, version, input event and check/line drilldown",Trace one EGP to original check and refund
+R-07,SNAPSHOT,P0,Business date Africa/Cairo cutoff 04:00; provisional on open shift; returns current payout date,Prove DST/retry/backdated source cases
+R-08,VISUAL,P1,"Arabic-first reporting UX: clear cards, table, filters, date, saved views, preview, no clutter",Screenshots responsive + RTL + values vs CSV
+R-09,EXPORTS,P1,CSV + verified available Excel/PDF exports with brand+range+metric labels; scheduled reports with role-aware recipient checks,No unapproved PII or cross-branch export
+R-10,ANALYSIS,P1,"Comparison/trend/decomposition: aggregate source before ratio, explain price vs volume and mix",Golden results on seeded fixtures
+R-11,QUESTION_BANK,P1,"Use 198 questions as eval set, classify intent, ambiguous questions and missing source","No invented answers, full offline/unsupported handling"
+R-12,CHAT_RULED,P1,Start deterministic query UX over certified metrics with source drilldown; add LLM only after eval,"No free-text raw SQL, no unapproved mutation"
+R-13,ACTIONS,P2,"Action drafts through existing approval hooks, audit and review; no writing directly from model output",Owner-approved scope and negative tests
+R-14,BENCH,P2,"Peer benchmarking opt-in with minimum cohort sizes, aggregation and consent",No indirect competitor data leakage
+R-15,EXPERT_SIGNOFF,P0,"Owner+operations manager+accountant+auditor review metric semantics, priority reports, edge cases",Record actual signoffs and unresolved questions
+R-16,PILOT_GATE,P0,"Prove report parity across UI/CSV/ledger, inspect replay/refund/void cases, quantify stale data",All critical checks passed before pilot claim

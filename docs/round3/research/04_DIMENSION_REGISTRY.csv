@@ -1,0 +1,32 @@
+﻿dimension_id,name_ar,type,description,compatible_facts,source_field_or_policy,priority,warning
+business_date,اليوم التجاري,time,4am Africa/Cairo based on accepted policy version,all valid event facts,BusinessDatePolicy,MUST,Ensure return payout date and EOD close
+business_week,الأسبوع التجاري,time,Group business dates to configured week start,"sales,refund,inventory",reporting_calendar,MUST,Ask week start when vague
+daypart,الفترة التشغيلية,time,Breakdown breakfast/lunch/dinner/late,"sale,order,kds",daypart_config,MUST,Late night belongs business date defined
+hour,الساعة,time,Hour from trusted event time localized to Cairo,"sales,shift,kds",event_time,MUST,Not user-editable demo clock
+branch,الفرع,organization,Legal or operational branch identifier,all scoped facts,branch_id,MUST,Tenant+row permission
+location,موقع المخزون,organization,Store room/stock location,"inventory,receipt",stock_location_id,SHOULD,Not applicable to all sales
+revenue_center,منطقة البيع,organization,Dining area/bar/counter revenue center,"check,sale",revenue_center_id,SHOULD,Different from sales channel
+channel,قناة البيع,order,DINE_IN TAKEAWAY DELIVERY MARKETPLACE,"order,sale,refund",sales_channel_id,MUST,Per-channel pricing differs
+order,الأوردر,order,Canonical order identity,"order,sale,kds",order_id,MUST,Split check does not multiply order
+check,الشيك,order,Payment/accounting check identity,"check,payment",check_id,MUST,Split checks may be multiple per visit
+table_visit,زيارة الترابيزة,service,One seating visit across multiple checks,"visit,sale",visit_id,SHOULD,Guests once per visit
+table,الترابيزة,service,Physical restaurant table,visit,table_id,SHOULD,Tables may be moved or combined
+staff,الموظف,personnel,Event actor or sales attribution,"sale,void,approval,shift",actor_user_id,MUST,Differentiate cashier waiter approver
+role,الوظيفة,personnel,Job code or role,"staff,approval,labor",role_id,SHOULD,Role-level security cannot expose PII
+product,الصنف,menu,Sold item/recipe SKU,"sale,recipe,waste",product_id,MUST,Bundle attribution policy
+category,فئة المنيو,menu,Category at sale-time,sale_line,category_version,MUST,Don't reassign old sales by current tree
+modifier,الإضافات,menu,Modifier/half-half config at sale time,sale_line,modifier_snapshot_id,SHOULD,No flattening different combinations
+size,الحجم,menu,Menu size unit at sale time,sale_line,size_id,SHOULD,Normalize recipe consumption
+payment_method,وسيلة الدفع,finance,Cash card wallet external transfer,payment_event,tender_method_code,MUST,Not a dimension of gross sales without bridge
+drawer,درج الكاش,finance,Physical cash drawer + session,drawer_event,drawer_session_id,MUST,Scope drawer by session
+void_reason,سبب الإلغاء,control,Policy-approved audit reason,audit_event,reason_code,MUST,Preserve free note separately
+approval_actor,الموافق,control,Approver identity,approval_event,approver_id,MUST,Access restricted to manager/accountant
+inventory_item,الخامة,stock,Stock item in base unit,"inventory,recipe",ingredient_id,SHOULD,Not necessarily one-to-one menu item
+supplier,المورّد,procurement,Supplier ID and price terms,"PO,receipt,invoice",supplier_id,SHOULD,Cost per UOM normalized
+driver,الطيار,delivery,Assigned delivery worker,delivery,driver_id,SHOULD,Sensitive personnel data; no unrelated branches
+zone,منطقة التوصيل,delivery,Delivery geofence/fee group,delivery,zone_id,SHOULD,Address PII minimized
+customer_cohort,فوج العملاء,customer,First purchase month/retention cohort,"customer,sale",cohort_id,LATER,Only consented/eligible data
+tax_group,فئة الضريبة,fiscal,Tax policy classification snapshot,tax_line,tax_group_id,MUST,Verify VAT applicability legally
+fiscal_status,حالة الإيصال,fiscal,ETA draft submitted accepted rejected returned,fiscal_document,eta_status,SHOULD,Sandbox and production distinct
+device,الجهاز,system,POS terminal/device key,"command,audit",device_id,MUST,Useful for offline tracing
+sync_status,حالة المزامنة,system,Pending replay accepted failed unknown,sync_event,sync_status,MUST,No double count of replayed commands

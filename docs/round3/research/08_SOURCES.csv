@@ -1,0 +1,42 @@
+﻿source_id,name,type,date,url,relevance
+SRC01,Toast IQ 90 days report,Toast primary,2026-06-10,https://pos.toasttab.com/news/toast-iq-restaurant-trends-report-ai-assistant,"Research user prompt categories, vendor claims; self-report"
+SRC02,Toast IQ 2026 Q2 findings,Toast primary,2026-10 (reported),https://pos.toasttab.com/blog/data/restaurant-ai-report,"Operational queries and actions, self-reported"
+SRC03,Toast IQ product,Toast primary,Accessed 2026-11-01,https://pos.toasttab.com/products/toast-iq,"Public pricing/feature claims, vendor only"
+SRC04,Square Managerbot beta,Square primary,2026-04-28,https://squareup.com/us/en/press/managerbot-open-beta,"Square AI evolved to proactive agent; beta, vendor claims"
+SRC05,Square AI early usage,Square primary,2025-08-12,https://squareup.com/us/en/press/square-ai-beta-insights,"Historical Square AI, not latest successor"
+SRC06,Lightspeed AI launch,Lightspeed primary,2026-01-09,https://www.lightspeedhq.com/news/lightspeed-commerce-launches-lightspeed-ai-a-new-ai-powered-intelligence-layer-for-retail-and-hospitality/,"Conversational AI, roadmap not proof of actions"
+SRC07,Lightspeed Oct 2026 saved charts,Lightspeed primary,2026-10-22,https://www.lightspeedhq.com/news/lightspeed-advances-its-connected-commerce-platform-to-help-merchants-run-smarter-and-capture-more-demand/,AI-saved live charts as of October 2026
+SRC08,Lightspeed Advanced Reporting,Lightspeed support,Accessed 2026-11-01,https://resto-support.lightspeedhq.com/hc/en-us/articles/226404808-Advanced-Reporting,"Custom drag/drop templates, PDF/Excel/CSV; L-Series different from K-Series"
+SRC09,Lightspeed benchmarks,Lightspeed support,Accessed 2026-11-01,https://k-series-support.lightspeedhq.com/hc/en-us/articles/28846463754523-Understanding-Benchmarks-and-Trends,"Similar nearby peer benchmark, package varies by region"
+SRC10,Foodics BI help catalog,Foodics support,Accessed 2026-11-01,https://help.foodics.com/hc/en-us/categories/22106949880988-Foodics-BI,"Deep inventory, KDS, retention, finance, comparison, scheduling"
+SRC11,Foodics menu engineering,Foodics support,Accessed 2026-11-01,https://help.foodics.com/hc/en-us/articles/22205249199644-Menu-Engineering-Deep-Dive-in-Foodics-AI,"Stars/Horses/Puzzles/Turtles, business-day filters"
+SRC12,Foodics report scheduling,Foodics support,Accessed 2026-11-01,https://help.foodics.com/hc/en-us/articles/22199908400028-How-to-schedule-reports-in-Foodics-AI,"PDF/XLSX/CSV schedules, triggers and recipient cautions"
+SRC13,Oracle reporting catalog,Oracle primary,Accessed 2026-11-01,https://docs.oracle.com/en/industries/food-beverage/reporting-and-analytics/rarrg/toc.htm,"Broad restaurant operations, waste, affinity, KDS, employee exceptions"
+SRC14,Oracle daily operations,Oracle primary,Accessed 2026-11-01,https://docs.oracle.com/en/industries/food-beverage/reporting-and-analytics/rarrg/c_daily_operations_tsr_add.htm,"Separate net sales, service, tax, collections, guests and checks"
+SRC15,Oracle void item report,Oracle primary,Accessed 2026-11-01,https://docs.oracle.com/en/industries/food-beverage/reporting-and-analytics/rarrg/c_voided_menu_items.htm,Voids by employee and reason
+SRC16,NCR Aloha reports,NCR Voyix primary,Accessed 2026-11-01,https://docs.ncrvoyix.com/restaurant/aloha-cloud/results/reports/about_back_office_reports,"Device activity, void audit, refund, item modifiers, staff and report exports"
+SRC17,NCR Aloha net sales definitions,NCR Voyix primary,Accessed 2026-11-01,https://docs.ncrvoyix.com/restaurant/aloha-smart-manager/reporting/sales/sales_summary_report,Shows vendor-specific gross/net definitions; do not assume universal metric semantics
+SRC18,TouchBistro reports,TouchBistro primary,Accessed 2026-11-01,https://www.touchbistro.com/features/reporting-analytics/,Vendor claims >50 reports; automatic daily email
+SRC19,Clover reports,Clover primary,Accessed 2026-11-01,https://www.clover.com/pos-systems/business-tracking-reporting,"Real-time multi-location sales, tax, EOD, exports"
+SRC20,SpotOn report index,SpotOn support,Accessed 2026-11-01,https://spotonteam.atlassian.net/wiki/spaces/SK/pages/4616290379/Reporting%2BSpotOn%2BRestaurant,"Vendor claims >70 prebuilt reports, automation"
+SRC21,Loyverse pricing,Loyverse primary,Accessed 2026-11-01,https://loyverse.com/pricing,"Free 31-day sales reporting, paid add-ons; verify prices by country/date"
+SRC22,Loyverse reports,Loyverse support,Accessed 2026-11-01,https://help.loyverse.com/help/reports,"Reports, shifts, customer history, exports"
+SRC23,Rewaa reporting,Rewaa primary,Accessed 2026-11-01,https://rewaa.com/solutions/reports/,Arabic region retail/restaurants sales inventory finance tax
+SRC24,Rewaa stock movements,Rewaa support,2026-08-06,https://help.rewaa.com/8671629-%D9%83%D9%8A%D9%81-%D8%AA%D8%AA%D8%A7%D8%A8%D8%B9-%D8%AD%D8%B1%D9%83%D8%A9-%D9%85%D9%86%D8%AA%D8%AC%D8%A7%D8%AA%D9%83-%D8%B9%D9%84%D9%89-%D8%A7%D9%84%D9%85%D9%86%D8%B5%D8%A9,Product movement traceability; manual stock edits excluded from that report
+SRC25,R365 Sales and Prime Cost,Restaurant365 support,2026-09-15 updated,https://docs.restaurant365.com/docs/sales-and-prime-cost,"Prime cost, budgets, periods"
+SRC26,R365 reporting API catalog,Restaurant365 support,2026-10-27,https://docs.restaurant365.com/apidocs/reports,Data grains and repeat-sales aggregation pitfall
+SRC27,R365 labor report grain,Restaurant365 support,2026-10-27,https://docs.restaurant365.com/apidocs/sales-and-prime-cost-labor-report,Net sales repeats by labor category; nonadditive hazard
+SRC28,dbt MetricFlow overview,dbt Labs docs,Accessed 2026-11-01,https://docs.getdbt.com/docs/build/about-metricflow?version=2,Versioned metric definitions; platform dependency caveats
+SRC29,dbt MetricFlow source,dbt Labs GitHub,Accessed 2026-11-01,https://github.com/dbt-labs/metricflow,Compiles semantically defined metrics to SQL; joins and grain handling
+SRC30,Power BI RLS,Microsoft Learn,Updated 2026,https://learn.microsoft.com/power-bi/service-admin-rls,RLS viewer/admin caveat; policies enforced server side
+SRC31,semantic layer study,ArXiv independent study,2026-04-28,https://arxiv.org/abs/2604.25149,"3 models, 100 retail questions: +17 to +23pp; final accuracy 67.7%-68.7%, not 100%; limited benchmark"
+SRC32,ETA e-receipt integration,Egyptian Tax Authority,Accessed 2026-11-01,https://portal.eta.gov.eg/ar/content/e-receipt-services,"Official portal, registration and technical links"
+SRC33,ETA receipt submission FAQ,Egyptian Tax Authority,Accessed 2026-11-01,https://sdk.invoicing.eta.gov.eg/receiptissuancefaq/,"Default 24h submission, batches, returns ≤540d per current FAQ; validate applicability"
+SRC34,ETA eReceipt APIs,Egyptian Tax Authority,Accessed 2026-11-01,https://sdk.invoicing.eta.gov.eg/ereceiptapi/,"Submission/search, response statuses, return receipt, exports"
+SRC35,ETA restaurant VAT scope,Egyptian Tax Authority,2025-05-18,https://www.eta.gov.eg/ar/news/twdh-khdw-almtam-walkafyhat-almhddt-bqrarat-wzyr-almalyt-ldrybt-alqymt-almdaft,14% applicability conditional on classification/registration; not blanket default
+SRC36,Egypt VAT law updates,Egyptian Tax Authority,Accessed 2026-11-01,https://www.eta.gov.eg/ar/content/qwanyn-aldrybt-ly-alqymt-almdaft,2025/2026 amendments; professional legal validation needed
+SRC37,Operator asks for item profit,Reddit self-reported,2025-10-07,https://www.reddit.com/r/restaurantowners/comments/1o0cfbe,Small anecdotal thread: reports hard to navigate; do not generalize prevalence
+SRC38,Toast reporting anecdote,Reddit self-reported,2026-04-07,https://www.reddit.com/r/ToastPOS/comments/1sejq7i/toast_reporting_errors_i_am_done/,Anecdotal delayed sync and restated shift figures; not verified independent audit
+SRC39,Toast tip-shift anecdote,Reddit self-reported,2026-07-19,https://www.reddit.com/r/ToastPOS/comments/1v0cr66/beware_critical_shift_review_and_reporting/,Anecdotal reconciliation issue; not generalizable
+SRC40,Square restaurant multi-site anecdote,Reddit self-reported,2026-07-07,https://www.reddit.com/r/SquarePOS_Users/comments/1uq46bt/restaurant_owners_considering_square_pos_heres_my/,Anecdotal multiple locations + sync/payment friction
+SRC41,Square versus Toast community,Reddit self-reported,2026-06-19,https://www.reddit.com/r/restaurantowners/comments/1uagqvw/what_pos_systems_are_you_using_these_days/,"Reports, restaurant splits and perceived pricing, subjective"
