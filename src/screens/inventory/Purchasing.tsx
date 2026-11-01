@@ -31,8 +31,9 @@ export default function Purchasing() {
     if (params?.newRequest) setNewReq({ itemId: params?.itemId });
   }, [params?.tab, params?.open, params?.newRequest, params?.itemId]);
   const reqs = useList<any>('StoreRequest.Find', { branchId: scope.branchId });
-  const invs = useList<any>('SupplierInvoice.Find', { branchId: scope.branchId });
-  const pending = useList<any>('SupplierInvoice.Pending', { branchId: scope.branchId });
+  const canBuy = can('purchasing:read');
+  const invs = useList<any>('SupplierInvoice.Find', { branchId: scope.branchId }, canBuy);
+  const pending = useList<any>('SupplierInvoice.Pending', { branchId: scope.branchId }, canBuy);
   const waiting = reqs.items.filter((r) => r.state === 'SUBMITTED');
   const loading = reqs.loading && !reqs.raw;
   return (
@@ -43,16 +44,17 @@ export default function Purchasing() {
           {can('supplierinvoice:post') && <Button data-fb="pur:direct" onClick={() => setDirect(true)}><ReceiptIcon className="w-4 h-4" />{t('فاتورة مورد مباشرة')}</Button>}
           {can('storerequest:create') && <Button data-fb="pur:new-request" variant="primary" onClick={() => setNewReq({})}><Plus className="w-4 h-4" />{t('طلبية مخزن جديدة')}</Button>}</>} />
       <StatGrid>
+        {/* the store keeper sees requests only; purchasing also sees receipts and invoices */}
         <StatCard label={t('طلبيات مستنية المشتريات')} value={waiting.length} icon={<ClipboardList />} tone={waiting.length ? 'warning' : 'neutral'} loading={loading} onClick={() => setTab('requests')} fb="pur:kpi-waiting" />
-        <StatCard label={t('استلامات من غير فاتورة')} value={pending.items.length} icon={<PackageCheck />} tone={pending.items.length ? 'info' : 'neutral'} loading={pending.loading && !pending.raw} onClick={() => setTab('invoices')} fb="pur:kpi-pending" />
+        {canBuy && <><StatCard label={t('استلامات من غير فاتورة')} value={pending.items.length} icon={<PackageCheck />} tone={pending.items.length ? 'info' : 'neutral'} loading={pending.loading && !pending.raw} onClick={() => setTab('invoices')} fb="pur:kpi-pending" />
         <StatCard label={t('فواتير الموردين (الكل)')} value={invs.items.length} icon={<FileText />} loading={invs.loading && !invs.raw} hint={t('بقيمة {m}', { m: money(String(invs.items.reduce((a, x) => a + Number(x.total), 0))) })} />
-        <StatCard label={t('فرق أسعار في الفواتير')} value={<Money v={String(invs.items.reduce((a, x) => a + Number(x.priceVariance), 0))} />} icon={<ShoppingBag />} hint={t('الفاتورة مقابل سعر الاستلام')} />
+        <StatCard label={t('فرق أسعار في الفواتير')} value={<Money v={String(invs.items.reduce((a, x) => a + Number(x.priceVariance), 0))} />} icon={<ShoppingBag />} hint={t('الفاتورة مقابل سعر الاستلام')} /></>}
       </StatGrid>
       <Tabs<Tab> variant="underline" value={tab} onChange={setTab} tabs={[
         { id: 'requests', label: t('طلبيات المخزن'), count: reqs.items.length, fb: 'pur:tab-requests' },
-        { id: 'invoices', label: t('فواتير الموردين'), count: invs.items.length, fb: 'pur:tab-invoices' },
+        ...(canBuy ? [{ id: 'invoices' as Tab, label: t('فواتير الموردين'), count: invs.items.length, fb: 'pur:tab-invoices' }] : []),
       ]} />
-      {tab === 'requests' ? (
+      {tab === 'requests' || !canBuy ? (
         <Card padding="sm">
           <Table loading={loading} onRowClick={(i) => setOpenSr(reqs.items[i].id)} align={['start', 'start', 'start', 'end', 'start', 'start']}
             empty={<EmptyState compact icon={<ClipboardList />} title={t('مفيش طلبيات مخزن')} text={t('أمين المخزن يعمل طلبية بالنواقص — الكمية بتتحسب لوحدها (المستهدف − الموجود) ويقدر يعدلها.')} action={can('storerequest:create') ? <Button variant="primary" onClick={() => setNewReq({})}>{t('طلبية مخزن جديدة')}</Button> : undefined} />}

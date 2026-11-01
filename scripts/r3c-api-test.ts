@@ -49,6 +49,19 @@ const a2 = (await call(cashier, 'Order.AddLines', { params: { orderId: oTal.id }
 ok(oDine.salesChannelId === 'sch_takeaway' && oTal.salesChannelId === 'sch_talabat', `orders carry salesChannelId: ${oDine.salesChannelId} / ${oTal.salesChannelId}`);
 ok(n(a1.lines[0].unitPrice) === 40 && n(a2.lines[0].unitPrice) === 48, `same coffee: takeaway line ${a1.lines[0].unitPrice}, طلبات line ${a2.lines[0].unitPrice}`);
 
+// 2b. online inbox: accept a delivery-app order on the طلبات channel
+{
+  const ext = (store.db.externalOrders ?? []).filter((e: any) => e.state === 'NEW' && e.fulfillment === 'DELIVERY');
+  let accepted: any = null; let lastErr: any = null;
+  for (const e of ext) {
+    const r = await tryCall(cashier, 'ExternalOrder.Accept', { params: { externalOrderId: e.id }, body: { prepMinutes: 20, salesChannelId: 'sch_talabat' } });
+    if (r.ok) { accepted = e; break; } lastErr = r.code;
+  }
+  if (!accepted) { for (let i = 0; i < 8 && !accepted; i++) { const sim = await tryCall(cashier, 'Channel.IngestExternalOrder', { params: { channel: 'APP_1' }, body: { simulate: true } }); const e = sim.ok ? store.db.externalOrders!.find((x: any) => x.state === 'NEW' && x.fulfillment === 'DELIVERY') : null; if (e) { const r = await tryCall(cashier, 'ExternalOrder.Accept', { params: { externalOrderId: e.id }, body: { prepMinutes: 20, salesChannelId: 'sch_talabat' } }); if (r.ok) accepted = e; else lastErr = r.code; } } }
+  const o = accepted ? store.db.orders.find((x: any) => x.externalOrderId === accepted.id) : null;
+  ok(!!o && o.salesChannelId === 'sch_talabat' && o.channel === 'DELIVERY', `online order accepted on طلبات: ${o ? `${o.number} ${o.salesChannelId} lines ${o.lines.map((l: any) => l.sku + ' ' + l.unitPrice).join(', ')}` : 'none (' + lastErr + ')'}`);
+}
+
 // 3. bulk: delivery +20%, tea excluded; dine-in untouched; preview = result; audit
 const mgr = await as('t_admin', 'demo-manager-1');
 const bulkBody = (dry: boolean, extra: any = {}) => ({ dryRun: dry, filter: { salesChannelIds: ['sch_delivery'], branchIds: ['branch_main'], includeVariants: true }, change: { mode: 'PERCENT', value: '20' }, rounding: { step: '1', direction: 'NEAREST' }, exclusions: { productIds: ['p_tea'], categoryIds: [], rowKeys: [] }, ...extra });

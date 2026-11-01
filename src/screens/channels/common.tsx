@@ -61,5 +61,5 @@ export function SalesChannelTag({ id }: { id?: string | null }) {
   const { items } = useSalesChannels(undefined, true);
   const c = items.find((x) => x.id === id);
   if (!c || c.isDefault) return null;
-  return <span className="inline-flex items-center gap-1 px-2 h-6 rounded-full text-[11px] font-bold border line surface-1" data-fb="order:sales-channel"><ChannelDot color={c.color} />{L(c.name)}</span>;
+  return <span className="self-start inline-flex items-center gap-1 px-2 h-6 rounded-full text-[11px] font-bold border line surface-1" data-fb="order:sales-channel"><ChannelDot color={c.color} />{L(c.name)}</span>;
 }

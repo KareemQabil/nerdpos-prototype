@@ -143,7 +143,7 @@ function SetPriceForm({ product, variant, branchId, channel, current, sched }: {
   return (
     <Card title={t('سعر جديد')} badge={<StateBadge ops={['Catalog.SetPrice']} />}>
       <div className="space-y-3">
-        <KV rows={[[t('الصنف'), `${L(product.name)}${variant ? ' · ' + L(variant.name) : ''}`], [t('القناة'), <span className="inline-flex items-center gap-1.5"><ChannelDot color={channel.color} />{chName(channel)} <span className="text-dim text-xs">({orderTypeLabel(channel.orderType)})</span></span>], [t('السعر الحالي'), current ? <Money v={current.amount} /> : '—']]} />
+        <KV rows={[[t('الصنف'), `${L(product.name)}${variant ? ' · ' + L(variant.name) : ''}`], [t('القناة'), <span className="inline-flex items-center gap-1.5"><ChannelDot color={channel.color} />{chName(channel)}{!channel.isDefault && <span className="text-dim text-xs">({orderTypeLabel(channel.orderType)})</span>}</span>], [t('السعر الحالي'), current ? <Money v={current.amount} /> : '—']]} />
         <Field label={t('السعر (ج.م)')}><Input data-fb="set-price:amount" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" /></Field>
         <Field label={t('يبدأ إمتى')}>
           <Radio<'NOW' | 'SCHEDULED'> fb="set-price:mode" value={mode} onChange={setMode} options={[{ value: 'NOW', label: <span className="inline-flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{t('من دلوقتي')}</span> }, { value: 'SCHEDULED', label: <span className="inline-flex items-center gap-1"><CalendarClock className="w-3.5 h-3.5" />{t('مجدول')}</span> }]} />

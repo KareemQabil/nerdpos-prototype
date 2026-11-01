@@ -97,6 +97,7 @@ export default function Item360() {
         </div>
       </Card>
 
+      {!isDish && !st && <Banner tone="info" title={t('تفاصيل المخزن مش ظاهرة للحساب ده')}>{t('رصيد الخامة ومستنداتها بتظهر لأمين المخزن والمدير. ادخل بحساب تاني لو محتاجها.')}</Banner>}
       {/* lifecycle strip */}
       {st && (
         <Card title={t('رحلة الصنف')} description={t('آخر 30 يوم في مخازن الفرع ده — اضغط على أي خطوة عشان تشوف تفاصيلها.')}>

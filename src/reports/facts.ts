@@ -104,7 +104,7 @@ const buildLine: Builder = (db, s) => {
     if (!lines.length) continue;
     const p = checkParts(o);
     const w = lines.map((l) => D(l.lineTotal).abs().plus('0.0001'));
-    const gross = allocate(p.gross, w, 4); const disc = allocate(p.discount, w, 4); const inside = allocate(p.insideTax, w, 4);
+    const gross = allocate(p.gross, w, 2); const disc = allocate(p.discount, w, 2); const inside = allocate(p.insideTax, w, 2); // whole piasters, largest remainder
     const base = checkDims(db, o);
     const ms = o.completedAtMs ?? o.createdAtMs;
     lines.forEach((l, i) => {

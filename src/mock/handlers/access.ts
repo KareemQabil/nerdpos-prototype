@@ -90,7 +90,7 @@ export const accessHandlers: Record<string, Handler> = {
     return { id: s!.id, revokedAt: s!.revokedAt };
   },
   'Permission.List': (ctx) => {
-    const all = [...permissionCatalog(ctx.db)].sort().map((id) => ({ id, module: id.split(':')[0] }));
+    const all = [...permissionCatalog(ctx.db)].filter((id) => !isVendorPermission(id) || ctx.can(id)).sort().map((id) => ({ id, module: id.split(':')[0] })); // r3C: vendor-only permissions are not offered to the venue
     return page(all.filter((p) => !ctx.query.module || p.module === ctx.query.module), ctx.query);
   },
   'Role.List': (ctx) => page(ctx.db.roles, ctx.query),
