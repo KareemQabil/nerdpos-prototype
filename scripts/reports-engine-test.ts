@@ -27,6 +27,8 @@ const y1 = add(today, -1), y2 = add(today, -2);
 const owner: any = { userId: 'u_owner', perms: () => true, accessibleBranchIds: ['branch_main', 'branch_second'], nowMs, defaultBranchId: 'branch_main' };
 const cashier: any = { userId: 'u_cashier_a', perms: (p: string) => ['report:run'].includes(p), accessibleBranchIds: ['branch_main'], nowMs, defaultBranchId: 'branch_main' };
 const v = (r: any, m: string) => r.totals[m]?.value;
+const L2 = (l: any) => l?.ar ?? '';
+const { m4 } = await import('../src/mock/money');
 
 console.log(`\n=== Registry & manifests (today ${today}, y1 ${y1}, y2 ${y2}, launch ${R.launchDate(db)})`);
 {
@@ -191,6 +193,128 @@ console.log('\n=== Evidence, parity, analysis');
   ok(Number(v(rr, 'rounding_count')) > 0, 'rounding report: cash payments rounded to 0.25', `${v(rr, 'rounding_count')} payments, net left to guests ${v(rr, 'rounding_adjustment')}`);
 }
 
+console.log('\n=== Round 4: pivot (nested rows, subtotals, cross-tab, time intelligence, top N, evidence)');
+{
+  const P = R.pivot;
+  const BR = ['branch_main', 'branch_second'];
+  const eq = (a: any, b: any) => a?.availability === b?.availability && (a?.value ?? null) === (b?.value ?? null);
+  const walk = (n: any, fn: (n: any, parent: any) => void, parent: any = null) => { fn(n, parent); n.children.forEach((c: any) => walk(c, fn, n)); };
+  // 3 levels: branch → channel → daypart, with a sum, a distinct count and a ratio
+  const spec = { metrics: ['item_net_sales', 'check_count', 'order_count', 'avg_check'], rows: ['branch', 'channel', 'daypart'], from: y2, to: y1, branchIds: BR };
+  const r = P(db, owner, spec);
+  ok(r.root.children.length === 2 && r.nodeCount > 10 && !r.meta.refused.length, `3-level pivot built: ${r.nodeCount} rows (branch → channel → daypart), nothing refused`);
+  let subBad: string[] = [], addBad: string[] = [], ratioBad: string[] = [], avgOfAvgDiffers = 0, distinctOver = 0;
+  walk(r.root, (n, parent) => {
+    const q = R.query(db, owner, { metrics: spec.metrics, filters: Object.fromEntries(Object.entries(n.path).map(([k, v]) => [k, [v as string]])), from: y2, to: y1, branchIds: BR });
+    for (const m of spec.metrics) if (!eq(n.cells[''][m], q.totals[m])) subBad.push(`${n.label.ar}.${m} ${n.cells[''][m]?.value} ≠ ${q.totals[m]?.value}`);
+    if (n.children.length) {
+      const sum = n.children.reduce((a: any, c: any) => a.plus(D(c.cells[''].item_net_sales.value ?? 0)), D(0));
+      if (!sum.equals(D(n.cells[''].item_net_sales.value))) addBad.push(n.label.ar);
+      const dsum = n.children.reduce((a: number, c: any) => a + Number(c.cells[''].order_count.value ?? 0), 0);
+      if (dsum > Number(n.cells[''].order_count.value)) distinctOver++;
+      const kids = n.children.filter((c: any) => c.cells[''].avg_check.availability === 'AVAILABLE');
+      if (kids.length > 1) { const avgOfAvg = kids.reduce((a: number, c: any) => a + Number(c.cells[''].avg_check.value), 0) / kids.length; if (Math.abs(avgOfAvg - Number(n.cells[''].avg_check.value)) > 0.01) avgOfAvgDiffers++; }
+    }
+    const a = n.cells[''].avg_check;
+    if (a.availability === 'AVAILABLE' && !D(a.value).equals(D(m4(D(n.cells[''].item_net_sales.value).dividedBy(n.cells[''].check_count.value))))) ratioBad.push(n.label.ar);
+    void parent;
+  });
+  ok(!subBad.length, 'every subtotal and the grand total equal the engine run at that grouping (no summing of rows)', subBad.slice(0, 3).join('; '));
+  ok(!addBad.length, 'additive money: children add up to their subtotal at every level', addBad.join(', '));
+  ok(!ratioBad.length && avgOfAvgDiffers > 0, `ratio (average check) = Σ net ÷ Σ checks at every subtotal; differs from an average of averages in ${avgOfAvgDiffers} group(s)`);
+  ok(Number(r.root.cells[''].order_count.value) <= r.root.children.reduce((a: number, c: any) => a + Number(c.cells[''].order_count.value), 0), `distinct orders are recounted per level (children sum ≥ parent where a visit spans groups: ${distinctOver} group(s))`);
+
+  // cross-tab: product × daypart
+  const x = P(db, owner, { metrics: ['item_net_sales', 'sold_quantity'], rows: ['category'], columns: ['daypart'], from: y2, to: y1, branchIds: BR });
+  let colBad = 0, rowBad = 0;
+  for (const h of x.cols) { const q = R.query(db, owner, { metrics: ['item_net_sales'], filters: { daypart: [h.key] }, from: y2, to: y1, branchIds: BR }); if (!eq(x.root.cells[h.key].item_net_sales, q.totals.item_net_sales)) colBad++; }
+  for (const n of x.root.children) { const s2 = x.cols.reduce((a: any, h: any) => a.plus(D(n.cells[h.key].item_net_sales.value ?? 0)), D(0)); if (!s2.equals(D(n.cells[''].item_net_sales.value))) rowBad++; }
+  ok(x.cols.length >= 3 && !colBad && !rowBad, `cross-tab category × daypart: ${x.cols.length} columns; column totals = engine by daypart; row totals = Σ columns`, `${colBad}/${rowBad}`);
+  const wk = P(db, owner, { metrics: ['net_item_sales'], rows: ['branch'], columns: ['weekday'], from: add(today, -13), to: y1, branchIds: BR });
+  ok(wk.cols.length === 7 && wk.cols[0].labels[0].ar === 'السبت', `weekday columns start on Saturday (${wk.cols.map((c: any) => c.labels[0].ar).join('، ')})`);
+
+  // top N + exact «others» (with a ready ratio column, never a sum of hidden ratios)
+  const t5 = P(db, owner, { metrics: ['item_net_sales', 'sold_quantity'], rows: ['product'], from: y2, to: y1, branchIds: BR, topN: { n: 5 }, calcs: [R.READY_CALCS.find((c: any) => c.id === 'price_per_unit')] });
+  const oth = t5.root.children.find((n: any) => n.others);
+  const top = t5.root.children.filter((n: any) => !n.others);
+  const rest = D(t5.root.cells[''].item_net_sales.value).minus(top.reduce((a: any, n: any) => a.plus(D(n.cells[''].item_net_sales.value)), D(0)));
+  ok(top.length === 5 && oth && D(oth.cells[''].item_net_sales.value).equals(rest), `top 5 + «${oth?.label.ar}» = grand total exactly`);
+  const pu = oth.cells['']['calc:price_per_unit'];
+  ok(pu.availability === 'AVAILABLE' && D(pu.value).equals(D(m4(D(oth.cells[''].item_net_sales.value).dividedBy(oth.cells[''].sold_quantity.value)))) && t5.measures.find((m: any) => m.id === 'calc:price_per_unit')?.formula?.ar.includes('÷'), `calculated column «متوسط سعر القطعة» = Σ net ÷ Σ qty on «الباقي» too (formula shown: ${t5.measures.find((m: any) => m.id === 'calc:price_per_unit')?.formula?.ar})`);
+  const exOth = R.explain(db, owner, { metric: 'item_net_sales', cell: oth.path, from: y2, to: y1, branchIds: BR });
+  ok(exOth.proof.holds === true && D(exOth.parts[0].sum).equals(D(oth.cells[''].item_net_sales.value)), `«الباقي» opens its evidence: ${exOth.parts[0].evidence.length} lines adding up to it`);
+  const b1 = r.root.children[0];
+  const exSub = R.explain(db, owner, { metric: 'item_net_sales', cell: b1.path, from: y2, to: y1, branchIds: BR });
+  const kidsCount = b1.children.reduce((a: number, c: any) => a + R.explain(db, owner, { metric: 'item_net_sales', cell: c.path, from: y2, to: y1, branchIds: BR }).parts[0].evidence.length, 0);
+  ok(exSub.proof.holds === true && exSub.parts[0].evidence.length === kidsCount, `subtotal evidence = union of its children (${exSub.parts[0].evidence.length} = Σ ${b1.children.length} children)`);
+  try { P(db, owner, { metrics: ['item_net_sales'], rows: ['product'], from: y1, calcs: [{ id: 'bad', kind: 'ratio', a: 'avg_check', b: 'order_count' }] }); ok(false, 'ratio of a ratio refused'); } catch (e: any) { ok(e.code === 'VALIDATION_FAILED', 'a calculated column cannot divide a ratio (only summable registered metrics)', e.details?.rule); }
+  const hv = P(db, owner, { metrics: ['item_net_sales'], rows: ['product'], from: y2, to: y1, branchIds: BR, having: [{ measure: 'item_net_sales', op: 'gte', value: '500' }] });
+  const hvOth = hv.root.children.find((n: any) => n.others);
+  ok(hv.root.children.filter((n: any) => !n.others).every((n: any) => Number(n.cells[''].item_net_sales.value) >= 500) && hvOth && D(hv.root.cells[''].item_net_sales.value).equals(hv.root.children.reduce((a: any, n: any) => a.plus(D(n.cells[''].item_net_sales.value)), D(0))), `condition (net ≥ 500): ${hv.root.children.length - 1} rows kept, the rest in «الباقي», total unchanged`);
+  const ill = P(db, owner, { metrics: ['item_net_sales', 'tender_collected'], rows: ['payment_method'], from: y1 });
+  ok(ill.meta.refused.some((x: any) => x.metric === 'item_net_sales') && ill.measures.every((m: any) => m.metric !== 'item_net_sales'), 'illegal combination (net sales × payment method) is refused with a reason, not computed', L2(ill.meta.refused[0]?.reason));
+  const na = P(db, owner, { metrics: ['labor_cost', 'item_net_sales'], rows: ['channel'], from: y1 });
+  let naZero = 0; walk(na.root, (n) => { if (n.cells[''].labor_cost.availability !== 'NOT_AVAILABLE') naZero++; });
+  ok(naZero === 0, 'NOT_AVAILABLE stays NOT_AVAILABLE on every row and subtotal (never 0)');
+  const st = P(db, owner, { metrics: ['inventory_value', 'stock_on_hand'], rows: ['location', 'inventory_item'], from: y1 });
+  const q0 = R.query(db, owner, { metrics: ['inventory_value'], from: y1 });
+  ok(eq(st.root.cells[''].inventory_value, q0.totals.inventory_value) && st.root.children.every((n: any) => n.cells[''].stock_on_hand.availability !== 'AVAILABLE'), 'semi-additive stock: value is a snapshot at asOf; quantity is not added across ingredients (shown only per ingredient)');
+  try { R.pivot(db, cashier, { metrics: ['item_net_sales'], rows: ['channel'], from: y1, branchIds: ['branch_second'] }); ok(false, 'cashier scope'); } catch (e: any) { ok(e.code === 'REPORT_SCOPE_DENIED', 'pivot keeps the branch scope (cashier → other branch refused)'); }
+
+  // time intelligence
+  const cw = P(db, owner, { metrics: ['net_item_sales'], rows: ['business_date'], from: y2, to: y1, branchIds: ['branch_main'], compare: 'last_week', formats: [{ id: 'a', measure: 'net_item_sales@chg', kind: 'arrows' }] });
+  const d1 = cw.root.children.find((n: any) => n.value === y1);
+  const prevQ = R.query(db, owner, { metrics: ['net_item_sales'], from: add(y1, -7), branchIds: ['branch_main'] });
+  ok(d1 && eq(d1.cells['']['net_item_sales@cmp'], prevQ.totals.net_item_sales) && D(d1.cells['']['net_item_sales@chg'].value).equals(D(d1.cells[''].net_item_sales.value).minus(prevQ.totals.net_item_sales.value)) && !!d1.cells['']['net_item_sales@chg'].style?.icon, `vs same day last week: ${d1?.cells[''].net_item_sales.value} vs ${d1?.cells['']['net_item_sales@cmp'].value} (imported daily total), change ${d1?.cells['']['net_item_sales@chg%'].value}% with arrow`);
+  const ly = P(db, owner, { metrics: ['net_item_sales'], rows: ['branch'], from: y2, to: y1, compare: 'last_year', branchIds: BR });
+  ok(ly.root.cells['']['net_item_sales@cmp'].availability === 'NOT_AVAILABLE' && ly.root.cells['']['net_item_sales@chg%'].availability === 'NOT_AVAILABLE', 'vs last year: NOT_AVAILABLE (no history), never 0', L2(ly.root.cells['']['net_item_sales@cmp'].reason));
+  const ch = P(db, owner, { metrics: ['item_net_sales'], rows: ['channel'], from: y2, to: y1, compare: 'last_week', branchIds: BR });
+  ok(ch.root.children.every((n: any) => n.cells['']['item_net_sales@cmp'].availability === 'NOT_AVAILABLE') && ch.root.cells['']['item_net_sales@cmp'].availability === 'AVAILABLE', 'last week by channel: NOT_AVAILABLE per channel (imported daily totals carry no channel), available for the total', L2(ch.root.children[0]?.cells['']['item_net_sales@cmp'].reason));
+  const ti = P(db, owner, { metrics: ['net_item_sales'], rows: ['branch'], from: y1, to: y1, branchIds: BR, extras: ['rolling7', 'rolling28', 'mtd', 'share_total', 'rank'] });
+  const r7 = R.query(db, owner, { metrics: ['net_item_sales'], from: add(y1, -6), to: y1, branchIds: BR });
+  const shareSum = ti.root.children.reduce((a: number, n: any) => a + Number(n.cells['']['net_item_sales@share_total'].value), 0);
+  const ranks = ti.root.children.map((n: any) => Number(n.cells['']['net_item_sales@rank'].value));
+  ok(eq(ti.root.cells['']['net_item_sales@rolling7'], r7.totals.net_item_sales), `rolling 7 days = engine over ${add(y1, -6)} → ${y1} (${r7.totals.net_item_sales.value})`);
+  ok(ti.root.cells['']['net_item_sales@mtd'].availability === (R.query(db, owner, { metrics: ['net_item_sales'], from: y1.slice(0, 8) + '01', to: y1, branchIds: BR }).meta.days.some((d: any) => d.source === 'NONE') ? 'NOT_AVAILABLE' : 'AVAILABLE'), `month to date: ${ti.root.cells['']['net_item_sales@mtd'].availability} (days without any data → not available)`);
+  ok(Math.abs(shareSum - 100) < 0.01 && ranks.includes(1), `share of total adds to 100% (${shareSum.toFixed(2)}), rank 1 = highest`);
+  const sc = P(db, owner, { metrics: ['item_net_sales'], rows: ['product'], from: y2, to: y1, branchIds: BR, formats: [{ id: 's', measure: 'item_net_sales', kind: 'scale' }, { id: 't', measure: 'item_net_sales', kind: 'threshold', op: 'lt', value: '1000', tone: 'bad' }] });
+  const scales = sc.root.children.map((n: any) => n.cells[''].item_net_sales.style?.scale).filter((v: any) => v !== undefined);
+  ok(scales.length > 3 && Math.min(...scales) === 0 && Math.max(...scales) === 1 && sc.root.children.some((n: any) => n.cells[''].item_net_sales.style?.tone === 'bad'), 'formatting rules are data evaluated by the engine (colour scale 0..1, below-target flag)');
+
+  // exports = screen (Excel read back cell by cell; CSV), and the paginated print layout
+  const { createRequire } = await import('node:module');
+  const ExcelJS = createRequire(process.cwd() + '/package.json')('exceljs');
+  const { exportTable } = await import('../src/reports/export/table');
+  const { buildPivotXlsx, buildPivotCsv } = await import('../src/reports/export/xlsx');
+  const { docFromPivot, paginate } = await import('../src/reports/print/layout');
+  const { seedTemplates } = await import('../src/reports/studio');
+  const view = [{ id: 'sold_quantity', label: 'الكمية' }, { id: 'item_net_sales', format: 'money0' as const }];
+  const tb = exportTable(r, view, 'ar', 'all', 'اختبار');
+  const buf = await buildPivotXlsx(ExcelJS, { table: tb, result: r, lang: 'ar', title: 'اختبار', venue: 'مطعم', branches: ['الفرع'], generatedBy: 'test', generatedAt: new Date(nowMs).toISOString(), params: [], evidence: [{ label: 'x', kind: 'LINE', businessDate: y1, amount: '1.0000' }] });
+  const wb = new ExcelJS.Workbook(); await wb.xlsx.load(buf);
+  const ws = wb.worksheets[0];
+  const headRow = 4; let bad = 0, outlineBad = 0, n = 0;
+  tb.rows.forEach((rr: any, i: number) => {
+    const xr = ws.getRow(headRow + 1 + i); n++;
+    if (xr.getCell(1).value !== rr.label) bad++;
+    rr.values.forEach((v: any, j: number) => { const c = xr.getCell(j + 2).value; if (v?.availability === 'AVAILABLE' ? Math.abs(Number(c) - Number(v.value)) > 1e-9 : typeof c !== 'string') bad++; });
+    if ((xr.outlineLevel ?? 0) !== (rr.kind === 'total' || rr.depth === 0 ? 0 : rr.depth)) outlineBad++;
+  });
+  ok(wb.worksheets.length === 3 && !bad && !outlineBad && ws.views[0].state === 'frozen' && ws.views[0].rightToLeft && ws.getRow(headRow).getCell(2).value === tb.columns[0].header, `Excel = screen: ${n} rows × ${tb.columns.length} columns read back equal (numbers stay numbers), outline levels per depth, frozen RTL header, 3 sheets (report, parameters & definitions, evidence)`, `${bad} / ${outlineBad}`);
+  const csv = buildPivotCsv(exportTable(t5, undefined, 'ar'), 'ar').replace('﻿', '').split('\n');
+  ok(csv.length === t5.root.children.length + 2 && csv.at(-1)!.startsWith('الإجمالي') && csv.at(-1)!.includes(Number(t5.root.cells[''].item_net_sales.value).toFixed(2)), `CSV flat: header + ${t5.root.children.length} rows + total; total equals the screen`);
+  const big = P(db, owner, { metrics: ['item_net_sales', 'sold_quantity', 'avg_check'], rows: ['business_date', 'check'], from: y2, to: y1, branchIds: BR });
+  const tpl = seedTemplates(new Date(nowMs).toISOString())[0];
+  const doc = docFromPivot(big, { title: 'x', lang: 'ar', depth: 0, venue: { name: 'v', branches: 'b', logo: null, headerLines: [], footerLines: [], taxNumber: null }, generatedBy: 't', generatedAt: '' });
+  const pages = paginate(doc, tpl);
+  const segs = pages.flatMap((p: any) => p.items.filter((i: any) => i.t === 'table'));
+  const carryOk = segs.every((sg: any, i: number) => i === 0 ? !sg.carryIn : JSON.stringify(sg.carryIn) === JSON.stringify(segs[i - 1].carryOut));
+  const tbl = doc.tables[0]; const ci = tbl.columns.findIndex((c: any) => c.carry);
+  const termSum = tbl.rows.filter((x: any) => x.terminal).reduce((a: any, x: any) => a.plus(D(x.raw[ci] ?? 0)), D(0));
+  const totalRow = tbl.rows.at(-1)!;
+  ok(pages.length > 2 && segs.length === pages.length && carryOk && termSum.equals(D(totalRow.raw[ci])) && tbl.columns[tbl.columns.findIndex((c: any) => c.label.includes('متوسط'))]?.carry === false && pages.at(-1)!.items.some((i: any) => i.t === 'signatures'), `print layout: ${tbl.rows.length} rows on ${pages.length} A4 pages, header on each, carried-forward subtotal in = previous out, Σ rows = grand total, ratios never carried, signatures on the last page`);
+}
+
 console.log('\n=== Through the API (handlers, permissions)');
 {
   const A = { deviceId: 'ADMIN', label: 'ADMIN', terminalId: 't_admin', branchId: null, token: null as string | null };
@@ -212,6 +336,42 @@ console.log('\n=== Through the API (handlers, permissions)');
   const askB = (await call<any>(A, 'Report.Ask', { query: { question: 'أنا بعت بكام امبارح؟', clarify: 'metric=net_item_sales' } })).data;
   const askC = (await call<any>(A, 'Report.Ask', { query: { question: 'ينفع نمسح مبيعات قبل إرسالها للضرائب؟' } })).data;
   ok(askA.status === 'CLARIFY' && askB.status === 'ANSWERED' && askC.status === 'REFUSED', 'Report.Ask: clarifies net vs gross, answers after the choice, refuses erasing sales', askB.text.ar);
+  // round 4: pivot over the API, saved reports (versions, sharing, edit rights), templates, audit, schedule bursting
+  const pv = (await call<any>(A, 'Report.Pivot', { query: { q: JSON.stringify({ metrics: ['item_net_sales'], rows: ['channel', 'category'], from: y2, to: y1 }) } })).data;
+  ok(pv.root.children.length >= 2 && pv.measures[0].id === 'item_net_sales', `Report.Pivot: ${pv.nodeCount} rows over the API`);
+  try { await call(M, 'Report.Pivot', { query: { q: JSON.stringify({ metrics: ['item_net_sales'], rows: ['channel'], from: y1, branchIds: ['branch_second'] }) } }); ok(false, 'pivot scope'); } catch (e: any) { ok(e.code === 'REPORT_SCOPE_DENIED', 'Report.Pivot refuses a cashier another branch (server-side)'); }
+  const listO = (await call<any>(A, 'SavedReport.Find', {})).data.items;
+  const listC = (await call<any>(M, 'SavedReport.Find', {})).data.items;
+  ok(listO.length >= 4 && listC.length < listO.length && !listC.some((x: any) => x.id === 'sr_controls_staff'), `saved reports: owner sees ${listO.length}, cashier ${listC.length} (role-limited ones hidden)`);
+  try { await call(M, 'Report.Pivot', { query: { savedReportId: 'sr_controls_staff' } }); ok(false, 'hidden saved'); } catch (e: any) { ok(e.code === 'REPORT_NOT_FOUND', 'a cashier cannot open a report shared with managers only'); }
+  const runSaved = (await call<any>(A, 'Report.Pivot', { query: { savedReportId: 'sr_branch_channel', audit: '1' } })).data;
+  ok(runSaved.rows.length === 4 && runSaved.saved?.name && runSaved.meta.from === add(today, -6), `saved report runs on its relative period (آخر 7 أيام → ${runSaved.meta.from} → ${runSaved.meta.to}), 4 levels`);
+  const created = (await call<any>(A, 'SavedReport.Save', { body: { name: 'تقريري التجريبي', category: 'sales', design: { ...runSaved.saved.design, rows: ['channel'] }, view: { mode: 'ME' } } })).data;
+  const v2 = (await call<any>(A, 'SavedReport.Save', { body: { id: created.id, expectedVersion: 1, name: 'تقريري التجريبي', category: 'sales', design: { ...created.design, compare: 'last_week' }, note: 'أضفت المقارنة' } })).data;
+  ok(created.version === 1 && v2.version === 2 && v2.versions.length === 2 && v2.versions[0].note === 'أضفت المقارنة', 'save creates version 1; saving again makes version 2 with a change note');
+  try { await call(A, 'SavedReport.Save', { body: { id: created.id, expectedVersion: 1, name: 'x y', design: created.design } }); ok(false, 'stale'); } catch (e: any) { ok(e.code === 'CONCURRENCY_CONFLICT', 'saving over someone else\'s newer version is refused (expectedVersion)'); }
+  try { await call(A, 'SavedReport.Save', { body: { name: 'غلط', design: { ...created.design, metrics: ['item_net_sales'], rows: ['payment_method', 'product', 'channel', 'staff', 'hour'] } } }); ok(false, 'bad design'); } catch (e: any) { ok(e.code === 'VALIDATION_FAILED', 'a design is validated on the server before saving (5 levels refused)'); }
+  const restored = (await call<any>(A, 'SavedReport.Restore', { params: { savedReportId: created.id }, body: { version: 1, expectedVersion: 2 } })).data;
+  ok(restored.version === 3 && !restored.design.compare, 'restore version 1 → a new version 3 (history kept)');
+  try { await call(M, 'SavedReport.Save', { body: { id: 'sr_branch_channel', expectedVersion: 1, name: 'x y', design: runSaved.saved.design } }); ok(false, 'edit denied'); } catch (e: any) { ok(e.code === 'REPORT_EDIT_DENIED', 'a viewer cannot edit someone else\'s report (save a copy instead)'); }
+  const dup = (await call<any>(M, 'SavedReport.Duplicate', { params: { savedReportId: 'sr_branch_channel' } })).data;
+  ok(dup.ownerId !== 'u_owner' && dup.view.mode === 'ME' && dup.canEdit, 'duplicate → my own private copy I can edit');
+  const fc = (await call<any>(A, 'SavedReport.FromCertified', { body: { reportId: 'top_items' } })).data;
+  ok(fc.design.metrics.length > 0 && fc.basedOn === 'top_items', `certified stays read-only; «save as» gives a custom design (${fc.design.metrics.join(', ')} × ${fc.design.rows.join(', ')})`);
+  const ex = (await call<any>(A, 'Report.PivotExport', { body: { savedReportId: 'sr_items_daypart', format: 'XLSX' } })).data;
+  const screen = (await call<any>(A, 'Report.Pivot', { query: { savedReportId: 'sr_items_daypart' } })).data;
+  ok(JSON.stringify(ex.result.root) === JSON.stringify(screen.root) && ex.filename.endsWith('.xlsx'), 'Report.PivotExport runs the same pivot as the screen (identical rows and values) and is logged');
+  const tpls = (await call<any>(A, 'ReportTemplate.Find', {})).data.items;
+  const tSaved = (await call<any>(A, 'ReportTemplate.Save', { body: { ...tpls[0], expectedVersion: tpls[0].version, orientation: 'landscape', note: 'عرضي' } })).data;
+  ok(tpls.length >= 3 && tSaved.version === tpls[0].version + 1 && tSaved.orientation === 'landscape', `templates: ${tpls.length} ready ones; saving makes a new version`);
+  try { await call(M, 'ReportTemplate.Save', { body: { ...tpls[1], expectedVersion: tpls[1].version } }); ok(false, 'tpl denied'); } catch (e: any) { ok(e.code === 'TEMPLATE_EDIT_DENIED', 'a cashier cannot change a built-in template'); }
+  const aud = (await call<any>(A, 'ReportAudit.Find', {})).data.items;
+  ok(['RUN', 'EXPORT', 'CREATE', 'SAVE', 'RESTORE', 'DUPLICATE', 'TEMPLATE_SAVE'].every((k) => aud.some((a: any) => a.action === k)) && aud.find((a: any) => a.action === 'EXPORT').rows > 0 && aud.find((a: any) => a.action === 'RUN').params.from, 'audit: runs, exports, saves, restores, copies and template edits — who, when, period, branches, row count');
+  const sch = (await call<any>(A, 'Report.Schedule', { body: { savedReportId: 'sr_branch_channel', templateId: 'tpl_accountant_a4', format: 'PDF', frequency: 'DAILY', time: '04:30', recipientsV2: [{ kind: 'ROLE', id: 'role_accountant' }, { kind: 'USER', id: 'u_owner' }] } })).data;
+  const fired = (await call<any>(A, 'Report.ScheduleRunNow', { params: { scheduleId: sch.id } })).data;
+  ok(sch.format === 'PDF' && sch.savedReportId && fired.outputs.length === 2 && fired.runs[0].outputs.length === 2, `schedule: saved report + template + PDF; run now → ${fired.outputs.length} outputs, one per branch (bursting): ${fired.outputs.map((o: any) => o.branchName).join(' / ')}`);
+  const out = (await call<any>(A, 'Report.ScheduleOutput', { params: { outputId: fired.outputs[0].id } })).data;
+  ok(out.result?.root && out.template?.id === 'tpl_accountant_a4' && out.result.meta.branchIds.length === 1, 'a run output opens for preview: one branch\'s pivot + its template');
   const cat = (await call<any>(A, 'Report.Catalog', {})).data;
   ok(cat.layers.length === 6, `Report.Catalog layers: ${cat.layers.map((l: any) => `${l.id}=${l.items}`).join(' ')}`);
 }

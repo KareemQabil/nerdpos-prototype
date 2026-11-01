@@ -13,7 +13,7 @@ const NA = (ar: string, en: string): Extra => ({ status: 'NOT_AVAILABLE', reason
 const MGR = { permission: 'session:zreport' };
 
 // dimension sets per fact (the registry may only list dimensions its fact carries — checked by the engine test)
-const T = ['business_date', 'business_week', 'branch'];
+const T = ['business_date', 'business_week', 'weekday', 'branch'];
 const CHECK = [...T, 'daypart', 'hour', 'channel', 'staff', 'device', 'revenue_center', 'table', 'table_visit', 'check', 'order'];
 const LINE = [...T, 'daypart', 'hour', 'channel', 'staff', 'product', 'category', 'size', 'modifier', 'tax_group', 'check', 'order'];
 const PAY = [...T, 'hour', 'payment_method', 'drawer', 'staff', 'device', 'check'];

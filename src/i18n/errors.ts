@@ -173,6 +173,10 @@ export const errorsAr: Record<string, string> = {
   PRINT_JOB_NOT_RETRYABLE: 'أمر الطباعة ده مينفعش يتعاد.',
   FISCAL_DOCUMENT_NOT_FOUND: 'الإيصال الإلكتروني ده مش موجود.',
   REPORT_NOT_FOUND: 'التقرير ده مش موجود أو مش مسموح لك تشوفه.',
+  REPORT_EDIT_DENIED: 'التقرير ده مش بتاعك ومش مسموح لك تعدّله. احفظ نسخة ليك وعدّل فيها.',
+  REPORT_SHARE_DENIED: 'صاحب التقرير بس هو اللي يغيّر مين يشوفه.',
+  TEMPLATE_NOT_FOUND: 'القالب ده مش موجود. اختار قالب تاني.',
+  TEMPLATE_EDIT_DENIED: 'مش مسموح لك تعدّل القالب ده. احفظه كنسخة ليك.',
   REPORT_SCOPE_DENIED: 'الفرع ده مش ضمن صلاحياتك في التقارير. اختار فرع من فروعك.',
   METRIC_NOT_FOUND: 'المقياس ده مش متسجل في قاموس التقارير.',
   // crm area: customers, delivery, loyalty, online orders, external payments
@@ -448,6 +452,10 @@ export const errorsEn: Record<string, string> = {
   PRINT_JOB_NOT_RETRYABLE: 'This job cannot be retried.',
   FISCAL_DOCUMENT_NOT_FOUND: 'E-receipt not found.',
   REPORT_NOT_FOUND: 'Report not found, or you do not have access to it.',
+  REPORT_EDIT_DENIED: 'This report is not yours and you may not edit it. Save your own copy and edit that.',
+  REPORT_SHARE_DENIED: "Only the report's owner can change who sees it.",
+  TEMPLATE_NOT_FOUND: 'Template not found. Pick another template.',
+  TEMPLATE_EDIT_DENIED: 'You may not edit this template. Save it as your own copy.',
   REPORT_SCOPE_DENIED: 'That branch is outside your report scope. Pick one of your branches.',
   METRIC_NOT_FOUND: 'This metric is not in the report registry.',
   // crm area: customers, delivery, loyalty, online orders, external payments

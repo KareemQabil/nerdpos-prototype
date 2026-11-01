@@ -72,7 +72,7 @@ export function lineCostAt(db: DB, l: OrderLine, atMs: number): { cost: string |
 }
 
 type Builder = (db: DB, s: FactScope) => Fact[];
-const dayDims = (db: DB, date: string) => ({ business_date: date, business_week: weekOf(date) });
+const dayDims = (db: DB, date: string) => ({ business_date: date, business_week: weekOf(date), weekday: String(new Date(date + 'T12:00:00Z').getUTCDay()) });
 const branchOk = (s: FactScope, b: string) => s.branchIds.includes(b);
 
 const completedSales = (db: DB, s: FactScope) => db.orders.filter((o) => o.kind === 'SALE' && o.status === 'COMPLETED' && branchOk(s, o.branchId) && inRange(o.completedBusinessDate, s.from, s.to) && (o.completedAtMs ?? 0) <= s.asOfMs);

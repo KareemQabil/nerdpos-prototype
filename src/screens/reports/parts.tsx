@@ -8,7 +8,7 @@ import { cn, dateTime } from '../../lib/format';
 import { Tech } from '../../app/tech';
 
 export type Loc = { ar: string; en: string };
-export interface EvidenceSpec { metric: string; cell?: Record<string, string | null>; filters?: Record<string, any>; from: string; to?: string; branchIds?: string[]; asOf?: string; label?: string }
+export interface EvidenceSpec { metric: string; cell?: Record<string, string | null>; filters?: Record<string, any>; exclude?: Record<string, any>; from: string; to?: string; branchIds?: string[]; asOf?: string; label?: string; where?: string }
 
 /** Any number in a report can open its evidence; the page provides the opener. */
 export const EvidenceCtx = createContext<(s: EvidenceSpec) => void>(() => {});

@@ -90,6 +90,7 @@ export interface QuerySpec {
   metrics: string[];
   dimensions?: string[];
   filters?: Record<string, string | string[] | undefined>;
+  exclude?: Record<string, string | string[] | undefined>; // «ما عدا»: drop facts whose dimension value is listed
   from: string;
   to?: string;
   branchIds?: string[];

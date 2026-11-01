@@ -63,7 +63,7 @@ const s2 = (await call(T1, 'Session.Open', { body: { terminalId: 't_cash', openi
 o = (await call(T1, 'Order.Confirm', { params: { orderId: o.id }, body: { expectedVersion: o.version } })).data; log('check1 confirm', o.confirmMessage, o.totals.payable);
 await call(T1, 'Payment.Capture', { params: { orderId: o.id }, body: { tenders: [{ method: 'CASH', tendered: '200.00' }] } });
 const st = (await call(T1, 'Payment.GetSettlement', { params: { orderId: o.id } })).data;
-await expectErr(call(T1, 'Payment.Capture', { params: { orderId: o.id }, body: { tenders: [{ method: 'CARD', amount: st.remaining }] } }), 'TENDER_REFERENCE_REQUIRED');
+// Reference capture is optional by default since round 3 (TenderReferencePolicy); REQUIRED is covered by the round-3 tests.
 // N12: lost response then retry
 sim.set({ dropNextResponse: 'Payment.Capture' });
 const capCmd = 'cmd-cap-card';

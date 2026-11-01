@@ -193,13 +193,13 @@ function EvidenceList({ b }: { b: any }) {
   );
 }
 
-export function ReportView({ run, onTemplate }: { run: any; onTemplate: () => void }) {
+export function ReportView({ run, onTemplate, withExpert, hidePurpose }: { run: any; onTemplate?: () => void; withExpert?: boolean; hidePurpose?: boolean }) {
   const [recon, setRecon] = useState(false);
   return (
     <div className="space-y-3" data-fb="reports:result">
       <ReportHeader h={run.header} onShowRecon={() => setRecon(!recon)} />
       {recon && <Card title={t('قواعد المطابقة للفترة')} description={t('كل قاعدة يا متطابقة، يا الفرق متشرح بحركات مربوطة، يا بتتعلم «مش متشرح».')}><ReconList checks={run.bridgeChecks} /></Card>}
-      <div className="text-sm text-soft flex items-start gap-2"><Info className="w-4 h-4 mt-0.5 shrink-0" /><span>{L(run.manifest.purpose)} <span className="text-dim">{t('القرار')}: {L(run.manifest.decision)} · {t('بيتابعه')}: {run.manifest.audience.map((a: string) => t(AUD[a] ?? a)).join('، ')} · {t('التنقل')}: {L(run.manifest.drilldown)}</span></span></div>
+      {!hidePurpose && <div className="text-sm text-soft flex items-start gap-2"><Info className="w-4 h-4 mt-0.5 shrink-0" /><span>{L(run.manifest.purpose)} <span className="text-dim">{t('القرار')}: {L(run.manifest.decision)} · {t('بيتابعه')}: {run.manifest.audience.map((a: string) => t(AUD[a] ?? a)).join('، ')} · {t('التنقل')}: {L(run.manifest.drilldown)}</span></span></div>}
       {run.manifest.notes?.map((n: any, i: number) => <Banner key={i} tone="info">{L(n)}</Banner>)}
       {run.blocks.map((b: any) => (
         <Card key={b.id} title={L(b.title)} className="min-w-0" data-fb={`block:${b.id}`} actions={<Tech><span className="num text-[10px] text-dim" dir="ltr">{b.kind} · {b.metrics.join(',')}{b.dimensions?.length ? ' × ' + b.dimensions.join(',') : ''}</span></Tech>}>
@@ -215,8 +215,8 @@ export function ReportView({ run, onTemplate }: { run: any; onTemplate: () => vo
           {b.kind === 'evidence' && <EvidenceList b={b} />}
         </Card>
       ))}
-      <div className="flex justify-end"><Button size="sm" variant="outline" onClick={onTemplate} data-fb="reports:template"><FileText className="w-4 h-4" />{t('عرض كقالب (A4 / إيصال)')}</Button></div>
-      <ExpertReview reportId={run.reportId} reportTitle={L(run.title)} checklist={run.checklist} />
+      {onTemplate && <div className="flex justify-end"><Button size="sm" variant="outline" onClick={onTemplate} data-fb="reports:template"><FileText className="w-4 h-4" />{t('عرض كقالب (A4 / إيصال)')}</Button></div>}
+      {withExpert && <ExpertReview reportId={run.reportId} reportTitle={L(run.title)} checklist={run.checklist} />}
     </div>
   );
 }

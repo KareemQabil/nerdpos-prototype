@@ -4,7 +4,7 @@
 import { ApiError } from '../errors';
 import type { Handler, Ctx } from '../kernel';
 import { permsOf } from '../kernel';
-import { nextId } from '../store';
+import { nextId, store } from '../store';
 import { hasPermission } from '../types-channels';
 import { need, requireBranch, userName } from './util';
 import {
@@ -14,13 +14,14 @@ import {
 import { ask, QUESTION_BANK_SIZE } from '../../reports/assistant';
 import { nextRun } from '../seed-ops';
 import type { ReportSchedule } from '../types-ops';
+import { scheduleExtras, studioAudit, touchRecentOf } from './report-studio';
 
 export function callerOf(ctx: Ctx): Caller {
   const db = ctx.db;
   const accessible = ctx.user ? db.branches.filter((b) => hasPermission(permsOf(db, ctx.user!, b.id), 'report:run')).map((b) => b.id) : [];
   return { userId: ctx.user?.id ?? null, perms: (p) => ctx.can(p), accessibleBranchIds: accessible, nowMs: ctx.now, defaultBranchId: ctx.branchId };
 }
-function guard<T>(fn: () => T): T {
+export function guard<T>(fn: () => T): T {
   try { return fn(); } catch (e) {
     if (e instanceof ReportRefusal) throw new ApiError(e.code, e.details, e.code === 'REPORT_SCOPE_DENIED' ? 403 : e.code === 'METRIC_NOT_FOUND' ? 404 : 400);
     throw e;
@@ -50,7 +51,12 @@ export const reportHandlers: Record<string, Handler> = {
       if (!ctx.can(man.permission)) throw new ApiError('REPORT_NOT_FOUND');
       const spec = runSpec(ctx);
       if ((Date.parse(spec.to) - Date.parse(spec.from)) / 86_400_000 > 93) throw new ApiError('VALIDATION_FAILED', { rule: 'a range is at most 93 days' });
-      return runManifest(ctx.db, callerOf(ctx), id, spec);
+      const out = runManifest(ctx.db, callerOf(ctx), id, spec);
+      if (ctx.query.audit === '1' && ctx.user) { // opened by a person (not a background refresh): audit + recent
+        studioAudit(ctx.db, ctx.nowIso, ctx.user.id, { action: 'RUN', targetKind: 'CERTIFIED', targetId: id, targetName: man.title.ar, params: { from: out.period.from, to: out.period.to, branchIds: out.branchIds }, rows: (out.sections ?? []).reduce((a: number, x: any) => a + x.rows.length, 0) });
+        touchRecentOf(ctx.db, ctx.nowIso, ctx.user.id, id); store.commit();
+      }
+      return out;
     }
     const def = LEGACY_REPORTS.find((r) => r.id === id);
     if (!def || !ctx.can(def.permission)) throw new ApiError('REPORT_NOT_FOUND');
@@ -93,7 +99,7 @@ export const reportHandlers: Record<string, Handler> = {
   'Report.Export': (ctx) => guard(() => {
     const b = ctx.body ?? {};
     need(b.reportId, 'VALIDATION_FAILED', { field: 'reportId' });
-    const format: 'CSV' | 'XLSX' = b.format === 'XLSX' ? 'XLSX' : 'CSV';
+    const format: 'CSV' | 'XLSX' | 'PDF' = b.format === 'XLSX' ? 'XLSX' : b.format === 'PDF' ? 'PDF' : 'CSV';
     const res = reportHandlers['Report.Run']({ ...ctx, params: { reportId: b.reportId }, query: { fromBusinessDate: b.fromBusinessDate, toBusinessDate: b.toBusinessDate ?? b.fromBusinessDate, branchIds: b.branchIds ?? '', asOf: b.asOf ?? '' } }) as any;
     const sheets = (res.sections ?? []).map((s: any) => ({ id: s.id, title: s.title, columns: s.columns ?? null, rows: s.rows ?? [] }));
     const code = ctx.db.branches.find((x) => x.id === ctx.branchId)?.code ?? 'BR';
@@ -102,20 +108,22 @@ export const reportHandlers: Record<string, Handler> = {
     (ctx.db.reportExports ??= []).unshift(rec);
     if (ctx.db.reportExports.length > 50) ctx.db.reportExports.length = 50;
     ctx.audit(`report export ${b.reportId} ${format}`, rec.id);
+    studioAudit(ctx.db, ctx.nowIso, ctx.user!.id, { action: 'EXPORT', targetKind: 'CERTIFIED', targetId: b.reportId, targetName: res.title?.ar ?? b.reportId, params: { from: rec.from, to: rec.to, branchIds: res.branchIds }, rows: rec.rows, format });
     const meta = res.header ? { asOf: res.header.asOf, timezone: res.header.timezone, provisional: res.header.provisional, reconciliation: res.header.reconciliation.status, metrics: res.header.metrics.map((m: any) => ({ id: m.id, label: m.label, version: m.version })), venue: res.header.venue } : null;
     return { status: 201, body: { ...rec, title: res.title, period: res.period, provisional: res.provisional, asOf: res.asOf ?? ctx.nowIso, generatedBy: userName(ctx.db, ctx.user!.id), meta, sheets } };
   }),
   'Report.Schedule': (ctx) => {
     const b = ctx.body ?? {};
-    const def = (reportHandlers['Report.List'](ctx) as any).items.find((r: any) => r.id === b.reportId);
+    const extra = scheduleExtras(ctx, b);
+    const def = extra.savedReportId ? { id: extra.reportId, title: extra.reportTitle } : (reportHandlers['Report.List'](ctx) as any).items.find((r: any) => r.id === b.reportId);
     if (!def) throw new ApiError('REPORT_NOT_FOUND');
     need(b.frequency === 'DAILY' || b.frequency === 'WEEKLY', 'VALIDATION_FAILED', { field: 'frequency' });
     need(/^\d{2}:\d{2}$/.test(b.time ?? ''), 'VALIDATION_FAILED', { field: 'time' });
     if (b.frequency === 'WEEKLY') need(Number(b.weekday) >= 0 && Number(b.weekday) <= 6, 'VALIDATION_FAILED', { field: 'weekday' });
-    const recipients: string[] = (b.recipients ?? []).map((x: string) => String(x).trim()).filter(Boolean).slice(0, 10);
+    const recipients: string[] = ((extra.recipients as string[] | undefined) ?? b.recipients ?? []).map((x: string) => String(x).trim()).filter(Boolean).slice(0, 20);
     need(recipients.length > 0, 'VALIDATION_FAILED', { field: 'recipients', rule: 'at least one person' });
     const next = nextRun(ctx.now, b.frequency, b.frequency === 'WEEKLY' ? Number(b.weekday) : null, b.time);
-    const s: ReportSchedule = { id: nextId('rs'), reportId: def.id, reportTitle: def.title, frequency: b.frequency, weekday: b.frequency === 'WEEKLY' ? Number(b.weekday) : null, time: b.time, format: b.format === 'CSV' ? 'CSV' : 'XLSX', recipients, branchId: requireBranch(ctx), active: true, createdAt: ctx.nowIso, createdBy: ctx.user!.id, nextRunAt: new Date(next).toISOString(), nextRunMs: next, runs: [], version: 1 };
+    const s: ReportSchedule = { id: nextId('rs'), reportId: def.id, reportTitle: def.title, frequency: b.frequency, weekday: b.frequency === 'WEEKLY' ? Number(b.weekday) : null, time: b.time, format: b.format === 'CSV' ? 'CSV' : b.format === 'PDF' ? 'PDF' : 'XLSX', recipients, branchId: requireBranch(ctx), active: true, createdAt: ctx.nowIso, createdBy: ctx.user!.id, nextRunAt: new Date(next).toISOString(), nextRunMs: next, runs: [], version: 1, ...extra, ...(extra.savedReportId ? {} : { reportId: def.id, reportTitle: def.title }) } as ReportSchedule;
     (ctx.db.reportSchedules ??= []).push(s);
     ctx.audit(`report schedule ${s.reportId} ${s.frequency} ${s.time}`, s.id);
     return { status: 201, body: { ...s, createdByName: userName(ctx.db, s.createdBy) } };

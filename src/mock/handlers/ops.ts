@@ -19,6 +19,7 @@ import { CAPABILITIES, capabilityOn, blockingCapability, OFFLINE_ALLOWLIST } fro
 import { nextRun } from '../seed-ops';
 import { deviceName } from '../../demo/people';
 import type { DB, Order, ApprovalGrant } from '../types';
+import { fireSchedule } from './report-studio';
 import type { ApprovalRequestRec, BusinessDaySummary, OfflineItem, ReconResult, ReportSchedule, WebhookDelivery, CapabilityState } from '../types-ops';
 
 const DAY = 86_400_000;
@@ -692,8 +693,7 @@ export function runOpsBackground(db: DB): boolean {
   }
   for (const s of db.reportSchedules ?? []) {
     if (!s.active || s.nextRunMs > now) continue;
-    s.runs.unshift({ at: new Date(now).toISOString(), status: 'SENT', note: `اتبعت لـ ${s.recipients.join('، ')} (${s.format})` });
-    s.runs.length = Math.min(s.runs.length, 10);
+    fireSchedule(db, s, now); // round 4: real outputs per branch (bursting), stored for preview + audited
     s.nextRunMs = nextRun(now, s.frequency, s.weekday, s.time); s.nextRunAt = new Date(s.nextRunMs).toISOString();
     changed = true;
   }

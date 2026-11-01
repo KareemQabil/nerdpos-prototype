@@ -4,7 +4,8 @@ import React from 'react';
 import { Receipt, CheckCircle2, AlertTriangle, ExternalLink, FileSearch } from 'lucide-react';
 import { useDev, useQuery, errorText } from '../../app/hooks';
 import { Drawer, Spinner, Banner, Pill, Table, Button, StateBadge } from '../../ui';
-import { t, L } from '../../i18n';
+import { t, L, getLang } from '../../i18n';
+import { rangeText } from '../../reports/format';
 import { dateTime } from '../../lib/format';
 import { Tech } from '../../app/tech';
 import { fmt, type EvidenceSpec } from './parts';
@@ -20,7 +21,7 @@ function Rows({ rows, unit, onOpen }: { rows: any[]; unit?: string; onOpen: (ord
         <Pill size="sm" tone="neutral">{t(KIND[e.kind] ?? e.kind)}</Pill>,
         <span className="num text-xs whitespace-nowrap">{e.businessDate ?? (e.at ? dateTime(e.at) : '—')}</span>,
         <span className="num whitespace-nowrap">{e.amount === null || e.amount === undefined ? '—' : unit === 'EGP' || !unit ? fmt(e.amount) : fmt(e.amount, unit)}</span>,
-        e.orderId ? <Button size="sm" variant="ghost" onClick={() => onOpen(e.orderId)} data-fb={`evidence-open:${e.orderId}`}><Receipt className="w-3.5 h-3.5" />{t('افتح الشيك')}</Button> : null,
+        e.orderId ? <Button size="icon" variant="ghost" onClick={() => onOpen(e.orderId)} data-fb={`evidence-open:${e.orderId}`} title={t('افتح الشيك')} aria-label={t('افتح الشيك')}><Receipt className="w-4 h-4" /></Button> : null,
       ])} />
   );
 }
@@ -28,7 +29,7 @@ function Rows({ rows, unit, onOpen }: { rows: any[]; unit?: string; onOpen: (ord
 export function EvidenceDrawer({ spec, onClose }: { spec: EvidenceSpec | null; onClose: () => void }) {
   const { nav } = useDev();
   const list = spec?.metric === '__list';
-  const q = useQuery<any>(spec && !list ? 'Report.Explain' : null, { query: { q: JSON.stringify(spec ? { metric: spec.metric, cell: spec.cell, filters: spec.filters, from: spec.from, to: spec.to, branchIds: spec.branchIds, asOf: spec.asOf } : {}) } });
+  const q = useQuery<any>(spec && !list ? 'Report.Explain' : null, { query: { q: JSON.stringify(spec ? { metric: spec.metric, cell: spec.cell, filters: spec.filters, exclude: spec.exclude, from: spec.from, to: spec.to, branchIds: spec.branchIds, asOf: spec.asOf } : {}) } });
   const r = q.data;
   const open = (orderId: string) => { onClose(); nav('receipt', { orderId }); };
   return (
@@ -40,8 +41,9 @@ export function EvidenceDrawer({ spec, onClose }: { spec: EvidenceSpec | null; o
           <div className="rounded-xl surface-1 p-3 space-y-1">
             <div className="text-2xl font-extrabold num">{r.value.availability === 'AVAILABLE' ? fmt(r.value.value, r.metric.unit) : <span className="text-base">{L(r.value.reason) || t('مش متاح')}</span>}</div>
             <div className="text-sm text-soft">{L(r.metric.definition)}</div>
-            {Object.keys(r.cell ?? {}).length > 0 && <div className="text-xs text-dim">{t('الخانة')}: {Object.entries(r.cell).map(([k, v]) => `${k}=${v}`).join(' · ')}</div>}
-            <div className="text-xs text-dim num">{r.meta.from}{r.meta.to !== r.meta.from ? ` → ${r.meta.to}` : ''} · {t('لحد')} {dateTime(r.meta.asOf)} · {t('نسخة التعريف')} {r.metric.version}</div>
+            {spec?.where && <div className="text-sm font-medium" data-fb="evidence-where">{spec.where}</div>}
+            {Object.keys(r.cell ?? {}).length > 0 && <Tech><div className="text-[10px] text-dim num" dir="ltr">{Object.entries(r.cell).map(([k, v]) => `${k}=${v}`).join(' · ')}</div></Tech>}
+            <div className="text-xs text-dim">{rangeText(r.meta.from, r.meta.to, getLang() === 'en' ? 'en' : 'ar')} · {t('لحد')} <span className="num">{dateTime(r.meta.asOf)}</span> · {t('نسخة التعريف')} <span className="num">{r.metric.version}</span></div>
             {r.proof.holds === true && <div className="text-sm text-[var(--success)] flex items-center gap-1" data-fb="evidence-proof"><CheckCircle2 className="w-4 h-4" />{t('مجموع السجلات بيطلع نفس الرقم')} <span className="num text-xs text-dim">{r.proof.equation}</span></div>}
             {r.proof.holds === false && <div className="text-sm text-[var(--error)] flex items-center gap-1"><AlertTriangle className="w-4 h-4" />{t('المجموع مختلف — ده لازم يتراجع')} <span className="num text-xs">{r.proof.equation}</span></div>}
             {r.metric.pitfalls?.map((p: any, i: number) => <div key={i} className="text-[11px] text-[var(--warning-text)]">{t('تنبيه')}: {L(p)}</div>)}

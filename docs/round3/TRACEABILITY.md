@@ -8,9 +8,9 @@ Status vocabulary (from the handoff): `FIXED_AND_TESTED` · `VERIFIED_EXISTING` 
 `NOT_TESTED_HARDWARE`. "Tested" means a scripted test or a Playwright run in the mock — never a real device.
 
 Test assets: `scripts/journeys-test.ts` (all journeys incl. new **J-P1** "مين عمل ومين سمح", N1–N12),
-`scripts/reports-engine-test.ts` (56 checks), `scripts/reports-eval.ts` (198 questions), `scripts/r3c-api-test.ts`
-(43 checks). Final run on this commit: journeys `FAILURES: 0`, engine `PASSES 56 / FAILURES 0`, r3c `FAILURES 0`,
-`tsc` clean, production build OK, 132 screens × 7 devices opened with 0 console errors.
+`scripts/reports-engine-test.ts` (101 checks), `scripts/reports-eval.ts` (198 questions), `scripts/r3c-api-test.ts`
+(43 checks). Final run on this commit: journeys `FAILURES: 0`, engine `PASSES 101 / FAILURES 0`, r3c `FAILURES 0`,
+`tsc` clean, production build OK, 135 screens × 7 devices opened with 0 console errors.
 
 ## A. The 13 prototype notes
 
@@ -65,8 +65,8 @@ Test assets: `scripts/journeys-test.ts` (all journeys incl. new **J-P1** "مين
 | P1-029 Inventory product flow | FIXED_AND_TESTED | Guided new product → menu → POS |
 | P1-030 Replenishment & purchasing | FIXED_AND_TESTED | Target − on hand; 100 → 80 → 60 → 60 |
 | P1-031 Package/vendor comparison | FIXED_AND_TESTED | Pack cards + best pack / supplier |
-| P1-032 Reporting baseline | FIXED_AND_TESTED | Registry (85 metrics, 34 dimensions) + 19 certified reports; awaiting operator sign-off (expert review inside) |
-| P1-033 Report templates | FIXED_AND_TESTED | A4 + receipt templates with logo; CSV/Excel with metadata |
+| P1-032 Reporting baseline | FIXED_AND_TESTED | Registry + 19 certified reports + pivot engine (nested rows, cross-tab, comparisons, top N + others) + 3-step designer + saved reports with versions/sharing + schedules + activity log; awaiting operator sign-off (expert review inside) |
+| P1-033 Report templates | FIXED_AND_TESTED | Reports studio: 3 print templates (A4 portrait/landscape, 80 mm) with paginated preview, repeated headers, carried totals, signatures, «مبدئي» watermark; Excel (levels, formats, definitions sheet) / CSV / PDF; Excel parity read back in the test |
 | P1-034 Printer template languages | FIXED_AND_TESTED (screen) | Second language on receipt/kitchen/menu when the item has a second name |
 | P1-035 Management policy UI | FIXED_AND_TESTED | KDS screens, Start, tender reference, channels, permissions, approval credentials |
 | P1-036 Inventory/menu usability | FIXED_AND_TESTED | Search + item 360 |

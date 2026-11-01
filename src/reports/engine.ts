@@ -116,12 +116,12 @@ export const EVAL: Record<string, Ev> = {
 };
 /** Metrics that can read the pre-launch daily aggregates (no evidence below the day) and the dimensions they allow. */
 const HISTORY: Record<string, { field: string; dims: string[]; byMethod?: boolean }> = {
-  item_net_sales: { field: 'net', dims: ['business_date', 'business_week', 'branch'] },
-  net_item_sales: { field: 'net', dims: ['business_date', 'business_week', 'branch'] },
-  order_count: { field: 'orders', dims: ['business_date', 'business_week', 'branch'] },
-  check_count: { field: 'orders', dims: ['business_date', 'business_week', 'branch'] },
-  guest_count: { field: 'guests', dims: ['business_date', 'business_week', 'branch'] },
-  tender_collected: { field: 'tender', dims: ['business_date', 'business_week', 'branch', 'payment_method'], byMethod: true },
+  item_net_sales: { field: 'net', dims: ['business_date', 'business_week', 'weekday', 'branch'] },
+  net_item_sales: { field: 'net', dims: ['business_date', 'business_week', 'weekday', 'branch'] },
+  order_count: { field: 'orders', dims: ['business_date', 'business_week', 'weekday', 'branch'] },
+  check_count: { field: 'orders', dims: ['business_date', 'business_week', 'weekday', 'branch'] },
+  guest_count: { field: 'guests', dims: ['business_date', 'business_week', 'weekday', 'branch'] },
+  tender_collected: { field: 'tender', dims: ['business_date', 'business_week', 'weekday', 'branch', 'payment_method'], byMethod: true },
 };
 const CAPABILITY_OF: Partial<Record<FactKind, string>> = { stock: 'INVENTORY', waste: 'INVENTORY', count: 'INVENTORY', po: 'INVENTORY', grn: 'INVENTORY', fiscal: 'E_RECEIPT', delivery: 'DELIVERY', reservation: 'RESERVATIONS', visit: 'TABLE_SERVICE' };
 const SPECIAL_REFUSAL: Record<string, Loc> = {
@@ -157,12 +157,14 @@ export const STAGE_LABEL: Record<string, Loc> = { S0: { ar: 'S0 قبل ما يظ
 export const DISP_LABEL: Record<string, Loc> = { NOT_PREPARED: { ar: 'ما اتعملش', en: 'Not prepared' }, RETURN_TO_STOCK: { ar: 'رجع المخزن', en: 'Back to stock' }, WASTE_HELD: { ar: 'هالك محجوز للمراجعة', en: 'Waste held' } };
 const FISCAL_LABEL: Record<string, Loc> = { PENDING_DATA: { ar: 'ناقصه بيانات', en: 'Pending data' }, BUILT: { ar: 'اتجهز', en: 'Built' }, SUBMITTED: { ar: 'اتبعت', en: 'Submitted' }, ACCEPTED: { ar: 'اتقبل', en: 'Accepted' }, REJECTED: { ar: 'اترفض', en: 'Rejected' }, SUPERSEDED: { ar: 'اتصحح بإيصال جديد', en: 'Superseded' } };
 const same = (s: string): Loc => ({ ar: s, en: s });
+export const WEEKDAY_LABEL: Record<string, Loc> = { '6': { ar: 'السبت', en: 'Saturday' }, '0': { ar: 'الحد', en: 'Sunday' }, '1': { ar: 'الاتنين', en: 'Monday' }, '2': { ar: 'التلات', en: 'Tuesday' }, '3': { ar: 'الأربع', en: 'Wednesday' }, '4': { ar: 'الخميس', en: 'Thursday' }, '5': { ar: 'الجمعة', en: 'Friday' } };
 export function dimLabel(db: DB, dim: string, v: string | null): Loc {
   if (v === null || v === undefined || v === '') return { ar: '—', en: '—' };
   const u = () => { const x = db.users.find((y) => y.id === v); return same(x ? userLabel(x.username, x.displayName) : v); };
   switch (dim) {
     case 'business_date': return same(v);
     case 'business_week': return { ar: `أسبوع ${v}`, en: `Week of ${v}` };
+    case 'weekday': return WEEKDAY_LABEL[v] ?? same(v);
     case 'daypart': return DAYPART_LABEL[v] ?? same(v);
     case 'hour': return same(`${v}:00`);
     case 'branch': { const b = db.branches.find((x) => x.id === v); return same(b?.name ?? v); }
@@ -196,7 +198,7 @@ export function dimLabel(db: DB, dim: string, v: string | null): Loc {
 }
 
 // ───────── evaluation
-interface Ctx { db: DB; scope: FactScope; cache: Map<string, Fact[]>; dims: string[]; filters: Record<string, string[]>; launch: string; caller: Caller }
+interface Ctx { db: DB; scope: FactScope; cache: Map<string, Fact[]>; dims: string[]; filters: Record<string, string[]>; exclude?: Record<string, string[]>; launch: string; caller: Caller }
 type Groups = Map<string, { dims: Record<string, string | null>; value: MetricValue; facts: Fact[]; source?: 'EVENTS' | 'HISTORY' }>;
 const keyOf = (dims: string[], f: Fact) => dims.map((d) => f.dims[d] ?? '∅').join('|');
 const dimsOf = (dims: string[], f: Fact) => Object.fromEntries(dims.map((d) => [d, f.dims[d] ?? null]));
@@ -204,9 +206,16 @@ const dimsOf = (dims: string[], f: Fact) => Object.fromEntries(dims.map((d) => [
 function factDims(kind: FactKind, sample?: Fact): string[] | null { return sample ? Object.keys(sample.dims) : null; }
 function filterFacts(c: Ctx, facts: Fact[]): Fact[] {
   const fs = Object.entries(c.filters).filter(([, v]) => v.length);
-  if (!fs.length) return facts;
-  return facts.filter((f) => fs.every(([d, vs]) => vs.includes(String(f.dims[d] ?? ''))));
+  const xs = Object.entries(c.exclude ?? {}).filter(([, v]) => v.length);
+  if (!fs.length && !xs.length) return facts;
+  return facts.filter((f) => fs.every(([d, vs]) => vs.includes(dv(f, d))) && xs.every(([d, vs]) => !vs.includes(dv(f, d))));
 }
+/** A fact's dimension value as a filter string; an empty value is «∅» (so a «—» row can be drilled into exactly). */
+export const NULL_KEY = '∅';
+function dv(f: Fact, d: string): string { const x = f.dims[d]; return x === null || x === undefined || x === '' ? NULL_KEY : String(x); }
+const listOf = (v: unknown): string[] => (Array.isArray(v) ? v : String(v).split(',')).map(String).filter((x) => x !== '');
+/** Options the pivot layer passes (never read from the API): a shared fact cache and a longer range for YTD. */
+export interface QueryOpts { cache?: Map<string, Fact[]>; maxDays?: number }
 const evFact = (e: Ev): FactKind | null => ('fact' in e ? e.fact : e.t === 'requires_dim' || e.t === 'trace' ? evFact(e.inner) : e.t === 'price_change' ? 'grn' : null);
 
 function group(c: Ctx, facts: Fact[], fn: (fs: Fact[]) => MetricValue): Groups {
@@ -309,7 +318,7 @@ function evalMetric(c: Ctx, m: MetricDef): Groups {
   const h = HISTORY[m.id];
   const preLaunch = c.scope.from < c.launch;
   if (!preLaunch || m.terms || m.numerator) return g; // composites and ratios get history through their parts
-  if (h && c.dims.every((d) => h.dims.includes(d)) && Object.keys(c.filters).every((d) => h.dims.includes(d) || !c.filters[d].length)) {
+  if (h && c.dims.every((d) => h.dims.includes(d)) && Object.keys(c.filters).every((d) => h.dims.includes(d) || !c.filters[d].length) && Object.keys(c.exclude ?? {}).every((d) => h.dims.includes(d))) {
     const hs = filterFacts(c, factsOf(c.db, 'history', { ...c.scope, to: addDays(c.launch, -1) < c.scope.to ? addDays(c.launch, -1) : c.scope.to }, c.cache));
     const expanded: Fact[] = h.byMethod ? hs.flatMap((f) => (['CASH', 'CARD', 'WALLET'] as const).map((pm) => ({ ...f, id: `${f.id}:${pm}`, dims: { ...f.dims, payment_method: pm }, n: { ...f.n, tender: f.n[pm === 'CASH' ? 'cash' : pm === 'CARD' ? 'card' : 'wallet'] } }))) : hs;
     const filtered = filterFacts(c, expanded);
@@ -323,7 +332,7 @@ function pmRefusal(m: MetricDef, dim: string): Loc {
   if (dim === 'payment_method' && ['line', 'check', 'composite', 'discount'].includes(m.fact) && !m.id.startsWith('net_tender')) return SPECIAL_REFUSAL.payment_method;
   if (m.additivity === 'SEMI_ADDITIVE' && (dim === 'business_date' || dim === 'business_week')) return SPECIAL_REFUSAL['business_date@SEMI'];
   const dd = dimensionById.get(dim);
-  return { ar: `«${m.label.ar}» ما ينفعش يتقسم حسب «${dd?.label.ar ?? dim}» — المصدر بتاعه (${m.grain}) مفيهوش البُعد ده، والتقسيم كان هيكرر أرقام.`, en: `${m.label.en} cannot be broken down by ${dd?.label.en ?? dim}: its grain (${m.grain}) does not carry it; the join would duplicate measures.` };
+  return { ar: `«${m.label.ar}» ما بيتقسمش حسب «${dd?.label.ar ?? dim}» — الرقم ده مش متسجل بالتفصيل ده، والتقسيم كان هيكرر أرقام.`, en: `${m.label.en} cannot be broken down by ${dd?.label.en ?? dim}: its grain (${m.grain}) does not carry it; the join would duplicate measures.` };
 }
 
 /** Branches the caller may read in reports. */
@@ -335,19 +344,21 @@ export function scopeBranches(db: DB, caller: Caller, requested?: string[]): str
   return list;
 }
 
-export function query(db: DB, caller: Caller, q: QuerySpec): QueryResult {
+export function query(db: DB, caller: Caller, q: QuerySpec, opts: QueryOpts = {}): QueryResult {
   const from = q.from; const to = q.to ?? q.from;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || to < from) throw new ReportRefusal('VALIDATION_FAILED', { field: 'period' });
-  if ((Date.parse(to) - Date.parse(from)) / 86_400_000 > 93) throw new ReportRefusal('VALIDATION_FAILED', { rule: 'a range is at most 93 days' });
+  if ((Date.parse(to) - Date.parse(from)) / 86_400_000 > (opts.maxDays ?? 93)) throw new ReportRefusal('VALIDATION_FAILED', { rule: 'a range is at most 93 days' });
   const branchIds = scopeBranches(db, caller, q.branchIds);
   const asOfMs = Math.min(q.asOf ? Date.parse(q.asOf) : caller.nowMs, caller.nowMs);
   const dims = [...new Set(q.dimensions ?? [])];
   const filters: Record<string, string[]> = {};
   for (const [k, v] of Object.entries(q.filters ?? {})) if (v !== undefined && v !== '' && !(Array.isArray(v) && !v.length)) filters[k] = (Array.isArray(v) ? v : String(v).split(',')).map(String);
+  const exclude: Record<string, string[]> = {};
+  for (const [k, v] of Object.entries(q.exclude ?? {})) if (v !== undefined && listOf(v).length) exclude[k] = listOf(v);
   const refused: QueryMeta['refused'] = []; const notAvailable: QueryMeta['notAvailable'] = [];
-  for (const d of [...dims, ...Object.keys(filters)]) if (!dimensionById.has(d)) throw new ReportRefusal('VALIDATION_FAILED', { field: 'dimension', value: d });
+  for (const d of [...dims, ...Object.keys(filters), ...Object.keys(exclude)]) if (!dimensionById.has(d)) throw new ReportRefusal('VALIDATION_FAILED', { field: 'dimension', value: d });
   const scope: FactScope = { branchIds, from, to, asOfMs };
-  const c: Ctx = { db, scope, cache: new Map(), dims, filters, launch: launchDate(db), caller };
+  const c: Ctx = { db, scope, cache: opts.cache ?? new Map(), dims, filters, exclude, launch: launchDate(db), caller };
   // the recon fact source is built lazily by the reconciliation module (avoids an import cycle)
   if (q.metrics.includes('reconciliation_errors')) c.cache.set(`recon|${branchIds.join(',')}|${from}|${to}|${asOfMs}`, reconFacts(db, scope));
   const ok: MetricDef[] = [];
@@ -359,7 +370,7 @@ export function query(db: DB, caller: Caller, q: QuerySpec): QueryResult {
     const cap = fk ? CAPABILITY_OF[fk] : undefined;
     if (cap && !branchIds.some((b) => capabilityOn(db, cap, b))) { notAvailable.push({ metric: id, reason: { ar: 'الموديول ده مقفول للفرع — الرقم مش متاح (مش صفر).', en: 'Module switched off for this branch — not available (not zero).' } }); continue; }
     if (m.permission && !caller.perms(m.permission)) { refused.push({ metric: id, reason: { ar: 'الرقم ده للمدير والمحاسب بس.', en: 'Managers and accountants only.' } }); continue; }
-    const badDim = [...dims, ...Object.keys(filters)].find((d) => !m.dimensions.includes(d));
+    const badDim = [...dims, ...Object.keys(filters), ...Object.keys(exclude)].find((d) => !m.dimensions.includes(d));
     if (badDim) { refused.push({ metric: id, dimension: badDim, reason: pmRefusal(m, badDim) }); continue; }
     const permDim = dims.find((d) => dimensionById.get(d)?.permission && !caller.perms(dimensionById.get(d)!.permission!));
     if (permDim) { refused.push({ metric: id, dimension: permDim, reason: { ar: `التقسيم حسب «${dimensionById.get(permDim)!.label.ar}» للمدير بس.`, en: `Breakdown by ${dimensionById.get(permDim)!.label.en} is for managers.` } }); continue; }
@@ -388,11 +399,13 @@ export function query(db: DB, caller: Caller, q: QuerySpec): QueryResult {
   let rows = [...rowMap.values()];
   for (const r of rows) for (const m of ok) {
     if (r.values[m.id]) continue;
+    const star = groups.get(m.id)?.get('*'); // the metric is undefined / not available for this whole grouping — never fill 0
+    if (star && star.value.availability !== 'AVAILABLE') { r.values[m.id] = star.value; continue; }
     const pre = r.dims.business_date && r.dims.business_date < c.launch;
     r.values[m.id] = pre && !hasHistory(m) ? NOT_AVAIL({ ar: 'يوم قبل تشغيل السيستم — مفيش بيانات تفصيلية.', en: 'Pre-launch day — no event-level data.' }) : zeroOrNA(m, c);
   }
   const sortM = q.sort?.metric ?? ok[0]?.id;
-  if (dims.includes('business_date') || dims.includes('hour') || dims.includes('business_week')) rows.sort((a, b) => a.key.localeCompare(b.key));
+  if (dims.includes('business_date') || dims.includes('hour') || dims.includes('business_week') || dims.includes('weekday')) rows.sort((a, b) => a.key.localeCompare(b.key));
   else if (sortM) rows.sort((a, b) => (q.sort?.dir === 'asc' ? 1 : -1) * D(a.values[sortM]?.value ?? -1e15).comparedTo(D(b.values[sortM]?.value ?? -1e15)));
   if (q.limit) rows = rows.slice(0, q.limit);
   const days = datesOf(from, to).map((d) => ({ date: d, status: dayStatus(db, branchIds, d, caller.nowMs), source: (d < c.launch ? ((db.salesHistory ?? []).some((h) => h.businessDate === d && branchIds.includes(h.branchId)) ? 'HISTORY' : 'NONE') : 'EVENTS') as 'EVENTS' | 'HISTORY' | 'NONE' }));
@@ -409,6 +422,17 @@ export function query(db: DB, caller: Caller, q: QuerySpec): QueryResult {
   };
   return { meta, dimensions: dims, metrics: q.metrics, rows, totals };
 }
+/** Pre-launch coverage of a metric: ok=false → days before launch have nothing for it; dims = the breakdowns the
+ *  imported daily totals support (null = not a sales metric, no launch boundary). Used by comparisons / MTD / YTD. */
+export function preLaunchCoverage(id: string): { ok: boolean; dims: string[] | null } {
+  const m = metricById.get(id);
+  if (!m) return { ok: false, dims: [] };
+  if (!preLaunchApplies(m)) return { ok: true, dims: null };
+  if (HISTORY[id]) return { ok: true, dims: HISTORY[id].dims };
+  const parts = m.terms ? m.terms.map((t) => t.metric) : m.numerator ? [m.numerator, m.denominator!] : [];
+  if (!parts.length || !parts.every((p) => HISTORY[p])) return { ok: false, dims: [] };
+  return { ok: true, dims: parts.map((p) => HISTORY[p].dims).reduce((a, b) => a.filter((x) => b.includes(x))) };
+}
 const SALES_FACTS = new Set<string>(['check', 'line', 'payment', 'refund', 'drawer', 'cash_entry', 'removal', 'discount', 'comp', 'staff_meal', 'kitchen', 'fiscal', 'approval', 'visit', 'recon', 'composite']);
 /** Only sales-domain facts start at launch; inventory, purchasing, reservations and delivery have their own history. */
 const preLaunchApplies = (m: MetricDef) => SALES_FACTS.has(m.fact) && !(m.fact === 'composite' && [m.numerator, m.terms?.[0]?.metric].some((x) => x && !SALES_FACTS.has(metricById.get(x)?.fact ?? '')));
@@ -421,17 +445,19 @@ function zeroOrNA(m: MetricDef, c: Ctx): MetricValue {
 }
 
 /** L4: the exact source records behind one cell. Their amounts add up to the cell (the proof is returned too). */
-export function explain(db: DB, caller: Caller, spec: { metric: string; cell?: Record<string, string | null>; filters?: QuerySpec['filters']; from: string; to?: string; branchIds?: string[]; asOf?: string }) {
+export function explain(db: DB, caller: Caller, spec: { metric: string; cell?: Record<string, string | null>; filters?: QuerySpec['filters']; exclude?: QuerySpec['exclude']; from: string; to?: string; branchIds?: string[]; asOf?: string }) {
   const m = metricById.get(spec.metric);
   if (!m) throw new ReportRefusal('METRIC_NOT_FOUND', { metric: spec.metric });
   const cellFilters = Object.fromEntries(Object.entries(spec.cell ?? {}).filter(([, v]) => v !== null && v !== undefined).map(([k, v]) => [k, String(v)]));
-  const r = query(db, caller, { metrics: [spec.metric], filters: { ...(spec.filters ?? {}), ...cellFilters }, from: spec.from, to: spec.to, branchIds: spec.branchIds, asOf: spec.asOf });
+  const r = query(db, caller, { metrics: [spec.metric], filters: { ...(spec.filters ?? {}), ...cellFilters }, exclude: spec.exclude, from: spec.from, to: spec.to, branchIds: spec.branchIds, asOf: spec.asOf }, { maxDays: 366 });
   const total = r.totals[spec.metric];
   const branchIds = r.meta.branchIds;
   const scope: FactScope = { branchIds, from: r.meta.from, to: r.meta.to, asOfMs: Date.parse(r.meta.asOf) };
   const filters: Record<string, string[]> = {};
   for (const [k, v] of Object.entries({ ...(spec.filters ?? {}), ...cellFilters })) if (v !== undefined && v !== '') filters[k] = (Array.isArray(v) ? v : String(v).split(',')).map(String);
-  const c: Ctx = { db, scope, cache: new Map(), dims: [], filters, launch: launchDate(db), caller };
+  const exclude: Record<string, string[]> = {};
+  for (const [k, v] of Object.entries(spec.exclude ?? {})) if (v !== undefined && listOf(v).length) exclude[k] = listOf(v);
+  const c: Ctx = { db, scope, cache: new Map(), dims: [], filters, exclude, launch: launchDate(db), caller };
   if (spec.metric === 'reconciliation_errors') c.cache.set(`recon|${branchIds.join(',')}|${scope.from}|${scope.to}|${scope.asOfMs}`, reconFacts(db, scope));
   const parts: { metric: string; label: Loc; sign: 1 | -1; role: 'term' | 'numerator' | 'denominator' | 'value'; field: string | null; evidence: EvidenceRef[]; sum: string | null }[] = [];
   const collect = (mm: MetricDef, sign: 1 | -1, role: 'term' | 'numerator' | 'denominator' | 'value') => {

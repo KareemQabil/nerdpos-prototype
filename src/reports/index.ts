@@ -9,3 +9,4 @@ export { METRICS, metricById } from './registry/metrics';
 export { DIMENSIONS, dimensionById } from './registry/dimensions';
 export { CHECKLIST } from './expert';
 export { LEGACY_REPORTS, runLegacyReport } from './legacy';
+export { pivot, flatten, outputColumns, resolvePeriod, comparePeriod, calcFormula, READY_CALCS, businessDayEndMs, type PivotSpec, type PivotResult, type PivotNode, type MeasureMeta, type FlatRow } from './pivot';

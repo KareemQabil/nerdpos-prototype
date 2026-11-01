@@ -1,6 +1,7 @@
 import type { Handler } from '../kernel';
 import { opsHandlers, gateByCapability } from './ops'; // operations & system area
-import { reportHandlers } from './reports'; // reports engine (src/reports/**): Report.* incl. Export/Schedule
+import { reportHandlers } from './reports';
+import { reportStudioHandlers } from './report-studio'; // reports engine (src/reports/**): Report.* incl. Export/Schedule
 import { accessHandlers } from './access';
 import { orgHandlers } from './org';
 import { catalogHandlers } from './catalog';
@@ -41,5 +42,6 @@ export const handlers: Record<string, Handler> = {
 // operations & system area (ops.ts): its handlers, then the capability gate around every handler
 // (an operation whose product capability is switched off answers CAPABILITY_NOT_AVAILABLE).
 Object.assign(handlers, opsHandlers);
-Object.assign(handlers, reportHandlers); // reports engine owns Report.* (overrides ops.ts Report.Export/Schedule)
+Object.assign(handlers, reportHandlers);
+Object.assign(handlers, reportStudioHandlers); // round 4 report studio: pivot, saved reports, templates, audit, schedule outputs // reports engine owns Report.* (overrides ops.ts Report.Export/Schedule)
 Object.assign(handlers, gateByCapability(handlers));

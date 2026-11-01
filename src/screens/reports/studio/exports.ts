@@ -1,0 +1,63 @@
+// Downloads for custom reports. The server runs the report again for the file (Report.PivotExport — logged and
+// audited) and the file is built from that result, so it carries the same numbers as the screen. Excel is built with
+// ExcelJS (loaded only when needed), CSV is plain; PDF comes from the print preview (PrintStudio).
+import { call } from '../../../api/client';
+import type { DeviceAuth } from '../../../api/client';
+import { saveFile } from '../../../lib/files';
+import { exportTable } from '../../../reports/export/table';
+import { buildPivotXlsx, buildPivotCsv } from '../../../reports/export/xlsx';
+import { paramsOf } from '../../../reports/print/layout';
+import type { PivotSpec, PivotResult } from '../../../reports/pivot';
+import type { ColumnView } from '../../../reports/studio';
+import type { Lang } from '../../../reports/format';
+
+export async function loadExcelJS(): Promise<any> { const mod: any = await import('exceljs'); return mod.default ?? mod; }
+
+export async function exportPivot(auth: DeviceAuth, o: { format: 'XLSX' | 'CSV'; savedId?: string | null; spec?: PivotSpec; name: string; view?: ColumnView[]; lang: Lang; venue: string; branchName: (id: string) => string; evidence?: boolean }): Promise<{ filename: string; saved: boolean }> {
+  const res = await call<any>(auth, 'Report.PivotExport', { body: { savedReportId: o.savedId ?? undefined, spec: o.savedId ? undefined : o.spec, from: o.spec?.from, to: o.spec?.to, branchIds: o.spec?.branchIds, format: o.format, name: o.name } });
+  const r: PivotResult = res.data.result;
+  const tb = exportTable(r, o.view, o.lang, 'all', o.name);
+  if (o.format === 'CSV') return { filename: res.data.filename, saved: await saveFile(res.data.filename, buildPivotCsv(tb, o.lang), 'text/csv;charset=utf-8') };
+  let evidence: any[] | null = null;
+  const first = r.measures.find((m) => m.kind === 'value' && m.period);
+  if (o.evidence && first) {
+    const ex = await call<any>(auth, 'Report.Explain', { query: { q: JSON.stringify({ metric: first.metric, filters: r.spec.filters, exclude: r.spec.exclude, from: r.meta.from, to: r.meta.to, branchIds: r.meta.branchIds }) } });
+    evidence = ex.data.parts.flatMap((p: any) => p.evidence.map((e: any) => ({ label: e.label, kind: e.kind, businessDate: e.businessDate ?? null, amount: e.amount ?? null })));
+  }
+  const ExcelJS = await loadExcelJS();
+  const buf = await buildPivotXlsx(ExcelJS, { table: tb, result: r, lang: o.lang, title: o.name, venue: o.venue, branches: r.meta.branchIds.map(o.branchName), generatedBy: res.data.generatedBy, generatedAt: res.data.generatedAt, params: paramsOf(r, o.lang).map((p) => ({ label: { ar: p.label, en: p.label }, value: p.value })), evidence });
+  return { filename: res.data.filename, saved: await saveFile(res.data.filename, new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })) };
+}
+
+/** Certified reports: Report.Export (server run, logged + audited) → Excel (one sheet per table + «عن التقرير») or CSV. */
+export async function exportCertified(auth: DeviceAuth, o: { reportId: string; from: string; to: string; branchIds?: string; format: 'XLSX' | 'CSV'; lang: Lang }): Promise<{ filename: string; saved: boolean }> {
+  const res = await call<any>(auth, 'Report.Export', { body: { reportId: o.reportId, fromBusinessDate: o.from, toBusinessDate: o.to, branchIds: o.branchIds, format: o.format } });
+  const d = res.data; const ar = o.lang === 'ar';
+  const pick = (l: any) => (l ? (ar ? l.ar : l.en || l.ar) : '');
+  const MONEY = /^-?\d+\.\d{4}$/;
+  const cell = (c: any) => (c === 'CAPABILITY_NOT_AVAILABLE' ? (ar ? 'مش متاح' : 'Not available') : c);
+  if (o.format === 'CSV') {
+    const esc = (s: any) => { const x = String(s ?? ''); return /[",\n]/.test(x) ? `"${x.replace(/"/g, '""')}"` : x; };
+    const lines: string[] = [esc(pick(d.title)), `${ar ? 'الفترة' : 'Period'},${d.period?.from} → ${d.period?.to}`, `${ar ? 'لحد' : 'As of'},${d.asOf}`, ''];
+    for (const s of d.sheets) { lines.push(esc(pick(s.title))); if (s.columns) lines.push(s.columns.map(esc).join(',')); for (const r of s.rows) lines.push(r.map((c: any) => esc(MONEY.test(String(c)) ? Number(c).toFixed(2) : cell(c))).join(',')); lines.push(''); }
+    return { filename: d.filename, saved: await saveFile(d.filename, '﻿' + lines.join('\n'), 'text/csv;charset=utf-8') };
+  }
+  const ExcelJS = await loadExcelJS();
+  const wb = new ExcelJS.Workbook(); wb.creator = 'NerdPOS';
+  const about = wb.addWorksheet(ar ? 'عن التقرير' : 'About', { views: [{ rightToLeft: ar }] });
+  about.getColumn(1).width = 28; about.getColumn(2).width = 60;
+  about.addRow([pick(d.title)]).font = { bold: true, size: 14 };
+  for (const [k, v] of [[ar ? 'الفترة' : 'Period', `${d.period?.from} → ${d.period?.to}`], [ar ? 'لحد' : 'As of', d.meta?.asOf], [ar ? 'الحالة' : 'Status', d.meta?.provisional ? (ar ? 'مبدئي' : 'Provisional') : (ar ? 'نهائي' : 'Final')], [ar ? 'اتطلع بواسطة' : 'Generated by', d.generatedBy]]) { const r = about.addRow([k, v]); r.getCell(1).font = { bold: true }; }
+  about.addRow([]); about.addRow([ar ? 'المقياس' : 'Metric', ar ? 'النسخة' : 'Version']).font = { bold: true };
+  for (const m of d.meta?.metrics ?? []) about.addRow([pick(m.label), m.version]);
+  d.sheets.forEach((s: any, i: number) => {
+    const ws = wb.addWorksheet((pick(s.title) || `S${i + 1}`).replace(/[\\/?*[\]:]/g, ' ').slice(0, 30), { views: [{ rightToLeft: ar, state: 'frozen', ySplit: 2 }] });
+    ws.addRow([pick(s.title)]).font = { bold: true, size: 12 };
+    const head = ws.addRow(s.columns ?? []); head.font = { bold: true }; head.eachCell((c: any) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } }; });
+    for (const r of s.rows) { const row = ws.addRow(r.map((c: any) => (MONEY.test(String(c)) ? Number(c) : cell(c)))); r.forEach((c: any, j: number) => { if (MONEY.test(String(c))) row.getCell(j + 1).numFmt = '#,##0.00'; }); if (/الإجمالي|الفرق/.test(String(r[0]))) row.font = { bold: true }; }
+    ws.columns.forEach((c: any, j: number) => { c.width = j === 0 ? 34 : 16; });
+  });
+  const buf = await wb.xlsx.writeBuffer();
+  const filename = String(d.filename).replace(/\.csv$/, '.xlsx');
+  return { filename, saved: await saveFile(filename, new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })) };
+}

@@ -153,7 +153,7 @@ setReconFactSource((db, s) => {
     if (d < launchDate(db) || dayStatus(db, s.branchIds, d, s.asOfMs) === 'FUTURE') continue;
     for (const b of s.branchIds) {
       const br = eodBridge(db, caller, { from: d, branchIds: [b], asOf: new Date(s.asOfMs).toISOString() });
-      for (const c of br.checks) out.push({ kind: 'recon', id: `${b}:${d}:${c.id}`, branchId: b, businessDate: d, recordedMs: s.asOfMs, dims: { business_date: d, business_week: d, branch: b }, n: { failed: c.status === 'UNEXPLAINED' ? '1' : '0', one: '1' }, ref: { kind: 'RECON', id: `${b}:${d}:${c.id}`, label: `${c.title.ar} — ${c.status === 'MATCHED' ? 'متطابق' : c.status === 'EXPLAINED' ? 'الفرق متشرح' : 'فرق مش متشرح'}`, businessDate: d, amount: c.status === 'UNEXPLAINED' ? '1' : '0' } });
+      for (const c of br.checks) out.push({ kind: 'recon', id: `${b}:${d}:${c.id}`, branchId: b, businessDate: d, recordedMs: s.asOfMs, dims: { business_date: d, business_week: d, weekday: String(new Date(d + 'T12:00:00Z').getUTCDay()), branch: b }, n: { failed: c.status === 'UNEXPLAINED' ? '1' : '0', one: '1' }, ref: { kind: 'RECON', id: `${b}:${d}:${c.id}`, label: `${c.title.ar} — ${c.status === 'MATCHED' ? 'متطابق' : c.status === 'EXPLAINED' ? 'الفرق متشرح' : 'فرق مش متشرح'}`, businessDate: d, amount: c.status === 'UNEXPLAINED' ? '1' : '0' } });
     }
   }
   return out;

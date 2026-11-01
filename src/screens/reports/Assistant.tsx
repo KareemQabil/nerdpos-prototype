@@ -2,7 +2,7 @@
 // (definition, period, filters, asOf, provisional, sources, not-available), one clarifying question when ambiguous,
 // refusals for what it must not do. Also used as a side panel (AskPanel) from any report page.
 import React, { useMemo, useRef, useState } from 'react';
-import { Send, MessageCircleQuestion, ShieldX, HelpCircle, Ban, CheckCircle2, Sparkles, BookOpen, Calendar, Filter, Clock, AlertTriangle, FileSearch, Info } from 'lucide-react';
+import { Wand2, Send, MessageCircleQuestion, ShieldX, HelpCircle, Ban, CheckCircle2, Sparkles, BookOpen, Calendar, Filter, Clock, AlertTriangle, FileSearch, Info } from 'lucide-react';
 import { useDev, errorText } from '../../app/hooks';
 import { call } from '../../api/client';
 import { Button, Card, Pill, Table, Spinner, StateBadge, PageHeader, Drawer, Banner } from '../../ui';
@@ -41,6 +41,9 @@ function AnswerCard({ a, onClarify, busy }: { a: any; onClarify: (id: string, la
   const open = React.useContext(EvidenceCtx);
   const st = STATUS[a.status] ?? STATUS.UNPARSED;
   const Icon = st.icon;
+  const { nav } = useDev();
+  // «افتح كتقرير»: the same query, pre-filled in the designer (the user can then split it, compare it, save it)
+  const asReport = a.data?.metrics?.length && a.data?.meta?.from && (a.status === 'ANSWERED' || a.status === 'EXPLAINED') ? () => nav('report-designer', { name: (L(a.text).split(/[:：—]/)[0] || '').trim().slice(0, 60) || t('تقرير من سؤال'), design: { metrics: a.data.metrics.filter((m: string) => !a.data.meta.refused?.some((x: any) => x.metric === m)).slice(0, 8), rows: (a.data.dimensions ?? []).slice(0, 4), columns: [], period: { preset: 'CUSTOM', from: a.data.meta.from, to: a.data.meta.to }, branches: a.data.meta.branchIds, compare: null, extras: [], topN: null, sort: null, having: [], calcs: [], format: { preset: 'none' }, view: { columns: [], chart: a.shape === 'chart' ? 'line' : 'bars', expandDepth: 1 } } }) : null;
   const run = a.data && a.parsed?.period ? { period: { from: a.parsed.period.from, to: a.parsed.period.to }, branchIds: a.data?.meta?.branchIds ?? a.data?.scope?.branchIds } : null;
   return (
     <div className="space-y-2" data-fb={`ask-answer:${a.status}`}>
@@ -48,6 +51,7 @@ function AnswerCard({ a, onClarify, busy }: { a: any; onClarify: (id: string, la
       <div className="text-[15px] leading-relaxed">{L(a.text)}</div>
       {a.clarify && <div className="flex flex-wrap gap-1.5">{a.clarify.options.map((o: any) => <Button key={o.id} size="sm" variant="outline" disabled={busy} onClick={() => onClarify(o.id, L(o.label))} data-fb={`ask-clarify:${o.id}`}>{L(o.label)}</Button>)}</div>}
       {a.shape === 'table' || a.shape === 'chart' ? <QueryResult r={a.data} /> : null}
+      {asReport && <div><Button size="sm" variant="outline" onClick={asReport} data-fb="ask:open-as-report"><Wand2 className="w-4 h-4" />{t('افتح كتقرير')}</Button><span className="text-[11px] text-dim ms-2">{t('نفس السؤال في مصمم التقارير — تقدر تقسّمه وتقارنه وتحفظه.')}</span></div>}
       {a.shape === 'bridge' && a.data?.sales && <Bridge run={{ period: { from: a.data.scope.from, to: a.data.scope.to }, branchIds: a.data.scope.branchIds }} br={a.data} />}
       {a.shape === 'matrix' && run && <Matrix run={run} mm={a.data} />}
       {a.shape === 'recon' && <ReconList checks={a.data.checks} />}

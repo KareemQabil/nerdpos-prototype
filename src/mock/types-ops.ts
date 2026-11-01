@@ -62,10 +62,12 @@ export interface BusinessDaySummary {
 export interface SalesHistoryDay { branchId: string; businessDate: string; netSales: Money; orders: number; guests: number; byHour: number[]; byMethod: Record<string, Money>; topItems: { name: Loc; qty: number; amount: Money }[] }
 
 export interface ReportSchedule {
-  id: string; reportId: string; reportTitle: Loc; frequency: 'DAILY' | 'WEEKLY'; weekday: number | null; time: string; format: 'CSV' | 'XLSX'; recipients: string[];
-  branchId: string; active: boolean; createdAt: string; createdBy: string; nextRunAt: string; nextRunMs: number; runs: { at: string; status: 'SENT' | 'FAILED'; note: string }[]; version: number;
+  id: string; reportId: string; reportTitle: Loc; frequency: 'DAILY' | 'WEEKLY'; weekday: number | null; time: string; format: 'CSV' | 'XLSX' | 'PDF'; recipients: string[];
+  branchId: string; active: boolean; createdAt: string; createdBy: string; nextRunAt: string; nextRunMs: number; runs: { at: string; status: 'SENT' | 'FAILED'; note: string; outputs?: { id: string; branchId: string; branchName: string; rows: number; recipients: string[] }[] }[]; version: number;
+  // round 4 report studio: a saved custom report + document template, recipients by person / role, one file per branch
+  savedReportId?: string; templateId?: string; recipientsV2?: { kind: 'USER' | 'ROLE' | 'TEXT'; id: string; label: string }[]; burst?: boolean;
 }
-export interface ReportExport { id: string; reportId: string; from: string; to: string; format: 'CSV' | 'XLSX'; at: string; by: string; rows: number; filename: string }
+export interface ReportExport { id: string; reportId: string; from: string; to: string; format: 'CSV' | 'XLSX' | 'PDF'; at: string; by: string; rows: number; filename: string }
 
 export interface CapabilityState { id: string; scopeType: 'TENANT' | 'BRANCH'; scopeId: string; enabled: boolean; updatedAt: string; updatedBy: string; version: number }
 

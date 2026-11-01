@@ -207,7 +207,19 @@ Design rationale: `docs/round3/DESIGN.md`; per-note and per-task status: `docs/r
 - **[GAP]** NOT_AVAILABLE by design until a source exists: labour, payroll, customer cohorts (OD06), aggregator commission, delivery fee net, forecast, refires, item affinity, supplier lateness, three-way match, return e-receipts, items × zone. VAT by tax group returns the check-level total.
 - **[DEMO]** Fixture days use cash rounding 0.25 (policy currently OFF) to exercise the rounding report; days before launch answer from imported daily totals ("HISTORY"). The assistant's 198-question scores were tuned on the same bank — an unseen question set is still needed.
 
-## 15. Prototype limitations
+## 15. Reports studio — pivot, designer, saved reports, print templates, exports, schedules
+
+Principle kept from round 3: the depth sits in the engine, the screens stay simple (a report opens with a few key numbers and one table; more detail is one click away). Engine test: `scripts/reports-engine-test.ts` (101 checks).
+
+- **[PROPOSED]** Ops (all `report:run`): `Report.Pivot`, `Report.PivotExport`, `SavedReport.Find/Get/Save/Duplicate/FromCertified/Restore/Delete/Favourite`, `ReportTemplate.Find/Save`, `ReportAudit.Find`, `Report.ScheduleRunNow`, `Report.ScheduleOutput`.
+- **[PROPOSED]** Extended: `Report.Schedule` (saved report, template, PDF, recipients by role or person, one output per branch); `Report.Export` (PDF, audited); `Report.Run` (`audit=1` records an open and the "recently opened" list).
+- **[PROPOSED]** Error codes `REPORT_EDIT_DENIED`, `REPORT_SHARE_DENIED`, `TEMPLATE_NOT_FOUND`, `TEMPLATE_EDIT_DENIED`.
+- **Engine guarantees:** subtotals and grand totals are recomputed by the engine at each level (never summed from rows) — ratios stay sum ÷ sum, distinct counts are recounted, stock is a snapshot; a subtotal's evidence is exactly its children; top N has an exact «الباقي» row; dividing an average/ratio is refused; colour rules are evaluated by the engine so screen, Excel and print agree; Excel is read back cell by cell in the test.
+- **[ASSUMED]** "Last year" = 364 days back (same weekday); comparisons are "as of" the end of the comparison period; any day without data in a comparison / MTD / YTD window → not available (MTD shows this today because history goes back 28 days); a condition on a number applies to the deepest level; carried-forward print totals only for plain additive money/quantity columns; built-in templates editable by owner/manager, anyone can save a copy; "managers & accountant" sharing = manager + accountant roles, the owner sees every saved report.
+- **Cut for simplicity (engine supports more):** A4 portrait/landscape + 80 mm only (no A3/Letter, no margin controls); six ready calculated columns instead of a formula editor; one column breakdown in the UI (engine: two); four colour presets instead of a rule editor; one condition on a number; comparisons/extra numbers on the first number only and in the total column of a cross-tab.
+- **[DEMO]** Schedules record the send, they don't email; PDF pages are images (text not selectable) and use the browser's Arabic font when offline; only the last 24 schedule outputs are kept in browser storage; studio data is seeded lazily on first use (no schema bump).
+
+## 16. Prototype limitations
 
 - Single-browser simulation: "devices" share one localStorage database; no real concurrency, only simulated races.
 - Offline mode is simulated per device in the client (queue + replay); there is no real service worker or local database.
