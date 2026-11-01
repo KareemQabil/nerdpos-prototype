@@ -72,7 +72,16 @@ const PLAIN: Record<string, Plain> = {
   SeatsPolicy: { title: 'الكراسي', explain: 'الويتر يقدر يحدد كل صنف لأنهي كرسي، ويقسم الشيك بالكرسي.' },
   TableTurnPolicy: { title: 'تنضيف الترابيزة بعد القعدة', explain: 'أول ما القعدة تتقفل الترابيزة بتبان «محتاجة تنضيف» على خريطة الصالة لحد ما حد يدوس «اتنضفت». ممكن تمنع حد يقعد عليها قبل التنضيف، أو تحذّر بس.', reacts: 'خريطة الصالة: الترابيزة بتبقى مقلّمة أصفر لحد ما تتنضف، وتنبيه لو اتأخرت.', question: 'الترابيزة لازم تتنضف قبل ما حد يقعد عليها، ولا الويتر يقرر؟' },
   OfflineModePolicy: { title: 'الشغل من غير نت', explain: 'لما النت يقطع، الجهاز بيسجل العمليات المسموحة (إضافة أصناف، إرسال للمطبخ، تحصيل كاش) ويبعتها أول ما النت يرجع. ممكن تحدد أقصى عدد ومين يتحصل كاش بس.', reacts: 'شريط «أوفلاين» فوق الشاشة وشاشة المزامنة.', question: 'لو النت قطع، تسمحوا بتحصيل الكارت يدوي ولا كاش بس؟' },
+  // r3B (round 3)
+  TenderReferencePolicy: { title: 'رقم العملية لكل طريقة دفع', explain: 'لكل طريقة دفع: الكاشير يكتب رقم العملية (من مكنة الكارت، رقم التحويل، أو رقم طلب التطبيق) ولا لأ — مقفول، اختياري، أو لازم. نفس الرقم مايتسجلش مرتين على نفس طريقة الدفع في نفس اليوم.', reacts: 'خانة «رقم العملية» في شاشة التحصيل بتظهر أو تختفي أو تبقى لازمة.', question: 'عندكم أنهي طريقة دفع لازم يتكتب لها رقم العملية؟ (مثلًا إنستاباي لازم، والكارت اختياري)' },
+  ShortOrderNumberPolicy: { title: 'رقم النداء القصير', explain: 'رقم صغير ينادوا بيه على الزبون ويظهر كبير على الإيصال وتذكرة المطبخ وشاشة التسليم. بيبدأ من 1 مع قفل اليوم، أو بعد عدد طلبات معين. رقم العملية الأصلي ثابت ومستحيل يتغير وبيتطبع دايمًا.', reacts: 'الإيصال، شاشة المطبخ، شاشة التسليم.', question: 'تحبوا رقم النداء يبدأ من 1 كل يوم، ولا كل 100 طلب؟' },
+  SecondLanguagePolicy: { title: 'اللغة التانية', explain: 'يطبع الاسم الإنجليزي للصنف تحت الاسم العربي على الإيصال أو تذكرة المطبخ أو أزرار المنيو — بس لو الصنف ليه اسم تاني متسجل. مفيش ترجمة أوتوماتيك.', reacts: 'الإيصال، شاشة المطبخ، أزرار الأصناف في شاشة البيع.' },
   WalletProvidersPolicy: { title: 'المحافظ الإلكترونية', explain: 'إنستاباي وفودافون كاش وغيرهم كطرق دفع برقم العملية، وكل واحدة تظهر سطر لوحدها في تقرير قفلة الوردية.' },
+  // r3A — who did it vs who allowed it
+  SupervisorOverridePolicy: { title: 'المدير يوافق في مكانه بدل ما يدخل بحسابه', explain: 'لو الحركة مش من صلاحية الموظف (إلغاء، مرتجع، ضيافة، صرف من الدرج، وجبة موظف…) يكملها من جهازه لما مدير عنده الصلاحية يوافق بالرقم السري أو الكارت أو البصمة أو من موبايله. السجل بيقول مين عمل ومين وافق.', reacts: 'زراير الإلغاء والمرتجع بتظهر للكاشير وبتطلب موافقة مدير على نفس الجهاز.', question: 'الكاشير يكمّل الإلغاء والمرتجع بموافقة المدير في مكانه، ولا المدير لازم يعملها بنفسه؟' },
+  ApprovalCredentialPolicy: { title: 'المدير يثبت شخصيته إزاي', explain: 'الطرق اللي المدير يوافق بيها على جهاز الكاشير: الرقم السري، تمرير كارت المدير، البصمة (لو فيه جهاز بصمة زي Digital Persona)، أو طلب يوصل على جهازه.', reacts: 'شاشة موافقة المدير.' },
+  StaffMealAllowancePolicy: { title: 'حد وجبة الموظف في اليوم', explain: 'كل موظف ليه حد في اليوم لوجباته، بسعر البيع أو بالتكلفة حسب تشغيل المكان. الوجبة اللي تعدّي الباقي بتترفض قبل ما تتسجل، والوجبة دايمًا محتاجة موافقة مدير.', reacts: 'شاشة وجبة الموظف: الباقي لكل موظف والرفض لو عدّى.', question: 'حد وجبة الموظف في اليوم كام، ومحسوب بسعر البيع ولا بالتكلفة؟' },
+  SplitLimitPolicy: { title: 'عدد الشيكات مايزيدش عن عدد الأفراد', explain: 'على الترابيزة، الشيك الجديد أو التقسيم مايخليش عدد الشيكات أكتر من عدد الأفراد القاعدين (3 أفراد = 3 شيكات بالكتير).', reacts: 'زرار «شيك جديد» والتقسيم على الترابيزة.' },
 };
 
 export const policyTitle = (p: PolicyMeta) => t(PLAIN[p.id]?.title ?? p.title);
@@ -152,6 +161,8 @@ const OPTIONS: Record<string, Record<string, OptText>> = {
     BLOCK: O('ممنوع صنفين بنفس الاسم'), WARN: O('تنبيه بس، ويتحفظ عادي'), ALLOW: O('مسموح'),
   },
   'TenderMethodPolicy.enabled': ON_SALE,
+  'TenderReferencePolicy.*': { OFF: O('مقفول', 'مفيش خانة لرقم العملية.'), OPTIONAL: O('اختياري', 'الخانة موجودة والكاشير يكتبه لو موجود.'), REQUIRED: O('لازم', 'مفيش دفع من غير رقم العملية.') },
+  'ShortOrderNumberPolicy.mode': { OFF: O('مقفول', 'رقم العملية بس.'), DAILY: O('يبدأ من 1 مع قفل اليوم'), EVERY_N: O('يرجع لـ 1 بعد عدد طلبات', 'وبيبدأ من 1 برضه مع كل يوم جديد.') },
   'CollectionScopePolicy.DINE_IN': {
     BRANCH_COLLECTING_DRAWER: O('أي كاشير مفتوح في الفرع يحصّل', 'والشيك يفضل محسوب على الويتر اللي فتحه.'),
     ORIGIN_SESSION: O('الوردية اللي فتحت الشيك بس', 'الشيك لازم يتحصّل على نفس الدرج اللي اتفتح عليه.'),
@@ -179,6 +190,8 @@ const OPTIONS: Record<string, Record<string, OptText>> = {
   TipDistributionPolicy: { PER_SERVER: O('للويتر صاحب الشيك'), POOLED: O('صندوق مشترك يتقسم آخر الوردية') },
   'StackedTaxPolicy.order': { BEFORE_VAT: O('قبل القيمة المضافة (تدخل فيها)'), AFTER_VAT: O('بعد القيمة المضافة') },
   'WalletProvidersPolicy.providers': { INSTAPAY: O('إنستاباي'), VODAFONE_CASH: O('فودافون كاش'), ORANGE_CASH: O('أورنج كاش'), ETISALAT_CASH: O('اتصالات كاش') },
+  'ApprovalCredentialPolicy.methods': { PIN: O('الرقم السري'), CARD: O('تمرير كارت المدير'), FINGERPRINT: O('البصمة'), REMOTE: O('طلب على جهاز المدير') },
+  'StaffMealAllowancePolicy.basis': { SALE_PRICE: O('بسعر البيع', 'الوجبة بتتحسب من الحد بسعرها في المنيو.'), COST: O('بالتكلفة', 'الوجبة بتتحسب بتكلفة خاماتها من الوصفة.') },
 };
 // Generic fallbacks for policies added later by other screens.
 const GENERIC: Record<string, OptText> = {
@@ -222,8 +235,12 @@ const FIELD_LABEL: Record<string, string> = {
   'ChargeComponentsPolicy.packaging.enabled': 'رسوم تغليف (تيك أواي)', 'ChargeComponentsPolicy.packaging.amount': 'مبلغ التغليف',
   'ChargeComponentsPolicy.cover.enabled': 'رسوم دخول للفرد (صالة)', 'ChargeComponentsPolicy.cover.amount': 'مبلغ الدخول', 'ChargeComponentsPolicy.taxable': 'الرسوم عليها ضريبة',
   'WalletProvidersPolicy.providers': 'المحافظ',
+  'TenderReferencePolicy.CARD': 'كارت (مكنة الكارت)', 'TenderReferencePolicy.DIGITAL_WALLET': 'محفظة / تحويل', 'TenderReferencePolicy.ONLINE': 'مدفوع قبل كده (تطبيق / لينك)',
+  'ShortOrderNumberPolicy.mode': 'رقم النداء', 'ShortOrderNumberPolicy.every': 'يرجع لـ 1 بعد',
+  'SecondLanguagePolicy.receipt': 'على إيصال الزبون', 'SecondLanguagePolicy.kitchen': 'على تذكرة المطبخ', 'SecondLanguagePolicy.menu': 'في أزرار المنيو',
   'TableTurnPolicy.markDirty': 'تتعلم «محتاجة تنضيف» بعد القعدة', 'TableTurnPolicy.blockSeating': 'ممنوع حد يقعد عليها قبل التنضيف', 'TableTurnPolicy.alertMinutes': 'ينبّه لو فضلت مش نضيفة بعد',
   'OfflineModePolicy.maxQueued': 'أقصى عمليات مستنية على الجهاز', 'OfflineModePolicy.cashOnly': 'التحصيل من غير نت كاش بس',
+  'ApprovalCredentialPolicy.methods': 'الطرق المسموحة', 'StaffMealAllowancePolicy.enabled': 'فيه حد في اليوم', 'StaffMealAllowancePolicy.basis': 'بيتحسب', 'StaffMealAllowancePolicy.dailyLimit': 'الحد لكل موظف في اليوم',
 };
 const REASON_KIND: Record<string, string> = {
   ORDER_CANCEL: 'إلغاء شيك ما اتبعتش', ORDER_VOID: 'إلغاء شيك كامل', LINE_VOID: 'إلغاء صنف', DISCOUNT: 'خصم', COMP: 'ضيافة', REFUND: 'مرتجع',
@@ -278,6 +295,8 @@ const BOOL_POLICY: Record<string, [string, string]> = {
   BlindClosePolicy: ['الكاشير يعد الدرج من غير ما يشوف المتوقع', 'المبلغ المتوقع ظاهر وقت العد'],
   DirectionCatalogDemo: ['ظاهرة في المنيو', 'مخفية'],
   SeatsPolicy: ['شغالة: الأصناف بتتحدد لكل كرسي', 'مقفولة'],
+  SupervisorOverridePolicy: ['الموظف يكمّل الحركة بموافقة المدير في مكانه', 'المدير لازم يعملها بنفسه بحسابه'],
+  SplitLimitPolicy: ['شغال: الشيكات على قد الأفراد', 'مقفول: شيكات من غير حد'],
 };
 export function boolPolicyText(policyId: string, v: unknown): string {
   const b = BOOL_POLICY[policyId];
@@ -375,6 +394,7 @@ const CONTEXT_FIELD: Record<string, [string, Unit]> = {
   foodFired: ['الأكل كان اتبعت للمطبخ', 'none'], variance: ['الفرق', 'egp'], quantity: ['الكمية', 'none'], percent: ['النسبة', 'pct'],
   orderId: ['الشيك', 'none'], fromSessionId: ['من وردية', 'none'], toSessionId: ['لوردية', 'none'], date: ['اليوم', 'none'], deliveryId: ['العملية', 'none'], consumerId: ['رايحة لـ', 'none'],
   attempts: ['عدد المحاولات', 'none'], warnings: ['عدد التحذيرات', 'none'], deadLetter: ['العملية وقفت بعد محاولات كتير', 'none'],
+  stage: ['المرحلة', 'none'], employeeName: ['الموظف', 'none'], mealValue: ['قيمة الوجبة', 'egp'], basis: ['بتتحسب', 'none'], remainingBefore: ['الباقي من حد الموظف', 'egp'], originalBusinessDate: ['يوم البيع الأصلي', 'none'], disposition: ['مصير الصنف', 'none'], fromQuantity: ['الكمية قبل', 'none'], toQuantity: ['الكمية بعد', 'none'], method: ['هيرجع إزاي', 'none'], // r3A
 };
 export const contextFieldLabel = (f: string) => t(CONTEXT_FIELD[f]?.[0] ?? f.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase());
 export const contextFieldUnit = (f: string): Unit => CONTEXT_FIELD[f]?.[1] ?? 'none';

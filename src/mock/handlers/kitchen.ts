@@ -9,6 +9,7 @@ import type { TicketMeta } from '../types-ops';
 import { userName } from './util';
 import { clock } from '../clock';
 import type { Ctx } from '../kernel';
+import { r3bOf, kdsScreenOf, branchHasDispatch, secondLangOf, secondName } from '../r3b'; // round 3: kitchen screens subscribe to stations
 
 const NEXT: Record<KitchenState, KitchenState[]> = { NEW: ['IN_PROGRESS', 'READY'], IN_PROGRESS: ['READY'], READY: ['DONE', 'IN_PROGRESS'], DONE: [] };
 
@@ -61,15 +62,40 @@ export const kitchenHandlers: Record<string, Handler> = {
   'Kitchen.Board': (ctx) => {
     const kt = policy<{ targetMinutes: number; alertMinutes: number }>('KitchenTimingPolicy') ?? { targetMinutes: 15, alertMinutes: 20 };
     const states = ctx.query.lifecycle ? ctx.query.lifecycle.split(',') : null;
+    // round 3 (F3-02): a kitchen screen shows only the stations it subscribes to; the manager PC / back office see all
+    const screen = screenView(ctx);
+    const mine = screen.stationIds.length ? new Set(screen.stationIds) : null;
     const doneWithin = Number(ctx.query.doneWithinMinutes ?? 0);
     const merged = new Set((ctx.db.ticketMeta ?? []).filter((m) => m.transferredFrom === 'MERGED').map((m) => m.ticketId));
     const items = ctx.db.tickets
-      .filter((t) => !merged.has(t.id) && (!ctx.query.stationId || t.stationId === ctx.query.stationId) && (!states || states.includes(t.state)))
+      .filter((t) => !merged.has(t.id) && (!ctx.query.stationId || t.stationId === ctx.query.stationId) && (!mine || ctx.query.allStations === 'true' || mine.has(t.stationId) || (screen.dispatch && screen.isKds)) && (!states || states.includes(t.state)))
       .filter((t) => !doneWithin || t.state !== 'DONE' || (t.doneAt && ctx.now - Date.parse(t.doneAt) <= doneWithin * 60000))
       .filter((t) => ctx.db.stations.find((s) => s.id === t.stationId)?.branchId === ctx.branchId)
-      .map((t) => ticketView(ctx, t, kt))
+      .map((t) => ({ ...ticketView(ctx, t, kt), onMyScreen: !mine || mine.has(t.stationId) })) // a dispatch screen also sees the other stations' tickets (consolidated hand-off)
       .sort((a, b) => (a.priority === 'RUSH' ? 0 : 1) - (b.priority === 'RUSH' ? 0 : 1) || a.createdAtMs - b.createdAtMs);
-    return { ...page(items, ctx.query), timing: kt, refireReasons: REFIRE_REASONS };
+    return { ...page(items, ctx.query), timing: kt, refireReasons: REFIRE_REASONS, screen };
+  },
+  // ───────── round 3: kitchen screens (F3-02, F2-06, E04–E06)
+  'KdsScreen.List': (ctx) => ({ items: ctx.db.terminals.filter((t) => t.kind === 'KDS' && t.branchId === ctx.branchId && t.lifecycle === 'ACTIVE').map((t) => ({ ...screenView(ctx, t.id), terminalName: t.name, terminalCode: t.code })), hasDispatch: branchHasDispatch(ctx.db, ctx.branchId) }),
+  'KdsScreen.Configure': (ctx) => {
+    const term = ctx.db.terminals.find((t) => t.id === ctx.params.terminalId && t.branchId === ctx.branchId);
+    need(term, 'ORGANIZATION_TERMINAL_NOT_FOUND');
+    need(term!.kind === 'KDS', 'VALIDATION_FAILED', { field: 'terminalId', rule: 'a kitchen screen (KDS terminal)' });
+    const ids: string[] = Array.isArray(ctx.body.stationIds) ? [...new Set<string>(ctx.body.stationIds.map(String))] : [];
+    for (const id of ids) { const st = ctx.db.stations.find((x) => x.id === id && x.branchId === ctx.branchId); need(st, 'KITCHEN_STATION_NOT_FOUND', { stationId: id }); }
+    const start = String(ctx.body.start ?? 'HIDDEN');
+    need(['HIDDEN', 'OPTIONAL', 'REQUIRED'].includes(start), 'VALIDATION_FAILED', { field: 'start', rule: 'HIDDEN | OPTIONAL | REQUIRED' });
+    const list = r3bOf(ctx.db).kdsScreens;
+    let c = list.find((x) => x.terminalId === term!.id);
+    if (c && ctx.body.expectedVersion !== undefined) checkVersion(c, ctx.body.expectedVersion);
+    const before = c ? { ...c } : null;
+    if (!c) { c = { terminalId: term!.id, stationIds: [], dispatch: true, start: 'HIDDEN', version: 0, updatedAt: '', updatedBy: '' }; list.push(c); }
+    Object.assign(c, { stationIds: ids, dispatch: ctx.body.dispatch !== false, start, updatedAt: ctx.nowIso, updatedBy: ctx.user!.id });
+    c.version++;
+    const names = ids.map((id) => ctx.db.stations.find((x) => x.id === id)?.name).join(', ') || 'ALL';
+    ctx.audit(`kitchen screen ${term!.code}: stations ${names}; dispatch ${c.dispatch}; start ${c.start}${before ? ` (was ${before.stationIds.length || 'ALL'} / ${before.dispatch} / ${before.start})` : ''}`, term!.id);
+    event('KdsScreenConfigured', term!.id, `${term!.code} → ${names}`);
+    return screenView(ctx, term!.id);
   },
   'KitchenTicket.Get': (ctx) => {
     const t = ctx.db.tickets.find((x) => x.id === ctx.params.ticketId);
@@ -82,6 +108,10 @@ export const kitchenHandlers: Record<string, Handler> = {
     checkVersion(t!, ctx.body.expectedVersion);
     const to = ctx.body.toState as KitchenState;
     if (!NEXT[t!.state].includes(to)) throw new ApiError('KITCHEN_TRANSITION_INVALID', { from: t!.state, to });
+    // round 3: hand-off only from a dispatch screen (when the branch has one); "Start" first only where the screen requires it
+    const scr = screenView(ctx);
+    if (to === 'DONE' && !scr.canHandOff) throw new ApiError('KDS_DISPATCH_ONLY', { terminal: ctx.terminal?.code ?? null });
+    if (to === 'READY' && t!.state === 'NEW' && scr.start === 'REQUIRED') throw new ApiError('KDS_START_REQUIRED', { terminal: ctx.terminal?.code ?? null });
     t!.state = to;
     if (to === 'IN_PROGRESS' && !t!.startedAt) t!.startedAt = ctx.nowIso;
     if (to === 'READY') t!.readyAt = ctx.nowIso;
@@ -96,6 +126,7 @@ export const kitchenHandlers: Record<string, Handler> = {
     const it = t!.items.find((i) => i.lineId === ctx.params.itemId);
     need(it, 'KITCHEN_ITEM_PROGRESS_NOT_FOUND');
     (it as any).bumped = !(it as any).bumped;
+    if (t!.state === 'NEW' && screenView(ctx).start === 'REQUIRED') { t!.state = 'IN_PROGRESS'; t!.startedAt = t!.startedAt ?? ctx.nowIso; } // working an item counts as starting
     t!.version++;
     if (t!.items.every((i) => i.status === 'CANCELLED' || (i as any).bumped)) { t!.state = 'READY'; t!.readyAt = ctx.nowIso; }
     return t;
@@ -167,8 +198,12 @@ function ticketView(ctx: Ctx, t: KitchenTicket, kt?: { targetMinutes: number; al
   const order = ctx.db.orders.find((o) => o.id === t.orderId);
   const visit = order?.visitId ? ctx.db.visits.find((v) => v.id === order.visitId) : null;
   const siblings = ctx.db.tickets.filter((x) => x.orderId === t.orderId && x.round === t.round && x.id !== t.id && !(ctx.db.ticketMeta ?? []).some((mm) => mm.ticketId === x.id && mm.transferredFrom === 'MERGED'));
+  const lang2 = secondLangOf(order?.branchId).kitchen;
   return {
     ...t, ageMinutes: age, targetMinutes: target, alertMinutes: alert, warn: age >= target, late: age >= alert,
+    // round 3: short call-out number (the transaction number stays), time waited before "start" (start never resets the timer), second-language names
+    shortNo: order?.shortNo ?? null, waitBeforeStartMinutes: t.startedAt ? Math.max(0, Math.floor((Date.parse(t.startedAt) - t.createdAtMs) / 60000)) : null,
+    items: lang2 ? t.items.map((i) => ({ ...i, name2: secondName(i.name) })) : t.items,
     readyMinutes: t.readyAt && t.state === 'READY' ? Math.floor((clock.now() - Date.parse(t.readyAt)) / 60000) : null,
     stationName: st?.name, priority: m?.priority ?? 'NORMAL', refireOf: m?.refireOf ?? null, refireReason: m?.refireReason ?? null, refireReasonText: m?.refireReason ? REFIRE_REASONS[m.refireReason] ?? { ar: m.refireReason, en: m.refireReason } : null, refireNote: m?.refireNote ?? null,
     transferredFromName: m?.transferredFrom && m.transferredFrom !== 'MERGED' ? ctx.db.stations.find((s) => s.id === m.transferredFrom)?.name ?? null : null, recalledAt: m?.recalledAt ?? null,
@@ -251,5 +286,20 @@ function kdsHandlers(): Record<string, Handler> {
       event('KitchenTicketMoved', t.orderId, `${t.orderNumber} r${t.round} → ${st!.name}`);
       return ticketView(ctx, t);
     },
+  };
+}
+
+/** The kitchen screen of the calling device, with plain station names and whether it may hand off (round 3). */
+function screenView(ctx: Ctx, terminalId?: string) {
+  const tid = terminalId ?? ctx.terminal?.id ?? null;
+  const term = tid ? ctx.db.terminals.find((t) => t.id === tid) : null;
+  const isKds = term?.kind === 'KDS';
+  const c = isKds ? kdsScreenOf(ctx.db, tid) : { ...kdsScreenOf(ctx.db, null), configured: false };
+  const stationIds = c.stationIds.filter((id) => ctx.db.stations.some((s) => s.id === id && s.active));
+  const hasDispatch = branchHasDispatch(ctx.db, term?.branchId ?? ctx.branchId);
+  return {
+    terminalId: tid, isKds, configured: c.configured, stationIds, stationNames: stationIds.map((id) => ctx.db.stations.find((s) => s.id === id)?.name ?? id),
+    dispatch: c.dispatch, start: c.start, version: c.version, updatedAt: c.updatedAt || null,
+    canHandOff: !isKds || c.dispatch || !hasDispatch, hasDispatch,
   };
 }

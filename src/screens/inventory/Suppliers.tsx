@@ -15,8 +15,9 @@ export default function Suppliers() {
   const [inactive, setInactive] = useState(false);
   const q = useList<any>('Supplier.List', { text: text || undefined, active: inactive ? undefined : 'true' });
   const [form, setForm] = useState<any | null>(null);
-  const [view, setView] = useState<string | null>(null);
-  const { nav } = useDev();
+  const { nav, params } = useDev();
+  const [view, setView] = useState<string | null>(params?.open ?? null);
+  React.useEffect(() => { if (params?.open) setView(params.open); }, [params?.open]);
   return (
     <div>
       <Section title={t('الموردين')} badge={<StateBadge ops={OPS} />} sub={t('بيانات كل مورد وشروط الدفع، والأصناف اللي بيوردها، وأوامر الشراء والاستلامات.')}

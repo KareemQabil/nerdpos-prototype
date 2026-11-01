@@ -20,10 +20,13 @@ export interface MenuDef {
 /** Sold-out for a modifier option in one branch ("خلص النهارده"). */
 export interface OptionAvailability { optionId: string; groupId: string; branchId: string; state: 'AVAILABLE' | 'SOLD_OUT'; soldOutFor: string | null; reason: string | null; updatedAt: string; updatedBy: string }
 
-export interface BulkPriceRow { productId: string; variantId: string | null; branchId: string; channel: Channel; oldAmount: Money; newAmount: Money; changePercent: string | null; ruleId?: string | null; skipped?: string | null }
+export interface BulkPriceRow { productId: string; variantId: string | null; branchId: string; channel: Channel; oldAmount: Money; newAmount: Money; changePercent: string | null; ruleId?: string | null; skipped?: string | null;
+  /** sales channels (E13) and exceptions (F2-05) */ salesChannelId?: string; excluded?: string | null; pinned?: boolean }
 export interface BulkPriceChange {
   id: string; createdAt: string; createdBy: string; effectiveFrom: number; status: 'APPLIED' | 'SCHEDULED';
-  filter: { categoryIds: string[]; branchIds: string[]; channels: Channel[]; productIds: string[]; includeVariants: boolean };
+  filter: { categoryIds: string[]; branchIds: string[]; channels: Channel[]; productIds: string[]; includeVariants: boolean; salesChannelIds?: string[] };
+  /** F2-05: items / categories / single rows kept out of this change; pinned rows explicitly included */
+  exclusions?: { productIds: string[]; categoryIds: string[]; rowKeys: string[] }; includePinned?: string[];
   change: { mode: 'PERCENT' | 'FIXED'; value: string }; rounding: { step: string; direction: 'NEAREST' | 'UP' | 'DOWN' };
   rows: BulkPriceRow[]; note?: string; approvalGrantId?: string | null;
 }

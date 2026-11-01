@@ -5,6 +5,7 @@ import { D, m4, Decimal } from './money';
 import { businessDate, zonedParts } from './clock';
 import { policy } from './policies';
 import type { Channel, DB, Loc, Product, Variant } from './types';
+import { salesChannelById, priceKeyOf } from './sales-channels'; // sales channels (E13)
 import type { MenuDef, MenuState } from './menu-types';
 
 export function menuState(db: DB): MenuState {
@@ -152,19 +153,41 @@ export function matchingVariant(other: Product, v: Variant | null, from: Product
   return ov.find((x) => x.id === v.id) ?? ov[activeVariants(from).findIndex((x) => x.id === v.id)] ?? defaultVariant(other);
 }
 
-export function ruleAt(db: DB, productId: string, branchId: string, channel: Channel, at: number, variantId: string | null = null) {
-  return db.priceRules.find((r) => r.productId === productId && r.branchId === branchId && r.channel === channel && (r.variantId ?? null) === variantId && r.effectiveFrom <= at && (r.effectiveTo === null || r.effectiveTo > at)) ?? null;
+export function ruleAt(db: DB, productId: string, branchId: string, channel: Channel, at: number, variantId: string | null = null, priceKey: string | null = null) {
+  return db.priceRules.find((r) => r.productId === productId && r.branchId === branchId && r.channel === channel && (r.variantId ?? null) === variantId && (r.salesChannelId ?? null) === priceKey && r.effectiveFrom <= at && (r.effectiveTo === null || r.effectiveTo > at)) ?? null;
 }
 
-/** Unit price of a product (and size) in a scope: the size's own price rule, else the product price + size delta. */
-export function priceFor(db: DB, p: Product, v: Variant | null, branchId: string, channel: Channel, at: number): { amount: string; ruleId: string; source: 'SIZE_PRICE' | 'PRODUCT_PRICE' } | null {
+export interface PriceHit { amount: string; ruleId: string; source: 'SIZE_PRICE' | 'PRODUCT_PRICE'; channelSource?: 'OWN' | 'FOLLOW' | 'ORDER_TYPE'; pinned?: boolean }
+
+/** Price in one price list (priceKey null = the order type's list): the size's own rule, else the product rule + size delta. */
+function priceInList(db: DB, p: Product, v: Variant | null, branchId: string, channel: Channel, at: number, priceKey: string | null): PriceHit | null {
   if (v) {
-    const own = ruleAt(db, p.id, branchId, channel, at, v.id);
-    if (own) return { amount: own.amount, ruleId: own.id, source: 'SIZE_PRICE' };
+    const own = ruleAt(db, p.id, branchId, channel, at, v.id, priceKey);
+    if (own) return { amount: own.amount, ruleId: own.id, source: 'SIZE_PRICE', ...(own.pinned ? { pinned: true } : {}) };
   }
-  const base = ruleAt(db, p.id, branchId, channel, at, null);
+  const base = ruleAt(db, p.id, branchId, channel, at, null, priceKey);
   if (!base) return null;
-  return { amount: m4(D(base.amount).plus(v ? D(v.priceDelta) : 0)), ruleId: base.id, source: 'PRODUCT_PRICE' };
+  return { amount: m4(D(base.amount).plus(v ? D(v.priceDelta) : 0)), ruleId: base.id, source: 'PRODUCT_PRICE', ...(base.pinned ? { pinned: true } : {}) };
+}
+
+/**
+ * Unit price of a product (and size) in a scope. With a sales channel (E13): the channel's own price first; a FOLLOW
+ * channel = the followed channel's price ± percent; otherwise the order type's price (the default channel's list).
+ * Without a sales channel, or with a default channel: exactly the order type's price (unchanged behaviour).
+ */
+export function priceFor(db: DB, p: Product, v: Variant | null, branchId: string, channel: Channel, at: number, salesChannelId: string | null = null, depth = 0): PriceHit | null {
+  const sc = salesChannelId ? salesChannelById(db, salesChannelId) : null;
+  const key = priceKeyOf(sc);
+  const ch = sc?.orderType ?? channel;
+  if (key === null) return priceInList(db, p, v, branchId, ch, at, null);
+  const own = priceInList(db, p, v, branchId, ch, at, key);
+  if (own) return { ...own, channelSource: 'OWN' };
+  if (sc!.priceMode === 'FOLLOW' && sc!.follow && depth < 4) {
+    const base = priceFor(db, p, v, branchId, ch, at, sc!.follow.channelId, depth + 1);
+    if (base) return { amount: roundToStep(D(base.amount).times(D(100).plus(sc!.follow.percent || '0')).dividedBy(100), sc!.follow.roundingStep || '0', 'NEAREST'), ruleId: base.ruleId, source: base.source, channelSource: 'FOLLOW' };
+  }
+  const fb = priceInList(db, p, v, branchId, ch, at, null);
+  return fb ? { ...fb, channelSource: 'ORDER_TYPE' } : null;
 }
 
 // ───────── bulk price rounding

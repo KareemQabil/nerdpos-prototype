@@ -1,5 +1,6 @@
 // Menus & dayparts admin: breakfast / lunch / dinner time windows (Cairo time, can cross midnight) and menus per channel
-// and branch (what the cashier sees, and when). A live preview shows what is on each channel right now (mock clock).
+// and branch (what the cashier sees, and when). A live preview shows what is on each channel right now, or a read-only
+// preview at a chosen time (server time is never moved).
 import React, { useEffect, useMemo, useState } from 'react';
 import { clock } from '../../mock/clock';
 import { Clock, Plus, Pencil, Save, CalendarClock, Store, Eye } from 'lucide-react';
@@ -175,10 +176,12 @@ function Timeline({ dayparts, nowLocal }: { dayparts: any[]; nowLocal?: string }
   );
 }
 
-/** What the cashier sees now on each channel (server: Catalog.Search menuNow on the mock clock). */
+/** What the cashier sees now on each channel, or a READ-ONLY preview at a chosen time (server: Catalog.Search menuNow /
+ *  previewAt). Trusted time: the preview never moves the server clock. */
 function NowPreview({ now }: { now?: any }) {
   const [ch, setCh] = useState<string>('DINE_IN');
-  const q = useItems<any>('Catalog.Search', { query: { active: 'true', channel: ch } });
+  const [at, setAt] = useState<string>(''); // '' = now; 'HH:MM' = preview only
+  const q = useItems<any>('Catalog.Search', { query: { active: 'true', channel: ch, ...(at ? { previewAt: at } : {}) } });
   useEffect(() => clock.subscribe(() => q.refetch()) as () => void, []); // eslint-disable-line react-hooks/exhaustive-deps
   const on = q.items.filter((p) => !p.menuNow || p.menuNow.onMenu);
   const off = q.items.filter((p) => p.menuNow && !p.menuNow.onMenu);
@@ -188,7 +191,13 @@ function NowPreview({ now }: { now?: any }) {
     return [...m.entries()];
   }, [off]);
   return (
-    <Card title={<span className="inline-flex items-center gap-2"><Eye className="w-4 h-4" />{t('الكاشير شايف إيه دلوقتي')}</span>} badge={<Pill tone="neutral"><span className="num">{now?.local ?? '…'}</span></Pill>}>
+    <Card title={<span className="inline-flex items-center gap-2"><Eye className="w-4 h-4" />{at ? t('معاينة: الكاشير هيشوف إيه الساعة {h}', { h: at }) : t('الكاشير شايف إيه دلوقتي')}</span>} badge={<Pill tone={at ? 'info' : 'neutral'}><span className="num">{at || (now?.local ?? '…')}</span></Pill>}>
+      <div className="flex items-center gap-1.5 flex-wrap mb-2" data-fb="menu-preview-at">
+        <span className="text-xs text-dim">{t('معاينة في وقت تاني:')}</span>
+        {['09:00', '13:00', '16:00', '20:00'].map((h) => <Button key={h} size="sm" variant={at === h ? 'primary' : 'ghost'} onClick={() => setAt(at === h ? '' : h)} data-fb={`menu-preview:${h}`}><span className="num">{h}</span></Button>)}
+        <Input type="time" value={at} onChange={(e) => setAt(e.target.value)} dir="ltr" className="!w-28 !h-8" aria-label={t('الساعة')} />
+        {at && <Button size="sm" variant="ghost" onClick={() => setAt('')}>{t('رجّع لدلوقتي')}</Button>}
+      </div>
       <Tabs value={ch} onChange={setCh} tabs={CHANNELS.map((c) => ({ id: c, label: channelLabel(c) }))} />
       <div className="mt-3 space-y-2 text-sm">
         <div><b className="num text-[var(--success)]">{on.length}</b> {t('صنف ظاهر')} · <b className="num text-dim">{off.length}</b> {t('مخفي')}</div>
@@ -198,7 +207,7 @@ function NowPreview({ now }: { now?: any }) {
             <div className="flex flex-wrap gap-1">{ps.map((p) => <Pill key={p.id} tone="neutral">{L(p.name)}</Pill>)}</div>
           </div>
         ))}
-        <div className="text-[11px] text-dim">{t('حرّك الساعة الوهمية من فوق عشان تشوف الفطار يظهر ويختفي.')}</div>
+        <div className="text-[11px] text-dim">{at ? t('دي معاينة بس — وقت السيرفر ما اتغيرش، والكاشير لسه شايف منيو دلوقتي.') : t('اختار ساعة فوق عشان تعاين الفطار والعشا من غير ما الوقت يتغير.')}</div>
         <Tech><div className="text-[11px] text-dim num">{t('اليوم التجاري')} {now?.businessDate}</div></Tech>
       </div>
     </Card>

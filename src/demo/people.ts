@@ -18,7 +18,9 @@ export const PERSONAS: Record<string, Persona> = {
   'demo-chef-1': { name: 'الشيف حسن', role: 'المطبخ', en: 'Chef Hassan', roleEn: 'Kitchen' },
   'demo-waiter-second': { name: 'علي', role: 'ويتر الفرع التاني', en: 'Ali', roleEn: 'Second-branch waiter' },
   'demo-owner': { name: 'الحاج سامي', role: 'صاحب المطعم', en: 'Hajj Sami', roleEn: 'Owner' },
+  'demo-accountant': { name: 'نادر', role: 'المحاسب', en: 'Nader', roleEn: 'Accountant' },
   'implementation-engineer': { name: 'كريم', role: 'مهندس التركيب', en: 'Karim', roleEn: 'Setup engineer' },
+  'nerdpos-support': { name: 'دعم NerdPOS', role: 'فريق NerdPOS (مش من المطعم)', en: 'NerdPOS support', roleEn: 'NerdPOS team (not the restaurant)' }, // r3C: vendor-only licensed modules
   // users created by the "setup from zero" journey (J-A1)
   'owner-1': { name: 'عم سيد', role: 'صاحب المطعم', en: 'Uncle Sayed', roleEn: 'Owner' },
   'manager-1': { name: 'طارق', role: 'المدير', en: 'Tarek', roleEn: 'Manager' },
@@ -77,13 +79,14 @@ export interface DeviceName { name: string; short: string; en: string; shortEn?:
 export const DEVICE_NAMES: Record<string, DeviceName> = {
   t_cash: { name: 'جهاز الكاشير', short: 'الكاشير', en: 'Cashier station', shortEn: 'Cashier', hint: 'جهاز الكاشير اللي عليه درج الفلوس: بيع تيك أواي، تحصيل الشيكات، الوردية' },
   t_floor: { name: 'تابلت الويتر', short: 'الويتر', en: 'Waiter tablet', shortEn: 'Waiter', hint: 'تابلت الويتر في الصالة: فتح الترابيزات والشيكات والإرسال للمطبخ (من غير درج)' },
-  t_kds: { name: 'شاشة المطبخ', short: 'المطبخ', en: 'Kitchen screen', shortEn: 'Kitchen', hint: 'شاشة المطبخ: الطلبات بتوصل هنا لكل محطة' },
+  t_kds: { name: 'شاشة المطبخ', short: 'المطبخ', en: 'Kitchen screen', shortEn: 'Kitchen', hint: 'شاشة المطبخ والتسليم: كل المحطات، وعليها «جاهز للتسليم» والتسليم للويتر' },
   t_admin: { name: 'كمبيوتر المدير', short: 'المدير', en: "Manager's PC", shortEn: 'Manager', hint: 'كمبيوتر المدير في المكتب: الموافقات والتقارير والإعدادات' },
   t_second_floor: { name: 'تابلت الفرع التاني', short: 'الفرع التاني', en: 'Second-branch tablet', shortEn: 'Branch 2', hint: 'تابلت ويتر في الفرع التاني' },
+  t_kds2: { name: 'شاشة المشويات', short: 'المشويات', en: 'Grill screen', shortEn: 'Grill', hint: 'شاشة محطة المشويات: بتعرض أصناف المشويات بس، و«جاهز» بيبعت الطلب لشاشة التسليم' },
   t_cash2: { name: 'كاشير التيك أواي', short: 'التيك أواي', en: 'Takeaway counter', shortEn: 'Takeaway', hint: 'كاشير تاني بدرج لطلبات التيك أواي' },
   BO: { name: 'الإدارة من أي مكان', short: 'الإدارة', en: 'Back office', shortEn: 'Back office', hint: 'الإدارة من أي كمبيوتر (من غير جهاز في المطعم): المنيو والإعدادات والتقارير' },
 };
-const SHORT_TO_ID: Record<string, string> = { T1: 't_cash', T2: 't_floor', K1: 't_kds', ADM: 't_admin', B2: 't_second_floor', BO: 'BO' };
+const SHORT_TO_ID: Record<string, string> = { T1: 't_cash', T2: 't_floor', K1: 't_kds', K2: 't_kds2', ADM: 't_admin', B2: 't_second_floor', BO: 'BO' };
 const KIND_NAME: Record<string, string> = { CASH: 'جهاز الكاشير', FLOOR: 'تابلت الويتر', KDS: 'شاشة المطبخ', ADMIN: 'كمبيوتر المدير' };
 const KIND_NAME_EN: Record<string, string> = { CASH: 'Cashier station', FLOOR: 'Waiter tablet', KDS: 'Kitchen screen', ADMIN: "Manager's PC" };
 const kindName = (k: string) => (isEn() ? KIND_NAME_EN[k] : KIND_NAME[k]);
@@ -94,10 +97,11 @@ export const deviceHint = (id: string) => (DEVICE_NAMES[id] ? (isEn() ? DEVICE_H
 const DEVICE_HINT_EN: Record<string, string> = {
   t_cash: 'The cashier station with the cash drawer: takeaway sales, collecting checks, the shift',
   t_floor: 'The waiter tablet on the floor: opening tables and checks, sending to the kitchen (no drawer)',
-  t_kds: 'The kitchen screen: orders arrive here for each station',
+  t_kds: 'The kitchen and dispatch screen: every station, with “ready for hand-off” and the hand-off to the waiter',
   t_admin: "The manager's PC in the office: approvals, reports and settings",
   t_second_floor: 'A waiter tablet in the second branch',
   t_cash2: 'A second cashier with a drawer for takeaway orders',
+  t_kds2: 'The grill station screen: grill items only; “Ready” sends the order to the dispatch screen',
   BO: 'Management from any computer (no device in the restaurant): menu, settings and reports',
 };
 
@@ -111,6 +115,7 @@ export function deviceName(idOrCode: string | null | undefined, kind?: string | 
   if (code === 'DEMO-CASH-1') return devName('t_cash');
   if (code === 'DEMO-FLOOR-1') return devName('t_floor');
   if (code === 'DEMO-KDS-1') return devName('t_kds');
+  if (code === 'DEMO-KDS-2') return devName('t_kds2');
   if (code === 'DEMO-ADMIN-1') return devName('t_admin');
   if (code === 'DEMO-SECOND-FLOOR-1') return devName('t_second_floor');
   if (kind && KIND_NAME[kind]) return kindName(kind);
@@ -127,10 +132,11 @@ const ROLE_NAMES: Record<string, string> = {
   owner: 'صاحب المطعم', manager: 'مدير', cashier: 'كاشير', waiter: 'ويتر', chef: 'المطبخ',
   bootstrap: 'تركيب السيستم', 'bootstrap admin': 'تركيب السيستم', 'implementation': 'تركيب السيستم',
   'waiter without fire (n8)': 'ويتر من غير إرسال للمطبخ',
+  'nerdpos support': 'دعم NerdPOS',
 };
 const ROLE_EN: Record<string, string> = {
   'ويتر': 'Waiter', 'كاشير': 'Cashier', 'مدير': 'Manager', 'المطبخ': 'Kitchen', 'صاحب المطعم': 'Owner',
-  'تركيب السيستم': 'System setup', 'ويتر من غير إرسال للمطبخ': 'Waiter without sending to the kitchen',
+  'تركيب السيستم': 'System setup', 'ويتر من غير إرسال للمطبخ': 'Waiter without sending to the kitchen', 'دعم NerdPOS': 'NerdPOS support',
 };
 /** Role name from the server ("Demo Waiter", "owner"…) → plain words in the UI language. Unknown names are shown as they are. */
 export function roleLabel(name: string | null | undefined): string {

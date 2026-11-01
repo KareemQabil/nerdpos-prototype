@@ -1,7 +1,8 @@
 // Call-center delivery order: phone lookup → customer card (or quick create) → address and zone → menu →
 // totals with the delivery fee (from the server) → payment (cash on delivery / paid online / card on delivery) → send.
+import { SalesChannelPicker, SalesChannelTag } from '../channels/common'; // r3C sales channels
 import React, { useEffect, useMemo, useState } from 'react';
-import { PhoneCall, Search, UserPlus, MapPin, Plus, Minus, Trash2, Send, CheckCircle2, Bike, Globe, Banknote, CreditCard, Star, ArrowRight, RotateCcw, ShoppingBag, ClipboardCheck } from 'lucide-react';
+import { PhoneCall, Search, UserPlus, MapPin, Plus, Minus, Trash2, Send, CheckCircle2, Bike, Globe, Banknote, CreditCard, Star, ArrowRight, RotateCcw, ShoppingBag, ClipboardCheck, AlertTriangle, ChevronDown, UserRoundPen } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';
 import { MenuGrid } from '../order/MenuGrid';
 import { ProductDialog, type LineDraft } from '../order/ProductDialog';
@@ -69,7 +70,7 @@ function Workspace({ params, set }: { params: Record<string, any>; set: (p: Reco
     if (!ready) { toast('warning', t('اختار العميل وعنوان التوصيل الأول')); return; }
     let o = order;
     if (!o) {
-      o = await run<any>('Order.Create', { body: { channel: 'DELIVERY', customerId: cust.id, note: note || undefined } }, { label: t('طلب دليفري') });
+      o = await run<any>('Order.Create', { body: { channel: 'DELIVERY', customerId: cust.id, note: note || undefined, ...(params.salesChannelId ? { salesChannelId: params.salesChannelId } : {}) } }, { label: t('طلب دليفري') });
       if (!o) return;
       set({ orderId: o.id });
     }
@@ -101,92 +102,140 @@ function Workspace({ params, set }: { params: Record<string, any>; set: (p: Reco
         {(params.customerId || params.orderId) && !order?.lines?.length && <Button variant="ghost" size="sm" onClick={reset}><RotateCcw className="w-4 h-4" />{t('ابدأ من الأول')}</Button>}
       </div>
       <Stepper className="shrink-0" current={step} steps={[{ label: t('العميل') }, { label: t('العنوان') }, { label: t('الأصناف') }, { label: t('مراجعة التوصيل') }, { label: t('ابعت للمطبخ') }]} />
-      <div className="flex-1 min-h-0 grid gap-3" style={{ gridTemplateColumns: wide ? 'minmax(290px, 330px) minmax(0, 1fr) minmax(310px, 350px)' : 'minmax(280px, 320px) minmax(0, 1fr)' }}>
-        {/* customer, address, payment */}
-        <div className="min-h-0 overflow-y-auto space-y-3 pe-1">
-          <CustomerStep cust={cust} loading={customerQ.loading} locked={!!order?.lines?.length} onPick={(c) => set({ customerId: c.id, addressId: undefined })} />
-          {cust && <AddressStep cust={cust} selected={params.addressId} locked={!!delivery} onSelect={(id) => set({ addressId: id })} />}
-          {cust && address && (
-            <Card title={t('٣. الدفع')}>
-              <div className="space-y-1.5">
-                {(Object.keys(PAYMENT_MODE) as PayMode[]).map((m) => {
-                  const P = PAYMENT_MODE[m];
-                  return (
-                    <button key={m} disabled={!!delivery} onClick={() => set({ payMode: m })} data-fb={`paymode:${m}`} className={cn('w-full h-11 rounded-xl border px-3 flex items-center gap-2 text-sm disabled:opacity-60', payMode === m ? 'border-[var(--primary)] bg-[var(--primary-container)] font-bold' : 'surface-1 border-[var(--glass-border)]')}>
-                      <P.icon className="w-4 h-4" />{t(P.ar)}
-                      {m === 'PAID_ONLINE' && <span className="ms-auto text-[10px] text-dim font-normal">{t('إنستاباي / لينك كارت')}</span>}
-                    </button>
-                  );
-                })}
-              </div>
-              {delivery && <div className="text-[11px] text-dim mt-2">{t('طريقة الدفع اتثبتت مع التوصيل.')}</div>}
-              <Field label={t('ملاحظة للطيار / المطبخ')} className="mt-3"><Input value={note} onChange={(e) => setNote(e.target.value)} disabled={!!delivery} placeholder={t('مثلاً: الجرس بايظ — كلّمه')} /></Field>
-            </Card>
-          )}
-          {!wide && <div className="h-[520px]"><OrderSide order={order} zone={zone} delivery={delivery} busy={busy} onReview={review} onSend={send} cust={cust} /></div>}
-        </div>
-
+      {/* round 3 (F2-07): one compact customer line (name, phone, tier, alerts, address, payment) — expand for details,
+          addresses and history — so the menu and the cart get the screen */}
+      <CustomerBar cust={cust} loading={customerQ.loading} locked={!!order?.lines?.length} lockedDelivery={!!delivery} onPick={(c) => set({ customerId: c.id, addressId: undefined })}
+        addressId={params.addressId} onAddress={(id) => set({ addressId: id })} zone={zone} payMode={payMode} onPayMode={(m) => set({ payMode: m })} note={note} onNote={setNote} />
+      <div className="flex-1 min-h-0 grid gap-3" style={{ gridTemplateColumns: wide ? 'minmax(0, 1fr) minmax(320px, 360px)' : 'minmax(0, 1fr) minmax(270px, 300px)' }}>
         {/* menu */}
         <div className="min-h-0 flex flex-col gap-2">
-          {!ready && (
+          {!ready && cust && (
             <Banner tone={address && !zone ? 'warning' : 'info'}>
               {!cust ? t('ابدأ برقم موبايل العميل — لو مش متسجل اعمله في ثانية.') : !address ? t('اختار عنوان التوصيل أو ضيف عنوان جديد.') : !zone ? t('العنوان ده برة مناطق التوصيل. اختار عنوان تاني أو خليه تيك أواي.') : t('التوصيل للمنطقة دي واقف دلوقتي.')}
             </Banner>
           )}
-          <div className="flex-1 min-h-0"><MenuGrid channel="DELIVERY" disabled={!ready || busy || (order && order.status !== 'DRAFT')} onPick={(p) => (needsDialog(p) ? setPick(p) : addLine({ productId: p.id, quantity: '1', modifierOptionIds: [] }))} /></div>
+          {/* r3C: pick the sales channel (دليفري / طلبات …) before the first item; it fixes the price list of this order */}
+          {!order?.lines?.length ? <SalesChannelPicker orderType="DELIVERY" fb="delivery-channel" value={params.salesChannelId ?? ''} onChange={(id) => set({ salesChannelId: id || undefined })} /> : <SalesChannelTag id={order?.salesChannelId} />}
+          <div className="flex-1 min-h-0"><MenuGrid channel="DELIVERY" salesChannelId={order?.salesChannelId ?? params.salesChannelId ?? null} disabled={!ready || busy || (order && order.status !== 'DRAFT')} onPick={(p) => (needsDialog(p) ? setPick(p) : addLine({ productId: p.id, quantity: '1', modifierOptionIds: [] }))} /></div>
         </div>
 
         {/* order */}
-        {wide && <OrderSide order={order} zone={zone} delivery={delivery} busy={busy} onReview={review} onSend={send} cust={cust} />}
+        <OrderSide order={order} zone={zone} delivery={delivery} busy={busy} onReview={review} onSend={send} cust={cust} />
       </div>
-      {pick && <ProductDialog product={pick} channel="DELIVERY" onClose={() => setPick(null)} onAdd={addLine} />}
+      {pick && <ProductDialog product={pick} channel="DELIVERY" salesChannelId={order?.salesChannelId ?? params.salesChannelId ?? null} onClose={() => setPick(null)} onAdd={addLine} />}
       {payOnline && order && <PayOnlineDialog order={order} onClose={(paid) => { setPayOnline(false); set({ doneDeliveryId: delivery?.id, orderId: undefined, paidOnline: paid ? '1' : undefined }); }} />}
     </div>
   );
 }
 
-function CustomerStep({ cust, loading, locked, onPick }: { cust: any; loading: boolean; locked: boolean; onPick: (c: any) => void }) {
+/** Round 3 (F2-07): the customer as ONE compact line — name, phone, tier, alerts, address (zone + fee) and payment —
+ * with «تفاصيل» to expand notes, tags, history and address management. Before a customer is chosen it is the phone
+ * lookup itself. The menu and the cart keep the rest of the screen. */
+function CustomerBar({ cust, loading, locked, lockedDelivery, onPick, addressId, onAddress, zone, payMode, onPayMode, note, onNote }: {
+  cust: any; loading: boolean; locked: boolean; lockedDelivery: boolean; onPick: (c: any) => void; addressId?: string; onAddress: (id: string) => void; zone: any;
+  payMode: PayMode; onPayMode: (m: PayMode) => void; note: string; onNote: (v: string) => void;
+}) {
+  const { zoneOf } = useZones();
   const [q, setQ] = useState('');
   const [creating, setCreating] = useState(false);
+  const [changing, setChanging] = useState(false);
+  const [open, setOpen] = useState(false);
   const isPhone = /^[\d+\s٠-٩-]+$/.test(q.trim());
   const res = useQuery<any>(!cust && q.trim().length >= 3 ? 'Customer.Search' : null, { query: isPhone ? { phone: q.trim(), limit: 6 } : { text: q.trim(), limit: 6 } });
   const items: any[] = res.data?.items ?? [];
-  if (loading && !cust) return <Card title={t('١. العميل')}><Spinner /></Card>;
-  if (cust) return (
-    <Card title={t('١. العميل')} actions={!locked && <Button size="sm" variant="ghost" onClick={() => setCreating(true)}>{t('تغيير')}</Button>}>
-      <div className="space-y-2" data-fb="customer-card">
-        <div className="flex items-start gap-3">
-          <span className="w-11 h-11 rounded-full surface-3 flex items-center justify-center text-lg font-bold shrink-0">{cust.name.slice(0, 1)}</span>
-          <div className="min-w-0">
-            <div className="font-bold flex items-center gap-1.5 flex-wrap">{cust.name}<TierBadge tier={cust.loyalty?.tier} /></div>
-            <div className="text-xs text-dim num" dir="ltr" style={{ textAlign: 'start' }}>{cust.phone}{cust.altPhone ? ` · ${cust.altPhone}` : ''}</div>
-            <TagPills tags={cust.tags} className="mt-1" />
+  const addresses: any[] = cust?.addresses ?? [];
+  const address = addresses.find((a) => a.id === addressId) ?? null;
+  // open the details by itself when something needs attention (no address yet / outside the zones)
+  useEffect(() => { if (cust && (!addresses.length || (address && !zoneOf(address.area)))) setOpen(true); }, [cust?.id, addresses.length, addressId]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (loading && !cust) return <div className="shrink-0 h-14 rounded-2xl surface-1 border border-[var(--glass-border)] flex items-center px-4"><Spinner /></div>;
+  if (!cust) return (
+    <div className="shrink-0 relative rounded-2xl border border-[var(--glass-border)] bg-[var(--glass-bg-strong)] px-3 py-2 flex items-center gap-2 flex-wrap" data-fb="customer-bar">
+      <span className="text-xs font-bold text-soft shrink-0">{t('١. العميل')}</span>
+      <div className="relative flex-1 min-w-[220px] max-w-md">
+        <Search className="w-4 h-4 absolute top-1/2 -translate-y-1/2 start-3 text-dim" />
+        <Input autoFocus data-fb="phone-lookup" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('رقم الموبايل أو الاسم…')} className="ps-9 h-10 text-lg num" inputMode="tel" dir="ltr" />
+        {q.trim().length >= 3 && (
+          <div className="absolute z-40 mt-1 w-full min-w-[300px] overlay-panel rounded-xl p-1.5 shadow-xl space-y-1">
+            {res.loading && <Spinner />}
+            {items.map((c) => <CustomerRow key={c.id} c={c} onClick={() => onPick(c)} />)}
+            {!res.loading && !items.length && <div className="text-sm text-dim text-center py-2">{t('الرقم ده مش متسجل')}</div>}
+          </div>
+        )}
+      </div>
+      <Button variant={q.trim().length >= 3 && !items.length ? 'primary' : 'outline'} onClick={() => setCreating(true)} data-fb="customer-new"><UserPlus className="w-4 h-4" />{t('عميل جديد')}</Button>
+      <CustomerPicker open={creating} createFirst initialPhone={isPhone ? q.trim() : ''} title={t('عميل جديد')} onClose={() => setCreating(false)} onPick={(c) => { setCreating(false); onPick(c); }} />
+    </div>
+  );
+  const z = address ? zoneOf(address.area) : null;
+  return (
+    <div className="shrink-0 rounded-2xl border border-[var(--glass-border)] bg-[var(--glass-bg-strong)]" data-fb="customer-card">
+      <div className="px-3 py-2 flex items-center gap-x-2.5 gap-y-2 flex-wrap min-h-[56px]" data-fb="customer-bar">
+        {/* who */}
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="w-9 h-9 rounded-full surface-3 flex items-center justify-center font-bold shrink-0">{cust.name.slice(0, 1)}</span>
+          <div className="min-w-0 leading-tight">
+            <div className="font-bold flex items-center gap-1.5 min-w-0"><span className="truncate max-w-[160px]" data-fb="customer-name">{cust.name}</span><TierBadge tier={cust.loyalty?.tier} /></div>
+            <div className="text-[11px] text-dim num truncate" dir="ltr" style={{ textAlign: 'start' }}>{cust.phone}{cust.altPhone ? ` · ${cust.altPhone}` : ''}</div>
           </div>
         </div>
-        <AllergyWarning allergies={cust.allergies} />
-        {tv(cust.notes) && <div className="text-xs rounded-lg surface-1 px-2.5 py-1.5">✎ {tv(cust.notes)}</div>}
-        <div className="grid grid-cols-3 gap-1.5 text-center">
-          <div className="rounded-lg surface-1 py-1.5"><div className="text-[10px] text-dim">{t('طلبات')}</div><div className="font-bold num">{cust.stats.orders}</div></div>
-          <div className="rounded-lg surface-1 py-1.5"><div className="text-[10px] text-dim">{t('النقاط')}</div><div className="font-bold num text-[var(--primary)]">{cust.loyalty.balance}</div></div>
-          <div className="rounded-lg surface-1 py-1.5"><div className="text-[10px] text-dim">{t('آخر طلب')}</div><div className="font-bold text-[11px]">{cust.stats.lastOrderAt ? dateTime(cust.stats.lastOrderAt) : '—'}</div></div>
+        {/* alerts */}
+        <div className="flex items-center gap-1.5 min-w-0" data-fb="customer-alerts">
+          {cust.allergies?.length > 0 && <Pill tone="warning" title={t('حساسية')}><AlertTriangle className="w-3 h-3" />{t('حساسية')}: {cust.allergies.length}</Pill>}
+          {tv(cust.notes) && <button type="button" onClick={() => setOpen(true)} title={tv(cust.notes)} className="max-w-[120px] truncate text-[11px] rounded-full surface-1 border border-[var(--glass-border)] px-2 h-[22px]">✎ {tv(cust.notes)}</button>}
+          <span className="text-[11px] text-dim whitespace-nowrap num">{t('{n} طلب', { n: cust.stats.orders })} · <span className="text-[var(--primary)] font-bold">{cust.loyalty.balance}</span> {t('نقطة')}</span>
         </div>
-        {cust.stats.favourite && <div className="text-[11px] text-dim">{t('بيطلب غالبًا')}: <b className="text-soft">{cust.stats.favourite}</b></div>}
-        {cust.orders?.length > 0 && <div className="text-[11px] text-dim truncate">{t('آخر طلب')}: {L({ ar: cust.orders[0].items, en: cust.orders[0].itemsEn })}</div>}
+        {/* address */}
+        <div className="flex items-center gap-1.5 min-w-0 ms-auto">
+          <MapPin className="w-4 h-4 text-dim shrink-0" />
+          {addresses.length ? (
+            <select data-fb="address-select" disabled={lockedDelivery} value={addressId ?? ''} onChange={(e) => onAddress(e.target.value)} className="glass-input !h-9 !py-0 !text-sm max-w-[230px] min-w-[150px]">
+              {!address && <option value="">{t('اختار العنوان')}</option>}
+              {addresses.map((a) => { const zz = zoneOf(a.area); return <option key={a.id} value={a.id}>{`${a.label ?? t('عنوان')} — ${a.area}${zz ? ` · ${L(zz.name)} ${money(zz.fee)}` : ` · ${t('برة المناطق')}`}`}</option>; })}
+            </select>
+          ) : <span className="text-xs text-[var(--warning-text)]">{t('مفيش عنوان — ضيف واحد')}</span>}
+          {z ? <Pill tone="neutral" size="sm"><span className="w-2 h-2 rounded-full" style={{ background: z.color }} />{money(z.fee)}</Pill> : address ? <Pill tone="warning" size="sm">{t('برة مناطق التوصيل')}</Pill> : null}
+        </div>
+        {/* payment */}
+        {address && (
+          <div className="flex items-center gap-1 p-0.5 rounded-xl surface-1 border border-[var(--glass-border)]" role="radiogroup" aria-label={t('الدفع')}>
+            {(Object.keys(PAYMENT_MODE) as PayMode[]).map((m) => { const P = PAYMENT_MODE[m]; return (
+              <button key={m} role="radio" aria-checked={payMode === m} disabled={lockedDelivery} onClick={() => onPayMode(m)} data-fb={`paymode:${m}`} title={t(P.ar)}
+                className={cn('h-8 px-2 rounded-lg text-xs flex items-center gap-1 disabled:opacity-60', payMode === m ? 'bg-[var(--primary-container)] text-[var(--primary)] font-bold' : 'text-soft hover:text-[var(--foreground)]')}>
+                <P.icon className="w-3.5 h-3.5" />{payMode === m && <span className="whitespace-nowrap">{t(P.ar)}</span>}
+              </button>
+            ); })}
+          </div>
+        )}
+        {note && !open && <span className="text-[11px] text-[var(--warning-text)] max-w-[140px] truncate" title={note}>✎ {note}</span>}
+        <div className="flex items-center gap-1">
+          {!locked && <Button size="sm" variant="ghost" data-fb="customer-change" title={t('تغيير العميل')} aria-label={t('تغيير العميل')} onClick={() => setChanging(true)}><UserRoundPen className="w-4 h-4" /></Button>}
+          <Button size="sm" variant={open ? 'subtle' : 'ghost'} data-fb="customer-expand" aria-expanded={open} onClick={() => setOpen(!open)}>{t('تفاصيل')}<ChevronDown className={cn('w-4 h-4 transition-transform', open && 'rotate-180')} /></Button>
+        </div>
       </div>
-      <CustomerPicker open={creating} onClose={() => setCreating(false)} onPick={(c) => { setCreating(false); onPick(c); }} />
-    </Card>
-  );
-  return (
-    <Card title={t('١. العميل')}>
-      <div className="space-y-2">
-        <div className="relative"><Search className="w-4 h-4 absolute top-3.5 start-3 text-dim" /><Input autoFocus data-fb="phone-lookup" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('رقم الموبايل…')} className="ps-9 text-xl num" inputMode="tel" dir="ltr" /></div>
-        {res.loading && <Spinner />}
-        {items.map((c) => <CustomerRow key={c.id} c={c} onClick={() => onPick(c)} />)}
-        {q.trim().length >= 3 && !res.loading && !items.length && <div className="text-sm text-dim text-center py-2">{t('الرقم ده مش متسجل')}</div>}
-        <Button variant={q.trim().length >= 3 && !items.length ? 'primary' : 'outline'} className="w-full" onClick={() => setCreating(true)} data-fb="customer-new"><UserPlus className="w-4 h-4" />{t('عميل جديد')}</Button>
-      </div>
-      <CustomerPicker open={creating} createFirst initialPhone={isPhone ? q.trim() : ''} title={t('عميل جديد')} onClose={() => setCreating(false)} onPick={(c) => { setCreating(false); onPick(c); }} />
-    </Card>
+      {open && (
+        <div className="border-t line p-3 grid gap-3 grid-cols-1 @3xl/main:grid-cols-3" data-fb="customer-details">
+          <div className="space-y-2 min-w-0">
+            <AllergyWarning allergies={cust.allergies} />
+            {tv(cust.notes) && <div className="text-xs rounded-lg surface-1 px-2.5 py-1.5">✎ {tv(cust.notes)}</div>}
+            <TagPills tags={cust.tags} />
+            <div className="grid grid-cols-3 gap-1.5 text-center">
+              <div className="rounded-lg surface-1 py-1.5"><div className="text-[10px] text-dim">{t('طلبات')}</div><div className="font-bold num">{cust.stats.orders}</div></div>
+              <div className="rounded-lg surface-1 py-1.5"><div className="text-[10px] text-dim">{t('النقاط')}</div><div className="font-bold num text-[var(--primary)]">{cust.loyalty.balance}</div></div>
+              <div className="rounded-lg surface-1 py-1.5"><div className="text-[10px] text-dim">{t('آخر طلب')}</div><div className="font-bold text-[11px]">{cust.stats.lastOrderAt ? dateTime(cust.stats.lastOrderAt) : '—'}</div></div>
+            </div>
+            {cust.stats.favourite && <div className="text-[11px] text-dim">{t('بيطلب غالبًا')}: <b className="text-soft">{cust.stats.favourite}</b></div>}
+            {cust.orders?.length > 0 && <div className="text-[11px] text-dim">{t('آخر طلب')}: {L({ ar: cust.orders[0].items, en: cust.orders[0].itemsEn })}</div>}
+          </div>
+          <div className="min-w-0"><AddressStep cust={cust} selected={addressId} locked={lockedDelivery} onSelect={onAddress} /></div>
+          <div className="space-y-2 min-w-0">
+            <Field label={t('ملاحظة للطيار / المطبخ')}><Input data-fb="delivery-note" value={note} onChange={(e) => onNote(e.target.value)} disabled={lockedDelivery} placeholder={t('مثلاً: الجرس بايظ — كلّمه')} /></Field>
+            {lockedDelivery && <div className="text-[11px] text-dim">{t('العنوان وطريقة الدفع اتثبتوا مع التوصيل.')}</div>}
+            {zone && <div className="text-[11px] text-dim">{t('المنطقة')}: <b className="text-soft">{L(zone.name)}</b> · {t('رسوم التوصيل')} <span className="num">{money(zone.fee)}</span> · {t('الحد الأدنى')} <span className="num">{money(zone.minOrder)}</span></div>}
+          </div>
+        </div>
+      )}
+      <CustomerPicker open={changing} onClose={() => setChanging(false)} onPick={(c) => { setChanging(false); onPick(c); }} />
+    </div>
   );
 }
 
@@ -303,7 +352,8 @@ export function PayOnlineDialog({ order, onClose }: { order: any; onClose: (paid
     if (!a) return;
     setResult(a);
     if (a.state === 'APPROVED') {
-      const c = await run('Payment.Capture', { params: { orderId: order.id }, body: { tenders: [{ method: a.method, amount: a.amount, authorizationId: a.id, walletProvider: provider === 'INSTAPAY' ? 'INSTAPAY' : undefined }] } }, { success: t('الدفع الأونلاين اتسجل') });
+      // round 3 tender taxonomy: a payment link is PREPAID («مدفوع قبل كده», internal ONLINE) — never a counter card/wallet
+      const c = await run('Payment.Capture', { params: { orderId: order.id }, body: { tenders: [{ method: 'ONLINE', amount: a.amount, authorizationId: a.id, walletProvider: provider === 'INSTAPAY' ? 'INSTAPAY' : provider === 'ONLINE_CARD' ? 'ONLINE_CARD' : 'WALLET' }] } }, { success: t('الدفع بلينك الدفع اتسجل — مدفوع قبل كده') });
       if (c) setTimeout(() => onClose(true), 600);
     }
   };

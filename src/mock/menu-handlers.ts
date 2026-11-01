@@ -9,7 +9,9 @@ import { D, m4, isMoney } from './money';
 import { checkVersion, need, page, userName } from './handlers/util';
 import type { Channel, ComboSlot, DB, Product } from './types';
 import type { BulkPriceChange, BulkPriceRow, Daypart, MenuDef } from './menu-types';
-import { menuState, activeDayparts, daypartActive, nextDaypartStart, branchBusinessDate, effectiveAvailability, optionSoldOut, activeVariants, ruleAt, roundToStep, recipeCostOf, marginPercent, hm } from './menu-engine';
+import { menuState, activeDayparts, daypartActive, nextDaypartStart, branchBusinessDate, effectiveAvailability, optionSoldOut, activeVariants, ruleAt, priceFor, roundToStep, recipeCostOf, marginPercent, hm } from './menu-engine';
+import { salesChannelsOf, salesChannelById, defaultChannelFor, priceKeyOf } from './sales-channels'; // sales channels (E13)
+import type { SalesChannel } from './types-channels';
 import { planPriceWindow, applyPriceWindow } from './menu-prices';
 import { zonedParts } from './clock';
 
@@ -183,28 +185,52 @@ export const menuHandlers: Record<string, Handler> = {
 
   // ───────── price list & bulk change
   'Catalog.PriceList': (ctx) => {
+    // sales channels (E13): one column per sales channel. Legacy keys `${orderType}:${size}` = the default channels.
     const db = ctx.db;
     const bid = (ctx.query.branchId || ctx.branchId) as string;
     need(bid, 'CONTEXT_REQUIRED');
     const at = ctx.now;
+    const scs = salesChannelsOf(db).filter((c) => c.active || ctx.query.includeInactive === 'true').sort((a, b) => a.sortOrder - b.sortOrder);
     const items = db.products.filter((p) => p.active && (!ctx.query.categoryId || p.categoryId === ctx.query.categoryId)).map((p) => {
       const scopes = [null, ...activeVariants(p).map((v) => v.id)];
       const prices: Record<string, any> = {};
-      for (const ch of CHANNELS) {
+      for (const sc of scs) {
+        const key = priceKeyOf(sc);
         for (const vid of scopes) {
-          const cur = ruleAt(db, p.id, bid, ch, at, vid);
-          const next = db.priceRules.filter((r) => r.productId === p.id && r.branchId === bid && r.channel === ch && (r.variantId ?? null) === vid && r.effectiveFrom > at).sort((a, b) => a.effectiveFrom - b.effectiveFrom)[0];
-          if (cur || next) prices[`${ch}:${vid ?? 'BASE'}`] = { current: cur ? { amount: cur.amount, ruleId: cur.id, from: new Date(cur.effectiveFrom).toISOString() } : null, next: next ? { amount: next.amount, ruleId: next.id, from: new Date(next.effectiveFrom).toISOString() } : null };
+          const cur = ruleAt(db, p.id, bid, sc.orderType, at, vid, key);
+          const next = db.priceRules.filter((r) => r.productId === p.id && r.branchId === bid && r.channel === sc.orderType && (r.variantId ?? null) === vid && (r.salesChannelId ?? null) === key && r.effectiveFrom > at).sort((a, b) => a.effectiveFrom - b.effectiveFrom)[0];
+          const nextV = next ? { amount: next.amount, ruleId: next.id, from: new Date(next.effectiveFrom).toISOString() } : null;
+          let entry: any = null;
+          if (cur) entry = { current: { amount: cur.amount, ruleId: cur.id, from: new Date(cur.effectiveFrom).toISOString(), source: 'OWN', pinned: !!cur.pinned, bulkChangeId: cur.bulkChangeId ?? null }, next: nextV };
+          else if (key !== null && vid === null) {
+            // a non-default channel without its own price: what it sells at (followed channel ± %, or the order type's price)
+            const v = null;
+            const hit = priceFor(db, p, v, bid, sc.orderType, at, sc.id);
+            if (hit || nextV) entry = { current: hit ? { amount: hit.amount, ruleId: hit.ruleId, from: null, source: hit.channelSource ?? 'ORDER_TYPE', pinned: false } : null, next: nextV };
+          } else if (nextV) entry = { current: null, next: nextV };
+          if (entry) {
+            prices[`${sc.id}:${vid ?? 'BASE'}`] = entry;
+            if (sc.isDefault) prices[`${sc.orderType}:${vid ?? 'BASE'}`] = entry;
+          }
         }
       }
       return { productId: p.id, sku: p.sku, name: p.name, categoryId: p.categoryId, variants: activeVariants(p).map((v) => ({ id: v.id, name: v.name, priceDelta: v.priceDelta, sku: v.sku ?? null })), prices, cost: recipeCostOf(db, p.id) };
     });
-    return { branchId: bid, at: new Date(at).toISOString(), items };
+    return { branchId: bid, at: new Date(at).toISOString(), channels: scs.map(channelBrief), items };
   },
   'Catalog.PriceChangeBatches': (ctx) => page([...menuState(ctx.db).bulkChanges].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((b) => ({ ...b, createdByName: userName(ctx.db, b.createdBy), effectiveFromIso: new Date(b.effectiveFrom).toISOString(), status: b.effectiveFrom > ctx.now ? 'SCHEDULED' : 'APPLIED' })), ctx.query),
   'Catalog.BulkPriceChange': (ctx) => bulkPriceChange(ctx),
 };
 
+const channelBrief = (c: SalesChannel) => ({ id: c.id, name: c.name, orderType: c.orderType, isDefault: c.isDefault, active: c.active, color: c.color, priceMode: c.priceMode, follow: c.follow, sortOrder: c.sortOrder });
+
+/**
+ * Bulk price change (F2-05 / P1-027 / A15): sales channels + scope, preview (dryRun), exclusions, apply.
+ * - filter.salesChannelIds (or legacy filter.channels = the default channel of each order type)
+ * - exclusions { productIds, categoryIds, rowKeys }: kept on the batch, the rows stay visible as "مستثنى"
+ * - pinned prices (single-item overrides, Catalog.SetPrice pinned) are skipped unless their row key is in includePinned
+ * Row key = productId|size|branchId|salesChannelId.
+ */
 function bulkPriceChange(ctx: Ctx) {
   const db = ctx.db;
   const b = ctx.body;
@@ -219,11 +245,23 @@ function bulkPriceChange(ctx: Ctx) {
   need(['NEAREST', 'UP', 'DOWN'].includes(direction), 'VALIDATION_FAILED', { field: 'rounding.direction' });
   const branchIds: string[] = b.filter?.branchIds?.length ? b.filter.branchIds : ctx.branchId ? [ctx.branchId] : db.branches.map((x) => x.id);
   for (const x of branchIds) need(db.branches.some((br) => br.id === x), 'ORGANIZATION_BRANCH_NOT_FOUND', { branchId: x });
-  const channels: Channel[] = b.filter?.channels?.length ? b.filter.channels : CHANNELS;
-  need(channels.every((c) => CHANNELS.includes(c)), 'VALIDATION_FAILED', { field: 'filter.channels' });
+  // sales channels: explicit ids, else the default channel of each requested order type (legacy body)
+  let scs: SalesChannel[];
+  if (b.filter?.salesChannelIds?.length) {
+    scs = (b.filter.salesChannelIds as string[]).map((id) => { const sc = salesChannelById(db, id); if (!sc) throw new ApiError('SALES_CHANNEL_NOT_FOUND', { salesChannelId: id }); return sc; });
+  } else {
+    const channels: Channel[] = b.filter?.channels?.length ? b.filter.channels : CHANNELS;
+    need(channels.every((c) => CHANNELS.includes(c)), 'VALIDATION_FAILED', { field: 'filter.channels' });
+    scs = channels.map((c) => defaultChannelFor(db, c));
+  }
+  const channels: Channel[] = [...new Set(scs.map((c) => c.orderType))];
   const categoryIds: string[] = b.filter?.categoryIds ?? [];
   const productIds: string[] = b.filter?.productIds ?? [];
   const includeVariants = b.filter?.includeVariants !== false;
+  const exclusions = { productIds: [...new Set((b.exclusions?.productIds ?? []) as string[])], categoryIds: [...new Set((b.exclusions?.categoryIds ?? []) as string[])], rowKeys: [...new Set((b.exclusions?.rowKeys ?? []) as string[])] };
+  for (const pid of exclusions.productIds) need(db.products.some((p) => p.id === pid), 'CATALOG_PRODUCT_NOT_FOUND', { productId: pid });
+  for (const cid of exclusions.categoryIds) need(db.categories.some((c) => c.id === cid), 'VALIDATION_FAILED', { field: 'exclusions.categoryIds', categoryId: cid });
+  const includePinned = new Set<string>((b.includePinned ?? []) as string[]);
   const from = b.effectiveFrom ? Date.parse(b.effectiveFrom) : ctx.now;
   need(!Number.isNaN(from), 'VALIDATION_FAILED', { field: 'effectiveFrom' });
   if (from < ctx.now - 60_000) throw new ApiError('VALIDATION_FAILED', { field: 'effectiveFrom', rule: 'no backdating', reasonAr: 'مينفعش تاريخ فات' });
@@ -232,47 +270,68 @@ function bulkPriceChange(ctx: Ctx) {
   const zeroDenied = policy<string>('ZeroPricePolicy') === 'DENY';
   const at = Math.max(from, ctx.now);
 
-  const rows: (BulkPriceRow & { name: any; variantName: any; sku: string; cost: string | null; marginOld: string | null; marginNew: string | null; categoryId: string })[] = [];
+  type Row = BulkPriceRow & { key: string; salesChannelId: string; salesChannelName: any; excluded: string | null; pinned: boolean; ownBefore: boolean; name: any; variantName: any; sku: string; cost: string | null; marginOld: string | null; marginNew: string | null; categoryId: string };
+  const rows: Row[] = [];
+  const followNotes: { salesChannelId: string; follows: string; percent: string }[] = [];
+  for (const sc of scs) if (sc.priceMode === 'FOLLOW' && sc.follow && !sc.isDefault) followNotes.push({ salesChannelId: sc.id, follows: sc.follow.channelId, percent: sc.follow.percent });
   const products = db.products.filter((p) => p.active && (!categoryIds.length || categoryIds.includes(p.categoryId)) && (!productIds.length || productIds.includes(p.id)));
   for (const p of products) {
     const scopes: (string | null)[] = [null, ...(includeVariants ? activeVariants(p).map((v) => v.id) : [])];
-    for (const bid of branchIds) for (const ch of channels) for (const vid of scopes) {
-      const cur = ruleAt(db, p.id, bid, ch, at, vid);
-      if (!cur) continue; // nothing to change (a size without its own price follows the product price)
-      const old = D(cur.amount);
+    for (const bid of branchIds) for (const sc of scs) for (const vid of scopes) {
+      const key = priceKeyOf(sc);
+      const ch = sc.orderType;
+      const cur = ruleAt(db, p.id, bid, ch, at, vid, key);
+      let oldAmount: string | null = cur?.amount ?? null;
+      // an OWN channel without its own price yet: the bulk change starts from what it sells at (the order type's price)
+      if (!cur && key !== null && sc.priceMode === 'OWN' && vid === null) oldAmount = priceFor(db, p, null, bid, ch, at, sc.id)?.amount ?? null;
+      if (oldAmount === null) continue; // nothing to change (a size without its own price follows the product price; a FOLLOW channel follows its source)
+      const old = D(oldAmount);
       const raw = mode === 'PERCENT' ? old.times(D(100).plus(value)).dividedBy(100) : old.plus(value);
-      let next = roundToStep(raw.lt(0) ? 0 : raw, step, direction);
+      const next = roundToStep(raw.lt(0) ? 0 : raw, step, direction);
+      const rowKey = `${p.id}|${vid ?? 'BASE'}|${bid}|${sc.id}`;
+      const excluded = exclusions.productIds.includes(p.id) ? 'ITEM' : exclusions.categoryIds.includes(p.categoryId) ? 'CATEGORY' : exclusions.rowKeys.includes(rowKey) ? 'ROW' : null;
+      const pinned = !!cur?.pinned;
       let skipped: string | null = null;
-      if (D(next).eq(old)) skipped = 'UNCHANGED';
+      if (excluded) skipped = 'EXCLUDED';
+      else if (pinned && !includePinned.has(rowKey)) skipped = 'PINNED';
+      else if (D(next).eq(old)) skipped = 'UNCHANGED';
       else if (D(next).isZero() && zeroDenied) skipped = 'ZERO_NOT_ALLOWED';
-      else { try { planPriceWindow(db, ctx.now, { productId: p.id, variantId: vid, branchId: bid, channel: ch, amount: next, from, to: null }); } catch (e: any) { skipped = e?.code === 'PRICE_SCHEDULE_CONFLICT' ? 'SCHEDULE_CONFLICT' : 'INVALID'; } }
+      else { try { planPriceWindow(db, ctx.now, { productId: p.id, variantId: vid, branchId: bid, channel: ch, salesChannelId: key, amount: next, from, to: null }); } catch (e: any) { skipped = e?.code === 'PRICE_SCHEDULE_CONFLICT' ? 'SCHEDULE_CONFLICT' : 'INVALID'; } }
       const v = vid ? (p.variants ?? []).find((x) => x.id === vid) : null;
       const cost = recipeCostOf(db, p.id, vid);
       const changePercent = old.isZero() ? null : D(next).minus(old).dividedBy(old).times(100).toDecimalPlaces(2).toString();
-      rows.push({ productId: p.id, variantId: vid, branchId: bid, channel: ch, oldAmount: m4(old), newAmount: m4(next), changePercent, skipped, name: p.name, variantName: v?.name ?? null, sku: v?.sku || p.sku, cost, marginOld: marginPercent(m4(old), cost), marginNew: marginPercent(m4(next), cost), categoryId: p.categoryId });
+      rows.push({ key: rowKey, productId: p.id, variantId: vid, branchId: bid, channel: ch, salesChannelId: sc.id, salesChannelName: sc.name, oldAmount: m4(old), newAmount: m4(next), changePercent, skipped, excluded, pinned, ownBefore: !!cur, name: p.name, variantName: v?.name ?? null, sku: v?.sku || p.sku, cost, marginOld: marginPercent(m4(old), cost), marginNew: marginPercent(m4(next), cost), categoryId: p.categoryId });
     }
   }
   const effective = rows.filter((r) => !r.skipped);
   const maxPct = effective.reduce((a, r) => (r.changePercent && D(r.changePercent).abs().gt(a) ? D(r.changePercent).abs() : a), D(0));
-  const summary = { rows: rows.length, changed: effective.length, skipped: rows.length - effective.length, maxChangePercent: maxPct.toString(), oldTotal: m4(effective.reduce((a, r) => a.plus(r.oldAmount), D(0))), newTotal: m4(effective.reduce((a, r) => a.plus(r.newAmount), D(0))), effectiveFrom: new Date(from).toISOString(), scheduled: from > ctx.now + 60_000 };
-  if (b.dryRun) return { status: 200, body: { dryRun: true, rows, summary } };
+  const summary = {
+    rows: rows.length, changed: effective.length, skipped: rows.length - effective.length,
+    excluded: rows.filter((r) => r.skipped === 'EXCLUDED').length, pinnedSkipped: rows.filter((r) => r.skipped === 'PINNED').length,
+    maxChangePercent: maxPct.toString(), oldTotal: m4(effective.reduce((a, r) => a.plus(r.oldAmount), D(0))), newTotal: m4(effective.reduce((a, r) => a.plus(r.newAmount), D(0))),
+    effectiveFrom: new Date(from).toISOString(), scheduled: from > ctx.now + 60_000, followNotes,
+    channels: scs.map(channelBrief),
+  };
+  if (b.dryRun) return { status: 200, body: { dryRun: true, rows, summary, exclusions } };
   need(effective.length > 0, 'VALIDATION_FAILED', { reasonAr: 'مفيش أسعار هتتغير بالاختيارات دي' });
 
   // one PRICE_CHANGE approval for the whole batch (ApprovalRequirementPolicy[PRICE_CHANGE], same rule fields as one price)
-  const targetId = 'bulk:' + hashOf({ f: b.filter ?? {}, c: b.change, r: b.rounding ?? {}, from: b.effectiveFrom ?? null, rows: effective.map((r) => [r.productId, r.variantId, r.branchId, r.channel, r.newAmount]) });
+  const targetId = 'bulk:' + hashOf({ f: b.filter ?? {}, c: b.change, r: b.rounding ?? {}, from: b.effectiveFrom ?? null, x: exclusions, rows: effective.map((r) => [r.productId, r.variantId, r.branchId, r.salesChannelId, r.newAmount]) });
   ctx.requireApproval({ action: 'PRICE_CHANGE', targetType: 'catalog.PriceList', targetId, context: { productId: 'BULK', branchId: branchIds.join(','), channel: channels.join(','), effectiveFrom: new Date(from).toISOString(), changeKind: 'CHANGE', oldAmount: summary.oldTotal, newAmount: summary.newTotal, changePercent: summary.maxChangePercent, firstPrice: false, decrease: effective.some((r) => D(r.newAmount).lt(r.oldAmount)), rows: effective.length }, grantId: b.approvalGrantId });
   const batchId = freshId(db, 'pcb');
   for (const r of effective) {
-    const plan = planPriceWindow(db, ctx.now, { productId: r.productId, variantId: r.variantId, branchId: r.branchId, channel: r.channel, amount: r.newAmount, from, to: null });
-    const { rule } = applyPriceWindow(db, plan, ctx.user!.id, ctx.nowIso, (prefix) => freshId(db, prefix), { bulkChangeId: batchId });
+    const plan = planPriceWindow(db, ctx.now, { productId: r.productId, variantId: r.variantId, branchId: r.branchId, channel: r.channel, salesChannelId: priceKeyOf(salesChannelById(db, r.salesChannelId)), amount: r.newAmount, from, to: null });
+    const { rule } = applyPriceWindow(db, plan, ctx.user!.id, ctx.nowIso, (prefix) => freshId(db, prefix), { bulkChangeId: batchId, ...(r.pinned ? { pinned: false } : {}) });
     r.ruleId = rule.id;
   }
   const batch: BulkPriceChange = {
     id: batchId, createdAt: ctx.nowIso, createdBy: ctx.user!.id, effectiveFrom: from, status: from > ctx.now + 60_000 ? 'SCHEDULED' : 'APPLIED',
-    filter: { categoryIds, branchIds, channels, productIds, includeVariants }, change: { mode, value }, rounding: { step, direction },
-    rows: rows.map(({ productId, variantId, branchId, channel, oldAmount, newAmount, changePercent, ruleId, skipped }) => ({ productId, variantId, branchId, channel, oldAmount, newAmount, changePercent, ruleId: ruleId ?? null, skipped })), note: b.note, approvalGrantId: b.approvalGrantId ?? null,
+    filter: { categoryIds, branchIds, channels, productIds, includeVariants, salesChannelIds: scs.map((c) => c.id) }, change: { mode, value }, rounding: { step, direction },
+    exclusions, includePinned: [...includePinned],
+    rows: rows.map(({ productId, variantId, branchId, channel, salesChannelId, oldAmount, newAmount, changePercent, ruleId, skipped, excluded, pinned }) => ({ productId, variantId, branchId, channel, salesChannelId, oldAmount, newAmount, changePercent, ruleId: ruleId ?? null, skipped, excluded, pinned })), note: b.note, approvalGrantId: b.approvalGrantId ?? null,
   };
   menuState(db).bulkChanges.push(batch);
-  ctx.audit(`bulk price change ${mode} ${value} (${effective.length} prices${batch.status === 'SCHEDULED' ? ', scheduled' : ''})`, batchId, true, b.approvalGrantId);
-  return { status: 200, body: { dryRun: false, batch: { ...batch, effectiveFromIso: new Date(from).toISOString() }, rows, summary } };
+  const exText = [exclusions.productIds.length ? `${exclusions.productIds.length} items` : '', exclusions.categoryIds.length ? `${exclusions.categoryIds.length} categories` : '', exclusions.rowKeys.length ? `${exclusions.rowKeys.length} rows` : ''].filter(Boolean).join(', ');
+  ctx.audit(`bulk price change ${mode} ${value} on ${scs.map((c) => c.name.en).join('/')} (${effective.length} prices${summary.excluded ? `, ${summary.excluded} excluded${exText ? ': ' + exText : ''}` : ''}${summary.pinnedSkipped ? `, ${summary.pinnedSkipped} pinned kept` : ''}${batch.status === 'SCHEDULED' ? ', scheduled' : ''})`, batchId, true, b.approvalGrantId);
+  return { status: 200, body: { dryRun: false, batch: { ...batch, effectiveFromIso: new Date(from).toISOString() }, rows, summary, exclusions } };
 }

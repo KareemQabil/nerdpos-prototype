@@ -9,6 +9,8 @@ import { t, L, tv, tLabel } from '../../i18n';
 import { dateTime, money } from '../../lib/format';
 import { BranchScope, ItemPicker, Qty, WarehouseSelect, fmtQty, unitLabel, useBranchScope, useItemsCatalog, useList, useWarehouses, Inp, Sel } from './common';
 import { personText } from '../../demo/people';
+import { ChainView } from './Chain';
+import { InvoiceButton } from './Purchasing';
 
 const OPS = ['GoodsReceipt.Post', 'GoodsReceipt.Find', 'GoodsReceipt.Get', 'GoodsReceipt.Reverse', 'SupplierReturn.Post', 'SupplierReturn.Find'];
 
@@ -20,18 +22,19 @@ export default function Receipts() {
     <div>
       <Section title={t('الاستلام ومرتجع الموردين')} badge={<StateBadge ops={OPS} />} sub={t('استلام البضاعة (على أمر شراء أو من السوق)، بسعرها وتاريخ صلاحيتها — بيحدّث الرصيد ومتوسط التكلفة. والمرتجع للمورد للبضاعة التالفة.')} actions={<BranchScope scope={scope} />} />
       <Tabs className="mb-4" value={tab} onChange={setTab} tabs={[{ id: 'gr', label: t('أذون الاستلام') }, { id: 'sr', label: t('مرتجعات الموردين') }]} />
-      {tab === 'gr' ? <ReceiptList branchId={scope.branchId} autoNew={!!params?.newReceipt} /> : <ReturnList branchId={scope.branchId} />}
+      {tab === 'gr' ? <ReceiptList branchId={scope.branchId} autoNew={!!params?.newReceipt} openId={params?.open} /> : <ReturnList branchId={scope.branchId} />}
     </div>
   );
 }
 
-function ReceiptList({ branchId, autoNew }: { branchId?: string; autoNew: boolean }) {
+function ReceiptList({ branchId, autoNew, openId }: { branchId?: string; autoNew: boolean; openId?: string }) {
   const suppliers = useList<any>('Supplier.List');
   const [supplier, setSupplier] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const q = useList<any>('GoodsReceipt.Find', { branchId, supplierId: supplier || undefined, businessDateFrom: from || undefined, businessDateTo: to || undefined });
-  const [open, setOpen] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(openId ?? null);
+  useEffect(() => { if (openId) setOpen(openId); }, [openId]);
   const [creating, setCreating] = useState(autoNew);
   useEffect(() => { if (autoNew) setCreating(true); }, [autoNew]);
   return (
@@ -56,7 +59,7 @@ function ReceiptList({ branchId, autoNew }: { branchId?: string; autoNew: boolea
 }
 
 interface RLine { itemId: string; poLineId: string | null; packId: string; quantity: string; unitCost: string; lotCode: string; expiryDate: string }
-export function ReceiveDialog({ po, onClose, onDone }: { po?: any; onClose: () => void; onDone?: (id: string) => void }) {
+export function ReceiveDialog({ po, onClose, onDone, presetItemId, presetSupplierId }: { po?: any; onClose: () => void; onDone?: (id: string) => void; presetItemId?: string; presetSupplierId?: string }) {
   const { run, busy } = useCommand();
   const { auth } = useDev();
   const suppliers = useList<any>('Supplier.List', { active: 'true' });
@@ -65,7 +68,7 @@ export function ReceiveDialog({ po, onClose, onDone }: { po?: any; onClose: () =
   const items = useItemsCatalog();
   const [poId, setPoId] = useState<string>(po?.id ?? '');
   const selPo = po ?? openPos.items.find((p) => p.id === poId);
-  const [supplierId, setSupplierId] = useState<string>(po?.supplierId ?? '');
+  const [supplierId, setSupplierId] = useState<string>(po?.supplierId ?? presetSupplierId ?? '');
   const [wh, setWh] = useState<string>(po?.warehouseId ?? '');
   const [invoice, setInvoice] = useState('');
   const [note, setNote] = useState('');
@@ -73,6 +76,14 @@ export function ReceiveDialog({ po, onClose, onDone }: { po?: any; onClose: () =
   const [lines, setLines] = useState<RLine[]>(() => (po ? fromPo(po) : [{ itemId: '', poLineId: null, packId: '', quantity: '', unitCost: '', lotCode: '', expiryDate: '' }]));
   useEffect(() => { if (!po && selPo) { setSupplierId(selPo.supplierId); setWh(selPo.warehouseId); setLines(fromPo(selPo)); } }, [poId]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!wh && whs.items.length) setWh(whs.items.find((w) => w.branchId === auth.branchId && w.kind === 'STORE')?.id ?? whs.items[0].id); }, [whs.items, wh, auth.branchId]);
+  // round 3: "استلام" from the item 360 page starts with that item
+  useEffect(() => {
+    if (po || !presetItemId || lines.some((l) => l.itemId)) return;
+    const item = items.items.find((x) => x.id === presetItemId);
+    if (!item) return;
+    const p = item.packs?.find((x: any) => x.id === item.purchasePackId) ?? item.packs?.[0];
+    setLines([{ itemId: item.id, poLineId: null, packId: p?.id ?? '', quantity: '', unitCost: (Number(item.lastCost || item.avgCost) * Number(p?.factor ?? 1)).toFixed(2), lotCode: '', expiryDate: '' }]);
+  }, [items.items, presetItemId]); // eslint-disable-line react-hooks/exhaustive-deps
   const total = lines.reduce((a, l) => a + Number(l.quantity || 0) * Number(l.unitCost || 0), 0);
   const post = async () => {
     const body = { supplierId, warehouseId: wh, purchaseOrderId: selPo?.id, supplierInvoiceNo: invoice || undefined, note: note || undefined,
@@ -116,6 +127,7 @@ export function ReceiveDialog({ po, onClose, onDone }: { po?: any; onClose: () =
 
 function ReceiptView({ id, onClose }: { id: string | null; onClose: () => void }) {
   const { run, busy } = useCommand();
+  const { can, nav } = useDev();
   const q = useQuery<any>(id ? 'GoodsReceipt.Get' : null, { params: { receiptId: id } });
   const r = q.data;
   const [rev, setRev] = useState<string | null>(null);
@@ -127,11 +139,13 @@ function ReceiptView({ id, onClose }: { id: string | null; onClose: () => void }
         <Button variant="danger" data-fb="receipt:reverse" onClick={() => setRev('')}><RotateCcw className="w-4 h-4" />{t('الغي الإذن ده')}</Button>
         <div className="flex-1" />
         <Button data-fb="receipt:return" onClick={() => setRet(true)}><Undo2 className="w-4 h-4" />{t('رجّع حاجة للمورد')}</Button>
+        {!r.invoiceId && can('supplierinvoice:post') && <InvoiceButton receipt={r} size="md" onDone={(iid) => nav('inv-purchasing', { tab: 'invoices', open: iid })} />}
       </>}>
       {!r ? <Spinner /> : (
         <div className="space-y-3">
           <KV rows={[[t('المخزن'), `${tv(r.warehouse.name)} — ${tv(r.warehouse.branchName)}`], [t('أمر الشراء'), r.purchaseOrderNumber ?? t('من غير أمر')], [t('فاتورة المورد'), tLabel(r.supplierInvoiceNo) || '—'], [t('إمتى'), `${dateTime(r.at)} · ${personText(r.userName)}`], [t('ملاحظة'), tv(r.note) ?? '—']]} />
           {r.reversal && <Banner tone="error">{t('الإذن اتلغى')} {dateTime(r.reversal.at)}: {r.reversal.reason}</Banner>}
+          {r.state === 'POSTED' && !r.invoiceId && <Banner tone="warning">{t('الإذن ده لسه مالوش فاتورة مورد — الفاتورة بتتعمل على الكمية اللي اتستلمت.')}</Banner>}
           <Table head={[t('الصنف'), t('الكمية'), t('بالوحدة'), t('السعر'), t('تكلفة الوحدة'), t('القيمة'), t('الدفعة / الصلاحية')]} rows={r.lines.map((l: any) => [
             <span className="font-bold">{L(l.item?.name)}</span>,
             <span className="num">{fmtQty(l.packQuantity)} {l.packId ? L(l.item?.packs?.find((p: any) => p.id === l.packId)?.name) : unitLabel(l.item?.unit)}</span>,
@@ -139,6 +153,7 @@ function ReceiptView({ id, onClose }: { id: string | null; onClose: () => void }
             <span className="text-xs">{l.lotCode ?? '—'}{l.expiryDate ? ` · ${l.expiryDate}` : ''}</span>,
           ])} />
           <div className="text-sm">{t('الإجمالي')}: <b className="num">{money(r.total)}</b>{Number(r.returnedValue) > 0 && <span className="text-dim"> · {t('اترجع منه')} <span className="num">{money(r.returnedValue)}</span></span>}</div>
+          <ChainView query={{ receiptId: r.id }} title={t('المستندات المربوطة')} />
           <Tech><div className="text-[11px] num text-dim">{r.id} · movements {r.movementIds.join(', ')}</div></Tech>
         </div>
       )}

@@ -1,4 +1,5 @@
 // Builds the initial mock database from data/demo-provisioning-1.2.json and rules/EG.profile.json.
+import { seedR3C } from './sales-channels'; // r3C: sales channels & vendor persona
 import { seed, egProfile } from './contracts';
 import { POLICIES, startingValue } from './policyRegistry';
 import type { DB, Product, PriceRule, Channel, PolicyValue, ReasonCode } from './types';
@@ -9,6 +10,8 @@ import { seedCrm, CRM_EMPTY } from './seed-crm';
 import { personaDisplayName } from '../demo/people'; // friendly demo names (displayName only)
 
 import { seedInventory } from './seed-inventory';
+import { seedR3B } from './seed-r3b';
+import { seedControl } from './seed-control'; // r3A: who did it vs who allowed it
 export const DEMO_PIN = '123456';
 export const DEMO_PASSWORD = 'demo-password-1';
 
@@ -151,6 +154,9 @@ export function buildSeed(nowMs: number): DB {
   seedCrm(db, nowMs); // customers, delivery, loyalty, online orders (seed-crm.ts)
   seedOps(db, nowMs); // operations & system area: floor plans, history, reconciliation, webhooks, schedules
   seedInventory(db, nowMs); // inventory & purchasing area: warehouses, items, recipes, suppliers, history (seed-inventory.ts)
+  seedR3C(db, nowMs, DEMO_PIN, DEMO_PASSWORD, personaDisplayName('nerdpos-support')); // sales channels (طلبات), vendor support persona (sales-channels.ts)
+  seedR3B(db, nowMs); // round 3 r3B: grill + dispatch kitchen screens, receipt template (seed-r3b.ts)
+  seedControl(db, nowMs, DEMO_PIN, DEMO_PASSWORD, personaDisplayName); // r3A: accountant, manager cards/fingerprints, yesterday's closed-day check (seed-control.ts)
   db.events.push({ id: 'ev_0', at: nowIso, type: 'Provisioned', ref: 'biz', text: 'demo-provisioning 1.2.0 + EG.profile 1.4.0 applied' });
   return db;
 }
@@ -158,8 +164,8 @@ export function buildSeed(nowMs: number): DB {
 export const DEMO_ROLE_ADDITIONS: Record<string, string[]> = {
   role_waiter: ['order:cancel', 'settings:read', 'print:read', 'order:changechannel', 'order:updatedetails', 'order:setcustomer', 'customer:pii:read', 'customer:create', 'customer:update', 'customeraddress:upsert', 'loyalty:read' /* crm area */],
   role_cashier: ['product:setavailability', 'order:changechannel', 'order:updatedetails', 'order:setcustomer', 'order:removediscount', 'order:create', 'order:addlines', 'order:updateline', 'order:removeline', 'order:fire', 'order:cancel', 'order:applydiscount', 'order:comp', 'cash:move', 'drawer:opennosale', 'print:reprint', 'print:retry', 'print:read', 'settings:read', 'report:run', 'kitchen:read', 'compliance:read', 'customer:pii:read', 'customer:create', 'customer:update', 'customeraddress:upsert', 'loyalty:read', 'delivery:read', 'delivery:create', 'delivery:assign', 'delivery:dispatch', 'delivery:complete', 'delivery:failattempt', 'delivery:cancel', 'delivery:settlecash', 'channel:manage', 'channel:ingest' /* crm area */],
-  role_manager: ['order:changechannel', 'order:updatedetails', 'order:setcustomer', 'order:removediscount', 'tax:read', 'settings:read', 'order:create', 'order:addlines', 'order:updateline', 'order:removeline', 'order:fire', 'order:cancel', 'order:applydiscount', 'order:comp', 'payment:capture', 'session:open', 'session:close', 'drawer:opennosale', 'print:reprint', 'print:retry', 'print:read', 'compliance:read', 'compliance:issuedocument', 'user:read', 'user:create', 'user:manageaccess', 'role:read', 'role:create', 'role:update', 'credential:reset', 'approve:order_discount', 'approve:order_comp', 'approve:price_change', 'approve:product_tax_change', 'approve:receipt_reprint', 'approve:credential_reset', 'approve:user_access_change', 'approve:drawer_no_sale', 'approve:tender_correction', 'approve:price_override', 'payment:correcttender', 'business:read', 'branch:read', 'terminal:read', 'audit:read', 'approval:read', 'kitchen:advanceticket', 'customer:pii:read', 'customer:create', 'customer:update', 'customeraddress:upsert', 'loyalty:read', 'loyalty:adjust', 'loyalty:configure', 'delivery:read', 'delivery:create', 'delivery:assign', 'delivery:dispatch', 'delivery:complete', 'delivery:failattempt', 'delivery:cancel', 'delivery:settlecash', 'delivery:configure', 'channel:manage', 'channel:ingest', 'approve:loyalty_adjust', 'approve:delivery_cancel', 'approve:driver_cash_variance' /* crm area */, 'inventory:read', 'warehouse:configure', 'warehouse:setsalesdefault', 'inventoryitem:configure', 'inventory:adjust', 'stock:count', 'stockcount:start', 'stockcount:recordobservations', 'stockcount:submit', 'stockcount:cancel', 'stock:transfer', 'transfer:create', 'transfer:receive', 'transfer:cancel', 'stock:recordwaste', 'stock:recordreturn', 'recipe:define', 'recipe:read', 'production:post', 'supplier:upsert', 'purchasing:read', 'purchaseorder:create', 'purchaseorder:update', 'purchaseorder:issue', 'purchaseorder:close', 'purchaseorder:cancel', 'goodsreceipt:post', 'goodsreceipt:reverse', 'supplierreturn:post', 'approve:inventory_adjust', 'approve:stock_count_post', 'approve:stock_waste' /* inventory area */],
-  role_chef: ['catalog:read', 'product:setavailability', 'inventory:read', 'recipe:read', 'stockcount:recordobservations', 'stock:recordwaste', 'production:post', 'transfer:receive' /* inventory area */, 'print:read', 'settings:read'],
+  role_manager: ['order:changechannel', 'order:updatedetails', 'order:setcustomer', 'order:removediscount', 'tax:read', 'settings:read', 'order:create', 'order:addlines', 'order:updateline', 'order:removeline', 'order:fire', 'order:cancel', 'order:applydiscount', 'order:comp', 'payment:capture', 'session:open', 'session:close', 'drawer:opennosale', 'print:reprint', 'print:retry', 'print:read', 'compliance:read', 'compliance:issuedocument', 'user:read', 'user:create', 'user:manageaccess', 'role:read', 'role:create', 'role:update', 'credential:reset', 'approve:order_discount', 'approve:order_comp', 'approve:price_change', 'approve:product_tax_change', 'approve:receipt_reprint', 'approve:credential_reset', 'approve:user_access_change', 'approve:drawer_no_sale', 'approve:tender_correction', 'approve:price_override', 'payment:correcttender', 'business:read', 'branch:read', 'terminal:read', 'audit:read', 'approval:read', 'kitchen:advanceticket', 'customer:pii:read', 'customer:create', 'customer:update', 'customeraddress:upsert', 'loyalty:read', 'loyalty:adjust', 'loyalty:configure', 'delivery:read', 'delivery:create', 'delivery:assign', 'delivery:dispatch', 'delivery:complete', 'delivery:failattempt', 'delivery:cancel', 'delivery:settlecash', 'delivery:configure', 'channel:manage', 'channel:ingest', 'approve:loyalty_adjust', 'approve:delivery_cancel', 'approve:driver_cash_variance' /* crm area */, 'inventory:read', 'warehouse:configure', 'warehouse:setsalesdefault', 'inventoryitem:configure', 'inventory:adjust', 'stock:count', 'stockcount:start', 'stockcount:recordobservations', 'stockcount:submit', 'stockcount:cancel', 'stock:transfer', 'transfer:create', 'transfer:receive', 'transfer:cancel', 'stock:recordwaste', 'stock:recordreturn', 'recipe:define', 'recipe:read', 'production:post', 'supplier:upsert', 'purchasing:read', 'purchaseorder:create', 'purchaseorder:update', 'purchaseorder:issue', 'purchaseorder:close', 'purchaseorder:cancel', 'goodsreceipt:post', 'goodsreceipt:reverse', 'supplierreturn:post', 'approve:inventory_adjust', 'approve:stock_count_post', 'approve:stock_waste', 'storerequest:create', 'supplierinvoice:post' /* inventory area */],
+  role_chef: ['catalog:read', 'product:setavailability', 'inventory:read', 'recipe:read', 'stockcount:recordobservations', 'stock:recordwaste', 'production:post', 'transfer:receive', 'storerequest:create' /* inventory area */, 'print:read', 'settings:read'],
 };
 
 const OPTION_AR: Record<string, string> = { opt_size_regular: 'عادي', opt_size_large: 'كبير', opt_medium: 'ميديم', opt_well: 'مستوي كويس', opt_cheese: 'جبنة زيادة', opt_egg: 'بيضة', opt_hot_sauce: 'صوص حار' };
@@ -232,6 +238,8 @@ export function buildEmpty(nowMs: number): DB {
     ...CRM_EMPTY,
     menu: undefined, // menu area: no dayparts/menus on a fresh install (nothing restricted)
     inv: undefined, // inventory area: a fresh install starts with no warehouses or stock
+    r3b: undefined, // round 3 r3B: no kitchen-screen config, no receipt template on a fresh install
+    salesChannels: undefined, permOverrides: undefined, // r3C: the three default channels are created on first read
     events: [{ id: 'ev_0', at: nowIso, type: 'Installed', ref: 'biz', text: 'dedicated deployment ready — bootstrap administrator only' }],
   };
 }

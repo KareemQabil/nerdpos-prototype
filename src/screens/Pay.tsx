@@ -1,16 +1,18 @@
-// D1 Pay: confirm, pay cash (keypad, quick cash, change), card with terminal reference, wallets, split tender,
-// partial payment, remaining shown; complete when paid. Every amount comes from the server (the change shown while
+// D1 Pay: confirm, pay cash (keypad, quick cash, change), card, wallet (provider chosen once), prepaid (only orders from
+// a delivery app or a payment link), points, deposit; split tender, partial payment, remaining shown; complete when paid.
+// Round 3 tender taxonomy (F3-05/F3-06): no separate «أونلاين» button at the counter; the reference (card machine /
+// transfer number) is a venue policy per method — off / optional / required (TenderReferencePolicy). Every amount comes from the server (the change shown while
 // typing is only a preview; the real change comes back with the payment).
 import React, { useEffect, useState } from 'react';
-import { ArrowRight, Banknote, CreditCard, Smartphone, CheckCircle2, Receipt, PiggyBank, ShieldCheck, Star, Delete, Printer, Plus, Wallet } from 'lucide-react';
+import { ArrowRight, Banknote, CreditCard, Smartphone, CheckCircle2, Receipt, PiggyBank, Star, Delete, Printer, Plus, Wallet, Globe } from 'lucide-react';
 import { useDev, useQuery, useCommand, useUnknowns } from '../app/hooks';
 import { PageHeader, StateBadge, Button, Card, Money, Field, Input, Select, Banner, Pill, Skeleton, Stepper, Kbd, EmptyState } from '../ui';
 import { t, L } from '../i18n';
 import { cn, money, qty } from '../lib/format';
 import { StatusPill } from './order/CheckPanel';
 import { CustomerChip } from './customers/common'; // crm area
-import { LoyaltyRedeemBox, ExternalAuthBox, EarnedNote } from './customers/PayExtras'; // crm area
-import { METHOD_AR } from './ops/BusinessDay';
+import { LoyaltyRedeemBox, EarnedNote } from './customers/PayExtras'; // crm area
+import { tenderLabel, tenderGroupLabel, providerLabel } from '../demo/tenderText'; // round 3 tender taxonomy
 import { Tech } from '../app/tech';
 
 export default function Pay() {
@@ -40,7 +42,7 @@ export function PayPanel({ orderId, onBack }: { orderId: string; onBack: () => v
   const step = order.status === 'DRAFT' ? 0 : order.status === 'CONFIRMED' ? (s?.settled ? 2 : 1) : 3;
   return (
     <div data-screen="D1" className="@container/pay space-y-4">
-      <PageHeader title={<>{t('التحصيل')} <span className="num text-soft text-lg font-bold">#{order.number}</span></>} ops={['Order.Confirm', 'Payment.Capture', 'Payment.GetSettlement', 'Order.Complete']} description={where(order)}
+      <PageHeader title={<>{t('التحصيل')} <span className="num text-soft text-lg font-bold">#{order.number}</span>{order.shortNo && <span className="ms-2 align-middle text-sm font-bold px-2 py-0.5 rounded-lg bg-[var(--foreground)] text-[var(--background)]" title={t('رقم النداء')} data-fb="pay-short-no">{t('نداء')} <span className="num">{order.shortNo}</span></span>}</>} ops={['Order.Confirm', 'Payment.Capture', 'Payment.GetSettlement', 'Order.Complete']} description={where(order)}
         actions={<Button variant="ghost" onClick={onBack} data-fb="pay-back"><ArrowRight className="w-4 h-4 ltr:rotate-180" />{t('رجوع')}</Button>} className="!mb-0" />
       {order.status !== 'VOIDED' && order.status !== 'CANCELLED' && <Stepper steps={[{ label: t('تأكيد الشيك') }, { label: t('الدفع') }, { label: t('إنهاء') }]} current={step} className="max-w-xl" />}
       <div className="grid @[880px]/pay:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-4 items-start">
@@ -136,7 +138,7 @@ function DueBox({ s, lastChange }: { s: any; lastChange: string | null }) {
   );
 }
 
-const methodLabel = (m: string, provider?: string | null) => (provider && METHOD_AR[`${m}:${provider}`] ? t(METHOD_AR[`${m}:${provider}`]) : ({ CASH: t('كاش'), CARD: t('كارت'), DIGITAL_WALLET: t('محفظة'), DEPOSIT: t('عربون'), LOYALTY: t('نقاط'), ONLINE: t('مدفوع أونلاين'), EXTERNAL: t('دفع إلكتروني') } as Record<string, string>)[m] ?? t('طريقة دفع تانية'));
+const methodLabel = (m: string, provider?: string | null) => tenderLabel(m, provider);
 const Line = ({ k, v }: { k: React.ReactNode; v: string }) => <div className="flex justify-between"><span className="text-soft">{k}</span><span className="num">{money(v)}</span></div>;
 const plainNum = (v: string) => money(v, false).replace(/,/g, '');
 
@@ -146,6 +148,7 @@ function TenderBox({ order, remaining, onChange }: { order: any; remaining: stri
   const tm = useQuery<any>('Settings.Effective', { query: { policyId: 'TenderMethodPolicy', scopeType: 'BRANCH', scopeId: auth.branchId } });
   const tip = useQuery<any>('Settings.Effective', { query: { policyId: 'TipPolicy', scopeType: 'TENANT', scopeId: 'biz' } });
   const wp = useQuery<any>('Settings.Effective', { query: { policyId: 'WalletProvidersPolicy', scopeType: 'TENANT', scopeId: 'biz' } });
+  const refPol = useQuery<any>('Settings.Effective', { query: { policyId: 'TenderReferencePolicy', scopeType: 'BRANCH', scopeId: auth.branchId } });
   const deposits = useQuery<any>('Deposit.Find', { query: {} });
   const enabled: string[] = tm.data?.value?.enabled ?? ['CASH', 'CARD'];
   const held = (deposits.data?.items ?? []).filter((d: any) => d.state === 'HELD');
@@ -154,6 +157,10 @@ function TenderBox({ order, remaining, onChange }: { order: any; remaining: stri
   const [amount, setAmount] = useState('');
   const [ref, setRef] = useState('');
   const [provider, setProvider] = useState('INSTAPAY');
+  const [prepaidVia, setPrepaidVia] = useState<string>(order.externalOrderId ? 'APP' : 'PAYMENT_LINK');
+  // round 3: PREPAID only on orders that came from a delivery app or a payment link (server enforces it too)
+  const prepaidOk = !!(order.externalOrderId || order.deliveryId);
+  const refRule: 'OFF' | 'OPTIONAL' | 'REQUIRED' = method === 'CARD' || method === 'DIGITAL_WALLET' || method === 'ONLINE' ? (refPol.data?.value?.[method] ?? 'OPTIONAL') : 'OFF';
   const [tipAmt, setTipAmt] = useState('');
   const tipsOn = tip.data?.value === 'ON';
   const rem = plainNum(remaining);
@@ -162,7 +169,7 @@ function TenderBox({ order, remaining, onChange }: { order: any; remaining: stri
   const tenderN = Number(tendered || rem);
   const preview = method === 'CASH' && tendered ? tenderN - remN : 0;
   const pay = async () => {
-    const tender: any = method === 'CASH' ? { method, tendered: tendered || rem } : { method, amount: amount || rem, reference: ref || undefined, walletProvider: method === 'DIGITAL_WALLET' ? provider : undefined };
+    const tender: any = method === 'CASH' ? { method, tendered: tendered || rem } : { method, amount: amount || rem, reference: refRule !== 'OFF' && ref.trim() ? ref.trim() : undefined, walletProvider: method === 'DIGITAL_WALLET' ? provider : method === 'ONLINE' ? (prepaidVia === 'APP' ? 'DELIVERY_APP' : 'PAYMENT_LINK') : undefined };
     if (tipsOn && tipAmt) tender.tip = tipAmt;
     const r = await run<any>('Payment.Capture', { params: { orderId: order.id }, body: { tenders: [tender] } }, { refId: order.id, label: t('دفع') });
     if (r) { onChange(r.change); setTendered(''); setAmount(''); setRef(''); setTipAmt(''); }
@@ -187,13 +194,14 @@ function TenderBox({ order, remaining, onChange }: { order: any; remaining: stri
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
   }); // eslint-disable-line react-hooks/exhaustive-deps
+  // round 3 tender taxonomy: CASH · CARD · WALLET (provider chosen once, below) · PREPAID (only app / payment-link orders) · POINTS · deposit
   const methods = [
-    ...enabled.map((m) => ({ id: m, label: methodLabel(m), icon: m === 'CASH' ? <Banknote /> : m === 'CARD' ? <CreditCard /> : <Smartphone /> })),
+    ...enabled.filter((m) => ['CASH', 'CARD', 'DIGITAL_WALLET'].includes(m)).map((m) => ({ id: m, label: tenderGroupLabel(m), icon: m === 'CASH' ? <Banknote /> : m === 'CARD' ? <CreditCard /> : <Smartphone /> })),
+    ...(prepaidOk ? [{ id: 'ONLINE', label: tenderGroupLabel('ONLINE'), icon: <Globe /> }] : []),
+    ...(order.customerId ? [{ id: 'LOYALTY', label: tenderGroupLabel('LOYALTY'), icon: <Star /> }] : []),
     ...(held.length ? [{ id: 'DEPOSIT', label: t('عربون'), icon: <PiggyBank /> }] : []),
-    ...(order.customerId ? [{ id: 'LOYALTY', label: t('نقاط'), icon: <Star /> }] : []),
-    { id: 'EXTERNAL', label: t('أونلاين'), icon: <ShieldCheck /> },
   ];
-  const plainMethod = !['DEPOSIT', 'LOYALTY', 'EXTERNAL'].includes(method);
+  const plainMethod = !['DEPOSIT', 'LOYALTY'].includes(method);
   return (
     <Card padding="md" title={t('اختار طريقة الدفع')} badge={<StateBadge ops={['Payment.Capture']} />}>
       <div className="space-y-4">
@@ -201,7 +209,6 @@ function TenderBox({ order, remaining, onChange }: { order: any; remaining: stri
           {methods.map((m) => <button key={m.id} role="radio" aria-checked={method === m.id} onClick={() => setMethod(m.id)} data-fb={`tender-method:${m.id}`} className={cn('min-h-[50px] rounded-xl border flex flex-col items-center justify-center gap-0.5 text-xs font-bold [&>svg]:w-5 [&>svg]:h-5 transition-colors', method === m.id ? 'border-[var(--primary)] bg-[var(--primary-container)] text-[var(--primary)]' : 'surface-1 border-[var(--glass-border)] text-soft hover:bg-[var(--surface-2)]')}>{m.icon}{m.label}</button>)}
         </div>
         {method === 'LOYALTY' && <LoyaltyRedeemBox order={order} />}
-        {method === 'EXTERNAL' && <ExternalAuthBox order={order} remaining={remaining} />}
         {method === 'CASH' && (
           <div className="space-y-3">
             <div className="rounded-2xl surface-1 border line px-4 py-3 flex items-center justify-between gap-3">
@@ -227,11 +234,25 @@ function TenderBox({ order, remaining, onChange }: { order: any; remaining: stri
             <div className="text-[11px] text-dim flex items-center gap-1.5 flex-wrap">{t('لو المبلغ أقل من المطلوب بيتسجل دفع جزئي وتكمّل الباقي بطريقة تانية.')}<span className="hidden lg:inline-flex items-center gap-1">· <Kbd>Enter</Kbd> {t('للدفع')}</span></div>
           </div>
         )}
-        {(method === 'CARD' || method === 'DIGITAL_WALLET') && (
+        {(method === 'CARD' || method === 'DIGITAL_WALLET' || method === 'ONLINE') && (
           <div className="space-y-3">
-            {method === 'DIGITAL_WALLET' && <Field label={<span className="flex items-center gap-1">{t('المحفظة')} <StateBadge state="PROPOSED" /></span>}><Select value={provider} onChange={(e) => setProvider(e.target.value)} options={(wp.data?.value?.providers ?? ['INSTAPAY', 'VODAFONE_CASH']).map((p: string) => ({ value: p, label: METHOD_AR[`DIGITAL_WALLET:${p}`] ? t(METHOD_AR[`DIGITAL_WALLET:${p}`]) : t('محفظة تانية') }))} /></Field>}
-            <Field label={t('المبلغ')} hint={t('سيبه فاضي = الباقي كله ({a}). أقل منه = دفع جزئي.', { a: money(remaining) })}><Input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" placeholder={rem} className="text-2xl h-14" /></Field>
-            <Field label={method === 'CARD' ? t('رقم العملية من مكنة الكارت') : t('رقم التحويل')} required hint={t('الرقم بيتسجل بس — مفيش ربط بمكنة أو بنك في النسخة دي.')}><Input data-fb="tender-reference" value={ref} onChange={(e) => setRef(e.target.value)} placeholder={t('مثلًا 004512')} className="num h-12" onKeyDown={(e) => { if (e.key === 'Enter' && !busy) pay(); }} /></Field>
+            {method === 'CARD' && <div className="text-xs text-dim">{t('الزبون دفع على مكنة الكارت اللي عند الكاشير.')}</div>}
+            {method === 'DIGITAL_WALLET' && <Field label={t('المحفظة / التحويل')} hint={t('إنستاباي وفودافون كاش وغيرهم — كلهم هنا بس، مش متكررين في حتة تانية.')}><Select data-fb="tender-wallet-provider" value={provider} onChange={(e) => setProvider(e.target.value)} options={(wp.data?.value?.providers ?? ['INSTAPAY', 'VODAFONE_CASH']).map((p: string) => ({ value: p, label: providerLabel(p) }))} /></Field>}
+            {method === 'ONLINE' && (
+              <Field label={t('اتدفع قبل كده عن طريق')} hint={t('للطلبات اللي جاية من تطبيق دليفري أو اللي اتدفعت بلينك دفع قبل ما توصل.')}>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {order.externalOrderId && <button onClick={() => setPrepaidVia('APP')} data-fb="prepaid-via:APP" className={cn('h-11 rounded-xl border text-sm', prepaidVia === 'APP' ? 'border-[var(--primary)] bg-[var(--primary-container)] font-bold' : 'surface-1 border-[var(--glass-border)]')}>{t('تطبيق الدليفري')}</button>}
+                  <button onClick={() => setPrepaidVia('PAYMENT_LINK')} data-fb="prepaid-via:PAYMENT_LINK" className={cn('h-11 rounded-xl border text-sm', prepaidVia === 'PAYMENT_LINK' ? 'border-[var(--primary)] bg-[var(--primary-container)] font-bold' : 'surface-1 border-[var(--glass-border)]')}>{t('لينك دفع')}</button>
+                </div>
+              </Field>
+            )}
+            <Field label={t('المبلغ')} hint={t('سيبه فاضي = الباقي كله ({a}). أقل منه = دفع جزئي وتكمّل بطريقة تانية.', { a: money(remaining) })}><Input data-fb="tender-amount" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" placeholder={rem} className="text-2xl h-14" /></Field>
+            {refRule !== 'OFF' && (
+              <Field label={method === 'CARD' ? t('رقم العملية من مكنة الكارت') : method === 'ONLINE' ? t('رقم الطلب / رقم العملية') : t('رقم التحويل')} required={refRule === 'REQUIRED'}
+                hint={refRule === 'REQUIRED' ? t('المطعم مخليه لازم لطريقة الدفع دي.') : t('اختياري — اكتبه لو موجود. نفس الرقم مايتسجلش مرتين في نفس اليوم.')}>
+                <Input data-fb="tender-reference" data-rule={refRule} value={ref} onChange={(e) => setRef(e.target.value)} placeholder={t('مثلًا 004512')} className="num h-12" onKeyDown={(e) => { if (e.key === 'Enter' && !busy) pay(); }} />
+              </Field>
+            )}
           </div>
         )}
         {method === 'DEPOSIT' && (
@@ -240,8 +261,8 @@ function TenderBox({ order, remaining, onChange }: { order: any; remaining: stri
         {tipsOn && plainMethod && <Field label={<span className="flex items-center gap-1">{t('بقشيش')} <StateBadge state="PROPOSED" /></span>} hint={t('البقشيش فلوس لوحدها مش مبيعات، وبيظهر في تقرير الوردية.')}><Input value={tipAmt} onChange={(e) => setTipAmt(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" /></Field>}
         {plainMethod && (
           <div className="sticky bottom-0 -mx-4 -mb-4 px-4 pb-4 pt-2 rounded-b-2xl bg-[linear-gradient(to_top,var(--glass-bg-strong)_70%,transparent)]">
-          <Button variant="primary" size="xl" className="w-full !h-16 text-xl" loading={busy} disabled={(method === 'CARD' || method === 'DIGITAL_WALLET') && !ref.trim()} onClick={pay} data-fb="capture">
-            {method === 'CASH' ? <Banknote className="w-6 h-6" /> : method === 'CARD' ? <CreditCard className="w-6 h-6" /> : <Smartphone className="w-6 h-6" />}
+          <Button variant="primary" size="xl" className="w-full !h-16 text-xl" loading={busy} disabled={refRule === 'REQUIRED' && !ref.trim()} onClick={pay} data-fb="capture">
+            {method === 'CASH' ? <Banknote className="w-6 h-6" /> : method === 'CARD' ? <CreditCard className="w-6 h-6" /> : method === 'ONLINE' ? <Globe className="w-6 h-6" /> : <Smartphone className="w-6 h-6" />}
             {t('ادفع')} <span className="num">{method === 'CASH' ? money(String(Math.min(tenderN, remN))) : money(amount || rem)}</span>
           </Button>
           </div>

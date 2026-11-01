@@ -6,12 +6,16 @@ import { checkVersion, need, page, requireFields } from './util';
 import type { User } from '../types';
 import { operations } from '../contracts';
 import { APPROVAL_ACTIONS } from '../policyRegistry';
+import { isVendorPermission, VENDOR_PERMISSIONS } from '../types-channels'; // r3C
+import { permOverridesOf, overrideLive } from '../user-perms'; // r3C (P1-041)
+import { clock } from '../clock';
 
 /** Registered permission ids: every permission named by an operation, the approve:* permissions, and those already on roles. */
 function permissionCatalog(db: any): Set<string> {
   const out = new Set<string>();
   operations.forEach((o) => { if (o.permission && !['PUBLIC', 'AUTHENTICATED', 'INTERNAL'].includes(o.permission)) out.add(o.permission); });
   APPROVAL_ACTIONS.forEach((a) => out.add(a.permission));
+  VENDOR_PERMISSIONS.forEach((p) => out.add(p));
   db.roles.forEach((r: any) => r.permissionIds.forEach((p: string) => p !== '*' && out.add(p)));
   return out;
 }
@@ -20,12 +24,21 @@ function assertPermissions(db: any, ids: unknown) {
   const unknown = ((ids as string[]) ?? []).filter((p) => p !== '*' && !cat.has(p));
   if (unknown.length) throw new ApiError('UNKNOWN_PERMISSION_ID', { permissionIds: unknown });
 }
+/** r3C (P1-041): nobody hands out what they do not hold; '*' only from a '*' holder; vendor-only permissions never from the venue. */
+function assertCanHandOut(ctx: any, ids: string[]) {
+  for (const p of ids) {
+    if (isVendorPermission(p) && !ctx.can(p)) throw new ApiError('VENDOR_ONLY_PERMISSION', { permission: p });
+    if (p === '*' ? !ctx.perms.has('*') : !ctx.can(p)) throw new ApiError('PERMISSION_ESCALATION', { permission: p });
+  }
+}
 const managesAccess = (db: any, roleIds: string[]) => roleIds.some((id) => { const r = db.roles.find((x: any) => x.id === id); return r?.active && (r.permissionIds.includes('*') || r.permissionIds.includes('user:manageaccess')); });
 
 const userView = (db: any, u: User) => ({
   id: u.id, username: u.username, displayName: u.displayName, active: u.active, version: u.version, mustChangeCredentials: u.mustChangeCredentials,
   roleAssignments: u.roleAssignments.map((ra) => ({ ...ra, roleName: db.roles.find((r: any) => r.id === ra.roleId)?.name })),
   locked: !!(u.lockedUntil && u.lockedUntil > Date.now()),
+  // r3C (P1-041): live per-user exceptions to the role
+  permOverrides: (db.permOverrides ?? []).filter((o: any) => o.userId === u.id && overrideLive(o, clock.now())).map((o: any) => ({ id: o.id, permission: o.permission, effect: o.effect, expiresAt: o.expiresAtMs ? new Date(o.expiresAtMs).toISOString() : null })),
 });
 
 export const accessHandlers: Record<string, Handler> = {
@@ -85,6 +98,7 @@ export const accessHandlers: Record<string, Handler> = {
     requireFields(ctx, 'name');
     need(!ctx.db.roles.some((r) => r.name === ctx.body.name), 'ROLE_NAME_TAKEN');
     assertPermissions(ctx.db, ctx.body.permissionIds);
+    assertCanHandOut(ctx, ctx.body.permissionIds ?? []);
     ctx.requireApproval({ action: 'USER_ACCESS_CHANGE', targetType: 'access.Role', targetId: 'new', context: { active: true, roleIdsHash: hashOf([ctx.body.name]), branchScopeHash: hashOf([]) }, grantId: ctx.body.approvalGrantId });
     const r = { id: nextId('role'), name: ctx.body.name, permissionIds: [...(ctx.body.permissionIds ?? [])], active: true, version: 1 };
     ctx.db.roles.push(r);
@@ -96,6 +110,7 @@ export const accessHandlers: Record<string, Handler> = {
     need(r, 'ROLE_NOT_FOUND');
     checkVersion(r!, ctx.body.expectedVersion);
     if (ctx.body.permissionIds) assertPermissions(ctx.db, ctx.body.permissionIds);
+    if (ctx.body.permissionIds) assertCanHandOut(ctx, (ctx.body.permissionIds as string[]).filter((p) => !r!.permissionIds.includes(p)));
     if (ctx.body.name && ctx.body.name !== r!.name) need(!ctx.db.roles.some((x) => x.name === ctx.body.name), 'ROLE_NAME_TAKEN');
     ctx.requireApproval({ action: 'USER_ACCESS_CHANGE', targetType: 'access.Role', targetId: r!.id, context: { active: ctx.body.active ?? r!.active, roleIdsHash: hashOf([r!.id]), branchScopeHash: hashOf(ctx.body.permissionIds ?? r!.permissionIds) }, grantId: ctx.body.approvalGrantId });
     if (ctx.body.name) r!.name = ctx.body.name;
@@ -186,6 +201,70 @@ export const accessHandlers: Record<string, Handler> = {
     const a = ctx.db.audit.find((x) => x.id === ctx.params.auditEntryId);
     need(a, 'AUDIT_ENTRY_NOT_FOUND');
     return a;
+  },
+  // ───── r3C (P1-041): per-user permission overrides on top of the role
+  'User.PermissionOverrides': (ctx) => {
+    const db = ctx.db;
+    const u = db.users.find((x) => x.id === ctx.params.userId);
+    need(u, 'USER_NOT_FOUND');
+    const roles = u!.roleAssignments.map((ra) => { const r = db.roles.find((x) => x.id === ra.roleId); return { roleId: ra.roleId, roleName: r?.name ?? ra.roleId, branchIds: ra.branchIds, active: !!r?.active, permissionIds: r?.permissionIds ?? [] }; });
+    const rolePerms = new Set(roles.filter((r) => r.active).flatMap((r) => r.permissionIds));
+    const name = (id: string | null) => { const x = db.users.find((y) => y.id === id); return x ? x.displayName : id; };
+    const overrides = permOverridesOf(db).filter((o) => o.userId === u!.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((o) => ({
+      ...o, expiresAt: o.expiresAtMs ? new Date(o.expiresAtMs).toISOString() : null, createdByName: name(o.createdBy), removedByName: o.removedBy ? name(o.removedBy) : null,
+      state: o.removedAt ? 'REMOVED' : o.expiresAtMs !== null && o.expiresAtMs <= ctx.now ? 'EXPIRED' : 'ACTIVE', inRole: rolePerms.has(o.permission) || (rolePerms.has('*') && !isVendorPermission(o.permission)),
+    }));
+    const eff = [...permsOf(db, u!, ctx.branchId)];
+    return { userId: u!.id, roles, roleHasAll: rolePerms.has('*'), rolePermissions: [...rolePerms].sort(), overrides, effective: eff.filter((p) => !p.startsWith('-')).sort(), revoked: eff.filter((p) => p.startsWith('-')).map((p) => p.slice(1)).sort(), selfEdit: ctx.user!.id === u!.id };
+  },
+  'User.SetPermissionOverride': (ctx) => {
+    const db = ctx.db;
+    const u = db.users.find((x) => x.id === ctx.params.userId);
+    need(u, 'USER_NOT_FOUND');
+    requireFields(ctx, 'permission', 'effect', 'reason');
+    const b = ctx.body;
+    const permission = String(b.permission);
+    if (u!.id === ctx.user!.id) throw new ApiError('SELF_PERMISSION_CHANGE', { userId: u!.id });
+    need(['GRANT', 'REVOKE'].includes(b.effect), 'VALIDATION_FAILED', { field: 'effect', reasonAr: 'اختار تزود الصلاحية ولا تشيلها' });
+    need(permission !== '*', 'VALIDATION_FAILED', { field: 'permission', reasonAr: 'مينفعش تدي "كل الصلاحيات" لشخص — ده دور صاحب المطعم' });
+    assertPermissions(db, [permission]);
+    const reason = String(b.reason ?? '').trim();
+    need(reason.length >= 3, 'VALIDATION_FAILED', { field: 'reason', reasonAr: 'اكتب السبب (هيتسجل)' });
+    const targetPerms = permsOf(db, u!, null);
+    if (targetPerms.has('*') && !ctx.perms.has('*')) throw new ApiError('PERMISSION_ESCALATION', { reason: 'target holds every permission', reasonAr: 'مينفعش تعدّل صلاحيات حد صلاحياته أكبر منك' });
+    if (isVendorPermission(permission) && !ctx.can(permission)) throw new ApiError('VENDOR_ONLY_PERMISSION', { permission });
+    if (b.effect === 'GRANT' && !ctx.can(permission)) throw new ApiError('PERMISSION_ESCALATION', { permission });
+    const roleSet = new Set(u!.roleAssignments.flatMap((ra) => db.roles.find((r) => r.id === ra.roleId && r.active)?.permissionIds ?? []));
+    const inRole = roleSet.has(permission) || (roleSet.has('*') && !isVendorPermission(permission));
+    if (b.effect === 'GRANT') need(!inRole, 'VALIDATION_FAILED', { field: 'permission', reasonAr: 'الصلاحية دي موجودة في دوره أصلًا' });
+    else need(inRole, 'VALIDATION_FAILED', { field: 'permission', reasonAr: 'الصلاحية دي مش في دوره أصلًا — مفيش حاجة تتشال' });
+    let expiresAtMs: number | null = null;
+    if (b.expiresAt) {
+      expiresAtMs = Date.parse(b.expiresAt);
+      need(!Number.isNaN(expiresAtMs) && expiresAtMs > ctx.now + 60_000, 'VALIDATION_FAILED', { field: 'expiresAt', reasonAr: 'وقت الانتهاء لازم يكون بعد دلوقتي' });
+      need(expiresAtMs <= ctx.now + 366 * 86_400_000, 'VALIDATION_FAILED', { field: 'expiresAt', reasonAr: 'أقصى مدة سنة' });
+    }
+    ctx.requireApproval({ action: 'USER_ACCESS_CHANGE', targetType: 'access.User', targetId: u!.id, context: { active: u!.active, roleIdsHash: hashOf(u!.roleAssignments.map((r) => r.roleId)), branchScopeHash: hashOf([b.effect, permission, expiresAtMs]) }, grantId: b.approvalGrantId });
+    const list = permOverridesOf(db);
+    for (const o of list) if (o.userId === u!.id && o.permission === permission && overrideLive(o, ctx.now)) { o.removedAt = ctx.nowIso; o.removedBy = ctx.user!.id; o.removeReason = 'replaced'; }
+    const o = { id: nextId('pov'), userId: u!.id, permission, effect: b.effect as 'GRANT' | 'REVOKE', reason, expiresAtMs, createdAt: ctx.nowIso, createdBy: ctx.user!.id, removedAt: null, removedBy: null };
+    list.push(o);
+    ctx.audit(`permission ${b.effect === 'GRANT' ? 'granted to' : 'revoked from'} ${u!.username}: ${permission}${expiresAtMs ? ` until ${new Date(expiresAtMs).toISOString()}` : ''} — ${reason}`, u!.id, true, b.approvalGrantId);
+    return { status: 201, body: { ...o, expiresAt: expiresAtMs ? new Date(expiresAtMs).toISOString() : null } };
+  },
+  'User.RemovePermissionOverride': (ctx) => {
+    const db = ctx.db;
+    const u = db.users.find((x) => x.id === ctx.params.userId);
+    need(u, 'USER_NOT_FOUND');
+    if (u!.id === ctx.user!.id) throw new ApiError('SELF_PERMISSION_CHANGE', { userId: u!.id });
+    const o = permOverridesOf(db).find((x) => x.id === ctx.params.overrideId && x.userId === u!.id);
+    need(o, 'PERMISSION_OVERRIDE_NOT_FOUND', { overrideId: ctx.params.overrideId });
+    need(!o!.removedAt, 'VALIDATION_FAILED', { reasonAr: 'الاستثناء ده اتشال قبل كده' });
+    if (permsOf(db, u!, null).has('*') && !ctx.perms.has('*')) throw new ApiError('PERMISSION_ESCALATION', { reason: 'target holds every permission' });
+    ctx.requireApproval({ action: 'USER_ACCESS_CHANGE', targetType: 'access.User', targetId: u!.id, context: { active: u!.active, roleIdsHash: hashOf(u!.roleAssignments.map((r) => r.roleId)), branchScopeHash: hashOf(['REMOVE', o!.id]) }, grantId: ctx.body?.approvalGrantId });
+    o!.removedAt = ctx.nowIso; o!.removedBy = ctx.user!.id; o!.removeReason = String(ctx.body?.reason ?? '').trim() || null;
+    ctx.audit(`permission override ended for ${u!.username}: ${o!.effect} ${o!.permission}`, u!.id, true, ctx.body?.approvalGrantId);
+    return { ...o!, expiresAt: o!.expiresAtMs ? new Date(o!.expiresAtMs).toISOString() : null };
   },
   'Approval.Grant': (ctx) => {
     requireFields(ctx, 'action', 'approverUserId', 'approverSecret', 'targetId', 'context');

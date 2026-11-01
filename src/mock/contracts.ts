@@ -7,6 +7,10 @@ import egProfileJson from '../contracts/eg-profile.json';
 import seedJson from '../contracts/seed.json';
 import { MENU_PROPOSED_OPERATIONS } from './menu-contracts'; // menu & pricing area
 import { INVENTORY_PROPOSED_OPERATIONS } from './inventory-contracts'; // inventory & purchasing area
+import { R3B_PROPOSED_OPERATIONS } from './r3b-contracts'; // round 3 r3B: kitchen screens, document template
+import { CHANNELS_PROPOSED_OPERATIONS } from './channels-contracts'; // sales channels & per-user permissions
+import { CONTROL_PROPOSED_OPERATIONS } from './control-contracts'; // r3A: who did it vs who allowed it
+import { REPORT_PROPOSED_OPERATIONS } from '../reports/contracts'; // reports engine (layers L1–L4 + assistant)
 
 export interface OperationDef {
   id: string; module: string; kind: 'CMD' | 'QRY' | string; method: string; path: string; permission: string;
@@ -25,7 +29,7 @@ export const PROPOSED_OPERATIONS: OperationDef[] = [
   { id: 'Print.Document', module: 'printing', kind: 'CMD', method: 'POST', path: '/print-jobs/documents', permission: 'order:read', input: { documentType: { type: 'Code', required: true }, documentId: { type: 'Id', required: true }, terminalId: { type: 'Ref<organization.Terminal>', required: true } }, output: 'PrintJobView', errors: [], approval: null, backend_state: 'PROPOSED', note: 'PRN-GAP-01 generalised print command' },
   { id: 'Order.ModifyFiredLine', module: 'orders', kind: 'CMD', method: 'POST', path: '/orders/{orderId}/lines/{lineId}/kitchen-modifications', permission: 'order:updateline', input: { text: { type: 'Text', required: true } }, output: 'OrderView', errors: ['LINE_NOT_FIRED'], approval: null, backend_state: 'PROPOSED', note: 'D12' },
   { id: 'Order.AssignSeat', module: 'orders', kind: 'CMD', method: 'POST', path: '/orders/{orderId}/lines/{lineId}/seat', permission: 'order:updateline', input: { seat: { type: 'Integer', required: false } }, output: 'OrderView', errors: [], approval: null, backend_state: 'PROPOSED', note: 'D2' },
-  { id: 'Order.CreateStaffMeal', module: 'orders', kind: 'CMD', method: 'POST', path: '/staff-meals', permission: 'order:create', input: {}, output: 'OrderView', errors: [], approval: null, backend_state: 'PROPOSED', note: 'D9' },
+  { id: 'Order.CreateStaffMeal', module: 'orders', kind: 'CMD', method: 'POST', path: '/staff-meals', permission: 'order:create', input: { employeeUserId: { type: 'Ref<identity.User>', required: true }, lines: { type: 'List<OrderLineInput>', required: true }, sendToKitchen: { type: 'Boolean', required: false }, approvalGrantId: { type: 'Ref<approvals.ApprovalGrant>', required: false } }, output: 'OrderView', errors: ['STAFF_MEAL_EMPLOYEE_REQUIRED', 'STAFF_MEAL_ALLOWANCE_EXCEEDED', 'APPROVAL_REQUIRED', 'SELF_APPROVAL_DENIED'], approval: { mode: 'ALWAYS', action: 'STAFF_MEAL' }, backend_state: 'PROPOSED', note: 'D9 + E12/F3-03: identified employee, manager approval, daily allowance, stock consumed' },
   { id: 'Deposit.Create', module: 'payments', kind: 'CMD', method: 'POST', path: '/deposits', permission: 'payment:capture', input: {}, output: 'DepositView', errors: ['SESSION_NOT_OPEN'], approval: null, backend_state: 'PROPOSED', note: 'D10' },
   { id: 'Deposit.Find', module: 'payments', kind: 'QRY', method: 'GET', path: '/deposits', permission: 'payment:read', input: {}, output: 'Page<DepositView>', errors: [], approval: null, backend_state: 'PROPOSED', note: 'D10' },
   { id: 'Deposit.Apply', module: 'payments', kind: 'CMD', method: 'POST', path: '/deposits/{depositId}/apply', permission: 'payment:capture', input: {}, output: 'DepositView', errors: [], approval: null, backend_state: 'PROPOSED', note: 'D10' },
@@ -58,7 +62,7 @@ export const PROPOSED_OPERATIONS: OperationDef[] = [
   { id: 'Payment.AuthorizationFind', module: 'payments', kind: 'QRY', method: 'GET', path: '/payments/authorizations', permission: 'payment:read', input: {}, output: 'Page<AuthorizationView>', errors: [], approval: null, backend_state: 'PROPOSED', note: 'card terminal / wallet authorizations of an order' },
 ];
 
-export const operations: OperationDef[] = [...(operationsJson as unknown as OperationDef[]), ...PROPOSED_OPERATIONS, ...MENU_PROPOSED_OPERATIONS, ...INVENTORY_PROPOSED_OPERATIONS];
+export const operations: OperationDef[] = [...(operationsJson as unknown as OperationDef[]), ...PROPOSED_OPERATIONS, ...MENU_PROPOSED_OPERATIONS, ...INVENTORY_PROPOSED_OPERATIONS, ...R3B_PROPOSED_OPERATIONS, ...CHANNELS_PROPOSED_OPERATIONS, ...CONTROL_PROPOSED_OPERATIONS, ...REPORT_PROPOSED_OPERATIONS];
 export const opsById = new Map(operations.map((o) => [o.id, o]));
 export const errorsByCode = new Map((errorsJson as ErrorDef[]).map((e) => [e.code, e]));
 export const policyDefs = policiesJson as { id: string; owner: string; type: string; allowed: unknown; default: unknown; scope_dimensions: unknown; note: string | null }[];

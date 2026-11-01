@@ -1,45 +1,33 @@
-// Demo clock: the mock server has its own clock (business-day cutoff, scheduled prices, happy hour, e-receipt alerts).
+// Server time, read-only (round 3 — trusted time, F2-03 / E09). The clock and the business date are shown; nothing
+// here (or anywhere in the UI) can move them. Transaction time and the business date come from the server; the
+// terminal's own clock is irrelevant. Anything that needs "another time" is a read-only preview (e.g. the menu admin
+// "what the cashier sees at 20:00") or seeded history — never a change of ledger time.
 import React from 'react';
-import { Clock } from 'lucide-react';
+import { Clock, Lock } from 'lucide-react';
 import { Popover } from './Popover';
 import { clock, businessDate, localTime } from '../mock/clock';
-import { Button, useNow } from '../ui';
+import { useNow } from '../ui';
 import { t } from '../i18n';
-import { cn } from '../lib/format';
-import { demo } from '../mock/demo';
+import { dayLong } from '../lib/format';
 
-export function ClockControl() {
-  useNow(1000);
+export function ServerClock() {
+  useNow(15000);
   const now = clock.now();
-  const off = clock.offset();
-  const go = (fn: () => void) => { fn(); demo.tick(); };
+  const bd = businessDate(now);
   return (
-    <Popover title={t('ساعة التجربة: قدّم الوقت عشان تشوف اليوم التجاري، الأسعار المجدولة، الهابي أور، وتنبيهات الإيصال الإلكتروني')} width={340} button={(o) => (
-      <button data-fb="chrome:clock" data-on={o} className={cn('chrome-btn', !!off && '!border-[color-mix(in_srgb,var(--warning)_50%,transparent)] !text-[var(--warning-text)] !bg-[color-mix(in_srgb,var(--warning)_12%,transparent)]')}>
-        <Clock className="w-4 h-4" /><span className="num font-bold">{localTime(now)}</span>{off ? <span className="text-[10px] hidden min-[1400px]:inline">{t('متقدمة')}</span> : null}<span className="num text-dim hidden min-[2200px]:inline">{businessDate(now)}</span>
+    <Popover title={t('وقت السيرفر — مش قابل للتعديل')} width={320} button={(o) => (
+      <button data-fb="chrome:server-clock" data-on={o} className="chrome-btn" aria-label={t('وقت السيرفر — مش قابل للتعديل')}>
+        <Clock className="w-4 h-4" /><span className="num font-bold">{localTime(now)}</span><Lock className="w-3 h-3 opacity-60" aria-hidden />
       </button>
     )}>
-      <div className="space-y-3 text-sm">
-        <div className="font-bold text-base">{t('ساعة التجربة')}</div>
-        <div className="text-xs text-dim">{t('السيستم ليه ساعة لوحده تقدر تقدّمها. اليوم التجاري بيبدأ الساعة 4 الفجر بتوقيت القاهرة: البيع الساعة 2 بالليل بيتحسب على اليوم اللي قبله.')}</div>
+      <div className="space-y-3 text-sm" data-fb="server-clock">
+        <div className="font-bold text-base flex items-center gap-1.5"><Lock className="w-4 h-4" />{t('وقت السيرفر — مش قابل للتعديل')}</div>
         <div className="grid grid-cols-2 gap-2 text-xs">
-          <div className="surface-1 rounded-xl p-2.5"><div className="text-dim">{t('القاهرة')}</div><div className="num font-bold text-lg">{localTime(now)}</div></div>
-          <div className="surface-1 rounded-xl p-2.5"><div className="text-dim">{t('اليوم التجاري')}</div><div className="num font-bold text-lg">{businessDate(now)}</div></div>
+          <div className="surface-1 rounded-xl p-2.5"><div className="text-dim">{t('الساعة (القاهرة)')}</div><div className="num font-bold text-lg">{localTime(now)}</div></div>
+          <div className="surface-1 rounded-xl p-2.5"><div className="text-dim">{t('اليوم التجاري')}</div><div className="font-bold">{dayLong(bd)}</div></div>
         </div>
-        <div className="grid grid-cols-3 gap-1.5">
-          <Button size="sm" onClick={() => go(() => clock.advance(15 * 60_000))}>+15 {t('دقيقة')}</Button>
-          <Button size="sm" onClick={() => go(() => clock.advance(60 * 60_000))}>+1 {t('ساعة')}</Button>
-          <Button size="sm" onClick={() => go(() => clock.advance(12 * 3_600_000))}>+12 {t('ساعة')}</Button>
-          <Button size="sm" title={t('قبل بداية اليوم الجديد بـ 5 دقايق')} onClick={() => go(() => clock.setCairoTime(3, 55))}>03:55</Button>
-          <Button size="sm" title={t('بعد بداية اليوم الجديد بـ 5 دقايق')} onClick={() => go(() => clock.setCairoTime(4, 5))}>04:05</Button>
-          <Button size="sm" title={t('2 بالليل — لسه على اليوم اللي فات')} onClick={() => go(() => clock.setCairoTime(2, 0))}>02:00</Button>
-          <Button size="sm" onClick={() => go(() => clock.setCairoTime(16, 0))}>{t('هابي أور')} 16:00</Button>
-          <Button size="sm" data-fb="clock:13" onClick={() => go(() => clock.setCairoTime(13, 0))}>13:00</Button>
-          <Button size="sm" data-fb="clock:breakfast" title={t('وقت الفطار')} onClick={() => go(() => clock.setCairoTime(9, 0))}>{t('فطار')} 09:00</Button>
-          <Button size="sm" data-fb="clock:dinner" title={t('وقت العشا')} onClick={() => go(() => clock.setCairoTime(20, 0))}>{t('عشا')} 20:00</Button>
-          <Button size="sm" onClick={() => go(() => clock.advance(86_400_000))}>+1 {t('يوم')}</Button>
-        </div>
-        <Button size="sm" variant="ghost" onClick={() => go(() => clock.reset())}>{t('رجّع الساعة للوقت الحقيقي')}</Button>
+        <div className="text-xs text-dim leading-relaxed">{t('وقت كل حركة واليوم التجاري بييجوا من السيرفر بس. محدش يقدر يغيّرهم — ولا حتى صاحب المطعم — وساعة الجهاز نفسه مالهاش دعوة. اليوم التجاري بيبدأ الساعة 4 الفجر: البيع الساعة 2 بالليل بيتحسب على اليوم اللي قبله.')}</div>
+        <div className="text-xs text-dim leading-relaxed">{t('عايز تشوف المنيو هيبقى شكله إيه الساعة 8 بالليل؟ استخدم «معاينة» في شاشة المنيوهات — بتوريك من غير ما تغيّر الوقت.')}</div>
       </div>
     </Popover>
   );

@@ -61,7 +61,7 @@ export async function expectRefusal(p: Promise<any>, code: string, log: Logger, 
 }
 
 /** Run a command; if APPROVAL_REQUIRED, the approver enters their PIN on the same device and the same command id retries. */
-export async function withApproval<T = any>(dev: DeviceAuth, opId: string, opts: { params?: any; body?: any }, approver: string, log: Logger, label?: string): Promise<T> {
+export async function withApproval<T = any>(dev: DeviceAuth, opId: string, opts: { params?: any; body?: any; query?: any }, approver: string, log: Logger, label?: string): Promise<T> {
   const commandId = newCommandId();
   try {
     const r = await call<T>(dev, opId, { ...opts, commandId });

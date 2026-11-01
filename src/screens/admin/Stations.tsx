@@ -1,9 +1,10 @@
 // F2 Stations, routing & tables (J-A1 step 11): kitchen stations, routing rules in ascending priority with an
-// explicit catch-all (no implicit default station), and the floor tables by area.
+// explicit catch-all (no implicit default station), the floor tables by area, and (round 3) the kitchen screens:
+// which stations each KDS terminal shows, whether it is the dispatch screen, and the «ابدأ» policy.
 import React, { useMemo, useState } from 'react';
-import { ChefHat, Route, Plus, Pencil, Power, Armchair, AlertTriangle, Users } from 'lucide-react';
+import { ChefHat, Route, Plus, Pencil, Power, Armchair, AlertTriangle, Users, MonitorPlay, ConciergeBell, Save } from 'lucide-react';
 import { useCommand, useDev } from '../../app/hooks';
-import { Banner, Button, Card, EmptyState, Field, Input, PageHeader, Pill, Select, StatCard, StatGrid, StateBadge, Switch, Table, Tabs } from '../../ui';
+import { Banner, Button, Card, EmptyState, Field, Input, PageHeader, Pill, Select, StatCard, StatGrid, StateBadge, Switch, Table, Tabs, SegmentedControl } from '../../ui';
 import { t, L, tv } from '../../i18n';
 import { Tech } from '../../app/tech';
 import { stationName } from '../../demo/humanLog';
@@ -11,8 +12,10 @@ import { cn } from '../../lib/format';
 import { useList, usePerm, Refused, CHANNELS, channelLabel, Modal } from './org/common';
 
 export default function Stations() {
-  const [tab, setTab] = useState<'kitchen' | 'tables'>('kitchen');
+  const { params } = useDev();
+  const [tab, setTab] = useState<'kitchen' | 'screens' | 'tables'>(params?.tab === 'screens' ? 'screens' : 'kitchen');
   const { me, auth } = useDev();
+  const screens = useList<any>('KdsScreen.List');
   const noBranch = !(me?.branchId ?? auth.branchId);
   const stations = useList<any>('KitchenStation.List');
   const rules = useList<any>('RoutingRule.List');
@@ -23,7 +26,7 @@ export default function Stations() {
       <PageHeader
         icon={<Route />}
         title={t('المطبخ والمحطات والترابيزات')}
-        badge={<StateBadge ops={['KitchenStation.List', 'KitchenStation.Create', 'KitchenStation.Configure', 'RoutingRule.List', 'RoutingRule.Create', 'RoutingRule.Configure', 'Table.List', 'Table.Create', 'Table.Configure', 'Table.SetActive']} />}
+        badge={<StateBadge ops={['KdsScreen.List', 'KdsScreen.Configure', 'KitchenStation.List', 'KitchenStation.Create', 'KitchenStation.Configure', 'RoutingRule.List', 'RoutingRule.Create', 'RoutingRule.Configure', 'Table.List', 'Table.Create', 'Table.Configure', 'Table.SetActive']} />}
         description={t('كل صنف بيتبعت للمطبخ بيروح لمحطة حسب أول قاعدة تنطبق عليه. الترابيزات بتظهر في شاشة الصالة على طول.')}
       />
       {noBranch && <Banner tone="warning">{t('الجهاز ده مش متربط بفرع، والمحطات والترابيزات تبع فرع. ادخل من جهاز في الفرع أو اختار الفرع من شاشة الدخول.')}<Tech> (CONTEXT_REQUIRED)</Tech></Banner>}
@@ -32,9 +35,66 @@ export default function Stations() {
         <StatCard label={t('قواعد التوزيع')} value={rules.items.filter((x) => x.active).length} icon={<Route />} tone={catchAll || !rules.items.length ? 'neutral' : 'error'} hint={catchAll ? t('فيه قاعدة «أي حاجة تانية» في الآخر') : t('ناقصة قاعدة «أي حاجة تانية»')} loading={rules.loading && !rules.data} />
         <StatCard label={t('ترابيزات شغالة')} value={tables.items.filter((x) => x.active).length} icon={<Armchair />} hint={t('{n} كرسي', { n: tables.items.filter((x) => x.active).reduce((a, x) => a + Number(x.capacity ?? 0), 0) })} loading={tables.loading && !tables.data} />
       </StatGrid>
-      <Tabs variant="underline" value={tab} onChange={setTab} tabs={[{ id: 'kitchen', icon: <ChefHat className="w-4 h-4" />, label: t('المحطات والتوزيع') }, { id: 'tables', icon: <Armchair className="w-4 h-4" />, label: t('الترابيزات'), count: tables.items.length || undefined }]} />
-      {tab === 'kitchen' ? <KitchenTab /> : <TablesTab />}
+      <Tabs variant="underline" value={tab} onChange={setTab} tabs={[{ id: 'kitchen', icon: <ChefHat className="w-4 h-4" />, label: t('المحطات والتوزيع') }, { id: 'screens', icon: <MonitorPlay className="w-4 h-4" />, label: <span data-fb="stations:tab:screens">{t('شاشات المطبخ')}</span>, count: screens.items.length || undefined }, { id: 'tables', icon: <Armchair className="w-4 h-4" />, label: t('الترابيزات'), count: tables.items.length || undefined }]} />
+      {tab === 'kitchen' ? <KitchenTab /> : tab === 'screens' ? <ScreensTab /> : <TablesTab />}
     </div>
+  );
+}
+
+// ───────── kitchen screens (round 3: F3-02, F2-06, E04–E06)
+const START_OPTS = [
+  { id: 'HIDDEN', label: 'مخفي', help: 'مفيش زرار «ابدأ». العداد شغال من ساعة ما الطلب وصل.' },
+  { id: 'OPTIONAL', label: 'اختياري', help: 'الشيف يدوس «ابدأ» لو عايز يسجّل إمتى بدأ فعلًا — مش لازم.' },
+  { id: 'REQUIRED', label: 'لازم', help: 'مفيش «جاهز» قبل «ابدأ». العداد برضه شغال من ساعة الوصول.' },
+] as const;
+function ScreensTab() {
+  const screens = useList<any>('KdsScreen.List');
+  const stations = useList<any>('KitchenStation.List');
+  const perm = usePerm('kitchen:configure');
+  const active = stations.items.filter((s) => s.active);
+  const covered = new Set<string>(screens.items.flatMap((x) => (x.stationIds.length ? x.stationIds : active.map((s) => s.id))));
+  const orphan = active.filter((s) => !covered.has(s.id));
+  const hasDispatch = screens.items.some((x) => x.dispatch);
+  return (
+    <div className="space-y-3">
+      <Banner tone="info" title={t('كل شاشة مطبخ بتشترك في محطاتها')}>{t('شاشة المحطة بتعرض أصنافها بس، و«جاهز» بيبعت الطلب لشاشة التسليم. «جاهز للتسليم» والتسليم للويتر بيظهروا على شاشة التسليم بس. «المطلوب دلوقتي» ثابت على جنب في كل الشاشات.')}</Banner>
+      {!hasDispatch && screens.items.length > 0 && <Banner tone="warning">{t('مفيش شاشة تسليم — كل شاشة هتسلّم الطلبات بتاعتها بنفسها لحد ما تختار شاشة تسليم.')}</Banner>}
+      {orphan.length > 0 && <Banner tone="warning">{t('المحطات دي مش ظاهرة على أي شاشة: {s}. ضيفها لشاشة عشان طلباتها تتشاف.', { s: orphan.map((x) => stationName(x.name)).join(t('، ')) })}</Banner>}
+      <Refused error={screens.error} />
+      <div className="grid @4xl/main:grid-cols-2 gap-3">
+        {screens.items.map((sc) => <ScreenCard key={sc.terminalId} sc={sc} stations={active} perm={perm} />)}
+      </div>
+      {!screens.items.length && !screens.error && <EmptyState icon={<MonitorPlay />} title={t('مفيش شاشات مطبخ في الفرع ده')} text={t('ضيف جهاز من نوع «شاشة المطبخ» من شاشة الأجهزة.')} />}
+    </div>
+  );
+}
+function ScreenCard({ sc, stations, perm }: { sc: any; stations: any[]; perm: { ok: boolean; title?: string } }) {
+  const { run, busy } = useCommand();
+  const [ids, setIds] = useState<string[]>(sc.stationIds);
+  const [dispatch, setDispatch] = useState<boolean>(sc.dispatch);
+  const [start, setStart] = useState<string>(sc.start);
+  const dirty = ids.join(',') !== sc.stationIds.join(',') || dispatch !== sc.dispatch || start !== sc.start;
+  const save = () => run('KdsScreen.Configure', { params: { terminalId: sc.terminalId }, body: { stationIds: ids, dispatch, start, expectedVersion: sc.configured ? sc.version : undefined } }, { success: t('إعداد الشاشة اتحفظ — الشاشة بتتحدث على طول') });
+  const toggle = (id: string) => setIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+  return (
+    <Card data-fb={`kds-screen:${sc.terminalId}`} title={<span className="flex items-center gap-2"><MonitorPlay className="w-4 h-4 text-[var(--primary)]" />{tv(sc.terminalName)}{dispatch && <Pill tone="success"><ConciergeBell className="w-3 h-3" />{t('شاشة التسليم')}</Pill>}</span>}
+      description={ids.length ? t('بتعرض: {s}', { s: ids.map((id) => stationName(stations.find((x) => x.id === id)?.name)).join(t('، ')) }) : t('بتعرض كل المحطات')}
+      footer={<div className="flex items-center justify-end gap-2"><Tech><span className="num text-[10px] text-dim me-auto">{sc.terminalCode} · v{sc.version}</span></Tech><Button size="sm" variant="primary" disabled={!perm.ok || !dirty || busy} title={perm.title} onClick={save} data-fb={`kds-screen-save:${sc.terminalId}`}><Save className="w-3.5 h-3.5" />{t('احفظ')}</Button></div>}>
+      <div className="space-y-4">
+        <Field label={t('المحطات اللي بتظهر على الشاشة دي')} hint={t('مفيش اختيار = كل المحطات.')}>
+          <div className="flex flex-wrap gap-1.5">
+            {stations.map((s) => <button key={s.id} type="button" disabled={!perm.ok} onClick={() => toggle(s.id)} data-fb={`kds-screen-station:${sc.terminalId}:${s.name}`} aria-pressed={ids.includes(s.id)} className={cn('h-10 px-3 rounded-xl border text-sm font-bold', ids.includes(s.id) ? 'border-[var(--primary)] bg-[var(--primary-container)] text-[var(--primary)]' : 'surface-1 border-[var(--glass-border)] text-soft')}>{stationName(s.name)}</button>)}
+          </div>
+        </Field>
+        <div className="flex items-start justify-between gap-3 rounded-xl surface-1 px-3 py-2.5">
+          <div className="min-w-0"><div className="font-bold text-sm">{t('شاشة تسليم (إكسبو)')}</div><div className="text-xs text-dim">{t('عليها «جاهز للتسليم» والتسليم للويتر. شاشات المحطات التانية «جاهز» عندها بيبعت الطلب هنا.')}</div></div>
+          <span data-fb={`kds-screen-dispatch:${sc.terminalId}`}><Switch checked={dispatch} onChange={setDispatch} disabled={!perm.ok} /></span>
+        </div>
+        <Field label={t('زرار «ابدأ»')} hint={START_OPTS.find((o) => o.id === start)?.help ? t(START_OPTS.find((o) => o.id === start)!.help) : undefined}>
+          <SegmentedControl value={start} onChange={setStart} options={START_OPTS.map((o) => ({ id: o.id, label: t(o.label), fb: `kds-screen-start:${sc.terminalId}:${o.id}`, disabled: !perm.ok }))} />
+        </Field>
+      </div>
+    </Card>
   );
 }
 

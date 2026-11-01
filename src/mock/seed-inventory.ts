@@ -57,7 +57,7 @@ const ITEMS: ItemDef[] = [
   { id: 'inv_mint', ar: 'نعناع (حزمة)', en: 'Mint (bunch)', cat: CAT.veg, unit: 'unit_pcs', cost: '5', sup: 'sup_nile', levels: { k: [6, 20] }, target: { k: 11 } },
   { id: 'inv_lemon', ar: 'ليمون', en: 'Lemons', cat: CAT.veg, unit: 'unit_kg', cost: '45', pack: ['شوال 10 كجم', '10kg sack', 10], sup: 'sup_nile', levels: { s: [5, 15], k: [2, 5] }, target: { s: 8, k: 2.4 } },
   { id: 'inv_orange', ar: 'برتقال بلدي للعصير', en: 'Juice oranges', cat: CAT.veg, unit: 'unit_kg', cost: '28', pack: ['قفص 20 كجم', '20kg crate', 20], sup: 'sup_nile', levels: { s: [20, 60], k: [8, 20] }, target: { s: 12, k: 6 } },
-  { id: 'inv_potato', ar: 'بطاطس', en: 'Potatoes', cat: CAT.veg, unit: 'unit_kg', cost: '18', pack: ['شوال 25 كجم', '25kg sack', 25], sup: 'sup_nile', levels: { s: [15, 50], k: [5, 15] }, target: { s: 34, k: 8 } },
+  { id: 'inv_potato', ar: 'بطاطس', en: 'Potatoes', cat: CAT.veg, unit: 'unit_kg', cost: '18', pack: ['شوال 25 كجم', '25kg sack', 25], sup: 'sup_nile', levels: { s: [20, 100], k: [5, 15] }, target: { s: 20, k: 8 } }, // round 3 A16: target 100, on hand 20 → suggestion 80
   { id: 'inv_baladi_bread', ar: 'عيش بلدي', en: 'Baladi bread', cat: CAT.bread, unit: 'unit_pcs', cost: '1.5', pack: ['كيس 50 رغيف', 'Bag of 50', 50], sup: 'sup_bakery', levels: { k: [60, 200], k2: [20, 60] }, target: { k: 140, k2: 25 } },
   { id: 'inv_shami_bread', ar: 'عيش شامي', en: 'Pita bread', cat: CAT.bread, unit: 'unit_pcs', cost: '3', pack: ['كيس 40 رغيف', 'Bag of 40', 40], sup: 'sup_bakery', levels: { k: [40, 120] }, target: { k: 70 } },
   { id: 'inv_burger_bun', ar: 'عيش برجر بالسمسم', en: 'Sesame burger buns', cat: CAT.bread, unit: 'unit_pcs', cost: '6', pack: ['كيس 12 عيشة', 'Bag of 12', 12], sup: 'sup_bakery', levels: { k: [24, 72] }, target: { k: 36 } },
@@ -198,6 +198,7 @@ export function seedInventory(db: DB, nowMs: number) {
     { id: 'sup_ahram', name: 'مخازن الأهرام للمواد الغذائية', taxId: '512-334-871', phone: '01001234567', contactName: 'أ. مجدي عبد الحميد', paymentTerms: 'آجل 15 يوم', address: 'العبور — المنطقة الصناعية', notes: 'بقالة وزيوت وألبان وبقوليات. التوريد يوم الأحد والأربع.', active: true, version: 1, createdAt: created },
     { id: 'sup_nile', name: 'مزارع النيل', taxId: '498-221-063', phone: '01112345678', contactName: 'الحاج سعيد', paymentTerms: 'كاش عند الاستلام', address: 'سوق العبور — عنبر 12', notes: 'خضار وفاكهة وفراخ وبيض — توريد يومي الصبح بدري.', active: true, version: 1, createdAt: created },
     { id: 'sup_butcher', name: 'جزارة الأمانة', taxId: null, phone: '01223456789', contactName: 'المعلم رضا', paymentTerms: 'أسبوعي', address: 'مدينة نصر — شارع مكرم عبيد', notes: 'لحمة مفرومة وكندوز — طازة كل يومين.', active: true, version: 1, createdAt: created },
+    { id: 'sup_metro', name: 'مترو للجملة', taxId: '611-208-447', phone: '01155566677', contactName: 'أ. هاني', paymentTerms: 'آجل 30 يوم', address: 'التجمع الخامس — طريق السويس', notes: 'جملة: زيوت وبقالة بعبوات كبيرة — أسعار أقل للعبوات الكبيرة.', active: true, version: 1, createdAt: created },
     { id: 'sup_bakery', name: 'مخبز الشروق', taxId: null, phone: '01098765432', contactName: 'أم محمد', paymentTerms: 'كاش', address: 'مدينة نصر', notes: 'عيش بلدي وشامي وبرجر وكنافة ورقاق — كل يوم الساعة 7.', active: true, version: 1, createdAt: created },
   ];
   base.items = ITEMS.map((d): InvItem => {
@@ -210,6 +211,31 @@ export function seedInventory(db: DB, nowMs: number) {
       defaultSupplierId: d.sup ?? null, avgCost: m4(d.cost), lastCost: m4(d.cost), costHistory: [], levels, version: 1, createdAt: created,
     };
   });
+  // round 3 (P1-031): the same ingredient comes in several packs — each pack is its own card with the suppliers' prices
+  const packOffers: Record<string, [string, string, string, number, [string, string][]][]> = {
+    inv_oil: [
+      ['pk_inv_oil_750', 'زجاجة 750 مل', '750ml bottle', 0.75, [['sup_ahram', '72']]],
+      ['pk_inv_oil_1l', 'زجاجة 1 لتر', '1L bottle', 1, [['sup_ahram', '88'], ['sup_metro', '86']]],
+      ['pk_inv_oil_5l', 'جركن 5 لتر', '5L jerrycan', 5, [['sup_ahram', '410'], ['sup_metro', '395']]],
+      ['pk_inv_oil', '', '', 18, [['sup_ahram', '1500'], ['sup_metro', '1520']]],
+    ],
+    inv_tahini: [
+      ['pk_inv_tahini_1', 'برطمان 1 كجم', '1kg jar', 1, [['sup_ahram', '185'], ['sup_metro', '178']]],
+      ['pk_inv_tahini', '', '', 5, [['sup_ahram', '800'], ['sup_metro', '790']]],
+      ['pk_inv_tahini_18', 'صفيحة 18 كجم', '18kg tin', 18, [['sup_metro', '2700']]],
+    ],
+  };
+  for (const [itemId, list] of Object.entries(packOffers)) {
+    const it = base.items.find((i) => i.id === itemId);
+    if (!it) continue;
+    for (const [id, ar, en, factor, offers] of list) {
+      let pk = it.packs.find((x) => x.id === id);
+      if (!pk) { pk = { id, name: { ar, en }, factor: qn(factor) }; it.packs.push(pk); }
+      pk.offers = offers.map(([supplierId, price]) => ({ supplierId, packPrice: m4(price), at: created, source: 'PRICE_LIST' as const, ref: null }));
+    }
+    it.packs.sort((a, b) => Number(a.factor) - Number(b.factor));
+  }
+
   const mkRecipe = (id: string, kind: Recipe['outputKind'], output: string, outQty: number, ins: In[], note: string | null, opt?: string | null, applies?: string | null): Recipe => {
     const inputs: RecipeInput[] = ins.map(([itemId, q, w]) => { const it = base.items.find((i) => i.id === itemId)!; const e = enteredOf(db, it, q); return { itemId, quantity: qn(q), enteredQuantity: e.q, enteredUnit: e.u, wastePercent: qn(w ?? 0) }; });
     const name = base.items.find((i) => i.id === output)?.name ?? db.products.find((x) => x.id === output)?.name ?? { ar: output, en: output };
@@ -242,7 +268,7 @@ export function seedInventory(db: DB, nowMs: number) {
       const gr: GoodsReceipt = { id: newId(inv, 'grn'), number: nextNumber(inv, 'GRN'), supplierId: sup, purchaseOrderId: po?.id ?? null, warehouseId: wh, state: 'POSTED', supplierInvoiceNo: invoice, lines: [], total: m4(0), at: iso(ms), businessDate: ymd(ms), userId, note: null, reversal: null, movementIds: [] };
       lines.forEach(([itemId, packs, packCost], i) => {
         const it = inv.items.find((x) => x.id === itemId)!;
-        const pack = it.packs[0] ?? null;
+        const pack = it.packs.find((x) => x.id === it.purchasePackId) ?? it.packs[0] ?? null;
         const qty = pack ? D(packs).times(pack.factor) : D(packs);
         const unitCost = pack ? D(packCost).dividedBy(pack.factor) : D(packCost);
         const pl = po?.lines.find((l) => l.itemId === itemId);
@@ -257,7 +283,7 @@ export function seedInventory(db: DB, nowMs: number) {
     const mkPo = (sup: string, wh: string, ms: number, state: PurchaseOrder['state'], lines: [string, number, string][], note: string | null, issuedMs: number | null): PurchaseOrder => {
       const po: PurchaseOrder = {
         id: newId(inv, 'po'), number: nextNumber(inv, 'PO'), supplierId: sup, warehouseId: wh, branchId: inv.warehouses.find((w) => w.id === wh)!.branchId, state,
-        lines: lines.map(([itemId, q, cost], i) => { const it = inv.items.find((x) => x.id === itemId)!; return { id: `pol_${i + 1}_${itemId}`, itemId, packId: it.packs[0]?.id ?? null, factor: it.packs[0]?.factor ?? '1', orderedQuantity: qn(q), orderedUnitCost: m4(cost) }; }),
+        lines: lines.map(([itemId, q, cost], i) => { const it = inv.items.find((x) => x.id === itemId)!; return { id: `pol_${i + 1}_${itemId}`, itemId, packId: (it.packs.find((x) => x.id === it.purchasePackId) ?? it.packs[0])?.id ?? null, factor: (it.packs.find((x) => x.id === it.purchasePackId) ?? it.packs[0])?.factor ?? '1', orderedQuantity: qn(q), orderedUnitCost: m4(cost) }; }),
         expectedDate: ymd(ms + DAY), note, createdAt: iso(ms), createdBy: 'u_manager_1', issuedAt: issuedMs ? iso(issuedMs) : null, issuedBy: issuedMs ? 'u_manager_1' : null,
         closedAt: null, closedBy: null, closeReason: null, cancelledAt: null, cancelReason: null, version: 3, history: [{ at: iso(ms), by: 'u_manager_1', text: 'DRAFT' }, ...(issuedMs ? [{ at: iso(issuedMs), by: 'u_manager_1', text: 'ISSUED' }] : [])],
       };
@@ -356,7 +382,7 @@ export function seedInventory(db: DB, nowMs: number) {
     const kitchenTop: [string, number][] = [['inv_flour', 5], ['inv_sugar', 6], ['inv_oil', 9], ['inv_tahini', 3], ['inv_tomato', 6], ['inv_cucumber', 4], ['inv_lettuce', 8], ['inv_onion', 5], ['inv_lemon', 4], ['inv_orange', 18], ['inv_potato', 10], ['inv_eggplant', 4], ['inv_milk', 6], ['inv_eggs', 30], ['inv_chickpeas', 3], ['inv_cheddar', 1], ['inv_mozzarella', 1.5], ['inv_soda_can', 48], ['inv_garlic', 1]];
     ev(at(6, 9), () => transfer(WH.s, WH.k, at(6, 9), kitchenTop, true));
     ev(at(3, 9, 30), () => transfer(WH.s, WH.k, at(3, 9, 30), [...kitchenTop.slice(0, 13), ['inv_chicken_breast', 8], ['inv_beef_mince', 8], ['inv_beef_cubes', 3]], true));
-    ev(at(1, 9), () => transfer(WH.s, WH.k, at(1, 9), [['inv_beef_mince', 10], ['inv_beef_cubes', 4], ['inv_chicken_breast', 6], ['inv_orange', 12], ['inv_tomato', 6], ['inv_potato', 8]], true));
+    ev(at(1, 9), () => transfer(WH.s, WH.k, at(1, 9), [['inv_beef_mince', 10], ['inv_beef_cubes', 4], ['inv_chicken_breast', 6], ['inv_orange', 12], ['inv_tomato', 6], ['inv_potato', 10]], true));
     ev(at(0, 10), () => transfer(WH.s, WH.k2, at(0, 10), [['inv_tahini', 2], ['inv_oil', 4], ['inv_beef_mince', 3]], false));
     // kitchen production every two days
     for (const d of [7, 5, 3, 1]) {
@@ -448,6 +474,27 @@ export function seedInventory(db: DB, nowMs: number) {
     if (left.gt(0)) {
       const recMs = lastReceipt?.atMs ?? nowMs - DAY;
       inv.lots.push({ id: newId(inv, 'lot'), itemId: it.id, warehouseId: b.warehouseId, lotCode: lastReceipt?.source.number ?? `L-${it.sku}`, expiryDate: ymd(Math.max(recMs + (it.shelfLifeDays ?? 7) * DAY, nowMs + 4 * DAY)), receivedAt: iso(recMs), initialQty: qn(left), remaining: qn(left), unitCost: it.avgCost, sourceRef: lastReceipt?.source.id ?? null });
+    }
+  }
+  // round 3: the first receipt already has its supplier invoice; one store request waits for purchasing
+  const gr1 = inv.receipts.find((r) => r.number === 'GRN-0001');
+  if (gr1) {
+    const invId = newId(inv, 'sinv');
+    const lines = gr1.lines.map((l, i) => ({ id: `sil_${i + 1}`, itemId: l.itemId, receiptLineId: `${gr1.id}:${l.id}`, packId: l.packId, factor: l.factor, packQuantity: l.packQuantity, quantity: l.quantity, receivedPackCost: l.packCost, packCost: l.packCost, value: l.value, priceVariance: m4(0) }));
+    const sub = lines.reduce((a, l) => a.plus(l.value), D(0));
+    const po1 = inv.purchaseOrders.find((p) => p.id === gr1.purchaseOrderId);
+    (inv.invoices ??= []).unshift({ id: invId, number: nextNumber(inv, 'INV'), kind: 'FROM_RECEIPT', supplierId: gr1.supplierId, supplierInvoiceNo: gr1.supplierInvoiceNo, warehouseId: gr1.warehouseId, branchId: 'branch_main', receiptIds: [gr1.id], purchaseOrderId: po1?.id ?? null, storeRequestId: null, lines, subtotal: m4(sub), taxAmount: m4(0), total: m4(sub), priceVariance: m4(0), dueDate: ymd(Date.parse(gr1.at) + 15 * DAY), state: 'POSTED', at: iso(Date.parse(gr1.at) + 3 * 3600_000), businessDate: gr1.businessDate, userId: 'u_manager_1', note: null });
+    gr1.invoiceId = invId;
+  }
+  {
+    const srMs = at(0, 9, 15);
+    const short = inv.items.filter((i) => i.active && i.levels[WH.s] && D(onHand(inv, i.id, WH.s)).lte(i.levels[WH.s].min) && i.id !== 'inv_potato').slice(0, 4);
+    if (short.length) {
+      (inv.storeRequests ??= []).unshift({
+        id: newId(inv, 'sr'), number: nextNumber(inv, 'SR'), warehouseId: WH.s, branchId: 'branch_main', state: 'SUBMITTED', note: 'نواقص المخزن الرئيسي — الصبح', neededBy: ymd(nowMs + DAY),
+        lines: short.map((i, n) => { const lv = i.levels[WH.s]; const have = onHand(inv, i.id, WH.s); const sug = Decimal.max(D(lv.par).minus(have), 0); return { id: `srl_${n + 1}_${i.id}`, itemId: i.id, onHand: have, min: lv.min, target: lv.par, suggestedQuantity: qn(sug), requestedQuantity: qn(sug.gt(0) ? sug : lv.par), note: null }; }),
+        createdAt: iso(srMs), createdBy: 'u_chef_1', submittedAt: iso(srMs), submittedBy: 'u_chef_1', cancelledAt: null, cancelReason: null, purchaseOrderIds: [], version: 1, history: [{ at: iso(srMs), by: 'u_chef_1', text: 'SUBMITTED' }],
+      });
     }
   }
   (db as any).inv = inv;

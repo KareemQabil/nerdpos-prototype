@@ -1,0 +1,27 @@
+// Expert review inside the prototype (research §9, DESIGN P5): the checklist each report is reviewed against, with what
+// the engine does today for each item so the expert signs off a concrete behaviour, not an intention.
+import type { Loc } from '../mock/types';
+
+export interface ChecklistItem { id: string; question: Loc; engine: Loc; roles: ('operations' | 'accountant' | 'auditor')[] }
+const I = (id: string, qAr: string, qEn: string, eAr: string, eEn: string, roles: ChecklistItem['roles']): ChecklistItem => ({ id, question: { ar: qAr, en: qEn }, engine: { ar: eAr, en: eEn }, roles });
+
+export const CHECKLIST: Record<string, ChecklistItem> = Object.fromEntries([
+  I('definition', 'التعريف واضح ومكتوب بكلام المطعم؟', 'Is the definition clear, in restaurant words?', 'كل رقم ليه تعريف ومعادلة ونسخة في «التعريفات» تحت التقرير.', 'Every number has a definition, formula and version under «Definitions».', ['operations', 'accountant', 'auditor']),
+  I('example', 'المثال المحسوب بالإيد بيطلع نفس الرقم؟', 'Does a hand-worked example give the same number?', 'دوس على أي رقم: بيفتح الشيكات والسطور اللي وراه ومجموعها بيطلع نفس الرقم (✓ الإثبات).', 'Click any number: the checks and lines behind it add up to it (✓ proof).', ['accountant']),
+  I('refund_cross_day', 'مرتجع النهارده على شيك امبارح: بيظهر فين؟', 'Refund today of yesterday\'s check: where does it show?', 'بيتحسب يوم الصرف (النهارده) وبيقلل صافي النهارده؛ امبارح ما بيتغيرش ولو مقفول بيفضل زي ما هو (S3).', 'Counted on the payout day; yesterday is never restated (S3 if closed).', ['accountant', 'auditor']),
+  I('split', 'شيك اتقسم على 3: الأوردرات والضيوف اتكرروا؟', 'Split into 3 checks: did orders or guests multiply?', 'الشيكات 3 بس الأوردر واحد والضيوف بيتعدوا مرة للقعدة. 100 على 3 = 33.33 + 33.33 + 33.34.', '3 checks, 1 order, guests once per visit. 100/3 = 33.33+33.33+33.34.', ['operations', 'accountant']),
+  I('comps', 'الضيافة بتدخل المبيعات أو الخصومات؟', 'Are comps in sales or discounts?', 'لأ: الضيافة رقم لوحده بسعر المنيو، برة المبيعات والخصومات.', 'No: comps are their own number at menu price.', ['accountant', 'auditor']),
+  I('staff_meals', 'وجبات الموظفين ظاهرة لوحدها ومش مبيعات؟', 'Are staff meals separate and never sales?', 'أوردرات سعرها صفر، بالموظف واللي وافق، بقيمتها وتكلفتها — مش مبيعات ولا خصم.', 'Zero-price orders with employee and approver, value and cost — never sales or discounts.', ['operations', 'accountant']),
+  I('delivery_fees', 'رسوم التوصيل وعمولة التطبيقات؟', 'Delivery fees and aggregator commission?', 'العمولة وصافي التوصيل «مش متاح» (مفيش عقود ولا كشوف تسوية) — عمرها ما بتطلع صفر.', 'Commission and fee net are NOT AVAILABLE (no contracts/statements) — never 0.', ['accountant']),
+  I('tax_inclusive', 'لو الأسعار شاملة الضريبة الصافي بيتحسب صح؟', 'With tax-inclusive prices, is net correct?', 'الضريبة اللي جوه السعر بتتشال من الصافي وبتظهر سطر لوحدها في الجسر.', 'VAT inside prices is extracted from net and shown on its own bridge line.', ['accountant']),
+  I('void_after_kitchen', 'إلغاء صنف بعد ما راح المطبخ متسجل بمين وافق ومصيره؟', 'Is a void after kitchen recorded with approver and disposition?', 'كل إلغاء بمرحلته (S0–S3)، مين عمل ومين وافق، والسبب، ومصير الصنف؛ الهالك المحجوز بيدخل طابور مراجعة المحاسب.', 'Every removal with stage S0–S3, actor, approver, reason and disposition; waste held enters the review queue.', ['operations', 'auditor']),
+  I('business_date', 'شيك الساعة 2 الفجر تبع أنهي يوم؟', 'A check at 02:00 belongs to which day?', 'لليوم التجاري اللي قبله (اليوم بيبدأ 4 الفجر بتوقيت القاهرة).', 'The previous business date (day starts 04:00 Cairo).', ['operations', 'accountant']),
+  I('provisional', 'واضح إن الرقم مبدئي لو اليوم مفتوح؟', 'Is it clear the number is provisional while the day is open?', 'رأس التقرير بيقول «مبدئي» وليه (يوم مفتوح، وردية مفتوحة، asOf)، و«نهائي» بس بعد قفل اليوم.', 'Header says provisional and why; final only after day close.', ['accountant', 'auditor']),
+  I('not_available', 'الرقم اللي مصدره مش موجود بيطلع صفر؟', 'Does a number without a source show 0?', 'لأ: بيطلع «مش متاح» ومعاه السبب.', 'No: NOT AVAILABLE with the reason.', ['auditor']),
+  I('reconciliation', 'الفرق بين المبيعات والتحصيل متشرح؟', 'Is the sales-vs-collection gap explained?', 'جسر نهاية اليوم: كل فرق متشرح بحركات (تقريب، دفع في يوم تاني، شيكات مفتوحة) وأي باقي بيتعلم «مش متشرح».', 'EOD bridge: every difference explained by events; any residual flagged.', ['accountant', 'auditor']),
+  I('permissions', 'الكاشير بيشوف فروع أو أرقام مش بتاعته؟', 'Can a cashier see other branches or restricted numbers?', 'الفروع حسب صلاحيات المستخدم، وأرقام الموظفين والعجز للمدير بس — والطلب بيترفض من السيرفر.', 'Branch scope from grants; staff and variance numbers for managers only — refused server-side.', ['auditor']),
+  I('export_parity', 'الملف (CSV/إكسل) نفس أرقام الشاشة؟', 'Do CSV/Excel equal the screen?', 'التصدير بيقرا من نفس النتيجة ومكتوب فيه الفترة وasOf ونسخة التعريفات.', 'Export reads the same result, with period, asOf and definition versions.', ['accountant']),
+  I('rounding', 'تقريب الفكة بيبان للمحاسب بالقرش؟', 'Is cash rounding visible to the piaster?', 'تقرير التقريب: كل دفعة اتقربت، سبنا كام للزبون وأخدنا كام، والحسابات نفسها بالقرش.', 'Rounding report: each rounded payment, left vs taken; books stay exact.', ['accountant']),
+].map((x) => [x.id, x]));
+
+export const DEFAULT_CHECKLIST = ['definition', 'example', 'business_date', 'provisional', 'not_available', 'permissions', 'export_parity'];

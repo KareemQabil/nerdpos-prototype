@@ -90,7 +90,7 @@ export default function Promotions() {
         <Switch checked={pr.active} onChange={(v) => toggle(pr, v)} />,
         <Button size="sm" data-fb={`promotion:edit:${pr.id}`} onClick={() => setForm(toDraft(pr))}><Pencil className="w-3.5 h-3.5" />{t('تعديل')}</Button>,
       ])} empty={t('مفيش عروض')} />
-      <div className="text-[11px] text-dim">{t('"شغال دلوقتي" حسب ساعة السيستم وتوقيت الفرع — حرّك الساعة من فوق عشان تجرب الهابي أور.')}</div>
+      <div className="text-[11px] text-dim">{t('"شغال دلوقتي" حسب وقت السيرفر وتوقيت الفرع (الوقت مش قابل للتعديل) — الهابي أور بيشتغل لوحده في ميعاده.')}</div>
       <Modal open={!!form} onClose={() => setForm(null)} xwide title={form?.id ? t('تعديل العرض') : t('عرض جديد')} badge={<StateBadge ops={['Promotion.Upsert']} />}
         footer={<><Button onClick={() => setForm(null)}>{t('إلغاء')}</Button><Button data-fb="promotion-form:save" variant="primary" loading={busy} onClick={save} disabled={!form?.name.ar.trim() || !form?.channels.length}><Save className="w-4 h-4" />{t('حفظ')}</Button></>}>
         {form && <PromoForm d={form} set={setForm} branches={branches.items} products={products.items} categories={categories.items} />}

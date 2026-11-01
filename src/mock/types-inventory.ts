@@ -16,7 +16,13 @@ export interface Warehouse {
 }
 
 /** A purchase/count pack of an item, e.g. "شيكارة 25 كجم" = 25 stock units. */
-export interface InvPack { id: string; name: Loc; factor: string }
+export interface InvPack {
+  id: string; name: Loc; factor: string;
+  /** round 3 (proposed): each pack is its own card — barcode and the latest price per supplier (for "best pack / best supplier"). */
+  barcode?: string | null; offers?: PackOffer[];
+}
+/** A supplier's price for one pack (from a receipt, an invoice, or typed from a price list). */
+export interface PackOffer { supplierId: string; packPrice: Money; at: string; source: 'RECEIPT' | 'INVOICE' | 'PRICE_LIST'; ref: string | null }
 
 export interface InvLevel { min: string; par: string }
 
@@ -102,12 +108,18 @@ export interface Supplier {
 }
 
 export type PurchaseOrderState = 'DRAFT' | 'ISSUED' | 'PARTIALLY_RECEIVED' | 'RECEIVED' | 'CLOSED' | 'CANCELLED';
-export interface PurchaseOrderLine { id: string; itemId: string; packId: string | null; factor: string; orderedQuantity: string; orderedUnitCost: Money }
+export interface PurchaseOrderLine {
+  id: string; itemId: string; packId: string | null; factor: string; orderedQuantity: string; orderedUnitCost: Money;
+  /** round 3: link to the store request line and what the store keeper asked for (stock units) */
+  requestLineId?: string | null; requestedQuantity?: string | null;
+}
 export interface PurchaseOrder {
   id: string; number: string; supplierId: string; warehouseId: string; branchId: string; state: PurchaseOrderState; lines: PurchaseOrderLine[];
   expectedDate: string | null; note: string | null; createdAt: string; createdBy: string; issuedAt: string | null; issuedBy: string | null;
   closedAt: string | null; closedBy: string | null; closeReason: string | null; cancelledAt: string | null; cancelReason: string | null; version: number;
   history: { at: string; by: string; text: string }[];
+  /** round 3: the store request this order came from */
+  storeRequestId?: string | null;
 }
 
 export interface GoodsReceiptLine {
@@ -118,6 +130,31 @@ export interface GoodsReceipt {
   id: string; number: string; supplierId: string; purchaseOrderId: string | null; warehouseId: string; state: 'POSTED' | 'REVERSED';
   supplierInvoiceNo: string | null; lines: GoodsReceiptLine[]; total: Money; at: string; businessDate: string; userId: string | null; note: string | null;
   reversal: { at: string; by: string; reason: string; approvalGrantId: string | null; movementIds: string[] } | null; movementIds: string[];
+  /** round 3: the supplier invoice raised from this receipt (or the direct invoice that created it) */
+  invoiceId?: string | null;
+}
+
+// ───────── round 3 (proposed): purchasing as four linked documents
+/** طلبية مخزن — the store keeper's list of what is short (suggested = target − on hand, editable). */
+export type StoreRequestState = 'DRAFT' | 'SUBMITTED' | 'ORDERED' | 'CANCELLED';
+export interface StoreRequestLine {
+  id: string; itemId: string; onHand: string; min: string | null; target: string | null; suggestedQuantity: string; requestedQuantity: string; note: string | null;
+}
+export interface StoreRequest {
+  id: string; number: string; warehouseId: string; branchId: string; state: StoreRequestState; lines: StoreRequestLine[]; note: string | null; neededBy: string | null;
+  createdAt: string; createdBy: string; submittedAt: string | null; submittedBy: string | null; cancelledAt: string | null; cancelReason: string | null;
+  purchaseOrderIds: string[]; version: number; history: { at: string; by: string; text: string }[];
+}
+/** فاتورة المورد — generated from what was actually received, or one direct document that receives and costs. */
+export interface SupplierInvoiceLine {
+  id: string; itemId: string; receiptLineId: string | null; packId: string | null; factor: string; packQuantity: string; quantity: string;
+  receivedPackCost: Money | null; packCost: Money; value: Money; priceVariance: Money;
+}
+export interface SupplierInvoice {
+  id: string; number: string; kind: 'FROM_RECEIPT' | 'DIRECT'; supplierId: string; supplierInvoiceNo: string | null; warehouseId: string; branchId: string;
+  receiptIds: string[]; purchaseOrderId: string | null; storeRequestId: string | null; lines: SupplierInvoiceLine[];
+  subtotal: Money; taxAmount: Money; total: Money; priceVariance: Money; dueDate: string | null; state: 'POSTED' | 'PAID';
+  at: string; businessDate: string; userId: string | null; note: string | null;
 }
 
 export interface SupplierReturn {
@@ -152,6 +189,9 @@ export interface InventoryState {
   supplierReturns: SupplierReturn[];
   customerReturns: CustomerReturn[];
   orderEffects: Record<string, OrderEffect>;
+  /** round 3 (proposed) — optional, always read with a default */
+  storeRequests?: StoreRequest[];
+  invoices?: SupplierInvoice[];
   seq: number;
   numbers: Record<string, number>;
 }

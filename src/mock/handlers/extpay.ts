@@ -22,7 +22,8 @@ export function authorizationForCapture(ctx: Ctx, o: Order, tender: any): Paymen
   const a = auths(ctx.db).find((x) => x.id === tender.authorizationId);
   if (!a) throw new ApiError('PAYMENT_AUTHORIZATION_NOT_FOUND', { authorizationId: tender.authorizationId });
   const amount = D(tender.amount ?? a.amount);
-  if (a.state !== 'APPROVED' || a.orderId !== o.id || a.method !== tender.method || amount.gt(D(a.amount))) {
+  // round 3: a payment-link / remote authorization is captured as PREPAID (internal code ONLINE) — paid before arrival
+  if (a.state !== 'APPROVED' || a.orderId !== o.id || (a.method !== tender.method && tender.method !== 'ONLINE') || amount.gt(D(a.amount))) {
     throw new ApiError('PAYMENT_AUTHORIZATION_INVALID', { authorizationId: a.id, state: a.state, orderMatches: a.orderId === o.id, method: a.method, authorized: a.amount });
   }
   return a;

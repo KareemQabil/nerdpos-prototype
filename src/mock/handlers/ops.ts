@@ -305,7 +305,8 @@ function capabilityView(ctx: Ctx) {
 
 export const opsHandlers: Record<string, Handler> = {
   // ───── capabilities
-  'Capability.List': (ctx) => ({ items: capabilityView(ctx), branchId: ctx.branchId }),
+  // licensed modules are managed by the vendor only (r3C): others get just which parts are present, for hiding screens
+  'Capability.List': (ctx) => (ctx.can('vendor:capabilities') ? { items: capabilityView(ctx), branchId: ctx.branchId, manage: true } : { items: capabilityView(ctx).map((c) => ({ id: c.id, enabled: c.enabled, state: c.state })), branchId: ctx.branchId, manage: false }),
   'Profile.SetCapability': (ctx) => {
     const c = CAPABILITIES.find((x) => x.id === ctx.params.capability);
     need(c, 'VALIDATION_FAILED', { field: 'capability', rule: CAPABILITIES.map((x) => x.id).join('|') });

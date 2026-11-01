@@ -2,6 +2,7 @@
 // Sources: rules/policies.json (canonical), CORE §3 registry (new CORE policies),
 // rules/EG.profile.json (Egyptian values + expert questions, incl. "pending"), 03_DIRECTION.md §2 (direction, مقترح).
 import { egProfile, policyDefs } from './contracts';
+import { R3B_POLICIES } from './policies-r3b';
 
 export type PolicyState = 'CANONICAL' | 'CORE' | 'PENDING' | 'DIRECTION';
 export type Field =
@@ -183,6 +184,8 @@ POLICIES.push(
   { id: 'MenuPriceDisplayPolicy', group: 'direction', title: 'عرض الأسعار على الكاشير', titleEn: 'Menu price display', description: 'الأسعار على شاشة البيع تظهر زي ما هي (والضريبة تتضاف في الشيك)، ولا شاملة الضريبة. السيرفر هو اللي بيحسب الرقم المعروض.', state: 'DIRECTION', scopes: ['TENANT', 'BRANCH'], appliesTo: 'NEW_ACTIONS', editor: { kind: 'object', fields: [{ key: 'DINE_IN', label: 'صالة', kind: 'enum', options: ['AS_PRICED', 'WITH_TAX'] }, { key: 'TAKEAWAY', label: 'تيك أواي', kind: 'enum', options: ['AS_PRICED', 'WITH_TAX'] }, { key: 'DELIVERY', label: 'دليفري', kind: 'enum', options: ['AS_PRICED', 'WITH_TAX'] }] }, canonicalDefault: { DINE_IN: 'AS_PRICED', TAKEAWAY: 'AS_PRICED', DELIVERY: 'AS_PRICED' }, question: 'الزبون بيشوف الأسعار شاملة الضريبة ولا الضريبة بتتضاف في الآخر؟', reacts: 'سعر المربعات وسعر السطر في شاشة البيع' },
   { id: 'SoldOutResetPolicy', group: 'direction', title: 'رجوع الأصناف اللي خلصت', titleEn: 'Sold-out reset', description: 'الأصناف والإضافات اللي اتعلّمت "خلص النهارده" ترجع لوحدها أول اليوم التجاري الجاي، ولا تفضل لحد ما حد يرجّعها.', state: 'DIRECTION', scopes: ['TENANT'], appliesTo: 'NEW_ACTIONS', editor: { kind: 'enum', options: ['NEXT_BUSINESS_DAY', 'MANUAL'] }, canonicalDefault: 'NEXT_BUSINESS_DAY', reacts: 'لوحة "خلص النهارده" والمربعات على الكاشير' },
 );
+
+POLICIES.push(...R3B_POLICIES); // r3B (round 3): tender reference, short display number, second language
 
 export const policyMeta = new Map(POLICIES.map((p) => [p.id, p]));
 

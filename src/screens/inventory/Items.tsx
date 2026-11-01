@@ -1,7 +1,7 @@
 // Stock items: every ingredient, preparation and resale item with its balance per warehouse, value, level state
 // and nearest expiry. Opening one shows its drawer (units & packs, levels, lots, cost history, recipes, movements).
 import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, Package, Coins, TrendingDown, PackageX } from 'lucide-react';
+import { Plus, Package, Coins, TrendingDown, PackageX, ScanSearch } from 'lucide-react';
 import { useDev } from '../../app/hooks';
 import { Button, Card, EmptyState, Money, PageHeader, Pill, SearchInput, Select, StatCard, StatGrid, StateBadge, Switch, Table, Toolbar } from '../../ui';
 import { Tech } from '../../app/tech';
@@ -13,7 +13,7 @@ const OPS = ['InventoryItem.Find', 'InventoryItem.Get', 'InventoryItem.Configure
 const KIND_LABEL: Record<string, string> = { RAW: 'خامة', PREP: 'تجهيزة', RESALE: 'بيتباع زي ما هو' };
 
 export default function InventoryItems() {
-  const { params } = useDev();
+  const { params, nav } = useDev();
   const scope = useBranchScope();
   const [text, setText] = useState('');
   const [cat, setCat] = useState('');
@@ -55,9 +55,9 @@ export default function InventoryItems() {
           <span className="text-xs text-dim">{t('{n} صنف', { n: shown.length })} · {t('القيمة')} <Money v={totalValue.toFixed(4)} /></span>
         </Toolbar>
         <Table loading={loading} dense maxHeight={640} onRowClick={(i) => setOpen(shown[i].id)}
-          align={['start', 'start', ...whs.map(() => 'end' as const), 'end', 'start', 'start', 'end']}
+          align={['start', 'start', ...whs.map(() => 'end' as const), 'end', 'start', 'start', 'end', 'end']}
           empty={<EmptyState compact icon={<Package />} title={q.items.length ? t('مفيش أصناف بالفلتر ده') : t('لسه مفيش أصناف في المخزن')} text={q.items.length ? t('غيّر البحث أو الفلتر.') : t('ضيف أول خامة من «صنف جديد».')} action={!q.items.length ? <Button variant="primary" onClick={() => setCreating(true)}>{t('صنف جديد')}</Button> : undefined} />}
-          head={[t('الصنف'), t('المجموعة'), ...whs.map((w) => <span key={w.id}>{tv(w.name)}{w.salesDefault ? ' ★' : ''}</span>), t('القيمة'), t('الحالة'), t('أقرب صلاحية'), t('في وصفات')]} rows={shown.map((i) => [
+          head={[t('الصنف'), t('المجموعة'), ...whs.map((w) => <span key={w.id}>{tv(w.name)}{w.salesDefault ? ' ★' : ''}</span>), t('القيمة'), t('الحالة'), t('أقرب صلاحية'), t('في وصفات'), '']} rows={shown.map((i) => [
           <div data-fb={`items:open:${i.id}`} className="text-start min-w-[150px]">
             <div className="font-bold flex items-center gap-1.5">{L(i.name)}{!i.active && <Pill tone="neutral">{t('موقوف')}</Pill>}</div>
             <div className="text-[11px] text-dim flex gap-1.5 items-center"><Tech><span className="num">{i.sku}</span></Tech>{i.kind !== 'RAW' && <Pill tone={i.kind === 'PREP' ? 'violet' : 'info'}>{t(KIND_LABEL[i.kind])}</Pill>}{i.packs?.length ? <span>{L(i.packs.find((p: any) => p.id === i.purchasePackId)?.name ?? i.packs[0].name)}</span> : null}</div>
@@ -68,6 +68,7 @@ export default function InventoryItems() {
           <LevelPill state={i.state} />,
           i.nextExpiry ? <span className="num text-xs">{i.nextExpiry}</span> : <span className="text-dim text-xs">—</span>,
           i.usedInRecipes ? <span className="num text-xs">{i.usedInRecipes}</span> : <span className="text-dim text-xs">—</span>,
+          <Button size="sm" variant="ghost" data-fb={`items:360:${i.id}`} title={t('صفحة الصنف كاملة')} onClick={(e) => { e.stopPropagation(); nav('item360', { kind: 'item', id: i.id }); }}><ScanSearch className="w-3.5 h-3.5" />{t('الرحلة')}</Button>,
         ])} />
       </Card>
       <ItemDrawer itemId={open} onClose={() => setOpen(null)} />

@@ -1,6 +1,7 @@
 // Shared display helpers for the output screens (G1–G4, H1): state pills and Arabic labels for codes.
 // Display only: no money is computed here.
 import React from 'react';
+import { tenderLabel } from '../../../demo/tenderText';
 import { Pill } from '../../../ui';
 import { Tech } from '../../../app/tech';
 import { t } from '../../../i18n';
@@ -46,9 +47,7 @@ export function issueLabel(code: string): string {
 
 // ───────── tenders and channels
 export function methodLabel(m: string): string {
-  const [base, provider] = String(m).split(':');
-  const b = ({ CASH: t('كاش'), CARD: t('كارت'), WALLET: t('محفظة'), INSTAPAY: t('إنستاباي'), DEPOSIT: t('عربون') } as Record<string, string>)[base] ?? base;
-  return provider ? `${b} (${provider})` : b;
+  return tenderLabel(m); // round 3 tender taxonomy (src/demo/tenderText.ts)
 }
 export function channelLabel(c: string): string {
   return ({ DINE_IN: t('صالة'), TAKEAWAY: t('تيك أواي'), DELIVERY: t('دليفري'), PICKUP: t('استلام') } as Record<string, string>)[c] ?? c;

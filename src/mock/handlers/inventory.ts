@@ -16,6 +16,8 @@ import {
   invOf, qn, newId, nextNumber, toStockQty, checkPrecision, isQty, getItem, getWarehouse, balanceOf, onHand, totalOnHand, salesWarehouse, post,
   activeVersion, menuRecipeOf, versionNeeds, explodeProduct, itemUnitCost, versionCost, netPrice, foodCostBand, nameOf, unitCode, type Actor,
 } from './inventory-engine';
+import { procureHandlers, recordReceiptOffers } from './inventory-procure';
+import { item360Handlers } from './inventory-360';
 
 export const WASTE_REASONS: WasteReason[] = ['BURNT', 'EXPIRED', 'DROPPED', 'SPOILED', 'PREP_ERROR', 'OVER_PRODUCTION', 'OTHER'];
 export const ADJUST_REASONS: AdjustmentReason[] = ['FOUND', 'LOST', 'DAMAGED', 'CORRECTION', 'OPENING', 'STAFF_USE', 'TASTING', 'OTHER'];
@@ -288,6 +290,8 @@ export function inventoryOnOrderChange(ctx: Ctx, order: Order) {
 
 // ───────── handlers
 export const inventoryHandlers: Record<string, Handler> = {
+  ...procureHandlers, // round 3: store requests, supplier invoices, document chain, pack advice
+  ...item360Handlers, // round 3: item 360 page, global search and the follow list status
   // Warehouses
   'Warehouse.List': (ctx) => {
     const inv = invOf(ctx.db);
@@ -1147,6 +1151,7 @@ export const inventoryHandlers: Record<string, Handler> = {
       gr.movementIds.push(post(db, actor(ctx, grantId), { itemId: l.itemId, warehouseId: w.id, kind: 'RECEIPT', quantity: l.quantity, unitCost: l.unitCost, updateAvg: true, source: src(ctx, 'receiving', gr.id, gr.number, { label: s.name }), lot: lotCode ? { lotCode, expiryDate: l.expiryDate } : null }).id);
     }
     inv.receipts.unshift(gr);
+    recordReceiptOffers(db, gr); // round 3: each pack card remembers the supplier's latest price
     if (po) { refreshPoState(db, po); po.version++; po.history.unshift({ at: ctx.nowIso, by: ctx.user!.id, text: `received ${gr.number} → ${po.state}` }); }
     ctx.audit(`goods receipt ${gr.number} from ${s.name} total ${gr.total}`, gr.id, false, grantId ?? undefined);
     return { status: 201, body: receiptView(db, gr) };
@@ -1396,3 +1401,5 @@ function productionView(db: DB, p: any) {
   return { ...p, output: (() => { const it = invOf(db).items.find((i) => i.id === p.outputItemId); return it ? itemBrief(db, it) : null; })(), warehouse: whBrief(db, p.warehouseId), inputs: p.inputs.map((i: any) => ({ ...i, name: nameOf(db, i.itemId), unit: (() => { const it = invOf(db).items.find((x) => x.id === i.itemId); return it ? unitCode(db, it.stockUnitId) : ''; })() })), userName: p.userId ? userName(db, p.userId) : null };
 }
 export { INFLOW, menuRecipeOf };
+// round 3: shared views for the purchasing documents, item 360 and global search (inventory-procure.ts, inventory-360.ts)
+export { itemBrief, whBrief, poView, receiptView, branchScope, warehousesIn, poReceived, refreshPoState, levelState, movementView, supplierView, recipeView };

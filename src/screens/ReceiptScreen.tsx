@@ -1,5 +1,7 @@
-// G1 Receipt preview: the ReceiptView (persisted snapshots only) rendered as an 80 mm Arabic thermal receipt.
-// The browser formats server money; it never computes a total, tax or change.
+// G1 Receipt preview: the ReceiptView (persisted snapshots only) rendered as an 80 mm Arabic thermal receipt or an A4
+// invoice page. The browser formats server money; it never computes a total, tax or change.
+// Round 3: the venue template (logo, header/footer lines, paper — src/ui/doc), the short call-out number printed big
+// next to the immutable transaction number (always printed), and second-language names only where the item has one.
 import React, { useEffect, useState } from 'react';
 import { ArrowRight, Copy, Printer, FileText } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -10,6 +12,8 @@ import { t, L } from '../i18n';
 import { money, qty, dateTime, cn } from '../lib/format';
 import { ReprintDialog, ReprintRuleNote } from './admin/output/ReprintDialog';
 import { methodLabel, channelLabel, fiscalStateLabel } from './admin/output/labels';
+import { DocHeader, DocFooter, ReceiptPaper, A4Page, SecondName, ShortNumber } from '../ui/doc';
+import { SegmentedControl } from '../ui';
 
 /** Server issue text without codes in brackets or tax-type codes (shown with technical details on). */
 const plainDetail = (x: string) => String(x ?? '').replace(/\s*\([A-Za-z0-9_.\-:=, ]+\)/g, '').replace(/\bT\d+(\s*أو\s*T\d+)?/g, t('نوع الضريبة')).replace(/\s{2,}/g, ' ');
@@ -33,6 +37,7 @@ export default function ReceiptScreen() {
   const [copy, setCopy] = useState<boolean>(!!params.copy);
   useEffect(() => { setCopy(!!params.copy); }, [params.copy, orderId]);
   const [reprintOpen, setReprintOpen] = useState(false);
+  const [layout, setLayout] = useState<'80' | 'A4'>('80');
   const q = useQuery<any>(orderId ? 'Receipt.Get' : null, { params: { orderId } });
   const { run, busy } = useCommand();
   const r = q.data;
@@ -55,6 +60,7 @@ export default function ReceiptScreen() {
         sub={t('الإيصال زي ما اتطبع بالظبط. النسخة بيتكتب عليها «نسخة» ومش بتعمل إيصال جديد.')}
         actions={<>
           <Button size="sm" variant="ghost" onClick={() => nav('checks')} data-fb="receipt:back"><ArrowRight className="w-4 h-4 ltr:rotate-180" />{t('رجوع للشيكات')}</Button>
+          <SegmentedControl size="sm" value={layout} onChange={setLayout} options={[{ id: '80', label: t('إيصال 80 مم'), fb: 'receipt:layout:80' }, { id: 'A4', label: t('صفحة A4'), fb: 'receipt:layout:A4' }]} />
           {!isPrebill && <Switch checked={copy} onChange={setCopy} label={t('اعرض كنسخة')} />}
           {completed && !isPrebill && can('print:reprint') && <Button size="sm" variant="primary" onClick={() => setReprintOpen(true)} disabled={!terminal} title={terminal ? '' : t('الطباعة محتاجة جهاز')} data-fb="receipt:reprint"><Copy className="w-4 h-4" />{t('اطبع نسخة')}</Button>}
           {isPrebill && r && (r.status === 'DRAFT' || r.status === 'CONFIRMED') && terminal && <Button size="sm" variant="outline" loading={busy} onClick={() => run('Print.PreBill', { params: { orderId }, body: { terminalId: terminal.id } }, { success: t('الشيك المبدئي اتبعت للطابعة — الشيك ما اتغيرش') })} data-fb="receipt:prebill-print"><Printer className="w-4 h-4" />{t('اطبع شيك مبدئي')} <StateBadge state="PROPOSED" /></Button>}
@@ -64,26 +70,27 @@ export default function ReceiptScreen() {
       {q.error && <Banner tone="error">{errorText(q.error)}</Banner>}
       {r && (
         <div className="flex flex-wrap gap-6 items-start">
-          <div className="paper relative overflow-hidden rounded-md shadow-2xl px-4 py-5 text-[12px] leading-relaxed" style={{ width: '80mm', direction: 'rtl' }} data-fb="receipt:paper">
+          {layout === 'A4' ? <A4Receipt r={r} isPrebill={isPrebill} copy={copy && !isPrebill} /> : (
+          <ReceiptPaper paper={r.template?.paper ?? '80MM'}>
             {copy && !isPrebill && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center" aria-hidden>
                 <span className="font-black text-black/15 select-none" style={{ fontSize: 110, transform: 'rotate(-35deg)' }}>{t('نسخة')}</span>
               </div>
             )}
-            <div className="text-center space-y-0.5">
-              <div className="text-base font-bold">{r.business.nameAr || r.business.name}</div>
-              {r.business.legalName && <div className="text-[11px]">{r.business.legalName}</div>}
-              <div className="text-[11px]">{L(r.branch.name)}<Tech> <span className="num">({r.branch.code})</span></Tech></div>
-              {r.business.address && <div className="text-[11px]">{r.business.address}</div>}
-              {r.business.taxNumber && <div className="text-[11px]">{t('رقم التسجيل الضريبي')}: <span className="num">{r.business.taxNumber}</span></div>}
-            </div>
+            <DocHeader template={r.template} title={r.business.nameAr || r.business.name} sub={r.business.legalName}
+              extra={<>
+                <div className="text-[11px]">{L(r.branch.name)}<Tech> <span className="num">({r.branch.code})</span></Tech></div>
+                {r.business.address && <div className="text-[11px]">{r.business.address}</div>}
+                {r.business.taxNumber && <div className="text-[11px]">{t('رقم التسجيل الضريبي')}: <span className="num">{r.business.taxNumber}</span></div>}
+              </>} />
             <Rule />
             <div className="text-center font-bold text-[13px]">
               {isPrebill ? <><div>{t('ليست فاتورة ضريبية')}</div><div className="num text-[11px]">Not a tax receipt</div></> : t('إيصال بيع')}
               {copy && !isPrebill && <div className="text-[13px] border border-black inline-block px-2 mt-1">{t('نسخة')} / COPY</div>}
             </div>
             <Rule />
-            <Row k={t('رقم الشيك')} v={<>{r.number}{r.checkNo > 1 ? ` / ${r.checkNo}` : ''}</>} />
+            <ShortNumber value={r.shortNo} />
+            <Row k={t('رقم العملية')} v={<span data-fb="receipt:transaction-id">{r.transactionId ?? r.number}{r.checkNo > 1 ? ` / ${r.checkNo}` : ''}</span>} />
             {r.table && <Row k={t('الطاولة')} v={r.table} text />}
             <Row k={t('القناة')} v={channelLabel(r.channel)} text />
             {r.server && <Row k={t('الويتر')} v={r.server} text />}
@@ -95,7 +102,7 @@ export default function ReceiptScreen() {
               {r.lines.map((l: any) => (
                 <div key={l.id} className={cn(l.voided && 'opacity-60')}>
                   <div className="flex justify-between gap-2">
-                    <span className={cn(l.voided && 'line-through')}><span className="num">{qty(l.quantity)}×</span> {L(l.name)}{l.variant ? ` (${L(l.variant)})` : ''}</span>
+                    <span className={cn(l.voided && 'line-through')}><span className="num">{qty(l.quantity)}×</span> {L(l.name)}{l.variant ? ` (${L(l.variant)})` : ''}<SecondName text={l.name2} className="ps-5" /></span>
                     <span className={cn('num whitespace-nowrap', l.voided && 'line-through')}>{money(l.lineTotal, false)}</span>
                   </div>
                   {l.voided && <div className="text-[11px] font-bold">— {t('ملغي')}</div>}
@@ -126,7 +133,7 @@ export default function ReceiptScreen() {
                     <Row k={methodLabel(p.method + (p.walletProvider ? ':' + p.walletProvider : ''))} v={money(p.amount, false)} />
                     {p.tendered && <Row k={<span className="ps-3 text-[11px]">{t('المدفوع')}</span>} v={money(p.tendered, false)} />}
                     {p.change && nz(p.change) && <Row k={<span className="ps-3 text-[11px]">{t('الباقي للعميل')}</span>} v={money(p.change, false)} />}
-                    {p.reference && <Row k={<span className="ps-3 text-[11px]">{t('مرجع الكارت')}</span>} v={p.reference} />}
+                    {p.reference && <Row k={<span className="ps-3 text-[11px]">{t('رقم العملية')}</span>} v={p.reference} />}
                     {p.tip && nz(p.tip) && <Row k={<span className="ps-3 text-[11px]">{t('بقشيش')}</span>} v={money(p.tip, false)} />}
                   </div>
                 ))}
@@ -152,8 +159,9 @@ export default function ReceiptScreen() {
               </>
             )}
             <Rule />
-            <div className="text-center text-[11px]">{t('شكرًا لزيارتكم')}</div>
-          </div>
+            {r.template?.footerLines?.length ? <DocFooter lines={r.template.footerLines} /> : <div className="text-center text-[11px]">{t('شكرًا لزيارتكم')}</div>}
+          </ReceiptPaper>
+          )}
 
           <div className="flex-1 min-w-[260px] space-y-3">
             <Banner tone="info">{t('ترتيب الإيصال: الأصناف، بعدها الخصم، بعدها الخدمة، بعدها الضريبة، وفي الآخر الإجمالي.')}</Banner>
@@ -172,5 +180,44 @@ export default function ReceiptScreen() {
 
       {reprintOpen && r && <ReprintDialog job={{ documentType: 'RECEIPT', documentId: r.orderId, label: `${t('إيصال')} ${r.number}` }} terminalId={terminal?.id ?? null} onClose={() => setReprintOpen(false)} onDone={() => setCopy(true)} />}
     </div>
+  );
+}
+
+/** The same receipt on an A4 page (invoice layout) with the venue template — the reports agent reuses A4Page. */
+function A4Receipt({ r, isPrebill, copy }: { r: any; isPrebill: boolean; copy: boolean }) {
+  const tt = r.totals;
+  return (
+    <A4Page template={r.template ? { ...r.template, logoOnReports: true } : null} venueName={r.business.nameAr || r.business.name} branchName={L(r.branch.name)}
+      title={isPrebill ? t('شيك مبدئي — ليست فاتورة ضريبية') : copy ? `${t('إيصال بيع')} — ${t('نسخة')}` : t('إيصال بيع')}
+      meta={<>
+        {r.shortNo && <div className="text-base font-black" data-fb="a4:short-no">{t('رقم النداء')}: <span className="num">{r.shortNo}</span></div>}
+        <div>{t('رقم العملية')}: <span className="num">{r.transactionId ?? r.number}</span></div>
+        {r.completedAt && <div>{t('التاريخ')}: {dateTime(r.completedAt)}</div>}
+        <div>{t('اليوم التجاري')}: <span className="num">{r.businessDate}</span></div>
+        {r.business.taxNumber && <div>{t('رقم التسجيل الضريبي')}: <span className="num">{r.business.taxNumber}</span></div>}
+      </>}
+      footerNote={t('اتطبع من النظام — القالب بيتظبط من «قوالب الإيصال والتقارير».')}>
+      <table className="w-full border-collapse text-[13px]">
+        <thead><tr className="border-b-2 border-black/70 text-start"><th className="text-start py-1.5">{t('الصنف')}</th><th className="py-1.5">{t('الكمية')}</th><th className="py-1.5 text-end">{t('سعر الوحدة')}</th><th className="py-1.5 text-end">{t('الإجمالي')}</th></tr></thead>
+        <tbody>
+          {r.lines.map((l: any) => (
+            <tr key={l.id} className={cn('border-b border-black/15 align-top', l.voided && 'opacity-60 line-through')}>
+              <td className="py-1.5">{L(l.name)}{l.variant ? ` (${L(l.variant)})` : ''}<SecondName text={l.name2} />{(l.modifiers ?? []).length > 0 && <div className="text-[11px]">+ {l.modifiers.map((m: any) => L(m)).join(t('، '))}</div>}</td>
+              <td className="py-1.5 text-center num">{qty(l.quantity)}</td>
+              <td className="py-1.5 text-end num">{money(l.unitTotal, false)}</td>
+              <td className="py-1.5 text-end num">{money(l.lineTotal, false)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="mt-4 ms-auto w-[80mm] space-y-1">
+        <Row k={t('إجمالي الأصناف')} v={money(tt.itemsSubtotal, false)} />
+        {nz(tt.discountTotal) && <Row k={t('خصم')} v={`-${money(tt.discountTotal, false)}`} />}
+        {nz(tt.serviceCharge) && <Row k={`${t('خدمة')} ${pctText(tt.serviceRate)}`} v={money(tt.serviceCharge, false)} />}
+        {(tt.taxLines ?? []).map((x: any, i: number) => <Row key={i} k={`${L(x.name) || t('ضريبة القيمة المضافة')} ${pctText(x.rate)}`} v={money(x.amount, false)} />)}
+        <div className="border-t-2 border-black pt-1"><Row k={t('الإجمالي')} v={money(tt.payable)} bold big /></div>
+        {(r.payments ?? []).map((p: any, i: number) => <Row key={i} k={methodLabel(p.method + (p.walletProvider ? ':' + p.walletProvider : ''))} v={money(p.amount, false)} />)}
+      </div>
+    </A4Page>
   );
 }

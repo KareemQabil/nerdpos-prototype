@@ -1,5 +1,6 @@
 // One simulated device: login gate (A1), sectioned sidebar (DeviceNav), header, current screen,
 // manager approval popup (C5) and the "result unknown" dialog.
+import { hasPermission } from '../mock/types-channels'; // r3C
 import React, { Suspense, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { LogOut, Lock, KeyRound, Delete, ShieldAlert, WifiOff, RefreshCw, Monitor, CalendarDays, Clock3, Wallet, ShoppingCart, Armchair, ChefHat, Briefcase, Building2, Check, Zap, Inbox } from 'lucide-react';
 import { DeviceProvider, useQuery, useApprovals, useUnknowns, retryUnknown, errorText, type DevCtx, useDev } from './hooks';
@@ -18,7 +19,7 @@ import { Tech } from './tech';
 import { personName, personLabel, personRole, deviceName, roleLabel, branchLabel, userLabel } from '../demo/people'; // plain names (demo layer)
 import { capabilityHiding } from '../screens/ops/capabilities-ui'; // operations & system area
 import { OfflineBar } from '../screens/ops/OfflineBar';
-import { RemoteApproval } from '../screens/ops/RemoteApproval';
+import { ControlApprovalDialog } from '../screens/control/ApprovalDialog'; // r3A
 import { ruleSentence, contextFieldLabel, contextValueText } from '../demo/policyText';
 import { Sidebar, visibleScreens, markPane } from './DeviceNav';
 export { visibleScreens } from './DeviceNav';
@@ -60,7 +61,7 @@ function Authed({ compact, width }: { compact?: boolean; width: number }) {
   const base = useDev();
   const me = useQuery<any>('Access.Me');
   const perms: string[] = me.data?.effectivePermissions ?? [];
-  const can = (p: string) => perms.includes('*') || perms.includes(p);
+  const can = (p: string) => hasPermission(perms, p); // r3C: '*' excludes vendor-only; '-p' = revoked for this user
   const ctx: DevCtx = { ...base, me: me.data, can };
   if (!me.data) return <div className="flex-1 flex items-center justify-center"><Spinner /></div>;
   return (
@@ -134,7 +135,7 @@ function Header() {
           : <Chip tone="warning" icon={<Wallet />} title={t('اضغط عشان تفتح وردية')} onClick={() => nav('shift')} fb="hdr-shift">{t('مفيش وردية — افتح وردية')}</Chip>)}
         {terminal && !terminal.drawer && <Chip className="@max-[44rem]/hdr:hidden" title={t('الجهاز ده مالوش درج فلوس — التحصيل بيتم على جهاز الكاشير')}>{t('من غير درج')}</Chip>}
         <Chip tone="primary" icon={<CalendarDays />} title={t('اليوم التجاري بيبدأ الساعة 4 الفجر بتوقيت القاهرة — البيع بعد نص الليل بيتحسب على اليوم اللي قبله')}><span className="@max-[38rem]/hdr:hidden">{t('اليوم التجاري')}</span> <span>{dayName(bd)}</span><Tech><span className="num ms-1">{bd}</span></Tech></Chip>
-        <Chip icon={<Clock3 />} className="num @max-[30rem]/hdr:hidden" title={t('الساعة دلوقتي في الفرع')}>{localTime(clock.now(), branch?.timezone)}</Chip>
+        <Chip icon={<Clock3 />} className="num @max-[30rem]/hdr:hidden" title={t('وقت السيرفر — مش قابل للتعديل')}>{localTime(clock.now(), branch?.timezone)}</Chip>
       </div>
     </header>
   );
@@ -259,58 +260,8 @@ function ApprovalHost() {
 }
 
 function ApprovalDialog({ req }: { req: ReturnType<typeof useApprovals>[number] }) {
-  const d = req.details;
-  const def = APPROVAL_ACTIONS.find((a) => a.id === d.action);
-  const branchId = req.auth.branchId ?? store.db.terminals.find((x) => x.id === req.auth.terminalId)?.branchId ?? null;
-  const approvers = demo.approvers(d.action, branchId);
-  const [approver, setApprover] = useState(approvers.find((a) => a.can)?.id ?? '');
-  const [pin, setPin] = useState('');
-  const [err, setErr] = useState<string | null>(null);
-  const [errCode, setErrCode] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [waitInBackground, setWaitInBackground] = useState(false); // remote approval: let the user switch devices while waiting
-  const rule = d.rule;
-  const ruleText = rule?.mode === 'ALWAYS' ? t('دايمًا') : rule?.mode === 'ABOVE_THRESHOLD' ? `${rule.field} > ${rule.threshold}` : rule?.mode === 'WHEN_TRUE' ? `${rule.field} = true` : rule?.mode === 'ANY_OF' ? 'ANY_OF' : rule?.mode;
-  const grant = async () => {
-    setBusy(true); setErr(null);
-    try {
-      const r = await call(req.auth, 'Approval.Grant', { body: { action: d.action, targetType: d.targetType, targetId: d.targetId, context: d.context, approverUserId: approver, approverCredentialKind: 'PIN', approverSecret: pin } });
-      toast('success', t('اتمنحت الموافقة — بنعيد نفس الطلب أوتوماتيك'), `grant ${r.data.grantId} · expires ${dateTime(r.data.expiresAt)}`, req.auth.label);
-      req.resolve(r.data.grantId);
-    } catch (e) {
-      const f = e as ApiFailure;
-      setErr(errorText(e)); setErrCode(f.code);
-      setPin('');
-    } finally { setBusy(false); }
-  };
-  if (waitInBackground) return <RemoteApproval req={req} floating onExpand={() => setWaitInBackground(false)} />;
-  return (
-    <Modal open onClose={() => req.resolve(null)} title={<span className="flex items-center gap-2"><ShieldAlert className="w-5 h-5 text-[var(--warning)]" />{t('موافقة مدير مطلوبة')}</span>} badge={<StateBadge ops={['Approval.Grant']} />}
-      footer={<><Button variant="ghost" onClick={() => req.resolve(null)}>{t('إلغاء — مفيش حاجة هتتكتب')}</Button><Button variant="primary" loading={busy} disabled={!approver || pin.length < 4} onClick={grant}>{t('موافقة')}</Button></>}>
-      <div className="space-y-4" data-screen="C5">
-        <div className="rounded-xl surface-1 p-3">
-          <div className="text-xs text-dim">{t('العملية')}</div>
-          <div className="font-bold text-lg">{def?.title ? t(def.title) : t('عملية محتاجة موافقة')}<Tech><span className="num text-xs text-dim ms-1">{d.action}</span></Tech></div>
-          <div className="text-xs text-dim mt-1">{ruleSentence(d.action, rule)}<Tech><span className="num"> · {ruleText} · {d.opId}</span></Tech></div>
-        </div>
-        <div>
-          <div className="text-xs font-bold text-soft mb-1">{t('بالظبط بتوافق على إيه')}</div>
-          <KV className="text-xs" rows={Object.entries(d.context ?? {}).filter(([k, v]) => v !== null && v !== '' && !/Id$|Version$|Hash$/.test(k)).map(([k, v]) => [contextFieldLabel(k), plainContextValue(k, v)] as [string, string])} />
-          <Tech><KV className="num text-[10px] mt-1" rows={[['targetType', d.targetType], ['targetId', d.targetId], ...Object.entries(d.context ?? {}).map(([k, v]) => [k, v === null ? 'null' : String(v)] as [string, string])]} /></Tech>
-        </div>
-        <Banner tone="info">{t('الموافقة بتتستخدم مرة واحدة للعملية دي بالظبط، ومن نفس الجهاز، وبتخلص بعد دقيقتين. صاحب الطلب مينفعش يوافق لنفسه.')}</Banner>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5"><div className="text-xs font-bold text-soft">{t('المدير')}</div>
-            <Select value={approver} onChange={(e) => setApprover(e.target.value)} options={[{ value: '', label: t('اختار') }, ...approvers.map((a) => ({ value: a.id, label: `${userLabel(a.username, a.displayName)}${a.can ? '' : ' — ' + t('مالوش صلاحية')}` }))]} />
-          </div>
-          <div className="space-y-1.5"><div className="text-xs font-bold text-soft">{t('الرقم السري')}</div><Input type="password" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="••••••" onKeyDown={(e) => e.key === 'Enter' && grant()} /></div>
-        </div>
-        {err && <Banner tone="error">{err}<Tech><span className="num text-[11px] text-dim ms-1">({errCode})</span></Tech></Banner>}
-        <RemoteApproval req={req} onBackground={() => setWaitInBackground(true)} />
-        <div className="text-[11px] text-dim">{t('بيانات عرض: الرقم السري')} <span className="num">{demo.pin}</span></div>
-      </div>
-    </Modal>
-  );
+  // r3A: PIN, manager card, fingerprint (simulated) or a request to the manager's device; supervisor override
+  return <ControlApprovalDialog req={req} />;
 }
 
 function UnknownHost() {

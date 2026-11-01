@@ -11,6 +11,7 @@ import { ALLERGEN_AR } from './MenuGrid';
 import { CustomerChip } from '../customers/common'; // crm area: customer on the check
 import { optionText, ruleSentence } from '../../demo/policyText';
 import { personName, deviceName, personText } from '../../demo/people';
+import { lineStage, STAGE_TEXT, DISPOSITION_TEXT, DISPOSITIONS } from '../../mock/control-registry'; // r3A: stages and dispositions
 
 export function useReasons(kind: string) {
   const r = useQuery<any>('ReasonCode.List', { query: { kind, active: true } });
@@ -50,11 +51,14 @@ export function CheckPanel({ order, refetch, mode, onCheckSwitch }: { order: any
   const items = active.reduce((a: number, l: any) => a + Number(l.quantity), 0);
 
   const fire = () => run('Order.Fire', { params: { orderId: order.id }, body: { expectedVersion: v } }, { success: t('اتبعت للمطبخ'), label: t('إرسال للمطبخ') });
+  // r3A [OWNER]: every removal before payment needs a manager and a reason — the − and the trash open the removal dialog
   const qtyChange = (l: any, d: number) => {
     const n = Math.round(Number(l.quantity) + d);
-    if (n < 1) return run('Order.RemoveLine', { params: { orderId: order.id, lineId: l.id }, query: { expectedVersion: v, expectedLineVersion: l.version }, body: { expectedVersion: v, expectedLineVersion: l.version } });
+    if (d < 0) return setDlg({ k: 'remove', line: l, n: n < 1 ? 0 : n } as any);
     return run('Order.UpdateLine', { params: { orderId: order.id, lineId: l.id }, body: { expectedVersion: v, expectedLineVersion: l.version, quantity: String(n) } });
   };
+  /** Someone without the permission can still ask: a manager authorises in place (supervisor override). */
+  const canAsk = (perm: string) => can(perm) || can('approval:grant');
   const [showBreak, setShowBreak] = useState(() => typeof window === 'undefined' || window.innerHeight > 860);
   const [moreOpen, setMoreOpen] = useState(false);
   type ActDef = { icon: React.ReactElement; label: string; onClick: () => void; disabled?: boolean; danger?: boolean; proposed?: boolean };
@@ -66,7 +70,7 @@ export function CheckPanel({ order, refetch, mode, onCheckSwitch }: { order: any
     can('order:comp') && { icon: <Gift />, label: t('ضيافة'), onClick: () => setDlg({ k: 'comp' }), disabled: !active.length },
     order.visitId && siblings.length > 1 && can('order:updateline') && { icon: <Merge />, label: t('دمج'), onClick: () => setDlg({ k: 'merge' }), proposed: true },
     can('order:changechannel') && { icon: <Shuffle />, label: t('تغيير القناة'), onClick: () => setDlg({ k: 'channel' }), proposed: true },
-    rounds.length === 0 ? can('order:cancel') && { icon: <XCircle />, label: t('إلغاء الشيك'), onClick: () => setDlg({ k: 'cancel' }), danger: true } : can('order:void') && { icon: <Ban />, label: t('إلغاء بعد الإرسال'), onClick: () => setDlg({ k: 'voidOrder' }), danger: true },
+    rounds.length === 0 ? canAsk('order:cancel') && { icon: <XCircle />, label: t('إلغاء الشيك'), onClick: () => setDlg({ k: 'cancel' }), danger: true } : canAsk('order:void') && { icon: <Ban />, label: t('إلغاء بعد الإرسال'), onClick: () => setDlg({ k: 'voidOrder' }), danger: true },
   ] as (ActDef | false | null | undefined | '')[]).filter(Boolean) as ActDef[];
   const where = order.kind === 'STAFF_MEAL' ? t('وجبة موظف') : order.tableName ? `${t('ترابيزة')} ${order.tableName}` : order.channel === 'TAKEAWAY' ? t('تيك أواي') : order.channel === 'DELIVERY' ? t('دليفري') : t('صالة كاونتر');
 
@@ -104,17 +108,29 @@ export function CheckPanel({ order, refetch, mode, onCheckSwitch }: { order: any
                 <span className="font-bold flex items-center gap-1.5"><ChefHat className="w-3.5 h-3.5 text-dim" />{t('الدفعة')} <span className="num">{r}</span>{info?.firedAt && <span className="text-dim font-normal num">· {time(info.firedAt)}</span>}{info?.via === 'CONFIRM' && <span className="text-dim font-normal">· {t('مع التأكيد')}</span>}</span>
                 <RoundStatus info={info} orderId={order.id} />
               </div>
-              <div className="divide-y divide-[var(--line)]">{lines.map((l: any) => <LineRow key={l.id} l={l} locked draft={draft} onVoid={() => setDlg({ k: 'void', line: l })} onMod={() => setDlg({ k: 'kmod', line: l })} onSeat={() => setDlg({ k: 'seat', line: l })} seats={seats} />)}</div>
+              <div className="divide-y divide-[var(--line)]">{lines.map((l: any) => <LineRow key={l.id} l={l} locked draft={draft} onVoid={canAsk('order:voidline') ? () => setDlg({ k: 'void', line: l }) : undefined} onMod={() => setDlg({ k: 'kmod', line: l })} onSeat={() => setDlg({ k: 'seat', line: l })} seats={seats} />)}</div>
             </div>
           );
         })}
         {unfired.length > 0 && (
           <div className="rounded-xl border-2 border-dashed border-[color-mix(in_srgb,var(--primary)_40%,transparent)] overflow-hidden" data-fb="check-unsent">
             <div className="px-3 py-1.5 text-xs font-bold text-[var(--primary)] flex items-center justify-between bg-[var(--primary-container)]"><span className="flex items-center gap-1.5"><Send className="w-3.5 h-3.5" />{t('لسه ما اتبعتش')} <span className="num">({unfired.length})</span></span><span className="text-soft font-normal">{t('تقدر تعدّل أو تشيل')}</span></div>
-            <div className="divide-y divide-[var(--line)]">{unfired.map((l: any) => <LineRow key={l.id} l={l} draft={draft} onQty={(d) => qtyChange(l, d)} onRemove={() => qtyChange(l, -999)} onSeat={() => setDlg({ k: 'seat', line: l })} seats={seats} busy={busy} />)}</div>
+            <div className="divide-y divide-[var(--line)]">{unfired.map((l: any) => <LineRow key={l.id} l={l} draft={draft} prebilled={lineStage(order, l) === 'S1'} onQty={(d) => qtyChange(l, d)} onRemove={() => qtyChange(l, -999)} onSeat={() => setDlg({ k: 'seat', line: l })} seats={seats} busy={busy} />)}</div>
           </div>
         )}
-        {removed.length > 0 && <div className="text-[11px] text-dim px-1">{t('اتشالوا قبل الإرسال')}: {removed.map((l: any) => L(l.name)).join(t('، '))}</div>}
+        {removed.length > 0 && (
+          <div className="rounded-xl border border-dashed line px-3 py-2 space-y-1" data-fb="check-removed">
+            <div className="text-[11px] font-bold text-soft flex items-center gap-1"><History className="w-3.5 h-3.5" />{t('أصناف اتشالت (متسجلة في السجل)')}</div>
+            {removed.map((l: any) => (
+              <div key={l.id} className="text-[11px] text-dim flex items-center gap-1.5 flex-wrap" data-fb={`removed:${l.sku}`}>
+                <span className="line-through">{L(l.name)} ×<span className="num">{qty(l.removed?.quantity ?? l.quantity)}</span></span>
+                {l.removed?.stage && <Pill size="sm" tone={l.removed.stage === 'S1' ? 'warning' : 'neutral'}>{t(STAGE_TEXT[l.removed.stage as 'S0'].short)}</Pill>}
+                {l.removed && <span>{firstName(l.removed.byName)}{l.removed.approverName ? ` · ${t('بموافقة')} ${firstName(l.removed.approverName)}` : ''}</span>}
+                {l.removed?.reasonCode && <span>· <ReasonText kind="LINE_VOID" code={l.removed.reasonCode} /></span>}
+              </div>
+            ))}
+          </div>
+        )}
         {order.discounts.filter((d: any) => d.active).map((d: any) => (
           <div key={d.id} className="flex items-center justify-between gap-2 text-xs rounded-xl px-3 py-2 border border-[color-mix(in_srgb,var(--error)_30%,transparent)] bg-[color-mix(in_srgb,var(--error)_8%,transparent)]">
             <span className="flex items-center gap-1.5 min-w-0"><Tag className="w-3.5 h-3.5 text-[var(--error)] shrink-0" /><b>{d.label ? L(d.label) : t('خصم')} {d.type === 'PERCENTAGE' ? <span className="num">{d.value}%</span> : <span className="num">{money(d.value)}</span>}</b><span className="text-dim truncate">· <ReasonText kind="DISCOUNT" code={d.reasonCode} />{d.approvalGrantId ? ` · ${t('بموافقة مدير')}` : ''}</span></span>
@@ -151,7 +167,7 @@ export function CheckPanel({ order, refetch, mode, onCheckSwitch }: { order: any
             {acts.length > 4 && <Act icon={moreOpen ? <ChevronUp /> : <MoreHorizontal />} label={moreOpen ? t('أقل') : t('المزيد')} onClick={() => setMoreOpen(!moreOpen)} />}
           </div>
         )}
-        {order.status === 'CONFIRMED' && can('order:void') && <Button variant="danger" size="sm" className="w-full" onClick={() => setDlg({ k: 'voidOrder' })}><Ban className="w-4 h-4" />{t('إلغاء الشيك (موافقة مدير)')}</Button>}
+        {order.status === 'CONFIRMED' && canAsk('order:void') && order.kind !== 'STAFF_MEAL' && <Button variant="danger" size="sm" className="w-full" onClick={() => setDlg({ k: 'voidOrder' })}><Ban className="w-4 h-4" />{t('إلغاء الشيك (موافقة مدير)')}</Button>}
         <div className="flex gap-2">
           {showFire && order.kind !== 'STAFF_MEAL' && <Button data-fb="send-round" variant="primary" size="xl" className="flex-1" disabled={!unfired.length || busy} onClick={fire}><Send className="w-5 h-5 rtl:-scale-x-100" />{t('ابعت للمطبخ')}{unfired.length ? <span className="num">({unfired.length})</span> : null}</Button>}
           {canPay && <Button data-fb="go-pay" variant={showFire && unfired.length ? 'success' : 'success'} size="xl" className={cn(showFire ? 'flex-1' : 'w-full')} disabled={!active.length} onClick={() => nav('pay', { orderId: order.id, back: mode === 'COUNTER' ? 'counter' : 'order' })}><Wallet className="w-5 h-5" />{draft ? t('ادفع') : t('تحصيل')}<Money v={T.payable} className="text-base opacity-90" /></Button>}
@@ -162,12 +178,13 @@ export function CheckPanel({ order, refetch, mode, onCheckSwitch }: { order: any
       </div>
 
       {dlg?.k === 'void' && <VoidLineDialog order={order} line={dlg.line} onClose={() => setDlg(null)} />}
+      {dlg?.k === 'remove' && <RemoveLineDialog order={order} line={dlg.line} to={(dlg as any).n} onClose={() => setDlg(null)} />}
       {dlg?.k === 'kmod' && <KitchenModDialog order={order} line={dlg.line} onClose={() => setDlg(null)} />}
       {dlg?.k === 'seat' && <SeatDialog order={order} line={dlg.line} onClose={() => setDlg(null)} />}
       {dlg?.k === 'discount' && <DiscountDialog order={order} onClose={() => setDlg(null)} />}
       {dlg?.k === 'comp' && <ReasonDialog title={t('ضيافة (الشيك كله مجاني)')} kind="COMP" ops={['Order.Comp']} onClose={() => setDlg(null)} onOk={(rc, note) => run('Order.Comp', { params: { orderId: order.id }, body: { expectedVersion: v, reasonCode: rc, reason: note } }, { success: t('اتعملت ضيافة') })} note={t('الشيك كله بيبقى مجاني (المطلوب صفر)، والسبب بيتسجل في تقرير الاستثناءات.')} />}
       {dlg?.k === 'cancel' && <ReasonDialog danger title={t('إلغاء شيك ما اتبعتش')} kind="ORDER_CANCEL" ops={['Order.Cancel']} onClose={() => setDlg(null)} onOk={(rc, note) => run('Order.Cancel', { params: { orderId: order.id }, body: { expectedVersion: v, reasonCode: rc, reason: note } }, { success: t('الشيك اتلغى') })} note={t('الإلغاء للشيك اللي مفيهوش ولا صنف اتبعت للمطبخ.')} />}
-      {dlg?.k === 'voidOrder' && <ReasonDialog danger title={t('إلغاء شيك بعد الإرسال')} kind="ORDER_VOID" ops={['Order.Void', 'Approval.Grant']} requireNote onClose={() => setDlg(null)} onOk={(rc, note) => run('Order.Void', { params: { orderId: order.id }, body: { expectedVersion: v, reasonCode: rc, reason: note } }, { success: t('الشيك اتلغى بالكامل') })} note={t('ده محتاج موافقة مدير دايمًا. الشيك اللي عليه فلوس اتدفعت مينفعش يتلغي — اعمل له مرتجع.')} />}
+      {dlg?.k === 'voidOrder' && <VoidOrderDialog order={order} onClose={() => setDlg(null)} />}
       {dlg?.k === 'move' && <MoveDialog order={order} siblings={siblings} onClose={() => setDlg(null)} />}
       {dlg?.k === 'split' && <SplitDialog order={order} siblings={siblings} onClose={() => setDlg(null)} />}
       {dlg?.k === 'merge' && <MergeDialog order={order} siblings={siblings} onClose={() => setDlg(null)} />}
@@ -209,7 +226,7 @@ function RoundStatus({ info, orderId }: { info: any; orderId: string }) {
   );
 }
 
-function LineRow({ l, locked, draft, onQty, onRemove, onVoid, onMod, onSeat, seats, busy }: { l: any; locked?: boolean; draft: boolean; onQty?: (d: number) => void; onRemove?: () => void; onVoid?: () => void; onMod?: () => void; onSeat?: () => void; seats?: boolean; busy?: boolean }) {
+function LineRow({ l, locked, draft, onQty, onRemove, onVoid, onMod, onSeat, seats, busy, prebilled }: { l: any; locked?: boolean; draft: boolean; onQty?: (d: number) => void; onRemove?: () => void; onVoid?: () => void; onMod?: () => void; onSeat?: () => void; seats?: boolean; busy?: boolean; prebilled?: boolean }) {
   const voided = l.status === 'VOIDED';
   const editable = draft && !voided && !locked;
   return (
@@ -234,14 +251,15 @@ function LineRow({ l, locked, draft, onQty, onRemove, onVoid, onMod, onSeat, sea
           {l.note && <div className="text-[11px] text-[var(--warning-text)] mt-0.5 flex items-center gap-1"><StickyNote className="w-3 h-3" />{l.note}</div>}
           {l.allergens?.length ? <div className="text-[11px] text-[var(--warning-text)] font-bold flex items-center gap-1"><AlertTriangle className="w-3 h-3" />{l.allergens.map((a: string) => t(ALLERGEN_AR[a] ?? a)).join(t('، '))}</div> : null}
           {l.kitchenMods?.map((m: any) => <div key={m.id} className="text-[11px] text-[var(--info)]">{t('ملاحظة للمطبخ')}: {m.text}</div>)}
-          {voided && <div className="text-[11px] text-[var(--error)]">{t('اتلغى')} · <ReasonText kind="LINE_VOID" code={l.voided.reasonCode} /> · {l.voided.disposition === 'WASTE' ? t('اتعمل واترمى (هالك)') : l.voided.disposition === 'NOT_PREPARED' ? t('ما اتعملش') : '—'}</div>}
+          {voided && <div className="text-[11px] text-[var(--error)]">{t('اتلغى')} · <ReasonText kind="LINE_VOID" code={l.voided.reasonCode} /> · {l.voided.dispositionKind ? t(DISPOSITION_TEXT[l.voided.dispositionKind as 'NOT_PREPARED'].label) : l.voided.disposition === 'WASTE' ? t('اتعمل واترمى (هالك)') : l.voided.disposition === 'NOT_PREPARED' ? t('ما اتعملش') : '—'}{l.voided.byName ? ` · ${firstName(l.voided.byName)}` : ''}{l.voided.approverName ? ` ${t('بموافقة')} ${firstName(l.voided.approverName)}` : ''}</div>}
+          {prebilled && !voided && <div className="text-[10px] text-[var(--warning-text)] flex items-center gap-1"><Printer className="w-3 h-3" />{t('ظهر للزبون في الشيك المبدئي — الشيل محتاج سبب وموافقة مدير')}</div>}
           {l.movedFrom && <div className="text-[10px] text-dim">{t('اتنقل من شيك تاني')}</div>}
           {draft && !voided && locked && (
             <div className="flex items-center gap-1 mt-1">
               <span className="text-[10px] text-dim flex items-center gap-1 me-auto"><Lock className="w-3 h-3" />{t('اتبعت')}</span>
               {seats && <MiniBtn onClick={onSeat!} title={t('الكرسي')}><Armchair className="w-4 h-4" /></MiniBtn>}
               <MiniBtn onClick={onMod!} title={t('ملاحظة للمطبخ بعد الإرسال')}><PenLine className="w-4 h-4" /></MiniBtn>
-              <button data-fb="void-line" onClick={onVoid} className="h-8 px-2.5 rounded-lg text-xs font-bold text-[var(--error)] border border-[color-mix(in_srgb,var(--error)_35%,transparent)] bg-[color-mix(in_srgb,var(--error)_8%,transparent)] flex items-center gap-1"><Ban className="w-3.5 h-3.5" />{t('إلغاء')}</button>
+              {onVoid && <button data-fb="void-line" onClick={onVoid} className="h-8 px-2.5 rounded-lg text-xs font-bold text-[var(--error)] border border-[color-mix(in_srgb,var(--error)_35%,transparent)] bg-[color-mix(in_srgb,var(--error)_8%,transparent)] flex items-center gap-1"><Ban className="w-3.5 h-3.5" />{t('إلغاء')}</button>}
             </div>
           )}
         </div>
@@ -263,7 +281,7 @@ const CHIP: Record<string, string> = { violet: 'var(--violet)', warning: 'var(--
 const Chip = ({ tone, children }: { tone: 'violet' | 'warning' | 'info'; children: React.ReactNode }) => <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold" style={{ color: CHIP[tone], background: `color-mix(in srgb, ${CHIP[tone]} 13%, transparent)` }}>{children}</span>;
 const MiniBtn = ({ onClick, children, title, disabled, danger, fb }: { onClick: () => void; children: React.ReactNode; title: string; disabled?: boolean; danger?: boolean; fb?: string }) => <button title={title} aria-label={title} disabled={disabled} onClick={onClick} data-fb={fb} className={cn('w-9 h-8 rounded-lg flex items-center justify-center hover:bg-[var(--surface-3)] disabled:opacity-30', danger ? 'text-[var(--error)]' : 'text-soft')}>{children}</button>;
 
-export function ReasonDialog({ title, kind, onOk, onClose, ops, note, requireNote, danger }: { title: string; kind: string; onOk: (code: string, note?: string) => Promise<any>; onClose: () => void; ops: string[]; note?: string; requireNote?: boolean; danger?: boolean }) {
+export function ReasonDialog({ title, kind, onOk, onClose, ops, note, requireNote, danger, children }: { title: string; kind: string; onOk: (code: string, note?: string) => Promise<any>; onClose: () => void; ops: string[]; note?: string; requireNote?: boolean; danger?: boolean; children?: React.ReactNode }) {
   const reasons = useReasons(kind);
   const [code, setCode] = useState('');
   const [txt, setTxt] = useState('');
@@ -274,6 +292,7 @@ export function ReasonDialog({ title, kind, onOk, onClose, ops, note, requireNot
     <Modal open onClose={onClose} title={title} badge={<StateBadge ops={ops} />} footer={<><Button variant="ghost" onClick={onClose}>{t('رجوع')}</Button><Button variant={danger ? 'danger' : 'primary'} loading={busy} disabled={!code || (needNote && !txt.trim())} onClick={async () => { setBusy(true); const r = await onOk(code, txt || undefined); setBusy(false); if (r) onClose(); }} data-fb="reason-ok">{t('تنفيذ')}</Button></>}>
       <div className="space-y-4">
         {note && <Banner tone={danger ? 'warning' : 'info'}>{note}</Banner>}
+        {children}
         <Field label={t('السبب')} hint={<Tech>ReasonCodePolicy · {kind}</Tech>}>
           <div className="grid grid-cols-2 gap-1.5">{reasons.map((r) => <button key={r.id} onClick={() => setCode(r.code)} data-fb={`reason:${r.code}`} className={cn('min-h-[48px] px-3 py-2 rounded-xl border text-sm text-start', code === r.code ? 'border-[var(--primary)] bg-[var(--primary-container)] font-bold' : 'border-[var(--glass-border)] surface-1 hover:bg-[var(--surface-2)]')}><div>{L(r.label)}</div>{r.requiresNote && <div className="text-[10px] text-dim font-normal">{t('لازم تكتب ملاحظة')}</div>}<Tech><div className="text-[10px] num text-dim">{r.code}</div></Tech></button>)}</div>
           {reasons.length === 0 && <span className="text-xs text-dim">{t('مفيش أسباب متسجلة للنوع ده — المدير يضيفها من الإعدادات.')}</span>}
@@ -284,10 +303,47 @@ export function ReasonDialog({ title, kind, onOk, onClose, ops, note, requireNot
   );
 }
 
+/** r3A: what happens to a voided item — short void (resellable / not made) vs long void (spoiled, kept for the accountant). */
+export function DispositionPicker({ value, onChange, allowAuto = true }: { value: string; onChange: (v: string) => void; allowAuto?: boolean }) {
+  const opts = [...(allowAuto ? [{ id: '', label: t('حسب المطبخ (تلقائي)'), help: t('لو المطبخ ما بدأش = ما اتعملش، لو بدأ = هالك محفوظ') }] : []), ...DISPOSITIONS.map((d) => ({ id: d, label: t(DISPOSITION_TEXT[d].label), help: t(DISPOSITION_TEXT[d].help) }))];
+  return (
+    <Field label={t('الصنف هيروح فين؟')}>
+      <div className="grid grid-cols-2 gap-1.5" data-fb="disposition-picker">{opts.map((o) => <button key={o.id || 'auto'} type="button" onClick={() => onChange(o.id)} data-fb={`disposition:${o.id || 'AUTO'}`} className={cn('min-h-[48px] px-3 py-2 rounded-xl border text-sm text-start', value === o.id ? 'border-[var(--primary)] bg-[var(--primary-container)] font-bold' : 'border-[var(--glass-border)] surface-1 hover:bg-[var(--surface-2)]')}><div>{o.label}</div><div className="text-[10px] text-dim font-normal">{o.help}</div></button>)}</div>
+    </Field>
+  );
+}
+
 function VoidLineDialog({ order, line, onClose }: { order: any; line: any; onClose: () => void }) {
   const { run } = useCommand();
-  return <ReasonDialog danger title={`${t('إلغاء صنف اتبعت')}: ${L(line.name)}`} kind="LINE_VOID" ops={['Order.VoidLine', 'Approval.Grant']} onClose={onClose} note={t('الصنف اتبعت للمطبخ فمينفعش يتشال. الإلغاء ممكن يحتاج موافقة مدير، وبيظهر مشطوب على شاشة المطبخ.')}
-    onOk={(rc, note) => run('Order.VoidLine', { params: { orderId: order.id, lineId: line.id }, body: { expectedVersion: order.version, reasonCode: rc, reason: note } }, { success: t('الصنف اتلغى') })} />;
+  const [disp, setDisp] = useState('');
+  return <ReasonDialog danger title={`${t('إلغاء صنف اتبعت')}: ${L(line.name)}`} kind="LINE_VOID" ops={['Order.VoidLine', 'Approval.Grant']} onClose={onClose} note={t('الصنف اتبعت للمطبخ فمينفعش يتشال من غير أثر. الإلغاء محتاج موافقة مدير (ينفع على نفس الجهاز)، وبيظهر مشطوب على شاشة المطبخ ومتسجل باسمك واسم المدير.')}
+    onOk={(rc, note) => run('Order.VoidLine', { params: { orderId: order.id, lineId: line.id }, body: { expectedVersion: order.version, reasonCode: rc, reason: note, ...(disp ? { disposition: disp } : {}) } }, { success: t('الصنف اتلغى') })}>
+    <DispositionPicker value={disp} onChange={setDisp} />
+  </ReasonDialog>;
+}
+
+/** r3A: removing (or reducing) a line that was not sent — S0 before the guest saw it, S1 after a pre-bill. */
+function RemoveLineDialog({ order, line, to, onClose }: { order: any; line: any; to: number; onClose: () => void }) {
+  const { run } = useCommand();
+  const stage = lineStage(order, line);
+  const full = to < 1;
+  const v = order.version;
+  return <ReasonDialog danger title={full ? `${t('شيل صنف')}: ${L(line.name)}` : `${t('تقليل')} ${L(line.name)}: ${qty(line.quantity)} ← ${to}`} kind="LINE_VOID" ops={['Order.RemoveLine', 'Order.UpdateLine', 'Approval.Grant']} onClose={onClose}
+    note={stage === 'S1' ? t('الصنف ده ظهر للزبون في الشيك المبدئي. الشيل محتاج سبب وموافقة مدير، ومتسجل باسمك واسم المدير — مش هيختفي من السجل.') : t('حتى قبل الإرسال، الشيل محتاج موافقة مدير (حسب إعدادات المطعم)، ومتسجل في سجل الشيك باسمك واسم المدير.')}
+    onOk={(rc, note) => full
+      ? run('Order.RemoveLine', { params: { orderId: order.id, lineId: line.id }, query: { expectedVersion: v, expectedLineVersion: line.version }, body: { expectedVersion: v, expectedLineVersion: line.version, reasonCode: rc, reason: note } }, { success: t('الصنف اتشال واتسجل') })
+      : run('Order.UpdateLine', { params: { orderId: order.id, lineId: line.id }, body: { expectedVersion: v, expectedLineVersion: line.version, quantity: String(to), reasonCode: rc, reason: note } }, { success: t('الكمية اتقللت واتسجلت') })}>
+    <div className="flex items-center gap-2 text-xs"><Pill tone={stage === 'S1' ? 'warning' : 'info'} data-fb="remove-stage">{t(STAGE_TEXT[stage].short)}</Pill><span className="text-dim">{t(STAGE_TEXT[stage].long)}</span></div>
+  </ReasonDialog>;
+}
+
+function VoidOrderDialog({ order, onClose }: { order: any; onClose: () => void }) {
+  const { run } = useCommand();
+  const [disp, setDisp] = useState('');
+  return <ReasonDialog danger title={t('إلغاء شيك بعد الإرسال')} kind="ORDER_VOID" ops={['Order.Void', 'Approval.Grant']} requireNote onClose={onClose} note={t('ده محتاج موافقة مدير دايمًا (ينفع على نفس الجهاز). الشيك اللي عليه فلوس اتدفعت مينفعش يتلغي — اعمل له مرتجع.')}
+    onOk={(rc, note) => run('Order.Void', { params: { orderId: order.id }, body: { expectedVersion: order.version, reasonCode: rc, reason: note, ...(disp ? { disposition: disp } : {}) } }, { success: t('الشيك اتلغى بالكامل') })}>
+    <DispositionPicker value={disp} onChange={setDisp} />
+  </ReasonDialog>;
 }
 
 function KitchenModDialog({ order, line, onClose }: { order: any; line: any; onClose: () => void }) {

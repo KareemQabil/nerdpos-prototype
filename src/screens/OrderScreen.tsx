@@ -1,5 +1,6 @@
 // C2 order entry for a table check (or any check opened by id): menu + the check.
 // Fast ordering: tapping a simple item that is already on the check (not sent yet) adds one to that line.
+import { SalesChannelTag } from './channels/common'; // r3C sales channels
 import React, { useState } from 'react';
 import { ArrowRight, Receipt } from 'lucide-react';
 import { useDev, useQuery, useCommand, errorText } from '../app/hooks';
@@ -48,12 +49,13 @@ export function OrderWorkspace({ orderId, mode, back }: { orderId: string; mode:
           {back && <Button size="sm" variant="ghost" onClick={back} data-fb="order-back"><ArrowRight className="w-4 h-4 ltr:rotate-180" />{t('رجوع')}</Button>}
           <div className="text-sm text-dim truncate">{editable ? t('دوس على الصنف يتضاف للشيك — ودوسة تانية تزوّد واحد.') : t('الشيك ده مقفول للتعديل.')}</div>
           <div className="flex-1" />
+          <SalesChannelTag id={order.salesChannelId} />
           <StateBadge ops={['Order.Get', 'Order.AddLines', 'Order.UpdateLine', 'Order.RemoveLine']} />
         </div>
-        <div className="flex-1 min-h-0"><MenuGrid channel={order.channel} disabled={!editable} onPick={(p) => (needsDialog(p) ? setPick(p) : add({ productId: p.id, quantity: '1', modifierOptionIds: [] }))} /></div>
+        <div className="flex-1 min-h-0"><MenuGrid channel={order.channel} salesChannelId={order.salesChannelId} disabled={!editable} onPick={(p) => (needsDialog(p) ? setPick(p) : add({ productId: p.id, quantity: '1', modifierOptionIds: [] }))} /></div>
       </div>
       <div className="w-[46%] @[760px]/ow:w-[340px] @[1100px]/ow:w-[390px] shrink-0 min-h-0"><CheckPanel order={order} refetch={o.refetch} mode={mode} onCheckSwitch={(id) => nav('order', { ...params, orderId: id })} /></div>
-      {pick && <ProductDialog product={pick} channel={order.channel} onClose={() => setPick(null)} onAdd={add} seatsEnabled={!!seatsP.data?.value && mode === 'FLOOR'} guestCount={order.guestCount} />}
+      {pick && <ProductDialog product={pick} channel={order.channel} salesChannelId={order.salesChannelId} onClose={() => setPick(null)} onAdd={add} seatsEnabled={!!seatsP.data?.value && mode === 'FLOOR'} guestCount={order.guestCount} />}
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { BranchScope, ItemPicker, PO_STATE, Qty, StatePill, WarehouseSelect, fmt
 import { ReceiveDialog } from './Receipts';
 import { clock } from '../../mock/clock';
 import { personText } from '../../demo/people';
+import { ChainView } from './Chain';
 
 const OPS = ['PurchaseOrder.Create', 'PurchaseOrder.Update', 'PurchaseOrder.Issue', 'PurchaseOrder.Find', 'PurchaseOrder.Get', 'PurchaseOrder.Close', 'PurchaseOrder.Cancel', 'Inventory.LowStock'];
 
@@ -21,7 +22,8 @@ export default function PurchaseOrders() {
   const [supplier, setSupplier] = useState('');
   const suppliers = useList<any>('Supplier.List');
   const q = useList<any>('PurchaseOrder.Find', { branchId: scope.branchId, lifecycle: state || undefined, supplierId: supplier || undefined });
-  const [open, setOpen] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(params?.open ?? null);
+  useEffect(() => { if (params?.open) setOpen(params.open); }, [params?.open]);
   const [editor, setEditor] = useState<any | null>(params?.create ? { supplierId: params?.supplierId } : null);
   const [suggest, setSuggest] = useState(!!params?.fromLowStock);
   useEffect(() => { if (params?.fromLowStock) setSuggest(true); if (params?.create) setEditor({ supplierId: params?.supplierId }); }, [params?.fromLowStock, params?.create, params?.supplierId]);
@@ -201,8 +203,9 @@ function PoView({ id, onClose, onEdit }: { id: string | null; onClose: () => voi
         <div className="space-y-3">
           <KV rows={[[t('يستلم في'), `${tv(po.warehouse.name)} — ${tv(po.warehouse.branchName)}`], [t('ميعاد التوريد'), po.expectedDate ?? '—'], [t('اتعمل'), `${dateTime(po.createdAt)} · ${personText(po.createdByName)}`], [t('ملاحظة'), tv(po.note) ?? '—'], ...(po.closeReason ? [[t('سبب القفل'), po.closeReason] as [string, string]] : []), ...(po.cancelReason ? [[t('سبب الإلغاء'), tv(po.cancelReason)] as [string, string]] : [])]} />
           {msg && <Textarea readOnly className="min-h-[140px] text-sm" value={message} onFocus={(e) => e.currentTarget.select()} />}
-          <Table head={[t('الصنف'), t('المطلوب'), t('سعر العبوة'), t('الإجمالي'), t('اتستلم'), t('باقي')]} rows={po.lines.map((l: any) => [
+          <Table head={[t('الصنف'), ...(po.storeRequestId ? [t('المخزن طلب')] : []), t('المطلوب'), t('سعر العبوة'), t('الإجمالي'), t('اتستلم'), t('باقي')]} rows={po.lines.map((l: any) => [
             <span className="font-bold">{L(l.item?.name)}</span>,
+            ...(po.storeRequestId ? [l.requestedQuantity ? <Qty v={l.requestedQuantity} unit={l.item?.unit} hint={false} /> : <span className="text-dim">—</span>] : []),
             <span className="num">{fmtQty(l.orderedQuantity)} {l.packId ? L(l.item?.packs?.find((p: any) => p.id === l.packId)?.name) : unitLabel(l.item?.unit)}{l.packId && <span className="text-[11px] text-dim"> = {fmtQty(l.orderedStockQuantity)} {unitLabel(l.item?.unit)}</span>}</span>,
             <span className="num text-xs">{money(l.orderedUnitCost)}</span>, <Money v={l.lineTotal} className="text-xs" />,
             Number(l.receivedQuantity) > 0 ? <Qty v={l.receivedQuantity} unit={l.item?.unit} className="text-[var(--success)]" /> : <span className="text-dim">—</span>,
@@ -214,6 +217,7 @@ function PoView({ id, onClose, onEdit }: { id: string | null; onClose: () => voi
               <div className="flex flex-wrap gap-1.5">{po.receipts.map((r: any) => <Pill key={r.id} tone={r.state === 'REVERSED' ? 'error' : 'success'}><span className="num">{r.number}</span> · {dateTime(r.at)} · <span className="num">{money(r.total)}</span>{r.state === 'REVERSED' ? ` · ${t('اتلغى')}` : ''}</Pill>)}</div>
             </div>
           )}
+          {(po.storeRequestId || po.receipts?.length > 0) && <ChainView query={{ purchaseOrderId: po.id }} title={t('المستندات المربوطة (طلبية ← أمر ← استلام ← فاتورة)')} />}
           <div><div className="text-xs font-bold text-soft mb-1">{t('السجل')}</div>
             <ol className="space-y-1 border-s-2 line ps-3 text-xs">{po.history.map((h: any, i: number) => <li key={i}><span className="text-dim">{dateTime(h.at)}</span> · {poHistoryText(h.text)}</li>)}</ol>
           </div>
@@ -233,4 +237,4 @@ function PoView({ id, onClose, onEdit }: { id: string | null; onClose: () => voi
     </Drawer>
   );
 }
-const poHistoryText = (s: string) => s.replace(/^DRAFT$/, t('اتعمل مسودة')).replace(/^ISSUED$/, t('اتبعت للمورد')).replace(/^CANCELLED/, t('اتلغى')).replace(/^CLOSED/, t('اتقفل')).replace('lines updated', t('الأصناف اتعدلت')).replace(/^received (\S+) → (\S+)$/, (_m, n, st) => `${t('استلام')} ${n} ← ${t(PO_STATE[st]?.ar ?? st)}`).replace(/^received → (\S+)$/, (_m, st) => `${t('استلام')} ← ${t(PO_STATE[st]?.ar ?? st)}`).replace(/^receipt (\S+) reversed → (\S+)$/, (_m, n, st) => `${t('إلغاء استلام')} ${n} ← ${t(PO_STATE[st]?.ar ?? st)}`);
+const poHistoryText = (s: string) => s.replace(/^DRAFT — (.+)$/, (_m, n) => `${t('اتعمل مسودة من طلبية المخزن')} ${n}`).replace(/^invoiced (\S+)$/, (_m, n) => `${t('اتعملت فاتورة المورد')} ${n}`).replace(/^DRAFT$/, t('اتعمل مسودة')).replace(/^ISSUED$/, t('اتبعت للمورد')).replace(/^CANCELLED/, t('اتلغى')).replace(/^CLOSED/, t('اتقفل')).replace('lines updated', t('الأصناف اتعدلت')).replace(/^received (\S+) → (\S+)$/, (_m, n, st) => `${t('استلام')} ${n} ← ${t(PO_STATE[st]?.ar ?? st)}`).replace(/^received → (\S+)$/, (_m, st) => `${t('استلام')} ← ${t(PO_STATE[st]?.ar ?? st)}`).replace(/^receipt (\S+) reversed → (\S+)$/, (_m, n, st) => `${t('إلغاء استلام')} ${n} ← ${t(PO_STATE[st]?.ar ?? st)}`);

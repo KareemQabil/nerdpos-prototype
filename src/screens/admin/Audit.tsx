@@ -11,9 +11,14 @@ import { contextFieldLabel, contextValueText, actionTitle } from '../../demo/pol
 import { deviceName, personName } from '../../demo/people';
 import { useList, Refused } from './org/common';
 import { opText } from './org/permText';
+import { ReversalTrace, StagePill } from '../control/VoidReview'; // r3A: removals by stage
+import { STAGE_TEXT } from '../../mock/control-registry';
+import type { StageId } from '../../mock/types-control';
+
+const CRED_AR: Record<string, string> = { PIN: 'بالرقم السري', CARD: 'بالكارت', FINGERPRINT: 'بالبصمة', REMOTE: 'من جهازه' };
 
 export default function Audit() {
-  const [tab, setTab] = useState<'grants' | 'audit'>('grants');
+  const [tab, setTab] = useState<'grants' | 'audit' | 'removals'>('grants');
   const users = useList<any>('User.Find');
   const terms = useList<any>('Terminal.List');
   const nameOf = (id: string | null) => { if (!id) return '—'; const u = users.items.find((x) => x.id === id); return u ? personName(u.username, u.displayName) : t('مستخدم'); };
@@ -24,10 +29,10 @@ export default function Audit() {
         icon={<ShieldCheck />}
         title={t('الموافقات والسجل')}
         badge={<StateBadge ops={['Approval.Find', 'Audit.Find', 'User.Find']} />}
-        description={t('كل موافقة مدير بتتستخدم مرة واحدة على حركة واحدة بعينها. والسجل بيقول مين عمل إيه، إمتى، ومن أنهي جهاز.')}
+        description={t('كل موافقة مدير بتتستخدم مرة واحدة على حركة واحدة بعينها. والسجل بيقول مين عمل إيه، ومين سمح بيها، إمتى، ومن أنهي جهاز.')}
       />
-      <Tabs variant="underline" value={tab} onChange={setTab} tabs={[{ id: 'grants', icon: <ShieldCheck className="w-4 h-4" />, label: t('موافقات المدير') }, { id: 'audit', icon: <ScrollText className="w-4 h-4" />, label: t('سجل الحركات') }]} />
-      {tab === 'grants' ? <Grants nameOf={nameOf} termOf={termOf} /> : <AuditLog nameOf={nameOf} termOf={termOf} />}
+      <Tabs variant="underline" value={tab} onChange={setTab} tabs={[{ id: 'grants', icon: <ShieldCheck className="w-4 h-4" />, label: t('موافقات المدير') }, { id: 'audit', icon: <ScrollText className="w-4 h-4" />, label: t('سجل الحركات') }, { id: 'removals', icon: <ScrollText className="w-4 h-4" />, label: t('الإلغاءات والمرتجعات بالمرحلة'), fb: 'audit-tab:removals' }]} />
+      {tab === 'grants' ? <Grants nameOf={nameOf} termOf={termOf} /> : tab === 'audit' ? <AuditLog nameOf={nameOf} termOf={termOf} /> : <ReversalTrace />}
     </div>
   );
 }
@@ -63,7 +68,7 @@ function Grants({ nameOf, termOf }: { nameOf: (id: string | null) => string; ter
           rows={items.map((g) => [
             <div><div className="font-bold">{actionTitle(g.action)}</div><Tech><div className="num text-[10px] text-dim">{g.action} · {g.targetType} {g.targetId}</div></Tech></div>,
             <span>{nameOf(g.requesterUserId)}</span>,
-            <span className="font-bold">{nameOf(g.approverUserId)}</span>,
+            <span><span className="font-bold">{nameOf(g.approverUserId)}</span><div className="text-[11px] text-dim">{t(CRED_AR[g.credentialKind ?? 'PIN'] ?? '')}{g.overridePermission ? ` · ${t('وافق في مكان الموظف')}` : ''}</div></span>,
             <span className="text-xs whitespace-nowrap">{dateTime(g.issuedAt)}<div className="text-[11px] text-dim">{termOf(g.terminalId)}</div></span>,
             pill(g),
             <button className="text-dim hover:text-[var(--primary)]" title={t('التفاصيل')} data-fb={`audit:grant:${g.id}`}><ChevronLeft className="w-4 h-4 ltr:rotate-180" /></button>,
@@ -76,6 +81,8 @@ function Grants({ nameOf, termOf }: { nameOf: (id: string | null) => string; ter
             <KV rows={[
               [t('مين طلب'), nameOf(sel.requesterUserId)],
               [t('مين وافق'), <b>{nameOf(sel.approverUserId)}</b>],
+              [t('إزاي'), t(CRED_AR[sel.credentialKind ?? 'PIN'] ?? '')],
+              ...(sel.overridePermission ? [[t('الصلاحية'), t('الحركة مش من صلاحية اللي طلب — المدير وافق في مكانه')] as [string, string]] : []),
               [t('من جهاز'), termOf(sel.terminalId)],
               [t('اتمنحت'), dateTime(sel.issuedAt)],
               [t('تنتهي'), dateTime(sel.expiresAt)],
@@ -105,10 +112,11 @@ const PAGE = 50;
 function AuditLog({ nameOf, termOf }: { nameOf: (id: string | null) => string; termOf: (id: string | null) => string }) {
   const audit = useList<any>('Audit.Find', { query: { limit: 500 } });
   const [sens, setSens] = useState<'all' | 'sensitive'>('all');
+  const [stage, setStage] = useState<'all' | 'approved' | StageId>('all');
   const [q, setQ] = useState('');
   const [n, setN] = useState(PAGE);
   const [sel, setSel] = useState<any | null>(null);
-  const items = useMemo(() => audit.items.filter((a) => (sens === 'all' || a.sensitive) && (!q || (opText(a.op) + ' ' + a.op + ' ' + a.summary + ' ' + (a.target ?? '') + ' ' + nameOf(a.userId)).toLowerCase().includes(q.toLowerCase()))), [audit.items, sens, q, nameOf]);
+  const items = useMemo(() => audit.items.filter((a) => (sens === 'all' || a.sensitive) && (stage === 'all' || (stage === 'approved' ? !!a.approverUserId : a.stage === stage)) && (!q || (opText(a.op) + ' ' + a.op + ' ' + a.summary + ' ' + (a.target ?? '') + ' ' + nameOf(a.userId) + ' ' + nameOf(a.approverUserId ?? null)).toLowerCase().includes(q.toLowerCase()))), [audit.items, sens, stage, q, nameOf]);
   const sensitive = audit.items.filter((a) => a.sensitive).length;
   return (
     <Card padding="sm">
@@ -116,15 +124,18 @@ function AuditLog({ nameOf, termOf }: { nameOf: (id: string | null) => string; t
         <SearchInput value={q} onChange={(v) => { setQ(v); setN(PAGE); }} placeholder={t('دوّر باسم الموظف أو الحركة')} data-fb="audit:search" />
         <FilterChips value={sens} onChange={(v) => { setSens(v); setN(PAGE); }} options={[{ id: 'all', label: t('كل الحركات'), count: audit.items.length }, { id: 'sensitive', label: t('الحساس بس'), count: sensitive, tone: 'warning' }]} />
       </Toolbar>
+      <Toolbar>
+        <FilterChips value={stage} onChange={(v) => { setStage(v); setN(PAGE); }} options={[{ id: 'all', label: t('أي مرحلة') }, { id: 'approved', label: t('بموافقة مدير'), count: audit.items.filter((a) => a.approverUserId).length }, ...(['S0', 'S1', 'S2', 'S3'] as StageId[]).map((s) => ({ id: s, label: t(STAGE_TEXT[s].short), count: audit.items.filter((a) => a.stage === s).length, tone: s === 'S3' ? 'error' as const : undefined }))]} />
+      </Toolbar>
       <Refused error={audit.error} />
-      <Table dense maxHeight={620} head={[t('الوقت'), t('الموظف'), t('الجهاز'), t('الحركة'), t('موافقة مدير')]}
+      <Table dense maxHeight={620} head={[t('الوقت'), t('مين عمل'), t('الجهاز'), t('الحركة'), t('مين سمح')]}
         loading={audit.loading && !audit.data} onRowClick={(i) => setSel(items[i])}
         rows={items.slice(0, n).map((a) => [
           <span className="text-xs whitespace-nowrap">{dateTime(a.at)}</span>,
           <span className="text-sm">{nameOf(a.userId)}</span>,
           <span className="text-xs text-dim">{termOf(a.terminalId)}</span>,
-          <div className="text-sm min-w-0"><span className="font-bold">{opText(a.op)}</span>{a.sensitive && <Pill tone="warning" className="ms-2">{t('حساس')}</Pill>}<Tech><div className="num text-[10px] text-dim break-all" dir="ltr">{a.op} · {a.summary}{a.target ? ` · ${a.target}` : ''}</div></Tech></div>,
-          a.approvalGrantId ? <Pill tone="info">{t('بموافقة')}</Pill> : <span className="text-dim">—</span>,
+          <div className="text-sm min-w-0"><span className="font-bold">{opText(a.op)}</span>{a.sensitive && <Pill tone="warning" className="ms-2">{t('حساس')}</Pill>}{a.stage && <span className="ms-2"><StagePill s={a.stage} /></span>}<Tech><div className="num text-[10px] text-dim break-all" dir="ltr">{a.op} · {a.summary}{a.target ? ` · ${a.target}` : ''}</div></Tech></div>,
+          a.approverUserId ? <span className="text-sm"><b>{nameOf(a.approverUserId)}</b><div className="text-[10px] text-dim">{t(CRED_AR[a.credentialKind ?? 'PIN'] ?? '')}{a.override ? ` · ${t('في مكان الموظف')}` : ''}</div></span> : a.approvalGrantId ? <Pill tone="info">{t('بموافقة')}</Pill> : <span className="text-dim">—</span>,
         ])}
         empty={<EmptyState compact icon={<ScrollText />} title={t('مفيش حركات بالبحث ده')} text={t('غيّر البحث أو الفلتر.')} />} />
       <div className="flex items-center justify-between gap-2 mt-2 px-1">
@@ -134,7 +145,7 @@ function AuditLog({ nameOf, termOf }: { nameOf: (id: string | null) => string; t
       {sel && (
         <Drawer open onClose={() => setSel(null)} icon={<ScrollText />} title={opText(sel.op)} badge={sel.sensitive ? <Pill tone="warning">{t('حساس')}</Pill> : undefined}>
           <div className="space-y-4">
-            <KV rows={[[t('الوقت'), dateTime(sel.at)], [t('الموظف'), nameOf(sel.userId)], [t('الجهاز'), termOf(sel.terminalId)], [t('موافقة مدير'), sel.approvalGrantId ? t('أيوه') : t('لأ')]]} />
+            <KV rows={[[t('الوقت'), dateTime(sel.at)], [t('مين عمل'), nameOf(sel.userId)], [t('الجهاز'), termOf(sel.terminalId)], [t('مين سمح'), sel.approverUserId ? `${nameOf(sel.approverUserId)} (${t(CRED_AR[sel.credentialKind ?? 'PIN'] ?? '')})` : sel.approvalGrantId ? t('أيوه') : t('من غير موافقة')], ...(sel.stage ? [[t('المرحلة'), t(STAGE_TEXT[sel.stage as StageId].short)] as [string, string]] : [])]} />
             <Tech>
               <div className="rounded-xl surface-2 p-3 num text-[11px]" dir="ltr"><KV rows={[['op', sel.op], ['summary', sel.summary], ['target', sel.target ?? '—'], ['X-Command-Id', sel.commandId ?? '—'], ['grant', sel.approvalGrantId ?? '—']]} /></div>
             </Tech>

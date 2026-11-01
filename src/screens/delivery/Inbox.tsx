@@ -1,5 +1,6 @@
 // Online orders inbox: orders from the delivery apps, the website and WhatsApp wait here; accept with a prep time
 // (items are linked to the menu once) or reject with a reason. Accepted orders go to the kitchen and to delivery.
+import { SalesChannelPicker } from '../channels/common'; // r3C sales channels
 import React, { useMemo, useState } from 'react';
 import { Globe, Inbox as InboxIcon, Check, X, Link2, Clock, AlertTriangle, MapPin, Bike, ShoppingBag, Sparkles, Phone } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';
@@ -125,12 +126,14 @@ function ItemRow({ e, it }: { e: any; it: any }) {
 function AcceptDialog({ e, onClose }: { e: any; onClose: () => void }) {
   const { run, busy } = useCommand();
   const [prep, setPrep] = useState(20);
-  const ok = async () => { const r = await run('ExternalOrder.Accept', { params: { externalOrderId: e.id }, body: { prepMinutes: prep, expectedVersion: e.version } }, { success: t('الطلب اتقبل واتبعت للمطبخ') }); if (r) onClose(); };
+  const [sc, setSc] = useState(''); // r3C: sales channel ('' = default of the order type)
+  const ok = async () => { const r = await run('ExternalOrder.Accept', { params: { externalOrderId: e.id }, body: { prepMinutes: prep, expectedVersion: e.version, ...(sc ? { salesChannelId: sc } : {}) } }, { success: t('الطلب اتقبل واتبعت للمطبخ') }); if (r) onClose(); };
   return (
     <Modal open onClose={onClose} title={`${t('قبول الطلب')} ${e.externalRef}`} badge={<StateBadge ops={['ExternalOrder.Accept', 'Order.Create', 'Delivery.Create', 'Order.Confirm']} />}
       footer={<><Button variant="ghost" onClick={onClose}>{t('رجوع')}</Button><Button variant="success" loading={busy} onClick={ok} data-fb="accept-confirm"><Check className="w-4 h-4" />{t('اقبل وابعت للمطبخ')}</Button></>}>
       <div className="space-y-3">
         <div className="text-sm">{t('الطلب هيظهر للعميل على')} {L(e.sourceLabel)} {t('بالوقت ده.')}</div>
+        <SalesChannelPicker orderType={e.fulfillment === 'DELIVERY' ? 'DELIVERY' : 'TAKEAWAY'} fb="accept-channel" label={t('قناة البيع (الأسعار)')} value={sc} onChange={setSc} />
         <Field label={t('وقت التحضير')}>
           <div className="grid grid-cols-4 gap-1.5">{[15, 20, 30, 45].map((m) => <button key={m} onClick={() => setPrep(m)} data-fb={`prep:${m}`} className={cn('h-12 rounded-xl border text-sm font-bold num', prep === m ? 'border-[var(--primary)] bg-[var(--primary-container)]' : 'surface-1 border-[var(--glass-border)]')}>{m} {t('د')}</button>)}</div>
         </Field>

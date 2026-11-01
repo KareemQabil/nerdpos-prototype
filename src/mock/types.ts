@@ -16,6 +16,7 @@ export interface User {
   id: string; username: string; displayName: string; active: boolean; version: number;
   pin: string; password: string; roleAssignments: RoleAssignment[];
   failedAttempts: number; lockedUntil: number | null; credentialVersion: number; mustChangeCredentials: boolean;
+  /** r3A (simulated): manager card code and enrolled fingerprint id used to approve in place */ cardCode?: string | null; fingerprintId?: string | null;
 }
 export interface AuthSession { id: string; userId: string; terminalId: string | null; branchId: string | null; credentialKind: 'PIN' | 'PASSWORD'; createdAt: string; expiresAt: number; revokedAt: string | null; credentialVersion: number }
 
@@ -47,6 +48,7 @@ export interface PriceRule {
   id: string; productId: string; branchId: string; channel: Channel; amount: Money; currency: 'EGP';
   effectiveFrom: number; effectiveTo: number | null; createdAt: string; createdBy: string; version: number; replacesRuleId?: string | null;
   /** menu area (proposed): own price of one size; absent = the product price */ variantId?: string | null; bulkChangeId?: string | null;
+  /** sales channels (types-channels.ts): price of one non-default sales channel; absent = the order type's price list. pinned = a single-item override that bulk changes skip unless included */ salesChannelId?: string | null; pinned?: boolean;
 }
 export interface TaxPolicy {
   id: string; name: Loc; jurisdiction: string; rate: string; calculationMode: 'EXCLUSIVE' | 'INCLUSIVE';
@@ -71,7 +73,8 @@ export interface OrderLine {
   taxPolicy: { id: string; rate: string; mode: 'EXCLUSIVE' | 'INCLUSIVE'; version: number; name: Loc; roundingMode: TaxPolicy['roundingMode']; roundingScale: number; exemption?: string };
   priceRuleId: string; status: LineStatus; version: number; note?: string;
   fireRound: number | null; firedAt: string | null; addedAt: string; addedBy: string;
-  voided?: { at: string; by: string; reasonCode: string; reason?: string; approvalGrantId?: string; disposition: string; approverId?: string };
+  voided?: { at: string; by: string; reasonCode: string; reason?: string; approvalGrantId?: string; disposition: string; approverId?: string; /** r3A */ dispositionKind?: import('./types-control').Disposition; stage?: import('./types-control').StageId; terminal?: string | null; byName?: string; approverName?: string | null };
+  /** r3A: who removed an unsent line (or reduced it) and who allowed it */ removed?: { at: string; by: string; approverId?: string | null; approvalGrantId?: string | null; stage: import('./types-control').StageId; reasonCode?: string | null; reason?: string | null; quantity: string; byName?: string; approverName?: string | null };
   movedTo?: string; movedFrom?: string;
   // direction
   seat?: number | null; variant?: { id: string; name: Loc; priceDelta: Money } | null;
@@ -113,6 +116,9 @@ export interface Order {
   history: HistoryEntry[]; customerName?: string; guestCount?: number;
   // crm area (types-crm.ts): customer snapshot, delivery and online-order links
   customerId?: string | null; customerPhone?: string | null; deliveryId?: string | null; externalOrderId?: string | null;
+  /** sales channel (types-channels.ts); absent = the default channel of the order type */ salesChannelId?: string | null;
+  /** r3A: staff meal details (employee, allowance basis, approver) */ staffMeal?: import('./types-control').StaffMealInfo;
+  /** r3B (E08): short display number for the guest / kitchen call-out (ShortOrderNumberPolicy); `number` stays the immutable transaction id */ shortNo?: string | null;
 }
 
 export interface KitchenStation { id: string; branchId: string; name: string; active: boolean; version: number; targetMinutes?: number }
@@ -143,13 +149,15 @@ export interface Capture {
 }
 export interface RefundCase {
   id: string; orderId: string; amount: Money; method: TenderMethod; reasonCode: string; reason: string; state: 'REQUESTED' | 'APPROVED' | 'PAID' | 'REJECTED' | 'CANCELLED';
-  allocations: { captureId: string; amount: Money }[]; lines: { lineId: string; quantity: string }[]; requestedBy: string; requestedAt: string;
+  allocations: { captureId: string; amount: Money }[]; lines: { lineId: string; quantity: string; disposition?: import('./types-control').Disposition }[]; requestedBy: string; requestedAt: string;
   decidedBy?: string; decidedAt?: string; paidAt?: string; paidSessionId?: string; businessDate?: string; version: number; approvalGrantId?: string;
+  /** r3A: stage (S2 same day / S3 after close), the original business date, who approved and whose drawer paid */ stage?: import('./types-control').StageId; afterClose?: boolean; originalBusinessDate?: string; approverId?: string | null; paidBy?: string; drawerOwnerId?: string | null; paidTerminalId?: string | null;
 }
 export interface ApprovalGrant {
   id: string; action: string; targetType: string; targetId: string; context: Record<string, unknown>; contextHash: string;
   requesterUserId: string; approverUserId: string; branchId: string | null; terminalId: string | null;
   issuedAt: string; expiresAtMs: number; consumedAt: string | null; consumedBy: string | null; reason?: string;
+  /** r3A: how the approver proved who they are, and the permission they lent when the actor lacked it */ credentialKind?: import('./types-control').CredentialKind; overridePermission?: string | null;
 }
 export interface ReasonCode { id: string; kind: string; code: string; label: Loc; requiresNote: boolean; sortOrder: number; active: boolean; version: number }
 export interface PolicyValue { id: string; policyId: string; scopeType: ScopeType; scopeId: string; value: unknown; version: number; updatedAt: string; updatedBy: string; source: string }
@@ -172,7 +180,7 @@ export interface Promotion {
   branchIds: string[]; channels: Channel[]; minSubtotal: Money | null; schedule: { days: number[]; start: string; end: string } | null;
   validFrom: number | null; validTo: number | null; active: boolean; version: number;
 }
-export interface AuditEntry { id: string; at: string; userId: string | null; terminalId: string | null; op: string; target: string; sensitive: boolean; summary: string; commandId?: string; approvalGrantId?: string }
+export interface AuditEntry { id: string; at: string; userId: string | null; terminalId: string | null; op: string; target: string; sensitive: boolean; summary: string; commandId?: string; approvalGrantId?: string; /** r3A */ approverUserId?: string | null; stage?: import('./types-control').StageId; override?: boolean; credentialKind?: string | null }
 export interface Idem { opId: string; hash: string; status: number; body: unknown; at: string; userId: string | null }
 export interface Alert { id: string; at: string; kind: string; severity: 'info' | 'warning' | 'error'; text: Loc; ref?: string; ack: boolean }
 
@@ -246,4 +254,11 @@ export interface DB extends CrmCollections {
   reportSchedules?: import('./types-ops').ReportSchedule[];
   reportExports?: import('./types-ops').ReportExport[];
   capabilities?: import('./types-ops').CapabilityState[];
+  // sales channels & per-user permission overrides (types-channels.ts) — optional, read through salesChannelsOf / permOverridesOf
+  salesChannels?: import('./types-channels').SalesChannel[];
+  permOverrides?: import('./types-channels').PermOverride[];
+  // r3B: kitchen screens per terminal, receipt/document template, short display-number counters (types-r3b.ts) — read through r3bOf(db)
+  r3b?: import('./types-r3b').R3BState;
+  // r3A: removal / refund trace at every stage (types-control.ts)
+  reversals?: import('./types-control').ReversalRec[];
 }

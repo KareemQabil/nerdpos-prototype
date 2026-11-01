@@ -10,6 +10,7 @@ import { cn } from '../../lib/format';
 import { branchLabel, personName, roleLabel, personLabel, userLabel } from '../../demo/people';
 import { useList, usePerm, RulePill, Refused, Modal } from './org/common';
 import { permText, moduleText } from './org/permText';
+import { UserPermOverrides } from './UserPermOverrides'; // r3C (P1-041): per-user grants / revocations
 
 interface RA { roleId: string; branchIds: string[] }
 
@@ -105,6 +106,8 @@ function UsersTab({ users, roles, creating, setCreating }: { users: ReturnType<t
               {u.active ? <Pill tone="success" dot>{t('شغال')}</Pill> : <Pill tone="neutral" dot>{t('موقوف')}</Pill>}
               {u.locked && <Pill tone="error"><Lock className="w-3 h-3" />{t('مقفول')}</Pill>}
               {u.mustChangeCredentials && <Pill tone="warning">{t('لازم يغيّر الرقم السري')}</Pill>}
+              {(u.permOverrides ?? []).filter((o: any) => o.effect === 'GRANT').length > 0 && <Pill tone="info" data-fb={`users:extra:${u.username}`}>+{(u.permOverrides ?? []).filter((o: any) => o.effect === 'GRANT').length} {t('زيادة على دوره')}</Pill>}
+              {(u.permOverrides ?? []).filter((o: any) => o.effect === 'REVOKE').length > 0 && <Pill tone="error">−{(u.permOverrides ?? []).filter((o: any) => o.effect === 'REVOKE').length} {t('متشالة منه')}</Pill>}
             </div>,
             <div className="flex gap-1 justify-end flex-wrap">
               <Button size="sm" variant="outline" data-fb={`users:access:${u.username}`} disabled={!permAccess.ok} title={permAccess.title} onClick={() => setAccess(u)}><ShieldCheck className="w-3.5 h-3.5" />{t('الصلاحيات')}</Button>
@@ -222,6 +225,7 @@ function AccessDrawer({ user, roles, branches, onClose }: { user: any; roles: an
         {!active && user.active && <Banner tone="warning">{t('الإيقاف بيخرّج الموظف من كل الأجهزة: أول حركة بعدها بترجّعه لشاشة الدخول.')}</Banner>}
         <FormGroup title={t('الدور والفروع')}><AssignmentsEditor value={ras} onChange={setRas} roles={roles} branches={branches} /></FormGroup>
         <div className="text-[11px] text-dim">{t('لازم يفضل فيه شخص واحد على الأقل يقدر يدير الصلاحيات — السيستم مش هيسمح تشيله.')}<Tech> LAST_OWNER_PROTECTED · v{user.version}</Tech></div>
+        <UserPermOverrides user={user} />
       </div>
     </Drawer>
   );

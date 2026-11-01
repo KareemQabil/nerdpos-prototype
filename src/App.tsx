@@ -11,7 +11,7 @@ import { store } from './mock/store';
 import { PolicyPanel } from './demo/PolicyPanel';
 import { FeedbackLayer, FeedbackPanel, useFeedback, feedback } from './demo/Feedback';
 import { ApiLogPanel } from './demo/ApiLog';
-import { ClockControl } from './demo/ClockControl';
+import { ServerClock } from './demo/ClockControl';
 import { Simulators } from './demo/Simulators';
 import { ResetMenu } from './demo/ResetMenu';
 import { Walkthrough } from './demo/Walkthrough';
@@ -63,8 +63,8 @@ export default function App() {
         </div>
         <div className="flex-1 min-w-2" />
 
-        {/* time */}
-        <ClockControl />
+        {/* server time: read-only (trusted time — nothing in the UI can move it) */}
+        <ServerClock />
         <Divider />
 
         {/* demo tools */}

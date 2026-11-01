@@ -5,6 +5,7 @@ import { effectiveAvailability, optionSoldOut, menuCheck, priceFor, ruleAt, defa
 import type { LineTaxPart, ModifierLevel, HalfPlacement } from './menu-types';
 import { policy, channelPolicy } from './policies';
 import { promoAmount } from './promo-engine';
+import { salesChannelById } from './sales-channels'; // sales channels (E13)
 import type { DB, Channel, Order, OrderLine, PolicySnapshot, Product, ServiceCapture, Totals, LineModifier, ChargeComponent, Variant } from './types';
 
 export interface QuoteInput {
@@ -12,6 +13,7 @@ export interface QuoteInput {
   comboSelections?: Record<string, { productId: string; variantId?: string | null; modifierOptionIds?: string[] }>; at: number;
   /** menu area (proposed): no/less/extra per ingredient option, topping placement on a pizza half, sub-choices of an option */
   modifierLevels?: Record<string, ModifierLevel>; modifierPlacement?: Record<string, HalfPlacement>; nestedOptionIds?: Record<string, string[]>;
+  /** sales channel (E13): its own / followed price first, then the order type's price */ salesChannelId?: string | null;
 }
 export interface Quote {
   productId: string; branchId: string; channel: Channel; quantity: string; currency: 'EGP';
@@ -24,6 +26,8 @@ export interface Quote {
   variantPrices?: { variantId: string; unitPrice: string; source: string }[];
   taxSplit?: LineTaxPart[];
   display: { unitTotal: string; lineTotal: string; taxIncluded: boolean; label: { ar: string; en: string } };
+  /** sales channel (E13): which channel priced it and where the price came from (OWN / FOLLOW / ORDER_TYPE fallback) */
+  salesChannel?: { id: string; name: { ar: string; en: string }; priceSource: 'OWN' | 'FOLLOW' | 'ORDER_TYPE' } | null;
   halfAndHalf?: { mode: string; halves: { productId: string; name: { ar: string; en: string }; price: string }[] } | null;
   menu?: { restricted: boolean; endsAt: string | null; menus: { id: string; name: { ar: string; en: string } }[] };
 }
@@ -62,7 +66,7 @@ export function quoteItem(db: DB, input: QuoteInput): Quote {
       if (!v || !v.active) throw new ApiError('MODIFIER_SELECTION_INVALID', { field: 'variantId', variantId: input.variantId, reasonAr: 'الحجم ده مش متاح' });
     } else v = defaultVariant(product);
   }
-  const priced = priceFor(db, product, v, input.branchId, input.channel, input.at);
+  const priced = priceFor(db, product, v, input.branchId, input.channel, input.at, input.salesChannelId ?? null);
   if (!priced) throw new ApiError('PRICE_NOT_FOUND', { productId: product.id, branchId: input.branchId, channel: input.channel });
   if (!av) throw new ApiError('PRODUCT_UNAVAILABLE', { productId: product.id, state: 'NOT_ON_BRANCH_MENU', rule: 'NewProductAvailabilityPolicy EXPLICIT_PER_BRANCH: activate the product on this branch', reasonAr: 'الصنف لسه مش متفعل في الفرع ده' });
   const mc = menuCheck(db, product, input.branchId, input.channel, input.at);
@@ -70,7 +74,7 @@ export function quoteItem(db: DB, input: QuoteInput): Quote {
   const tax = product.taxPolicyId ? db.taxPolicies.find((t) => t.id === product.taxPolicyId) : null;
   if (!tax || !tax.active) throw new ApiError('TAX_POLICY_NOT_FOUND', { productId: product.id });
 
-  const variant: Quote['variant'] = v ? { id: v.id, name: v.name, priceDelta: m4(D(priced.amount).minus(priceFor(db, product, null, input.branchId, input.channel, input.at)?.amount ?? priced.amount)) } : null;
+  const variant: Quote['variant'] = v ? { id: v.id, name: v.name, priceDelta: m4(D(priced.amount).minus(priceFor(db, product, null, input.branchId, input.channel, input.at, input.salesChannelId ?? null)?.amount ?? priced.amount)) } : null;
   const modMultiplier = v ? D(v.modifierMultiplier || '1') : D(1);
   let base = D(priced.amount);
   const parts: LineTaxPart[] = [];
@@ -86,7 +90,7 @@ export function quoteItem(db: DB, input: QuoteInput): Quote {
     const oav = effectiveAvailability(db, other.id, input.branchId, input.at);
     if (!oav || oav.state !== 'AVAILABLE') throw new ApiError('PRODUCT_UNAVAILABLE', { productId: other.id, state: oav?.state ?? 'NOT_ON_BRANCH_MENU', reasonAr: `${other.name.ar} خلص — اختار نص تاني` });
     const ov = matchingVariant(other, v, product);
-    const op = priceFor(db, other, ov, input.branchId, input.channel, input.at);
+    const op = priceFor(db, other, ov, input.branchId, input.channel, input.at, input.salesChannelId ?? null);
     if (!op) throw new ApiError('PRICE_NOT_FOUND', { productId: other.id, branchId: input.branchId, channel: input.channel });
     const a = D(priced.amount), b = D(op.amount);
     const mode = policy<string>('HalfAndHalfPricingPolicy') ?? 'HIGHER_HALF';
@@ -184,7 +188,7 @@ export function quoteItem(db: DB, input: QuoteInput): Quote {
           nestedDetail = picks.length ? { ar: picks.map((p) => p.name.ar).join('، '), en: picks.map((p) => p.name.en).join(', ') } : undefined;
         }
       }
-      const standalone = priceFor(db, sp, sv ?? defaultVariant(sp), input.branchId, input.channel, input.at);
+      const standalone = priceFor(db, sp, sv ?? defaultVariant(sp), input.branchId, input.channel, input.at, input.salesChannelId ?? null);
       const ctax = (sp.taxPolicyId ? db.taxPolicies.find((t) => t.id === sp.taxPolicyId && t.active) : null) ?? tax;
       comps.push({ slotId: slot.id, p: sp, v: sv, upcharge: D(opt.upcharge), nested, nestedDetail, weight: standalone ? D(standalone.amount) : D(0), tax: ctax, slotName: slot.name });
     }
@@ -231,8 +235,9 @@ export function quoteItem(db: DB, input: QuoteInput): Quote {
     unitPrice: m4(base), modifiers: mods, unitTotal: m4(unitTotal), lineTotal: m4(lineTotal), priceRuleId: priced.ruleId,
     tax: { taxPolicyId: tax.id, rate: tax.rate, mode: tax.calculationMode, version: tax.version }, variant, children: children.length ? children : undefined,
     quotedAt: new Date(input.at).toISOString(),
-    variantPrices: activeVariants(product).map((x) => { const pr = priceFor(db, product, x, input.branchId, input.channel, input.at); return pr ? { variantId: x.id, unitPrice: pr.amount, source: pr.source } : null; }).filter(Boolean) as Quote['variantPrices'],
+    variantPrices: activeVariants(product).map((x) => { const pr = priceFor(db, product, x, input.branchId, input.channel, input.at, input.salesChannelId ?? null); return pr ? { variantId: x.id, unitPrice: pr.amount, source: pr.source } : null; }).filter(Boolean) as Quote['variantPrices'],
     taxSplit, display, halfAndHalf: half,
+    ...(input.salesChannelId ? (() => { const sc = salesChannelById(db, input.salesChannelId); return sc ? { salesChannel: { id: sc.id, name: sc.name, priceSource: priced.channelSource ?? 'OWN' } } : {}; })() : {}),
     menu: { restricted: mc.restricted, endsAt: mc.endsAt ? new Date(mc.endsAt).toISOString() : null, menus: mc.menus },
   };
 }

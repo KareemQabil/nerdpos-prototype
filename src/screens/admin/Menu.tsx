@@ -2,13 +2,15 @@
 // defaults, order, sub-choices, ingredients no/less/extra, sold out today), menus & dayparts, and the "sold out today" board.
 import { unitLabel } from '../inventory/common';
 import React, { useState } from 'react';
-import { Plus, Pencil, Search, Image as ImageIcon, Save, ArrowUp, ArrowDown, Star, CircleSlash, RotateCcw, Layers, Pizza, Ruler } from 'lucide-react';
+import { Plus, Pencil, Search, Image as ImageIcon, Save, ArrowUp, ArrowDown, Star, CircleSlash, RotateCcw, Layers, Pizza, Ruler, ScanSearch, Zap } from 'lucide-react';
 import { useCommand } from '../../app/hooks';
 import { Banner, Button, Card, Field, Input, Modal, Money, Pill, Section, Select, StateBadge, Switch, Table, Tabs , EmptyState } from '../../ui';
 import { Tech } from '../../app/tech';
 import { t, L, tv } from '../../i18n';
 import { LocInputs, PolicyChip, Radio, Swatch, allergenLabel, availabilityLabel, availabilityTone, useItems, usePolicy } from './catalog/common';
 import { ProductCreate, ProductDrawer, type DrawerTab } from './catalog/ProductEditor';
+import { NewProductWizard } from './catalog/NewProductWizard';
+import { useDev } from '../../app/hooks';
 import { MenusAdmin } from '../menu/MenusAdmin';
 import { SoldOutBoard } from '../menu/SoldOutBoard';
 
@@ -53,7 +55,10 @@ function Products() {
   const [active, setActive] = useState<'all' | 'true' | 'false'>('true');
   const [qText, setQ] = useState('');
   const [creating, setCreating] = useState(false);
-  const [open, setOpen] = useState<{ id: string; tab?: DrawerTab } | null>(null);
+  const { params, nav } = useDev();
+  const [wizard, setWizard] = useState(!!params?.newProduct);
+  const [open, setOpen] = useState<{ id: string; tab?: DrawerTab } | null>(params?.openProduct ? { id: params.openProduct } : null);
+  React.useEffect(() => { if (params?.openProduct) setOpen({ id: params.openProduct }); if (params?.newProduct) setWizard(true); }, [params?.openProduct, params?.newProduct]);
   const cats = useItems<any>('Category.List');
   const units = useItems<any>('Unit.List');
   const list = useItems<any>('Catalog.Search', { query: { categoryId: cat || undefined, active: active === 'all' ? undefined : active, q: qText.trim() || undefined } });
@@ -67,7 +72,8 @@ function Products() {
         <Field label={t('القسم')} className="w-52"><Select data-fb="products:category" value={cat} onChange={(e) => setCat(e.target.value)} options={[{ value: '', label: t('كل الأقسام') }, ...cats.items.map((c) => ({ value: c.id, label: L(c.name) }))]} /></Field>
         <Field label={t('الحالة')} className="w-40"><Select data-fb="products:active" value={active} onChange={(e) => setActive(e.target.value as any)} options={[{ value: 'true', label: t('الشغالة') }, { value: 'false', label: t('المؤرشفة') }, { value: 'all', label: t('الكل') }]} /></Field>
         <div className="flex-1" />
-        <Button data-fb="products:new" variant="primary" onClick={() => setCreating(true)}><Plus className="w-4 h-4" />{t('صنف جديد')}</Button>
+        <Button data-fb="products:quick" variant="ghost" onClick={() => setCreating(true)} title={t('الفورم القديمة: الاسم والسعر بس، والباقي من درج الصنف')}><Zap className="w-4 h-4" />{t('إضافة سريعة')}</Button>
+        <Button data-fb="products:new" variant="primary" onClick={() => setWizard(true)}><Plus className="w-4 h-4" />{t('صنف جديد (خطوة بخطوة)')}</Button>
       </div>
       <div className="text-[11px] text-dim">{t('{n} صنف', { n: shown.length })}</div>
       <Table maxHeight={680} loading={list.loading && !list.items.length} onRowClick={(i) => setOpen({ id: shown[i].id })}
@@ -95,9 +101,13 @@ function Products() {
           <Pill tone={availabilityTone(p.availability.state)}>{availabilityLabel(p.availability.state)}{p.availability.soldOutFor ? ' · ' + t('النهارده') : ''}</Pill>
           {p.availability.reason && <div className="text-[11px] text-dim mt-0.5 max-w-[140px] truncate" title={tv(p.availability.reason)}>{tv(p.availability.reason)}</div>}
         </button>,
-        <Button size="sm" variant="ghost" data-fb={`products:open:${p.id}`} onClick={(e) => { e.stopPropagation(); setOpen({ id: p.id }); }}><Pencil className="w-3.5 h-3.5" />{t('فتح')}</Button>,
+        <div className="flex gap-1 justify-end">
+          <Button size="sm" variant="ghost" data-fb={`products:360:${p.id}`} title={t('صفحة الصنف: السعر والتكلفة والوصفة والمبيعات')} onClick={(e) => { e.stopPropagation(); nav('item360', { kind: 'product', id: p.id }); }}><ScanSearch className="w-3.5 h-3.5" />{t('الرحلة')}</Button>
+          <Button size="sm" variant="ghost" data-fb={`products:open:${p.id}`} onClick={(e) => { e.stopPropagation(); setOpen({ id: p.id }); }}><Pencil className="w-3.5 h-3.5" />{t('فتح')}</Button>
+        </div>,
       ])} />
       <ProductCreate open={creating} onClose={() => setCreating(false)} onCreated={(id, tab) => { setCreating(false); setOpen({ id, tab }); }} />
+      <NewProductWizard open={wizard} onClose={() => setWizard(false)} />
       <ProductDrawer productId={open?.id ?? null} initialTab={open?.tab ?? 'data'} onClose={() => setOpen(null)} />
     </div>
   );

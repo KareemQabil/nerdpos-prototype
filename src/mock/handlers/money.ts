@@ -8,6 +8,8 @@ import { D, m4, add, sub, allocate, isMoney, round } from '../money';
 import { checkVersion, getOrder, need, openSessionOn, page, reasonCheck, requireFields, settlementOf, userName } from './util';
 import type { Capture, CashEntry, Session, ZReport, Order, TenderMethod } from '../types';
 import { authorizationForCapture } from './extpay'; // crm area: external authorizations
+import { paidStage, paidDateOf, recordReversal, stockForReturn, checkDisposition, approvedText, DISP_AR } from './reversals'; // r3A: refund stages S2/S3
+import { checkTenderReference, prepaidAllowed, referenceRule } from '../r3b'; // round 3: tender taxonomy + reference policy
 
 function cashEntry(ctx: Ctx, sessionId: string, kind: CashEntry['kind'], amount: string, extra: Partial<CashEntry> = {}) {
   const e: CashEntry = { id: nextId('ce'), sessionId, kind, amount: m4(amount), at: ctx.nowIso, by: ctx.user!.id, ...extra };
@@ -97,10 +99,12 @@ export const moneyHandlers: Record<string, Handler> = {
     let changeTotal = D(0);
     for (const t of tenders) {
       const method = t.method as TenderMethod;
-      if (method !== 'DEPOSIT' && !enabled.includes(method)) throw new ApiError('TENDER_METHOD_DISABLED', { method, enabled });
+      // round 3 tender taxonomy: PREPAID (ONLINE) is not a counter method — only orders from a delivery app or a payment link
+      if (method === 'ONLINE') { if (!prepaidAllowed(o, !!t.authorizationId)) throw new ApiError('TENDER_PREPAID_NOT_ALLOWED', { orderId: o.id }); }
+      else if (method !== 'DEPOSIT' && !enabled.includes(method)) throw new ApiError('TENDER_METHOD_DISABLED', { method, enabled });
       const auth = t.authorizationId ? authorizationForCapture(ctx, o, t) : null; // crm area: approved card/wallet authorization
-      const reference = (t.reference ?? auth?.reference ?? ctx.body.tenderReference ?? '').trim() || null;
-      if ((method === 'CARD' || method === 'DIGITAL_WALLET') && !reference) throw new ApiError('TENDER_REFERENCE_REQUIRED', { method });
+      // reference capture per method is a venue policy (off / optional / required); a number is never recorded twice
+      const reference = method === 'CASH' ? null : checkTenderReference(db, o, { method, walletProvider: t.walletProvider ?? null }, t.reference ?? auth?.reference ?? ctx.body.tenderReference ?? null, ctx.businessDate(o.branchId), !!auth);
       if (!isMoney(t.amount ?? t.tendered)) throw new ApiError('VALIDATION_FAILED', { field: 'amount' });
       let applied: any, change = D(0), tendered: string | null = null, roundingAdj = D(0);
       if (method === 'CASH') {
@@ -149,7 +153,7 @@ export const moneyHandlers: Record<string, Handler> = {
     const to = ctx.body.toMethod as TenderMethod;
     if (to === c!.method) throw new ApiError('TENDER_CORRECTION_SAME_METHOD');
     reasonCheck(ctx, 'TENDER_CORRECTION', ctx.body.reasonCode, ctx.body.reason);
-    if ((to === 'CARD' || to === 'DIGITAL_WALLET') && !(ctx.body.reference ?? '').trim()) throw new ApiError('TENDER_REFERENCE_REQUIRED');
+    if (referenceRule(to, c!.branchId) === 'REQUIRED' && !(ctx.body.reference ?? '').trim()) throw new ApiError('TENDER_REFERENCE_REQUIRED', { method: to }); // round 3: per-method reference policy
     const session = db.sessions.find((s) => s.id === c!.sessionId);
     if (!session || session.state !== 'OPEN') throw new ApiError('SESSION_NOT_OPEN', { reason: 'a tender is corrected inside its open drawer session' });
     const g = ctx.requireApproval({ action: 'TENDER_CORRECTION', targetType: 'payments.PaymentCapture', targetId: c!.id, context: { fromMethod: c!.method, toMethod: to, amount: c!.amount, reasonCode: ctx.body.reasonCode }, grantId: ctx.body.approvalGrantId });
@@ -280,10 +284,13 @@ export const moneyHandlers: Record<string, Handler> = {
       const ok = cross === 'ALLOW_ANY' || cap.method === ctx.body.method || (cross === 'ALLOW_TO_CASH' && ctx.body.method === 'CASH');
       if (!ok) throw new ApiError('CROSS_TENDER_REFUND_DENIED', { captureMethod: cap.method, refundMethod: ctx.body.method, policy: `RefundMethodPolicy ${cross}` });
     }
-    const r = { id: nextId('ref'), orderId: o.id, amount, method: ctx.body.method, reasonCode: ctx.body.reasonCode, reason: ctx.body.reason, state: 'REQUESTED' as const, allocations: allocs.map((a) => ({ captureId: a.captureId, amount: m4(a.amount) })), lines: ctx.body.lines ?? [], requestedBy: ctx.user!.id, requestedAt: ctx.nowIso, version: 1 };
+    // r3A: the stage decides the authority — same day (S2) or after the business day closed (S3, a linked return today)
+    const stage = paidStage(db, o);
+    const lines = (ctx.body.lines ?? []).map((l: any) => ({ lineId: l.lineId, quantity: String(l.quantity), ...(checkDisposition(l.disposition, 'lines.disposition') ? { disposition: l.disposition } : {}) }));
+    const r = { id: nextId('ref'), orderId: o.id, amount, method: ctx.body.method, reasonCode: ctx.body.reasonCode, reason: ctx.body.reason, state: 'REQUESTED' as const, allocations: allocs.map((a) => ({ captureId: a.captureId, amount: m4(a.amount) })), lines, requestedBy: ctx.user!.id, requestedAt: ctx.nowIso, version: 1, stage, afterClose: stage === 'S3', originalBusinessDate: paidDateOf(db, o) };
     db.refunds.push(r);
-    o.history.push({ at: ctx.nowIso, by: ctx.user!.id, byName: ctx.user!.displayName, kind: 'REFUND_REQUESTED', text: { ar: `طلب مرتجع ${amount} (${ctx.body.reasonCode})`, en: `refund requested ${amount}` } });
-    ctx.audit(`refund requested ${amount} on ${o.number}`, r.id, true);
+    o.history.push({ at: ctx.nowIso, by: ctx.user!.id, byName: ctx.user!.displayName, kind: 'REFUND_REQUESTED', text: { ar: `طلب ${stage === 'S3' ? 'مرتجع بعد قفل اليوم' : 'مرتجع'} ${amount} (${ctx.body.reasonCode})`, en: `refund requested ${amount}` }, terminal: ctx.terminal?.code });
+    ctx.audit(`refund requested ${amount} on ${o.number} (${stage})`, r.id, true, undefined, { stage });
     return { status: 201, body: r };
   },
   'Refund.Approve': (ctx) => {
@@ -294,13 +301,19 @@ export const moneyHandlers: Record<string, Handler> = {
     if (r!.state !== 'REQUESTED') throw new ApiError('REFUND_CASE_NOT_PENDING', { state: r!.state });
     checkVersion(r!, ctx.body.expectedVersion);
     const payout = (ctx.body.payoutMethod ?? r!.method) as TenderMethod;
-    const g = ctx.requireApproval({ action: 'REFUND_APPROVE', targetType: 'refunds.RefundCase', targetId: r!.id, context: { amount: r!.amount, reasonCode: r!.reasonCode, method: payout }, grantId: ctx.body.approvalGrantId });
+    // r3A (F2-01): the cashier runs the payout on their own device; a manager authorises there (PIN / card / finger /
+    // remote); cash leaves THAT drawer. After the day closed (S3) the third-level permission authorises it.
+    const stage = paidStage(db, o);
+    if (payout === 'CASH' && !openSessionOn(db, ctx.terminal?.id)) throw new ApiError('REFUND_NEEDS_CASHIER_DRAWER', { reason: 'a cash refund is paid out of the open drawer of the cashier device that runs it', terminal: ctx.terminal?.code ?? null });
+    const g = stage === 'S3'
+      ? ctx.requireApproval({ action: 'RETURN_AFTER_CLOSE', targetType: 'refunds.RefundCase', targetId: r!.id, context: { orderId: o.id, amount: r!.amount, originalBusinessDate: paidDateOf(db, o), reasonCode: r!.reasonCode, method: payout, stage }, grantId: ctx.body.approvalGrantId })
+      : ctx.requireApproval({ action: 'REFUND_APPROVE', targetType: 'refunds.RefundCase', targetId: r!.id, context: { amount: r!.amount, reasonCode: r!.reasonCode, method: payout }, grantId: ctx.body.approvalGrantId });
     if (g && g.approverUserId === r!.requestedBy && !ctx.body.allowSelf) throw new ApiError('SELF_APPROVAL_DENIED', { reason: 'the refund requester cannot approve it' });
     let session: Session | null = null;
     if (payout === 'CASH') {
       session = openSessionOn(db, ctx.terminal?.id);
       if (!session) throw new ApiError('SESSION_NOT_OPEN', { reason: 'a cash refund is paid out of an open drawer on this terminal' });
-      cashEntry(ctx, session.id, 'REFUND_OUT', r!.amount, { ref: o.number, approvalGrantId: g?.id });
+      cashEntry(ctx, session.id, 'REFUND_OUT', r!.amount, { ref: o.number, approvalGrantId: g?.id, reasonCode: r!.reasonCode });
     }
     r!.state = 'PAID';
     r!.decidedBy = ctx.user!.id;
@@ -310,8 +323,20 @@ export const moneyHandlers: Record<string, Handler> = {
     r!.businessDate = ctx.businessDate(o.branchId);
     r!.approvalGrantId = g?.id;
     r!.version++;
-    o.history.push({ at: ctx.nowIso, by: ctx.user!.id, byName: ctx.user!.displayName, kind: 'REFUND_PAID', text: { ar: `المرتجع اتصرف ${r!.amount} ${payout === 'CASH' ? 'كاش من الدرج' : payout}${g ? ' بموافقة ' + userName(db, g.approverUserId) : ''}`, en: `refund paid ${r!.amount} ${payout}` } });
-    ctx.audit(`refund paid ${r!.amount} ${payout}`, r!.id, true, g?.id);
+    const drawerOwner = session ? session.userId : null;
+    Object.assign(r!, { stage, afterClose: stage === 'S3', originalBusinessDate: paidDateOf(db, o), approverId: g?.approverUserId ?? null, paidBy: ctx.user!.id, drawerOwnerId: drawerOwner, paidTerminalId: ctx.terminal?.id ?? null });
+    // trace per returned line (or the amount alone) with the item disposition and its stock effect
+    const lineRows = r!.lines.length ? r!.lines : [null];
+    const allocated = allocate(r!.amount, lineRows.map((x) => { const l = x && o.lines.find((y) => y.id === x.lineId); return l ? D(l.unitTotal).times(x!.quantity) : D(1); }), 2);
+    lineRows.forEach((x, i) => {
+      const l = x ? o.lines.find((y) => y.id === x.lineId) ?? null : null;
+      const disp = x?.disposition ?? (l ? 'WASTE_HELD' : null);
+      if (l && x) stockForReturn(ctx, o, l, x.quantity, disp);
+      recordReversal(ctx, { o, line: l, name: l ? undefined : { ar: 'مبلغ من الشيك', en: 'Amount of the check' }, quantity: x?.quantity ?? '1', value: allocated[i], stage, kind: stage === 'S3' ? 'RETURN_AFTER_CLOSE' : 'REFUND', grant: g, reasonCode: r!.reasonCode, reason: r!.reason, disposition: disp, sessionId: session?.id ?? null, refundId: r!.id, afterClose: stage === 'S3' });
+    });
+    const dispText = r!.lines.map((x) => x.disposition ? DISP_AR[x.disposition] : '').filter(Boolean)[0];
+    o.history.push({ at: ctx.nowIso, by: ctx.user!.id, byName: ctx.user!.displayName, terminal: ctx.terminal?.code, kind: 'REFUND_PAID', text: { ar: `${stage === 'S3' ? `مرتجع بعد قفل يوم ${paidDateOf(db, o)} — اتسجل على يوم ${ctx.businessDate(o.branchId)} — ` : ''}المرتجع اتصرف ${Number(r!.amount).toFixed(2)} ج.م ${payout === 'CASH' ? `كاش من درج ${userName(db, drawerOwner)}` : payout}${dispText ? ` (${dispText})` : ''} — ${approvedText(db, g)}`, en: `refund paid ${r!.amount} ${payout}` }, data: { stage, grantId: g?.id, approverId: g?.approverUserId, sessionId: session?.id } });
+    ctx.audit(`refund paid ${r!.amount} ${payout} (${stage})`, r!.id, true, g?.id, { stage });
     if (ctx.terminal) enqueuePrint(db, { documentType: 'RECEIPT', documentId: r!.id, copyKind: 'ORIGINAL', terminalId: ctx.terminal.id, createdBy: ctx.user!.id, label: `إيصال مرتجع ${o.number}` });
     return r;
   },
@@ -329,7 +354,7 @@ export const moneyHandlers: Record<string, Handler> = {
     r!.state = 'CANCELLED'; r!.version++;
     return r;
   },
-  'Refund.Find': (ctx) => page(ctx.db.refunds.filter((r) => ctx.db.orders.find((o) => o.id === r.orderId)?.branchId === ctx.branchId).map((r) => ({ ...r, orderNumber: ctx.db.orders.find((o) => o.id === r.orderId)?.number })), ctx.query),
+  'Refund.Find': (ctx) => page(ctx.db.refunds.filter((r) => ctx.db.orders.find((o) => o.id === r.orderId)?.branchId === ctx.branchId).map((r) => ({ ...r, orderNumber: ctx.db.orders.find((o) => o.id === r.orderId)?.number, requestedByName: userName(ctx.db, r.requestedBy), approverName: r.approverId ? userName(ctx.db, r.approverId) : null, drawerOwnerName: r.drawerOwnerId ? userName(ctx.db, r.drawerOwnerId) : null, paidByName: r.paidBy ? userName(ctx.db, r.paidBy) : null })), ctx.query),
   'Refund.Get': (ctx) => {
     const r = ctx.db.refunds.find((x) => x.id === ctx.params.refundCaseId);
     need(r, 'REFUNDS_REFUNDCASE_NOT_FOUND');
@@ -405,5 +430,6 @@ export function refundable(ctx: Ctx, o: Order) {
     return { lineId: l.id, name: l.name, quantity: l.quantity, refundedQuantity: (refundedQty.get(l.id) ?? D(0)).toString(), unitRefundable: round(unit, 2), lineRefundable: shares[i] };
   });
   const st = settlementOf(db, o);
-  return { captures, lines, effectivePaid: st.effectivePaid, payable: t.payable };
+  // r3A: the stage tells the screen who must authorise (same day vs after the day closed) and where it is booked
+  return { captures, lines, effectivePaid: st.effectivePaid, payable: t.payable, stage: paidStage(db, o), paidBusinessDate: paidDateOf(db, o), bookedOn: ctx.businessDate(o.branchId), kind: o.kind };
 }

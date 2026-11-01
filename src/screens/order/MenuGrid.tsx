@@ -3,13 +3,14 @@
 // Menu area: only what is on a running menu for this channel shows (dayparts on the mock clock); sold-out-today
 // items show as "خلص"; a "خلص النهارده" board is one tap away; pictures, calories and allergens on the tiles.
 import React, { useEffect, useMemo, useState } from 'react';
+import { policy } from '../../mock/policies'; // round 3: SecondLanguagePolicy.menu (read-only)
 import { Package, Search, AlertTriangle, PackageX, Clock, Eye, EyeOff, Layers, Pizza, Ruler } from 'lucide-react';
 import { useDev, useQuery } from '../../app/hooks';
 import { call, ApiFailure } from '../../api/client';
 import { clock } from '../../mock/clock';
 import { Pill, StateBadge, Input, Modal, Button, EmptyState, Skeleton } from '../../ui';
 import { Tech } from '../../app/tech';
-import { t, L, tv } from '../../i18n';
+import { t, L, tv, getLang } from '../../i18n';
 import { cn, money } from '../../lib/format';
 import { SoldOutBoard } from '../menu/SoldOutBoard';
 import { timeText } from '../menu/parts';
@@ -23,21 +24,23 @@ export const ALLERGEN_AR: Record<string, string> = { GLUTEN: 'جلوتين', DAI
 /** The minimum selection a tile is quoted with (required groups' default options and their required sub-choices). */
 export interface TileSelection { modifierOptionIds: string[]; nestedOptionIds?: Record<string, string[]> }
 
-export function useTileQuotes(productIds: string[], channel: string, branchId: string | null, epoch: string) {
+export function useTileQuotes(productIds: string[], channelIn: string, branchId: string | null, epoch: string, salesChannelId?: string | null) {
   const { auth } = useDev();
+  const channel = channelIn; // r3C: the cache key carries the sales channel too (its own prices)
+  const ck = salesChannelId ? `${channelIn}@${salesChannelId}` : channelIn;
   const [, force] = useState(0);
   useEffect(() => {
     let alive = true;
     const now = Date.now();
     const todo = productIds.filter((id) => {
-      const c = cache.get(`${epoch}|${channel}|${id}`);
+      const c = cache.get(`${epoch}|${ck}|${id}`);
       return !c || now - c.at > 60_000;
     });
     Promise.all(todo.map((id) => {
-      const key = `${epoch}|${channel}|${id}`;
+      const key = `${epoch}|${ck}|${id}`;
       if (inflight.has(key)) return inflight.get(key);
       const sel = defaultSel(id);
-      const p = call(auth, 'Pricing.QuoteItem', { params: { productId: id }, body: { branchId, channel, productId: id, quantity: '1', modifierOptionIds: sel.modifierOptionIds, nestedOptionIds: sel.nestedOptionIds } })
+      const p = call(auth, 'Pricing.QuoteItem', { params: { productId: id }, body: { branchId, channel, ...(salesChannelId ? { salesChannelId } : {}), productId: id, quantity: '1', modifierOptionIds: sel.modifierOptionIds, nestedOptionIds: sel.nestedOptionIds } })
         .then((r) => { cache.set(key, { data: r.data, at: Date.now() }); })
         .catch((e) => { cache.set(key, { error: e, at: Date.now() }); })
         .finally(() => inflight.delete(key));
@@ -46,8 +49,8 @@ export function useTileQuotes(productIds: string[], channel: string, branchId: s
     })).then(() => alive && force((x) => x + 1));
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productIds.join(','), channel, branchId, epoch]);
-  return (id: string) => cache.get(`${epoch}|${channel}|${id}`);
+  }, [productIds.join(','), ck, branchId, epoch]);
+  return (id: string) => cache.get(`${epoch}|${ck}|${id}`);
 }
 
 // a tile is quoted with the minimum required selection; the server tells us which groups need one
@@ -87,7 +90,7 @@ function useClockTick(onTick: () => void) {
   }, []);
 }
 
-export function MenuGrid({ channel, onPick, disabled }: { channel: string; onPick: (p: any) => void; disabled?: boolean }) {
+export function MenuGrid({ channel, onPick, disabled, salesChannelId }: { channel: string; onPick: (p: any) => void; disabled?: boolean; salesChannelId?: string | null }) {
   const { auth, can } = useDev();
   const cats = useQuery<any>('Category.List', { query: { active: true } });
   const products = useQuery<any>('Catalog.Search', { query: { active: true, limit: 500, channel } });
@@ -113,7 +116,7 @@ export function MenuGrid({ channel, onPick, disabled }: { channel: string; onPic
   const visible = listed.filter((p) => (!cat || p.categoryId === cat) && (!q || (p.name.ar + p.name.en + p.sku).toLowerCase().includes(q.toLowerCase())));
   const soldOutCount = items.filter((p) => p.availability?.state === 'SOLD_OUT').length + gs.reduce((a, g) => a + g.options.filter((o: any) => o.soldOut).length, 0);
   const epoch = useMemo(() => items.map((p) => `${p.id}:${p.version}:${p.availability?.state}:${p.menuNow?.onMenu ?? ''}`).join(',') + '|' + gs.map((g) => `${g.id}:${g.version}:${g.options.filter((o: any) => o.soldOut).map((o: any) => o.id).join('.')}`).join(',') + '|' + JSON.stringify(display.data?.value ?? null) + '|' + Math.floor(clock.offset() / 60000), [items, gs, display.data, minute]); // eslint-disable-line react-hooks/exhaustive-deps
-  const quoteOf = useTileQuotes(groups.data ? visible.filter(onMenu).map((p) => p.id) : [], channel, auth.branchId, epoch);
+  const quoteOf = useTileQuotes(groups.data ? visible.filter(onMenu).map((p) => p.id) : [], channel, auth.branchId, epoch, salesChannelId);
   const catsShown = (cats.data?.items ?? []).filter((c: any) => listed.some((p) => p.categoryId === c.id));
   const running = (overview.data?.dayparts ?? []).filter((d: any) => d.runningNow);
   const nextUp = (overview.data?.dayparts ?? []).filter((d: any) => !d.runningNow && d.active && d.nextStart).sort((a: any, b: any) => a.nextStart.localeCompare(b.nextStart))[0];
@@ -201,6 +204,7 @@ function Tile({ p, quote, onPick, disabled }: { p: any; quote?: QuoteState; onPi
       </div>
       <div className="p-2.5 flex flex-col gap-0.5">
         <div className="font-bold text-sm leading-tight truncate">{L(p.name)}</div>
+        {menuSecondLang() && otherName(p.name) && <div className="text-[10px] text-dim leading-tight truncate" data-fb="tile-name2">{otherName(p.name)}</div>}
                 <span className="num text-[var(--primary)] font-extrabold text-[15px]" style={{ textAlign: 'start' }}>{d ? money(d.display?.unitTotal ?? d.unitTotal) : quote || off ? '—' : '…'}</span>
         {d?.display?.taxIncluded && <span className="text-[9px] text-dim leading-none">{L(d.display.label)}</span>}
         {p.calories != null && <div className="text-[9px] text-dim num">{p.calories} {t('سعر حراري')}</div>}
@@ -208,4 +212,13 @@ function Tile({ p, quote, onPick, disabled }: { p: any; quote?: QuoteState; onPi
       </div>
     </button>
   );
+}
+
+// round 3 (E16/P1-034): the item's second-language name on the menu tiles when SecondLanguagePolicy.menu is on —
+// only when the item has a second name (never machine translated).
+function menuSecondLang(): boolean { return !!policy<{ menu?: boolean }>('SecondLanguagePolicy')?.menu; }
+function otherName(n: { ar: string; en: string } | null | undefined): string | null {
+  const a = (n?.ar ?? '').trim(); const e = (n?.en ?? '').trim();
+  if (!a || !e || a === e) return null;
+  return getLang() === 'ar' ? e : a;
 }

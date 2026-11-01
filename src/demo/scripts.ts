@@ -12,6 +12,7 @@ import { runOutbox } from '../mock/outbox';
 import { ApiFailure } from '../api/client';
 import { egp } from './humanLog';
 import { personaDisplayName, userLabel, deviceName, branchLabel } from './people';
+import { CONTROL_JOURNEY } from './journey-control'; // r3A: who did it vs who allowed it
 
 export interface StepText { who: string; do_ar: string; do_en: string; expect_ar: string; expect_en: string; note?: string; operations: { op: string; http: string; actor: string; expected: string }[] }
 export interface StepDef { before?: () => void; id: string; device: string; user: string; screen?: string | (() => [string, Record<string, any>]); run: (log: Logger) => Promise<void>; text?: StepText }
@@ -78,7 +79,8 @@ const R1: StepDef[] = [
     const tea = order(id).lines.find((l) => l.productId === 'p_tea' && l.status === 'ACTIVE' && l.fireRound === null)!;
     await api(w, 'Order.UpdateLine', { params: { orderId: id, lineId: tea.id }, body: { expectedVersion: order(id).version, expectedLineVersion: tea.version, quantity: '3' } }, log, 'tea → 3');
     const salad = order(id).lines.find((l) => l.productId === 'p_green_salad' && l.status === 'ACTIVE')!;
-    await api(w, 'Order.RemoveLine', { params: { orderId: id, lineId: salad.id }, body: { expectedVersion: order(id).version, expectedLineVersion: salad.version }, query: { expectedVersion: order(id).version, expectedLineVersion: salad.version } }, log, 'remove salad');
+    // r3A [OWNER]: every removal before payment needs a manager — even before it is sent — and it is traced
+    await withApproval(w, 'Order.RemoveLine', { params: { orderId: id, lineId: salad.id }, body: { expectedVersion: order(id).version, expectedLineVersion: salad.version, reasonCode: 'CUSTOMER_CHANGED_MIND' }, query: { expectedVersion: order(id).version, expectedLineVersion: salad.version } }, 'demo-manager-1', log, 'remove salad (manager approves on the tablet)');
     const kofta = order(id).lines.find((l) => l.productId === 'p_kofta')!;
     await expectRefusal(api(w, 'Order.UpdateLine', { params: { orderId: id, lineId: kofta.id }, body: { expectedVersion: order(id).version, expectedLineVersion: kofta.version, quantity: '3' } }), 'LINE_ALREADY_FIRED', log, 'change kofta qty', t('محاولة تغيير كمية الكفتة'));
   } },
@@ -502,9 +504,10 @@ const F1: StepDef[] = [
     await api(c, 'Order.Confirm', { params: { orderId: o.id }, body: { expectedVersion: order(o.id).version } }, log, 'confirm');
     await api(c, 'Payment.Capture', { params: { orderId: o.id }, body: { tenders: [{ method: 'CASH', tendered: '100' }] } }, log, 'cash');
     await api(c, 'Order.Complete', { params: { orderId: o.id }, body: { expectedVersion: order(o.id).version } }, log, 'complete — sale done');
-    for (let i = 0; i < 6; i++) { clock.advance(6 * 60_000); runOutbox(); }
+    // trusted time: the clock never moves — the waiting retries are made due instead (the job's own next-try time)
+    for (let i = 0; i < 6; i++) { const pj = store.db.printJobs.find((x) => x.documentId === o.id); if (pj && (pj.state === 'FAILED' || pj.state === 'PENDING')) pj.nextAtMs = 0; runOutbox(); }
     const j = store.db.printJobs.find((x) => x.documentId === o.id)!;
-    log({ ok: j.state === 'DEAD', text: `print job ${j.id}: ${j.state} after ${j.attempts.length} attempts (clock moved forward)`, plain: j.state === 'DEAD' ? t('أمر الطباعة فشل {n} مرات واتوقف ومستني حد يعيده — والبيع خلص عادي', { n: j.attempts.length }) : t('أمر الطباعة لسه بيحاول') });
+    log({ ok: j.state === 'DEAD', text: `print job ${j.id}: ${j.state} after ${j.attempts.length} attempts (retries made due, clock untouched)`, plain: j.state === 'DEAD' ? t('أمر الطباعة فشل {n} مرات واتوقف ومستني حد يعيده — والبيع خلص عادي', { n: j.attempts.length }) : t('أمر الطباعة لسه بيحاول') });
   } },
   { id: 'J-F1-4', device: 't_floor', user: 'demo-waiter-1', screen: 'floor', text: { who: 'demo-waiter-1 on T2', do_ar: 'شاشة المطبخ واقعة: KDS DOWN، والويتر يبعت جولة. بعدين نرجّعها ونعمل إعادة إرسال.', do_en: 'Kitchen screen down: KDS DOWN, the waiter sends a round. Then bring it back and re-send.', expect_ar: 'الجولة بتتسجل والشيك بيعرض "ما وصلش المطبخ" + إعادة إرسال. إعادة الإرسال بتعمل التذاكر مرة واحدة بس.', expect_en: 'The round is recorded; the check shows "not delivered" with re-send. Re-send creates the tickets exactly once.', operations: [{ op: 'Kitchen.Resend', http: 'POST /orders/{orderId}/kitchen/resend', actor: 'waiter', expected: 'no duplicate' }] }, run: async (log) => {
     sim.set({ kds: 'DOWN' });
@@ -523,7 +526,7 @@ const F1: StepDef[] = [
     log({ ok: store.db.tickets.filter((t) => t.orderId === o.id).length === 2, text: `tickets for this check: ${store.db.tickets.filter((t) => t.orderId === o.id).length} (one per station)`, plain: t('المطبخ استلم {n} طلب (واحد لكل محطة) — من غير تكرار', { n: store.db.tickets.filter((x) => x.orderId === o.id).length }) });
     devices.navigate('t_floor', 'order', { orderId: o.id, back: 'floor' });
   } },
-  { id: 'J-F1-5', device: 't_admin', user: 'demo-manager-1', screen: 'ereceipts', text: { who: 'demo-manager-1 on ADMIN', do_ar: 'منصة الإيصال الإلكتروني واقعة يوم: ETA DOWN، بيع يتقفل، والساعة تتقدم 12 ثم 20 ساعة، وبعدين ETA ترجع.', do_en: 'E-receipt platform down for a day: ETA DOWN, a sale completes, the clock moves 12 h then 20 h, then ETA comes back.', expect_ar: 'البيع خلص. الإيصال في الطابور، تنبيه عند 12 ساعة و20 ساعة قبل مهلة 24 ساعة. لما المنصة ترجع بيتقبل.', expect_en: 'The sale is done. The document queues; alerts at 12 h and 20 h before the 24 h deadline. Accepted when the platform returns.', operations: [{ op: 'Compliance.Find', http: 'GET /compliance/documents', actor: 'manager', expected: 'queue + alerts' }] }, run: async (log) => {
+  { id: 'J-F1-5', device: 't_admin', user: 'demo-manager-1', screen: 'ereceipts', text: { who: 'demo-manager-1 on ADMIN', do_ar: 'منصة الإيصال الإلكتروني واقعة يوم: ETA DOWN، بيع يتقفل، وبعدين الإيصال يبقى عمره 12 ثم 20 ساعة (بنعتّق السجل — الساعة ما بتتحركش)، وبعدين ETA ترجع.', do_en: 'E-receipt platform down for a day: ETA DOWN, a sale completes, the receipt is aged to 12 h then 20 h (the record is aged — the clock never moves), then ETA comes back.', expect_ar: 'البيع خلص. الإيصال في الطابور، تنبيه عند 12 ساعة و20 ساعة قبل مهلة 24 ساعة. لما المنصة ترجع بيتقبل.', expect_en: 'The sale is done. The document queues; alerts at 12 h and 20 h before the 24 h deadline. Accepted when the platform returns.', operations: [{ op: 'Compliance.Find', http: 'GET /compliance/documents', actor: 'manager', expected: 'queue + alerts' }] }, run: async (log) => {
     sim.set({ eta: 'DOWN' });
     log({ ok: null, text: 'simulator: ETA DOWN', plain: t('جهّزنا العطل: منظومة الإيصال الإلكتروني واقعة') });
     const c = await as('t_cash', 'demo-cashier-a', log);
@@ -534,10 +537,12 @@ const F1: StepDef[] = [
     await api(c, 'Payment.Capture', { params: { orderId: o.id }, body: { tenders: [{ method: 'CASH', tendered: '300' }] } }, log, 'cash');
     await api(c, 'Order.Complete', { params: { orderId: o.id }, body: { expectedVersion: order(o.id).version } }, log, 'complete');
     runOutbox();
-    clock.advance(12 * 3_600_000 + 60_000); runOutbox(); await sleep(2100); runOutbox();
-    clock.advance(8 * 3_600_000); await sleep(2100); runOutbox();
+    // trusted time: the clock never moves — the e-receipt record is aged instead (as if the sale was 12 h, then 20 h ago)
+    const ageDoc = (h: number) => { const d = store.db.fiscalDocuments.find((x) => x.orderId === o.id); if (d) { d.createdAtMs = clock.now() - h * 3_600_000; d.createdAt = new Date(d.createdAtMs).toISOString(); } store.commit(); };
+    ageDoc(12 + 1 / 60); runOutbox(); await sleep(2100); runOutbox();
+    ageDoc(20 + 1 / 60); await sleep(2100); runOutbox();
     const doc = store.db.fiscalDocuments.find((d) => d.orderId === o.id)!;
-    log({ ok: true, text: `document ${doc.state}; alerts: ${store.db.alerts.filter((a) => a.ref?.endsWith(doc.id)).map((a) => a.kind + ' ' + a.severity).join(', ')}`, plain: t('الساعة اتقدمت: الإيصال مستني في الطابور، وطلع {n} تنبيه للمدير', { n: store.db.alerts.filter((a) => a.ref?.endsWith(doc.id)).length }) });
+    log({ ok: true, text: `document ${doc.state}; alerts: ${store.db.alerts.filter((a) => a.ref?.endsWith(doc.id)).map((a) => a.kind + ' ' + a.severity).join(', ')} (record aged, clock untouched)`, plain: t('الإيصال بقاله 20 ساعة مستني في الطابور (بيانات قديمة متجهزة — الوقت ما اتغيرش)، وطلع {n} تنبيه للمدير', { n: store.db.alerts.filter((a) => a.ref?.endsWith(doc.id)).length }) });
     sim.set({ eta: 'UP' });
     doc.nextTryAtMs = 0; runOutbox();
     log({ ok: store.db.fiscalDocuments.find((d) => d.id === doc.id)!.state === 'ACCEPTED', text: `ETA back up → ${store.db.fiscalDocuments.find((d) => d.id === doc.id)!.state}`, plain: store.db.fiscalDocuments.find((d) => d.id === doc.id)!.state === 'ACCEPTED' ? t('المنظومة رجعت والإيصال اتقبل') : t('المنظومة رجعت بس الإيصال لسه ما اتقبلش') });
@@ -554,4 +559,5 @@ export const JOURNEYS: Journey[] = [
   { id: 'J-A1', title: 'تركيب مطعم من الصفر (J-A1)', titleEn: 'Setup from zero (J-A1)', reset: 'ZERO', intro: 'من سيرفر فاضي: النشاط، الفرع، الأجهزة، الأدوار والناس، بروفايل مصر، الضريبة، الأسباب، استيراد المنيو، الترابيزات والمحطات، التسجيل الضريبي، أول بيع وأول قفل وتقارير.', steps: withText(A1) },
   { id: 'J-C1', title: 'كاونتر وتيك أواي', titleEn: 'Counter & takeaway', reset: null, intro: 'طلب تيك أواي، الدفع الأول (الإرسال للمطبخ وقت التأكيد)، والإيصال ونسخته.', steps: C1 },
   { id: 'J-F1', title: 'سيناريوهات الأعطال', titleEn: 'Failure journeys', reset: null, intro: 'رد ضايع في الدفع، جهازين على نفس الشيك، طابعة واقعة، شاشة مطبخ واقعة وإعادة إرسال، ومنصة الإيصال الإلكتروني واقعة يوم كامل.', steps: F1 },
+  CONTROL_JOURNEY, // r3A
 ];

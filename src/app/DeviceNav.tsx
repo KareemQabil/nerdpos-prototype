@@ -5,9 +5,10 @@ import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } fro
 import { createPortal } from 'react-dom';
 import {
   Search, ChevronDown, LogOut, PanelRightClose, PanelRightOpen, CornerDownLeft,
-  LayoutDashboard, ConciergeBell, Wallet, Bike, Contact, Boxes, BookOpen, FileBarChart, Settings2, Landmark, Activity,
+  LayoutDashboard, ConciergeBell, Wallet, Bike, Contact, Boxes, BookOpen, FileBarChart, Settings2, Landmark, Activity, Star,
 } from 'lucide-react';
-import { useDev } from './hooks';
+import { useDev, useQuery } from './hooks';
+import { REF_TYPES, refType, refTypeLabel, refTarget, follow, useFollowList, refsParam, TONE_DOT, type RefType, type StatusView } from '../screens/search/refs';
 import { devices } from './devices';
 import { SCREENS, SCREEN_GROUPS, type Kind, type ScreenDef, type ScreenGroup } from './registry';
 import { call } from '../api/client';
@@ -98,7 +99,8 @@ export function Sidebar({ paneWidth, compact }: { paneWidth: number; compact?: b
   const badges = useBadges(branchId);
   const autoWide = paneWidth >= 1180 && !compact;
   const wide = p.mode === 'wide' ? paneWidth >= 760 : p.mode === 'rail' ? false : autoWide;
-  const [palette, setPalette] = useState(false);
+  const [palette, setPalette] = useState<false | true | 'follow'>(false);
+  const followed = useFollowList(me?.user?.id);
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K' || e.code === 'KeyK')) {
@@ -131,9 +133,14 @@ export function Sidebar({ paneWidth, compact }: { paneWidth: number; compact?: b
             {wide ? <PanelRightClose className="w-4 h-4 ltr:-scale-x-100" /> : <PanelRightOpen className="w-4 h-4 ltr:-scale-x-100" />}
           </button>
         </div>
-        <button data-fb="nav-search" onClick={() => setPalette(true)} title={t('دوّر على شاشة (Ctrl+K)')} className={cn('sb-input rounded-xl flex items-center gap-2 text-xs w-full transition-colors', wide ? 'h-9 px-2.5' : 'h-9 justify-center')}>
+        <button data-fb="nav-search" onClick={() => setPalette(true)} title={t('دوّر على شاشة أو أي حاجة (Ctrl+K)')} className={cn('sb-input rounded-xl flex items-center gap-2 text-xs w-full transition-colors', wide ? 'h-9 px-2.5' : 'h-9 justify-center')}>
           <Search className="w-4 h-4 sb-dim shrink-0" />
-          {wide && <><span className="sb-dim flex-1 text-start truncate">{t('دوّر على شاشة')}</span><Kbd className="!bg-transparent">Ctrl K</Kbd></>}
+          {wide && <><span className="sb-dim flex-1 text-start truncate">{t('دوّر على أي حاجة')}</span><Kbd className="!bg-transparent">Ctrl K</Kbd></>}
+        </button>
+        <button data-fb="nav-follow" onClick={() => setPalette('follow')} title={t('متابعاتي — الحاجات اللي بتتابعها وحالتها دلوقتي')} className={cn('sb-item rounded-xl flex items-center gap-2 text-xs w-full', wide ? 'h-8 px-2.5' : 'h-8 justify-center')}>
+          <Star className={cn('w-4 h-4 shrink-0', followed.length ? 'fill-current text-amber-400' : 'sb-dim')} />
+          {wide && <span className="flex-1 text-start truncate sb-dim">{t('متابعاتي')}</span>}
+          {followed.length > 0 && <span className="num min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-black text-[10px] font-bold flex items-center justify-center">{followed.length}</span>}
         </button>
       </div>
 
@@ -187,7 +194,7 @@ export function Sidebar({ paneWidth, compact }: { paneWidth: number; compact?: b
           </>
         )}
       </div>
-      {palette && <CommandPalette sections={sections} onClose={() => setPalette(false)} />}
+      {palette && <CommandPalette sections={sections} initial={palette === 'follow' ? 'follow' : undefined} onClose={() => setPalette(false)} />}
     </aside>
   );
 }
@@ -225,61 +232,129 @@ function RailItem({ s, label, group, active, badge, onClick }: { s: ScreenDef; l
   );
 }
 
-// ───────── quick screen search
-const norm = (s: string) => s.toLowerCase().replace(/[ً-ٰٟ]/g, '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[—\-–·،,()]/g, ' ').replace(/\s+/g, ' ').trim();
+// ───────── quick search: screens AND records (dishes, ingredients, suppliers, purchasing documents, checks, customers,
+// people) with typed chips, keyboard navigation and "تابع" (follow) — round 3, F2-04.
+const norm = (s: string) => s.toLowerCase().replace(/[ً-ٰٟ]/g, '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[—\-–·،,()]/g, ' ').replace(/\s+/g, ' ').trim();
 
-function CommandPalette({ sections, onClose }: { sections: NavSection[]; onClose: () => void }) {
-  const { nav, screen, id } = useDev();
+type Entry = { kind: 'screen'; s: ScreenDef; sec: NavSection; group: string } | { kind: 'record'; r: StatusView; group: string; followed: boolean };
+type Filter = 'all' | 'screens' | RefType;
+
+function CommandPalette({ sections, onClose, initial }: { sections: NavSection[]; onClose: () => void; initial?: 'follow' }) {
+  const { nav, screen, id, me } = useDev();
   const lang = useLang();
+  const userId: string | undefined = me?.user?.id;
   const [q, setQ] = useState('');
+  const [filter, setFilter] = useState<Filter>('all');
   const [sel, setSel] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
-  const flat = sections.flatMap((sec) => sec.items.map((s) => ({ s, sec })));
+  const followed = useFollowList(userId);
   const nq = norm(q);
-  const results = nq ? flat.filter(({ s, sec }) => nq.split(' ').every((w) => norm(`${s.title} ${s.titleEn} ${sec.title} ${L(SCREEN_GROUPS[sec.group])} ${s.code}`).includes(w))) : flat;
-  useEffect(() => setSel(0), [q]);
+  const recQ = useQuery<any>(nq.length >= 2 && filter !== 'screens' ? 'Search.Global' : null, { query: { q: q.trim(), types: filter !== 'all' && filter !== 'screens' ? filter : undefined } });
+  const folQ = useQuery<any>(!nq && followed.length ? 'Search.Status' : null, { query: { refs: refsParam(followed) } });
+  const flat = sections.flatMap((sec) => sec.items.map((s) => ({ s, sec })));
+  const screenHits = filter !== 'all' && filter !== 'screens' ? [] : nq ? flat.filter(({ s, sec }) => nq.split(' ').every((w) => norm(`${s.title} ${s.titleEn} ${sec.title} ${L(SCREEN_GROUPS[sec.group])} ${s.code}`).includes(w))) : flat;
+  const isF = (r: { type: string; id: string }) => followed.some((x) => x.type === r.type && x.id === r.id);
+  const entries: Entry[] = [];
+  if (!nq && initial === 'follow' || (!nq && followed.length)) for (const r of (folQ.data?.items ?? []) as StatusView[]) entries.push({ kind: 'record', r, group: t('متابعاتي'), followed: true });
+  if (nq) for (const r of (recQ.data?.items ?? []) as StatusView[]) entries.push({ kind: 'record', r, group: refTypeLabel(r.type), followed: isF(r) });
+  if (!(initial === 'follow' && !nq)) for (const x of screenHits) entries.push({ kind: 'screen', s: x.s, sec: x.sec, group: nq ? t('الشاشات') : x.sec.title });
+  const counts: Record<string, number> = recQ.data?.counts ?? {};
+  const typeChips = REF_TYPES.filter((x) => counts[x.type] || filter === x.type);
+  const chips: { id: Filter; label: string; n?: number }[] = [{ id: 'all', label: t('الكل') }, { id: 'screens', label: t('الشاشات') }, ...typeChips.map((x) => ({ id: x.type as Filter, label: t(x.ar), n: counts[x.type] }))];
+  useEffect(() => setSel(0), [q, filter]);
   useEffect(() => { listRef.current?.querySelector(`[data-idx="${sel}"]`)?.scrollIntoView({ block: 'nearest' }); }, [sel]);
-  const go = (sid: string) => { nav(sid); onClose(); };
+  const open = (e: Entry) => {
+    if (e.kind === 'screen') nav(e.s.id);
+    else { const tg = refTarget(e.r); nav(tg.screen, tg.params); }
+    onClose();
+  };
+  const toggleFollow = (e: Entry) => { if (e.kind === 'record' && userId) follow.toggle(userId, { type: e.r.type, id: e.r.id }); };
   const onKey = (e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowDown') { e.preventDefault(); setSel((x) => Math.min(results.length - 1, x + 1)); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); setSel((x) => Math.min(entries.length - 1, x + 1)); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setSel((x) => Math.max(0, x - 1)); }
-    else if (e.key === 'Enter' && results[sel]) { e.preventDefault(); go(results[sel].s.id); }
+    else if (e.key === 'Tab') { e.preventDefault(); const i = chips.findIndex((c) => c.id === filter); setFilter(chips[(i + (e.shiftKey ? chips.length - 1 : 1)) % chips.length].id); }
+    else if (e.key === 'Enter' && entries[sel]) { e.preventDefault(); if (e.shiftKey) toggleFollow(entries[sel]); else open(entries[sel]); }
     else if (e.key === 'Escape') { e.preventDefault(); onClose(); }
   };
   let lastGroup = '';
+  const loading = recQ.loading && nq.length >= 2;
   return createPortal(
-    <div className="fixed inset-x-0 bottom-0 top-12 z-[75] flex items-start justify-center pt-[10vh] px-4" role="dialog" aria-modal aria-label={t('دوّر على شاشة')} data-device={id}>
+    <div className="fixed inset-x-0 bottom-0 top-12 z-[75] flex items-start justify-center pt-[8vh] px-4" role="dialog" aria-modal aria-label={t('دوّر')} data-device={id}>
       <div className="absolute inset-0 glass-overlay animate-fade-in" onClick={onClose} />
-      <div className="relative w-full max-w-xl overlay-panel rounded-2xl overflow-hidden animate-scale-in" onKeyDown={onKey}>
+      <div className="relative w-full max-w-2xl overlay-panel rounded-2xl overflow-hidden animate-scale-in" onKeyDown={onKey}>
         <div className="flex items-center gap-3 px-4 h-14 border-b line">
           <Search className="w-5 h-5 text-dim shrink-0" />
-          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('دوّر على شاشة… (مثلًا: المخزن، الوردية، العروض)')} className="flex-1 bg-transparent !outline-none text-base min-w-0" data-fb="palette-input" />
+          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('دوّر على أي حاجة… طبق، خامة، مورد، أمر شراء، شيك، عميل، شاشة')} className="flex-1 bg-transparent !outline-none text-base min-w-0" data-fb="palette-input" />
+          {loading && <span className="w-4 h-4 rounded-full border-2 border-[var(--primary)] border-t-transparent animate-spin" />}
           <Kbd>Esc</Kbd>
         </div>
-        <div ref={listRef} className="max-h-[52vh] overflow-y-auto p-2">
-          {results.length === 0 && <div className="py-10 text-center text-sm text-dim">{t('مفيش شاشة بالاسم ده. جرّب كلمة تانية.')}</div>}
-          {results.map(({ s, sec }, i) => {
-            const header = sec.group !== lastGroup ? (lastGroup = sec.group, <div key={`h-${sec.group}`} className="px-2 pt-2 pb-1 text-[11px] font-bold text-dim">{sec.title}</div>) : null;
-            const Icon = s.icon;
+        {nq.length >= 2 && (
+          <div className="flex items-center gap-1.5 px-3 py-2 border-b line overflow-x-auto scrollbar-hide" role="tablist" aria-label={t('نوع النتيجة')}>
+            {chips.map((c) => (
+              <button key={c.id} role="tab" aria-selected={filter === c.id} data-fb={`palette-chip:${c.id}`} onClick={() => setFilter(c.id)}
+                className={cn('shrink-0 h-7 px-2.5 rounded-full text-xs border transition-colors', filter === c.id ? 'bg-[var(--primary)] text-[var(--primary-foreground)] border-transparent font-bold' : 'surface-1 border-[var(--glass-border)] text-soft hover:text-[var(--foreground)]')}>
+                {c.label}{c.n ? <span className="num opacity-75 ms-1">{c.n}</span> : null}
+              </button>
+            ))}
+          </div>
+        )}
+        <div ref={listRef} className="max-h-[56vh] overflow-y-auto p-2">
+          {!nq && !followed.length && initial === 'follow' && <div className="py-8 px-6 text-center text-sm text-dim">{t('لسه مش متابع حاجة. دوّر على أي حاجة (مثلًا «طحينة») واضغط ☆ «تابع» عشان تشوف حالتها هنا على طول.')}</div>}
+          {nq.length >= 2 && !loading && entries.length === 0 && <div className="py-10 text-center text-sm text-dim">{t('مفيش نتايج. جرّب كلمة تانية أو جزء من الاسم أو الرقم.')}</div>}
+          {nq.length === 1 && <div className="py-3 text-center text-[11px] text-dim">{t('اكتب حرفين على الأقل عشان ندوّر في البيانات')}</div>}
+          {entries.map((e, i) => {
+            const header = e.group !== lastGroup ? (lastGroup = e.group, <div key={`h-${e.group}-${i}`} className="px-2 pt-2 pb-1 text-[11px] font-bold text-dim flex items-center gap-1.5">{e.group === t('متابعاتي') && <Star className="w-3 h-3 fill-current text-[var(--warning)]" />}{e.group}</div>) : null;
             const on = i === sel;
+            if (e.kind === 'screen') {
+              const Icon = e.s.icon;
+              return (
+                <React.Fragment key={`s-${e.s.id}`}>
+                  {header}
+                  <button data-idx={i} data-fb={`palette:${e.s.id}`} onMouseMove={() => setSel(i)} onClick={() => open(e)} className={cn('w-full flex items-center gap-3 px-2.5 h-11 rounded-xl text-start transition-colors', on ? 'bg-[var(--primary-container)]' : 'hover:bg-[var(--surface-2)]')}>
+                    <span className={cn('w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br text-slate-950 shrink-0', e.s.gradient)}><Icon className="w-4 h-4" /></span>
+                    <span className="flex-1 min-w-0"><span className="block text-sm font-bold truncate">{lang === 'ar' ? e.s.title : e.s.titleEn}</span><span className="block text-[11px] text-dim truncate">{t('شاشة')} · {e.sec.title}</span></span>
+                    {isActiveItem(e.s.id, screen) && <span className="text-[10px] text-dim">{t('مفتوحة دلوقتي')}</span>}
+                    {on && <CornerDownLeft className="w-4 h-4 text-[var(--primary)] rtl:-scale-x-100" />}
+                  </button>
+                </React.Fragment>
+              );
+            }
+            const T = refType(e.r.type);
+            const Icon = T.icon;
             return (
-              <React.Fragment key={s.id}>
+              <React.Fragment key={`r-${e.r.type}-${e.r.id}`}>
                 {header}
-                <button data-idx={i} data-fb={`palette:${s.id}`} onMouseMove={() => setSel(i)} onClick={() => go(s.id)} className={cn('w-full flex items-center gap-3 px-2.5 h-11 rounded-xl text-start transition-colors', on ? 'bg-[var(--primary-container)]' : 'hover:bg-[var(--surface-2)]')}>
-                  <span className={cn('w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br text-slate-950 shrink-0', s.gradient)}><Icon className="w-4 h-4" /></span>
-                  <span className="flex-1 min-w-0"><span className="block text-sm font-bold truncate">{lang === 'ar' ? s.title : s.titleEn}</span><span className="block text-[11px] text-dim truncate">{lang === 'ar' ? s.titleEn : s.title}</span></span>
-                  {isActiveItem(s.id, screen) && <span className="text-[10px] text-dim">{t('مفتوحة دلوقتي')}</span>}
-                  {on && <CornerDownLeft className="w-4 h-4 text-[var(--primary)] rtl:-scale-x-100" />}
-                </button>
+                <div data-idx={i} onMouseMove={() => setSel(i)} className={cn('w-full flex items-center gap-2 px-2.5 min-h-[52px] py-1.5 rounded-xl transition-colors', on ? 'bg-[var(--primary-container)]' : 'hover:bg-[var(--surface-2)]', e.r.missing && 'opacity-60')}>
+                  <button data-fb={`palette-rec:${e.r.type}:${e.r.id}`} onClick={() => open(e)} className="flex-1 min-w-0 flex items-center gap-3 text-start">
+                    <span className={cn('w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br text-slate-950 shrink-0', T.tone)}><Icon className="w-4 h-4" /></span>
+                    <span className="flex-1 min-w-0">
+                      <span className="flex items-center gap-1.5 min-w-0"><span className="text-sm font-bold truncate">{L(e.r.title)}</span><span className="shrink-0 text-[10px] px-1.5 h-[18px] leading-[18px] rounded-full surface-2 text-soft border border-[var(--glass-border)]">{t(T.ar)}</span></span>
+                      <span className="flex items-center gap-1.5 text-[11px] min-w-0">
+                        <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', TONE_DOT[e.r.status.tone])} />
+                        <span className={cn('truncate', e.r.status.tone === 'warning' ? 'text-[var(--warning-text)]' : e.r.status.tone === 'error' ? 'text-[var(--error)]' : e.r.status.tone === 'success' ? 'text-[var(--success)]' : 'text-soft')}>{L(e.r.status.text)}</span>
+                        {e.r.sub && L(e.r.sub) && <span className="text-dim truncate">· {L(e.r.sub)}</span>}
+                      </span>
+                    </span>
+                  </button>
+                  {userId && (
+                    <button data-fb={`palette-follow:${e.r.type}:${e.r.id}`} onClick={() => toggleFollow(e)} title={e.followed ? t('بطّل متابعة') : t('تابع — اعرض حالتها في متابعاتي')} aria-pressed={e.followed}
+                      className={cn('shrink-0 h-8 px-2 rounded-lg flex items-center gap-1 text-[11px] border transition-colors', e.followed ? 'border-[color-mix(in_srgb,var(--warning)_45%,transparent)] text-[var(--warning-text)] bg-[color-mix(in_srgb,var(--warning)_12%,transparent)]' : 'border-[var(--glass-border)] text-soft hover:text-[var(--foreground)]')}>
+                      <Star className={cn('w-3.5 h-3.5', e.followed && 'fill-current')} />{e.followed ? t('متابَع') : t('تابع')}
+                    </button>
+                  )}
+                  {on && <CornerDownLeft className="w-4 h-4 text-[var(--primary)] rtl:-scale-x-100 shrink-0" />}
+                </div>
               </React.Fragment>
             );
           })}
         </div>
-        <div className="flex items-center gap-4 px-4 h-10 border-t line text-[11px] text-dim overlay-footer">
+        <div className="flex items-center gap-4 px-4 h-10 border-t line text-[11px] text-dim overlay-footer flex-wrap">
           <span className="flex items-center gap-1.5"><Kbd>↑</Kbd><Kbd>↓</Kbd>{t('اختار')}</span>
           <span className="flex items-center gap-1.5"><Kbd>Enter</Kbd>{t('افتح')}</span>
+          <span className="flex items-center gap-1.5"><Kbd>Shift</Kbd>+<Kbd>Enter</Kbd>{t('تابع')}</span>
+          {nq.length >= 2 && <span className="flex items-center gap-1.5"><Kbd>Tab</Kbd>{t('نوع النتيجة')}</span>}
           <span className="flex-1" />
-          <span className="num">{results.length}</span>
+          <span className="num">{entries.length}</span>
         </div>
       </div>
     </div>,

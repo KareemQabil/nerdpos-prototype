@@ -5,7 +5,7 @@ import { policy, channelPolicy } from '../policies';
 import { quoteItem, capturePolicySnapshot, captureService, computeLiveTotals, computeTotals, activeLines } from '../pricing';
 import { enqueueRound, enqueuePrint, issueFiscal } from '../outbox';
 import { D, m4, allocate, q6, isMoney } from '../money';
-import { checkVersion, getOrder, need, openSessionOn, orderView, page, reasonCheck, requireBranch, requireFields, settlementOf } from './util';
+import { checkVersion, getOrder, need, openSessionOn, orderView, page, reasonCheck, requireBranch, requireFields, settlementOf, userName } from './util';
 import { openVisitOn, closeVisit } from './floor';
 import { promotionActive } from './catalog';
 import { setOrderCustomer } from './customers'; // crm area
@@ -13,8 +13,21 @@ import { onOrderCompleted } from './loyalty'; // crm area
 import { autoApplyPromotions, findByCode, promotionForOrder } from './promotions';
 import type { Channel, Order, OrderLine } from '../types';
 import { inventoryOnOrderChange } from './inventory'; // inventory area: sales consumption
+import { lineStage, STAGE_ACTION, recordReversal, approvedText, voidDisposition, checkDisposition, legacyDisposition, DISP_AR, allowanceOf, allowancePolicy, mealValue, staffOf } from './reversals'; // r3A: who did it vs who allowed it
+import { assignShortNo } from '../r3b'; // r3B: short display number
+import { resolveSalesChannel } from '../sales-channels'; // sales channels (E13)
 
 const OPEN = (o: Order) => o.status === 'DRAFT' || o.status === 'CONFIRMED';
+
+/** r3A (E03): a visit cannot hold more checks than its guests (SplitLimitPolicy). */
+function assertCheckRoom(ctx: Ctx, visitId: string, adding: number) {
+  if (policy<boolean>('SplitLimitPolicy', { branchId: ctx.branchId }) === false) return;
+  const v = ctx.db.visits.find((x) => x.id === visitId);
+  const guests = Number(v?.guestCount ?? 0);
+  if (!guests) return;
+  const existing = ctx.db.orders.filter((o) => o.visitId === visitId && !['CANCELLED', 'VOIDED', 'MERGED'].includes(o.status)).length;
+  if (existing + adding > guests) throw new ApiError('SPLIT_LIMIT_GUESTS', { guests, checks: existing, adding });
+}
 
 function formatNumber(ctx: Ctx, branchId: string) {
   const p = policy<{ prefix?: string | null; width?: number; includeBranchCode?: boolean }>('OrderNumberPolicy', { branchId }) ?? {};
@@ -48,7 +61,7 @@ function newLine(ctx: Ctx, o: Order, input: any): OrderLine {
   const modIds: string[] = input.modifierOptionIds ?? (input.modifiers ?? []).map((m: any) => m.optionId ?? m.modifierOptionId);
   const qty = String(input.quantity ?? '1');
   if (!isMoney(qty) || D(qty).lte(0)) throw new ApiError('VALIDATION_FAILED', { field: 'quantity' });
-  const qt = quoteItem(db, { branchId: o.branchId, channel: o.channel, productId: input.productId, quantity: qty, modifierOptionIds: modIds, variantId: input.variantId, halfProductId: input.halfProductId, comboSelections: input.comboSelections, at: ctx.now, modifierLevels: input.modifierLevels, modifierPlacement: input.modifierPlacement, nestedOptionIds: input.nestedOptionIds });
+  const qt = quoteItem(db, { branchId: o.branchId, channel: o.channel, productId: input.productId, quantity: qty, modifierOptionIds: modIds, variantId: input.variantId, halfProductId: input.halfProductId, comboSelections: input.comboSelections, at: ctx.now, modifierLevels: input.modifierLevels, modifierPlacement: input.modifierPlacement, nestedOptionIds: input.nestedOptionIds, salesChannelId: o.salesChannelId ?? null /* sales channels (E13) */ });
   const product = db.products.find((p) => p.id === input.productId)!;
   const tax = db.taxPolicies.find((t) => t.id === qt.tax.taxPolicyId)!;
   db.units.find((u) => u.id === product.unitId)!.used = true;
@@ -125,6 +138,7 @@ export const orderHandlers: Record<string, Handler> = {
     const branchId = requireBranch(ctx);
     const channel = ctx.body.channel as Channel;
     need(['DINE_IN', 'TAKEAWAY', 'DELIVERY'].includes(channel), 'ORDER_CHANNEL_UNAVAILABLE', { channel });
+    const sc = resolveSalesChannel(db, channel, ctx.body.salesChannelId); // sales channels (E13): default = the order type's channel
     let visitId: string | null = null, tableId: string | null = null, guestCount: number | undefined;
     if (ctx.body.tableId) {
       if (channel !== 'DINE_IN') throw new ApiError('VALIDATION_FAILED', { field: 'tableId', rule: 'only DINE_IN checks sit on a table' });
@@ -134,6 +148,7 @@ export const orderHandlers: Record<string, Handler> = {
       if (!v) throw new ApiError('TABLE_NOT_OCCUPIED', { tableId: t.id, rule: 'a floor check is anchored to an open table visit' });
       const comp = channelPolicy('CheckCompositionPolicy', { branchId, channel }, 'VISIT_SINGLE_CHECK');
       if (comp === 'VISIT_SINGLE_CHECK' && db.orders.some((o) => o.visitId === v.id && OPEN(o))) throw new ApiError('CAPABILITY_NOT_AVAILABLE', { policy: 'CheckCompositionPolicy', value: comp, reason: 'one check per visit' });
+      assertCheckRoom(ctx, v.id, 1); // r3A (E03)
       visitId = v.id; tableId = v.tableId; guestCount = v.guestCount;
     }
     let sessionId: string | null = null;
@@ -149,10 +164,12 @@ export const orderHandlers: Record<string, Handler> = {
       version: 1, label: ctx.body.label, note: ctx.body.note, checkNo: visitId ? db.orders.filter((x) => x.visitId === visitId).length + 1 : 1,
       fireMode: null, rounds: [], lines: [], discounts: [], comp: null, policy: capturePolicySnapshot(branchId, channel, ctx.nowIso), service: null, confirmation: null,
       history: [hist(ctx.user!.id, 'CREATED', { ar: `اتفتح شيك ${channel === 'DINE_IN' ? (visitId ? 'صالة على ترابيزة' : 'صالة كاونتر') : channel === 'DELIVERY' ? 'دليفري' : 'تيك أواي'}${sessionId ? ' على وردية الدرج' : ' من غير درج (شيك صالة)'}`, en: `created ${channel}${sessionId ? ' on drawer session' : ' floor check (no drawer)'}` }, null, ctx.terminal?.code)],
-      guestCount, customerName: ctx.body.customerName,
+      guestCount, customerName: ctx.body.customerName, salesChannelId: sc.id,
     };
+    if (!sc.isDefault) o.history.push(hist(ctx.user!.id, 'SALES_CHANNEL', { ar: `قناة البيع: ${sc.name.ar} — الأسعار من قايمتها`, en: `sales channel: ${sc.name.en} — priced from its list` }, { salesChannelId: sc.id }, ctx.terminal?.code));
     if (ctx.body.customerId) setOrderCustomer(ctx, o, ctx.body.customerId); // crm area: customer snapshot
     db.orders.push(o);
+    assignShortNo(db, o); // r3B (E08): optional short call-out number; o.number stays the immutable transaction id
     ctx.audit(`order ${o.number} created`, o.id);
     return { status: 201, body: orderView(db, o) };
   },
@@ -184,6 +201,16 @@ export const orderHandlers: Record<string, Handler> = {
     const unit = ctx.db.units.find((u) => u.id === ctx.db.products.find((p) => p.id === line!.productId)?.unitId);
     if (unit && D(qty).decimalPlaces() > unit.precision) throw new ApiError('QUANTITY_PRECISION_UNSUPPORTED', { precision: unit.precision });
     const before = line!.quantity;
+    // r3A: reducing the quantity removes units — same stage authority and trace as removing the line
+    let cut: { stage: 'S0' | 'S1'; g: any; qty: string; value: string } | null = null;
+    if (D(qty).lt(D(before))) {
+      const stage = lineStage(o, line!);
+      const q = D(before).minus(D(qty)).toString();
+      const value = m4(D(line!.unitTotal).times(q));
+      if (stage === 'S1') reasonCheck(ctx, 'LINE_VOID', ctx.body.reasonCode, ctx.body.reason);
+      const g = ctx.requireApproval({ action: STAGE_ACTION[stage], targetType: 'orders.OrderLine', targetId: line!.id, context: { orderId: o.id, lineId: line!.id, lineVersion: line!.version, quantity: q, lineAmount: value, stage, reasonCode: ctx.body.reasonCode ?? null, fromQuantity: before, toQuantity: q6(qty) }, grantId: ctx.body.approvalGrantId });
+      cut = { stage, g, qty: q, value };
+    }
     if (ctx.body.modifiers) {
       const fresh = newLine(ctx, o, { productId: line!.productId, quantity: qty, modifiers: ctx.body.modifiers, variantId: line!.variant?.id, note: ctx.body.note ?? line!.note });
       Object.assign(line!, { quantity: fresh.quantity, unitPrice: fresh.unitPrice, modifiers: fresh.modifiers, unitTotal: fresh.unitTotal, lineTotal: fresh.lineTotal, priceRuleId: fresh.priceRuleId });
@@ -193,7 +220,11 @@ export const orderHandlers: Record<string, Handler> = {
     }
     if (ctx.body.note !== undefined) line!.note = ctx.body.note;
     line!.version++;
-    bump(ctx, o, 'LINE_UPDATED', { ar: `${line!.name.ar}: الكمية ${before} ← ${line!.quantity}`, en: `${line!.name.en}: qty ${before} → ${line!.quantity}` });
+    if (cut) {
+      recordReversal(ctx, { o, line: line!, quantity: cut.qty, value: cut.value, stage: cut.stage, kind: 'QTY_DECREASE', grant: cut.g, reasonCode: ctx.body.reasonCode, reason: ctx.body.reason, disposition: 'NOT_PREPARED' });
+      ctx.audit(`qty ${line!.name.en} ${before} → ${line!.quantity} on ${o.number}`, line!.id, true, cut.g?.id, { stage: cut.stage });
+    }
+    bump(ctx, o, 'LINE_UPDATED', { ar: `${line!.name.ar}: الكمية ${before} ← ${line!.quantity}${cut ? ` — ${approvedText(ctx.db, cut.g)}` : ''}`, en: `${line!.name.en}: qty ${before} → ${line!.quantity}` }, cut ? { stage: cut.stage, grantId: cut.g?.id, approverId: cut.g?.approverUserId } : undefined);
     return orderView(ctx.db, o);
   },
   'Order.RemoveLine': (ctx) => {
@@ -206,13 +237,31 @@ export const orderHandlers: Record<string, Handler> = {
     if (line!.fireRound !== null) throw new ApiError('LINE_ALREADY_FIRED', { lineId: line!.id, fireRound: line!.fireRound });
     checkVersion(o, ctx.query.expectedVersion ?? ctx.body?.expectedVersion);
     checkVersion(line!, ctx.query.expectedLineVersion ?? ctx.body?.expectedLineVersion, 'expectedLineVersion');
+    // r3A [OWNER]: every removal before payment needs a manager (S0 included) and is written to the trace
+    const stage = lineStage(o, line!);
+    const rc = ctx.body?.reasonCode ?? null;
+    if (stage === 'S1') reasonCheck(ctx, 'LINE_VOID', rc ?? undefined, ctx.body?.reason);
+    const g = ctx.requireApproval({ action: STAGE_ACTION[stage], targetType: 'orders.OrderLine', targetId: line!.id, context: { orderId: o.id, lineId: line!.id, lineVersion: line!.version, quantity: line!.quantity, lineAmount: line!.lineTotal, stage, reasonCode: rc }, grantId: ctx.body?.approvalGrantId });
     line!.status = 'REMOVED';
     line!.version++;
-    bump(ctx, o, 'LINE_REMOVED', { ar: `اتشال (قبل الإرسال): ${line!.name.ar}`, en: `removed (unfired): ${line!.name.en}` });
+    line!.removed = { at: ctx.nowIso, by: ctx.user!.id, approverId: g?.approverUserId ?? null, approverName: g ? userName(ctx.db, g.approverUserId) : null, byName: userName(ctx.db, ctx.user!.id), approvalGrantId: g?.id ?? null, stage, reasonCode: rc, reason: ctx.body?.reason ?? null, quantity: line!.quantity };
+    recordReversal(ctx, { o, line: line!, quantity: line!.quantity, value: line!.lineTotal, stage, kind: 'LINE_REMOVE', grant: g, reasonCode: rc, reason: ctx.body?.reason, disposition: 'NOT_PREPARED' });
+    ctx.audit(`line removed ${line!.name.en} ×${line!.quantity} on ${o.number} (${stage})`, line!.id, true, g?.id, { stage });
+    bump(ctx, o, 'LINE_REMOVED', { ar: `اتشال ${stage === 'S0' ? '(قبل الإرسال)' : '(بعد الشيك المبدئي — قبل الدفع)'}: ${line!.name.ar} ×${Number(line!.quantity)} — ${approvedText(ctx.db, g)}`, en: `removed (${stage}): ${line!.name.en}` }, { lineId: line!.id, stage, grantId: g?.id, approverId: g?.approverUserId });
     return orderView(ctx.db, o);
   },
   'Order.Fire': (ctx) => {
     const o = getOrder(ctx, ctx.params.orderId, 'ORDER_NOT_FOUND');
+    if (o.kind === 'STAFF_MEAL' && o.status === 'COMPLETED') {
+      // r3A: a staff meal registered "send later" goes to the kitchen when the employee takes the break
+      checkVersion(o, ctx.body.expectedVersion);
+      const r = fireRound(ctx, o, 'FIRE');
+      if (!r) throw new ApiError('NOTHING_TO_FIRE');
+      if (o.staffMeal) o.staffMeal.sentToKitchen = true;
+      o.version++;
+      o.history.push(hist(ctx.user!.id, 'FIRED', { ar: 'وجبة الموظف اتبعتت للمطبخ', en: 'staff meal sent to the kitchen' }, r, ctx.terminal?.code));
+      return { orderId: o.id, fireRound: r.round, lineIds: r.lineIds, firedAt: ctx.nowIso, version: o.version, order: orderView(ctx.db, o) };
+    }
     if (o.status !== 'DRAFT') throw new ApiError('ORDER_NOT_EDITABLE', { status: o.status });
     if (o.visitId && ctx.db.visits.find((v) => v.id === o.visitId)?.state !== 'OPEN') throw new ApiError('TABLE_VISIT_CLOSED');
     checkVersion(o, ctx.body.expectedVersion);
@@ -280,10 +329,27 @@ export const orderHandlers: Record<string, Handler> = {
     checkVersion(o, ctx.body.expectedVersion);
     if (o.lines.some((l) => l.fireRound !== null && l.status !== 'REMOVED')) throw new ApiError('ORDER_ALREADY_FIRED');
     reasonCheck(ctx, 'ORDER_CANCEL', ctx.body.reasonCode, ctx.body.reason);
+    // r3A: cancelling a check with items removes them — S0 / S1 authority and a trace per item
+    const live = activeLines(o);
+    let g: any = null;
+    let stage: 'S0' | 'S1' = 'S0';
+    if (live.length) {
+      stage = live.some((l) => lineStage(o, l) === 'S1') ? 'S1' : 'S0';
+      const payable = computeLiveTotals(o).payable;
+      g = stage === 'S0'
+        ? ctx.requireApproval({ action: 'LINE_REMOVE_UNSENT', targetType: 'orders.Order', targetId: o.id, context: { orderId: o.id, lineId: 'ALL', quantity: String(live.length), lineAmount: payable, stage, reasonCode: ctx.body.reasonCode }, grantId: ctx.body.approvalGrantId })
+        : ctx.requireApproval({ action: 'ORDER_VOID', targetType: 'orders.Order', targetId: o.id, context: { orderId: o.id, orderVersion: o.version, reasonCode: ctx.body.reasonCode, payableBasis: 'DRAFT_PREVIEW', payable, currentEffectivePaid: '0.0000', captureCount: 0, stage }, grantId: ctx.body.approvalGrantId });
+      for (const l of live) {
+        l.status = 'REMOVED'; l.version++;
+        l.removed = { at: ctx.nowIso, by: ctx.user!.id, approverId: g?.approverUserId ?? null, approverName: g ? userName(ctx.db, g.approverUserId) : null, byName: userName(ctx.db, ctx.user!.id), approvalGrantId: g?.id ?? null, stage, reasonCode: ctx.body.reasonCode, reason: ctx.body.reason ?? null, quantity: l.quantity };
+        recordReversal(ctx, { o, line: l, quantity: l.quantity, value: l.lineTotal, stage, kind: 'ORDER_CANCEL', grant: g, reasonCode: ctx.body.reasonCode, reason: ctx.body.reason, disposition: 'NOT_PREPARED' });
+      }
+      ctx.audit(`order ${o.number} cancelled with ${live.length} items (${stage})`, o.id, true, g?.id, { stage });
+    }
     o.status = 'CANCELLED';
     o.cancelledAt = ctx.nowIso;
     o.endReason = { code: ctx.body.reasonCode, note: ctx.body.reason };
-    bump(ctx, o, 'CANCELLED', { ar: `الشيك اتلغى قبل الإرسال (${ctx.body.reasonCode})`, en: `cancelled (${ctx.body.reasonCode})` });
+    bump(ctx, o, 'CANCELLED', { ar: `الشيك اتلغى قبل الإرسال (${ctx.body.reasonCode})${live.length ? ` — ${live.length} صنف — ${approvedText(ctx.db, g)}` : ''}`, en: `cancelled (${ctx.body.reasonCode})` }, live.length ? { stage, grantId: g?.id, approverId: g?.approverUserId } : undefined);
     afterEnd(ctx, o);
     return orderView(ctx.db, o);
   },
@@ -297,15 +363,22 @@ export const orderHandlers: Record<string, Handler> = {
     reasonCheck(ctx, 'ORDER_VOID', ctx.body.reasonCode, ctx.body.reason);
     if (!(ctx.body.reason ?? '').trim()) throw new ApiError('VALIDATION_FAILED', { field: 'reason', rule: 'required for a void' });
     const totals = computeTotals(o);
-    const g = ctx.requireApproval({ action: 'ORDER_VOID', targetType: 'orders.Order', targetId: o.id, context: { orderId: o.id, orderVersion: o.version, reasonCode: ctx.body.reasonCode, payableBasis: o.confirmation ? 'CONFIRMED' : 'DRAFT_PREVIEW', payable: totals.payable, currentEffectivePaid: '0.0000', captureCount: 0 }, grantId: ctx.body.approvalGrantId });
+    const chosen = checkDisposition(ctx.body.disposition); // r3A: what happens to the items (default per item by kitchen start)
+    const g = ctx.requireApproval({ action: 'ORDER_VOID', targetType: 'orders.Order', targetId: o.id, context: { orderId: o.id, orderVersion: o.version, reasonCode: ctx.body.reasonCode, payableBasis: o.confirmation ? 'CONFIRMED' : 'DRAFT_PREVIEW', payable: totals.payable, currentEffectivePaid: '0.0000', captureCount: 0, ...(chosen ? { disposition: chosen } : {}) }, grantId: ctx.body.approvalGrantId });
     const lineIds = activeLines(o).map((l) => l.id);
-    for (const l of activeLines(o)) { l.status = 'VOIDED'; l.version++; l.voided = { at: ctx.nowIso, by: ctx.user!.id, reasonCode: ctx.body.reasonCode, reason: ctx.body.reason, approvalGrantId: g?.id, disposition: 'ORDER_VOID', approverId: g?.approverUserId }; }
+    for (const l of activeLines(o)) {
+      const disp = l.fireRound === null ? 'NOT_PREPARED' : voidDisposition(ctx.db, l, chosen === 'NOT_PREPARED' ? null : chosen);
+      const stage = lineStage(o, l);
+      l.status = 'VOIDED'; l.version++;
+      l.voided = { at: ctx.nowIso, by: ctx.user!.id, reasonCode: ctx.body.reasonCode, reason: ctx.body.reason, approvalGrantId: g?.id, disposition: legacyDisposition(disp), approverId: g?.approverUserId, dispositionKind: disp, stage, terminal: ctx.terminal?.code ?? null, byName: userName(ctx.db, ctx.user!.id), approverName: g ? userName(ctx.db, g.approverUserId) : null };
+      recordReversal(ctx, { o, line: l, quantity: l.quantity, value: l.lineTotal, stage, kind: 'ORDER_VOID', grant: g, reasonCode: ctx.body.reasonCode, reason: ctx.body.reason, disposition: disp });
+    }
     cancelTicketItems(ctx, o, lineIds);
     o.status = 'VOIDED';
     o.voidedAt = ctx.nowIso;
     o.endReason = { code: ctx.body.reasonCode, note: ctx.body.reason, approvalGrantId: g?.id };
     bump(ctx, o, 'VOIDED', { ar: `الشيك اتلغى بالكامل بعد الإرسال (${ctx.body.reasonCode}) بموافقة ${ctx.db.users.find((u) => u.id === g?.approverUserId)?.displayName ?? '—'}`, en: `voided (${ctx.body.reasonCode})` });
-    ctx.audit(`order ${o.number} voided`, o.id, true, g?.id);
+    ctx.audit(`order ${o.number} voided`, o.id, true, g?.id, { stage: 'S1' });
     afterEnd(ctx, o);
     return orderView(ctx.db, o);
   },
@@ -319,15 +392,16 @@ export const orderHandlers: Record<string, Handler> = {
     if (line!.fireRound === null) throw new ApiError('LINE_NOT_FIRED');
     checkVersion(o, ctx.body.expectedVersion);
     reasonCheck(ctx, 'LINE_VOID', ctx.body.reasonCode, ctx.body.reason);
-    const g = ctx.requireApproval({ action: 'LINE_VOID', targetType: 'orders.OrderLine', targetId: line!.id, context: { orderId: o.id, lineId: line!.id, lineVersion: line!.version, reasonCode: ctx.body.reasonCode, lineAmount: line!.lineTotal, fireRound: line!.fireRound }, grantId: ctx.body.approvalGrantId });
-    const started = ctx.db.tickets.some((t) => t.items.some((i) => i.lineId === line!.id) && t.state !== 'NEW');
-    const disp = policy<{ beforeKitchenStart: string; afterKitchenStart: string }>('LineVoidDispositionPolicy') ?? { beforeKitchenStart: 'NOT_PREPARED', afterKitchenStart: 'WASTE' };
+    // r3A: disposition of the item (short vs long void) — bound to the approval so the manager sees it
+    const disp = voidDisposition(ctx.db, line!, checkDisposition(ctx.body.disposition));
+    const g = ctx.requireApproval({ action: 'LINE_VOID', targetType: 'orders.OrderLine', targetId: line!.id, context: { orderId: o.id, lineId: line!.id, lineVersion: line!.version, reasonCode: ctx.body.reasonCode, lineAmount: line!.lineTotal, fireRound: line!.fireRound, ...(ctx.body.disposition ? { disposition: disp, stage: 'S1' } : {}) }, grantId: ctx.body.approvalGrantId });
     line!.status = 'VOIDED';
     line!.version++;
-    line!.voided = { at: ctx.nowIso, by: ctx.user!.id, reasonCode: ctx.body.reasonCode, reason: ctx.body.reason, approvalGrantId: g?.id, disposition: started ? disp.afterKitchenStart : disp.beforeKitchenStart, approverId: g?.approverUserId };
+    line!.voided = { at: ctx.nowIso, by: ctx.user!.id, reasonCode: ctx.body.reasonCode, reason: ctx.body.reason, approvalGrantId: g?.id, disposition: legacyDisposition(disp), approverId: g?.approverUserId, dispositionKind: disp, stage: 'S1', terminal: ctx.terminal?.code ?? null, byName: userName(ctx.db, ctx.user!.id), approverName: g ? userName(ctx.db, g.approverUserId) : null };
     cancelTicketItems(ctx, o, [line!.id]);
-    bump(ctx, o, 'LINE_VOIDED', { ar: `اتلغى بعد الإرسال: ${line!.name.ar} (${ctx.body.reasonCode}) — ${line!.voided.disposition === 'WASTE' ? 'هالك' : 'ما اتعملش'} — موافقة ${ctx.db.users.find((u) => u.id === g?.approverUserId)?.displayName ?? 'غير مطلوبة'}`, en: `voided fired line ${line!.name.en}` });
-    ctx.audit(`line void ${line!.name.en} on ${o.number}`, line!.id, true, g?.id);
+    recordReversal(ctx, { o, line: line!, quantity: line!.quantity, value: line!.lineTotal, stage: 'S1', kind: 'LINE_VOID', grant: g, reasonCode: ctx.body.reasonCode, reason: ctx.body.reason, disposition: disp });
+    bump(ctx, o, 'LINE_VOIDED', { ar: `اتلغى بعد الإرسال: ${line!.name.ar} (${ctx.body.reasonCode}) — ${DISP_AR[disp]} — ${approvedText(ctx.db, g)}`, en: `voided fired line ${line!.name.en}` }, { lineId: line!.id, stage: 'S1', disposition: disp, grantId: g?.id, approverId: g?.approverUserId });
+    ctx.audit(`line void ${line!.name.en} on ${o.number}`, line!.id, true, g?.id, { stage: 'S1' });
     event('OrderLineVoided', o.id, `${o.number} ${line!.name.en}`);
     return orderView(ctx.db, o);
   },
@@ -454,6 +528,7 @@ export const orderHandlers: Record<string, Handler> = {
     }
     const from = o.channel;
     o.channel = to;
+    o.salesChannelId = resolveSalesChannel(ctx.db, to, ctx.body.salesChannelId).id; // sales channels (E13)
     o.service = null;
     ensureService(ctx, o);
     bump(ctx, o, 'CHANNEL_CHANGED', { ar: `القناة اتغيرت ${from} ← ${to}؛ الأصناف وأسعارها والجولات زي ما هي، والخدمة اتحسبت للقناة الجديدة (سؤال للخبير)`, en: `channel ${from} → ${to}` });
@@ -485,9 +560,13 @@ export const orderHandlers: Record<string, Handler> = {
       });
     };
     let created: Order[] = [];
+    // r3A (E03): never more checks than guests
+    if (mode === 'EQUAL') assertCheckRoom(ctx, o.visitId, Math.max(0, Number(ctx.body.parts) - 1));
+    if (mode === 'SHARE_ITEM') assertCheckRoom(ctx, o.visitId, Math.max(0, Number(ctx.body.parts) - 1 - (ctx.body.targetOrderIds ?? []).length));
     if (mode === 'BY_SEAT') {
       const seats = [...new Set(activeLines(o).map((l) => l.seat).filter((s) => s))] as number[];
       need(seats.length >= 2, 'VALIDATION_FAILED', { rule: 'assign lines to at least two seats first' });
+      assertCheckRoom(ctx, o.visitId, seats.length - 1);
       for (const s of seats.slice(1)) {
         const c = mkCheck(); c.label = `كرسي ${s}`;
         const moving = o.lines.filter((l) => l.status === 'ACTIVE' && l.seat === s);
@@ -577,22 +656,36 @@ export const orderHandlers: Record<string, Handler> = {
     bump(ctx, o, 'PRICE_OVERRIDE', { ar: `سعر ${l!.name.ar} اتعدل ${old} ← ${l!.unitTotal}${g ? ' بموافقة' : ''}`, en: 'price override' });
     return orderView(ctx.db, o);
   },
-  // Direction D9: staff meal — not a sale, no receipt, own report line.
+  // Direction D9 + r3A (F3-03, E12): staff meal — an identified employee, manager authorisation, a daily allowance
+  // (sale value or cost), stock consumed like a sale, kitchen routing as normal; never a sale, never a discount.
   'Order.CreateStaffMeal': (ctx) => {
     const db = ctx.db;
     const branchId = requireBranch(ctx);
     const items = ctx.body.lines ?? [];
-    need(items.length, 'VALIDATION_FAILED', { field: 'lines' });
+    need(Array.isArray(items) && items.length, 'VALIDATION_FAILED', { field: 'lines' });
+    const emp = staffOf(db, branchId).find((u) => u.id === ctx.body.employeeUserId);
+    if (!emp) throw new ApiError('STAFF_MEAL_EMPLOYEE_REQUIRED', { employeeUserId: ctx.body.employeeUserId ?? null });
+    const sendNow = ctx.body.sendToKitchen !== false;
     const o: Order = {
       id: nextId('ord'), number: 'SM-' + formatNumber(ctx, branchId), branchId, channel: 'TAKEAWAY', status: 'COMPLETED', kind: 'STAFF_MEAL', visitId: null, tableId: null, sessionId: null, terminalId: ctx.terminal?.id ?? '', serverUserId: ctx.user!.id,
       createdAt: ctx.nowIso, createdAtMs: ctx.now, businessDate: ctx.businessDate(branchId), createdBy: ctx.user!.id, confirmedAt: ctx.nowIso, confirmedBy: ctx.user!.id, completedAt: ctx.nowIso, completedAtMs: ctx.now, completedBusinessDate: ctx.businessDate(branchId), completedSessionId: null,
       version: 1, checkNo: 1, fireMode: 'AT_CONFIRM', rounds: [], lines: [], discounts: [], comp: { reasonCode: 'STAFF_MEAL', at: ctx.nowIso, by: ctx.user!.id }, policy: capturePolicySnapshot(branchId, 'TAKEAWAY', ctx.nowIso), service: null, confirmation: null,
-      history: [hist(ctx.user!.id, 'STAFF_MEAL', { ar: `وجبة موظف لـ ${ctx.body.staffName ?? '—'} — مش بيع، من غير إيصال`, en: 'staff meal — not a sale' })], customerName: ctx.body.staffName,
+      history: [], customerName: emp.displayName,
     };
     o.lines = items.map((l: any) => newLine(ctx, o, l));
+    const ap = allowancePolicy(branchId);
+    const val = mealValue(db, o.lines, ap.basis, ctx.now);
+    const al = allowanceOf(ctx, emp.id, branchId);
+    if (ap.enabled && D(al.used).plus(val.value).gt(ap.dailyLimit)) throw new ApiError('STAFF_MEAL_ALLOWANCE_EXCEEDED', { employee: emp.displayName, basis: ap.basis, limit: ap.dailyLimit, used: al.used, requested: val.value, remaining: al.remaining });
+    const g = ctx.requireApproval({ action: 'STAFF_MEAL', targetType: 'orders.StaffMeal', targetId: `staffmeal:${emp.id}`, context: { employeeUserId: emp.id, employeeName: emp.displayName, mealValue: val.value, basis: ap.basis, remainingBefore: al.remaining, lineCount: o.lines.length, linesHash: o.lines.map((l) => `${l.productId}x${l.quantity}:${l.modifiers.map((m) => m.optionId).join('+')}`).join('|') }, grantId: ctx.body.approvalGrantId });
+    if (g && g.approverUserId === emp.id) throw new ApiError('SELF_APPROVAL_DENIED', { reason: 'an employee cannot approve their own meal' });
+    o.staffMeal = { employeeUserId: emp.id, employeeName: emp.displayName, basis: ap.basis, value: val.value, saleValue: val.sale, approverId: g?.approverUserId ?? null, grantId: g?.id ?? null, sentToKitchen: sendNow };
     o.confirmation = computeLiveTotals(o);
-    fireRound(ctx, o, 'CONFIRM');
+    o.history.push(hist(ctx.user!.id, 'STAFF_MEAL', { ar: `وجبة موظف لـ ${emp.displayName} — قيمتها ${Number(val.value).toFixed(2)} ج.م ${ap.basis === 'COST' ? 'بالتكلفة' : 'بسعر البيع'}${ap.enabled ? ` من حد ${Number(ap.dailyLimit).toFixed(0)} ج.م` : ''} — ${approvedText(db, g)} — مش بيع، من غير إيصال`, en: `staff meal for ${emp.username} — not a sale` }, { employeeUserId: emp.id, grantId: g?.id, approverId: g?.approverUserId }, ctx.terminal?.code));
     db.orders.push(o);
+    if (sendNow) fireRound(ctx, o, 'CONFIRM');
+    inventoryOnOrderChange(ctx, o); // stock consumed like a sale (never a sale in the reports)
+    ctx.audit(`staff meal ${o.number} for ${emp.username} (${val.value} ${ap.basis})`, o.id, true, g?.id);
     return orderView(db, o);
   },
 };

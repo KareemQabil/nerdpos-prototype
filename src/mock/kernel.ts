@@ -9,7 +9,10 @@ import { policy, approvalRule, ruleRequires, selfApprovalAllowed } from './polic
 import { APPROVAL_ACTIONS } from './policyRegistry';
 import type { DB, User, AuthSession, Terminal, ApprovalGrant } from './types';
 import { handlers } from './handlers';
+import { DELEGABLE_OPS } from './control-registry'; // r3A: supervisor override
 import { runOutbox } from './outbox';
+import { applyUserOverrides } from './user-perms'; // P1-041 per-user overrides
+import { hasPermission } from './types-channels'; // '*' excludes vendor-only permissions
 
 export interface Ctx {
   op: OperationDef;
@@ -28,7 +31,9 @@ export interface Ctx {
   businessDate: (branchId?: string | null) => string;
   can: (perm: string) => boolean;
   requireApproval: (a: { action: string; targetType: string; targetId: string; context: Record<string, unknown>; grantId?: string | null }) => ApprovalGrant | null;
-  audit: (summary: string, target: string, sensitive?: boolean, grantId?: string) => void;
+  audit: (summary: string, target: string, sensitive?: boolean, grantId?: string, extra?: { stage?: string; credentialKind?: string | null }) => void;
+  /** r3A: set when the actor lacks the operation's permission and a supervisor must authorise it in place */
+  override: { permission: string } | null;
 }
 export interface HandlerResult { status?: number; body?: unknown; headers?: Record<string, string> }
 export type Handler = (ctx: Ctx) => HandlerResult | unknown;
@@ -53,7 +58,7 @@ export function permsOf(db: DB, user: User, branchId: string | null): Set<string
     const role = db.roles.find((r) => r.id === ra.roleId && r.active);
     role?.permissionIds.forEach((p) => out.add(p));
   }
-  return out;
+  return applyUserOverrides(db, user, out); // P1-041: role permissions ± the user's own grants/revocations
 }
 
 /**
@@ -67,7 +72,7 @@ export const DIRECTION_PERMISSION: Record<string, string> = {
   'Compliance.VerifyChain': 'compliance:read',
   // operations & system area (ops.ts, floor.ts, kitchen.ts, catalog.ts promotions)
   'Floor.Upsert': 'table:upsert', 'Table.MarkClean': 'table:release', 'Order.TransferSession': 'session:close', 'BusinessDay.Close': 'session:zreport', 'ApprovalRequest.Create': 'AUTHENTICATED',
-  'Promotion.Upsert': 'catalog:setprice', 'Sync.ResolveConflict': 'sync:replay', 'Report.Export': 'report:run', 'Report.Schedule': 'report:run', 'Profile.SetCapability': 'settings:updatepolicy',
+  'Promotion.Upsert': 'catalog:setprice', 'Sync.ResolveConflict': 'sync:replay', 'Report.Export': 'report:run', 'Report.Schedule': 'report:run', 'Profile.SetCapability': 'vendor:capabilities' /* licensed modules: vendor only (meeting T1 ~1605) */,
   // crm area (customers, delivery, loyalty, channels)
   'Customer.Merge': 'customer:update', 'DeliveryZone.Upsert': 'delivery:configure', 'Driver.Upsert': 'delivery:configure', 'Driver.UpdateLocation': 'delivery:dispatch',
   'Driver.SettleCash': 'delivery:settlecash', 'Loyalty.Redeem': 'payment:capture', 'LoyaltyTier.Upsert': 'loyalty:configure', 'Channel.IngestExternalOrder': 'channel:ingest', 'Payment.AuthorizeExternal': 'payment:capture',
@@ -168,12 +173,15 @@ function execute(op: OperationDef, params: Record<string, string>, query: Record
     if (!br.active && op.permission !== 'PUBLIC') throw new ApiError('BRANCH_INACTIVE');
   }
   const perms = user ? permsOf(db, user, branchId) : new Set<string>();
-  const can = (p: string) => perms.has('*') || perms.has(p);
+  const can = (p: string) => hasPermission(perms, p); // '*' = all but vendor-only; '-p' = revoked for this user (P1-041)
 
   // 3. permission (authorization precedes every read and write)
   const required = effectivePermission(op);
+  let override: { permission: string } | null = null;
   if (required !== 'PUBLIC' && required !== 'AUTHENTICATED' && !can(required)) {
-    throw new ApiError('PERMISSION_DENIED', { required });
+    // r3A supervisor override: a delegable operation runs as the actor once an approver who holds the permission authorises it
+    if (user && DELEGABLE_OPS.has(op.id) && policy<boolean>('SupervisorOverridePolicy', { branchId }) !== false) override = { permission: required };
+    else throw new ApiError('PERMISSION_DENIED', { required });
   }
 
   // 4. idempotency
@@ -208,10 +216,10 @@ function execute(op: OperationDef, params: Record<string, string>, query: Record
     can,
     requireApproval: ({ action, targetType, targetId, context, grantId }) => {
       const rule = approvalRule(action, { branchId });
-      const needed = ruleRequires(rule, context);
+      const needed = ruleRequires(rule, context) || !!override;
       if (!needed && !grantId) return null;
       if (!grantId) {
-        throw new ApiError('APPROVAL_REQUIRED', { action, targetType, targetId, context, rule, actionTitle: APPROVAL_ACTIONS.find((a) => a.id === action)?.title });
+        throw new ApiError('APPROVAL_REQUIRED', { action, targetType, targetId, context, rule, actionTitle: APPROVAL_ACTIONS.find((a) => a.id === action)?.title, override: override?.permission ?? null, stage: context.stage ?? null });
       }
       const g = db.grants.find((x) => x.id === grantId);
       if (!g) throw new ApiError('APPROVAL_GRANT_INVALID', { grantId });
@@ -225,16 +233,28 @@ function execute(op: OperationDef, params: Record<string, string>, query: Record
         (g.branchId && g.branchId !== branchId) ? 'branch' :
         (g.terminalId && g.terminalId !== terminal?.id) ? 'terminal' : null;
       if (mismatch) throw new ApiError('APPROVAL_GRANT_INVALID', { grantId, mismatch, expectedContext: g.context, actualContext: context });
+      if (override) {
+        // the approver lends their authority: they must hold the operation's permission too
+        const approver = db.users.find((u) => u.id === g.approverUserId);
+        const ap = approver ? permsOf(db, approver, branchId) : new Set<string>();
+        if (!(ap.has('*') || ap.has(override.permission))) throw new ApiError('APPROVER_NOT_AUTHORIZED', { required: override.permission, reason: 'the approver does not hold this permission either' });
+        g.overridePermission = override.permission;
+      }
       consumed.push(g);
       return g;
     },
-    audit: (summary, target, sensitive = false, grantId) => {
-      db.audit.unshift({ id: nextId('au'), at: new Date(now).toISOString(), userId: user?.id ?? null, terminalId: terminal?.id ?? null, op: op.id, target, sensitive, summary, commandId: commandId ?? undefined, approvalGrantId: grantId });
+    audit: (summary, target, sensitive = false, grantId, extra) => {
+      const g = grantId ? db.grants.find((x) => x.id === grantId) : undefined;
+      db.audit.unshift({ id: nextId('au'), at: new Date(now).toISOString(), userId: user?.id ?? null, terminalId: terminal?.id ?? null, op: op.id, target, sensitive, summary, commandId: commandId ?? undefined, approvalGrantId: grantId,
+        approverUserId: g?.approverUserId ?? null, stage: extra?.stage as any, override: !!override || undefined, credentialKind: extra?.credentialKind ?? g?.credentialKind ?? null });
       if (db.audit.length > 1000) db.audit.length = 1000;
     },
+    override,
   };
   try {
     const out = handler(ctx) as HandlerResult | undefined;
+    // r3A: an operation run on someone else's authority must have consumed a grant (fail closed)
+    if (override && !consumed.length) throw new ApiError('PERMISSION_DENIED', { required: override.permission });
     const isWrapped = !!out && typeof out === 'object' && typeof (out as any).status === 'number' && Object.keys(out).every((k) => k === 'status' || k === 'body' || k === 'headers');
     const result: HandlerResult = isWrapped ? out! : { body: out };
     const status = result.status ?? (isCmd ? (op.method === 'POST' && /Create|Open|Register|Request|Grant|Login/.test(op.id) ? 201 : 200) : 200);
@@ -263,11 +283,23 @@ function stripVolatile(body: any) {
 /** Approval.Grant is a normal command handled in handlers/approvals.ts; exposed for it. */
 export function issueGrant(ctx: Ctx, input: { action: string; targetType: string; targetId: string; context: Record<string, unknown>; approverUserId: string; approverSecret: string; reason?: string }) {
   const db = ctx.db;
-  const approver = db.users.find((x) => x.id === input.approverUserId);
+  // r3A: the approver proves who they are with a PIN, a manager card (swipe) or a fingerprint (reader) — card/finger simulated
+  const kind = String(ctx.body?.approverCredentialKind ?? 'PIN').toUpperCase() as 'PIN' | 'CARD' | 'FINGERPRINT';
+  const allowed = policy<{ methods?: string[] }>('ApprovalCredentialPolicy', { branchId: ctx.branchId })?.methods ?? ['PIN', 'CARD', 'FINGERPRINT', 'REMOTE'];
+  if (!['PIN', 'CARD', 'FINGERPRINT'].includes(kind)) throw new ApiError('VALIDATION_FAILED', { field: 'approverCredentialKind', rule: 'PIN|CARD|FINGERPRINT' });
+  if (!allowed.includes(kind)) throw new ApiError('APPROVAL_CREDENTIAL_NOT_ALLOWED', { kind, allowed });
+  let approver = db.users.find((x) => x.id === input.approverUserId);
+  if (kind !== 'PIN') {
+    const secret = String(input.approverSecret ?? '');
+    const byCred = db.users.find((u) => (kind === 'CARD' ? u.cardCode : u.fingerprintId) === secret && !!secret);
+    if (!byCred) throw new ApiError('APPROVER_CREDENTIAL_UNKNOWN', { kind });
+    if (input.approverUserId && approver && approver.id !== byCred.id) throw new ApiError('APPROVER_NOT_AUTHORIZED', { reason: 'the card / finger belongs to someone else' });
+    approver = byCred;
+  }
   if (!approver || !approver.active) throw new ApiError('APPROVER_NOT_AUTHORIZED', { reason: 'unknown or inactive approver' });
   const lock = policy<{ maxFailedAttempts: number; lockMinutes: number }>('LoginLockoutPolicy') ?? { maxFailedAttempts: 5, lockMinutes: 15 };
   if (approver.lockedUntil && approver.lockedUntil > ctx.now) throw new ApiError('CREDENTIAL_LOCKED', { until: new Date(approver.lockedUntil).toISOString() });
-  if (approver.pin !== input.approverSecret) {
+  if (kind === 'PIN' && approver.pin !== input.approverSecret) {
     approver.failedAttempts++;
     if (approver.failedAttempts >= lock.maxFailedAttempts) { approver.lockedUntil = ctx.now + lock.lockMinutes * 60_000; approver.failedAttempts = 0; }
     throw Object.assign(new ApiError('APPROVER_NOT_AUTHORIZED', { reason: 'wrong PIN' }), { keepWrites: true });
@@ -276,14 +308,16 @@ export function issueGrant(ctx: Ctx, input: { action: string; targetType: string
   const def = APPROVAL_ACTIONS.find((a) => a.id === input.action);
   const approverPerms = permsOf(db, approver, ctx.branchId);
   if (!def || !(approverPerms.has('*') || approverPerms.has(def.permission))) throw new ApiError('APPROVER_NOT_AUTHORIZED', { required: def?.permission ?? input.action });
+  const lend = ctx.body?.overridePermission ? String(ctx.body.overridePermission) : null;
+  if (lend && !(approverPerms.has('*') || approverPerms.has(lend))) throw new ApiError('APPROVER_NOT_AUTHORIZED', { required: lend, reason: 'the approver does not hold this permission either' });
   if (approver.id === ctx.user?.id && !selfApprovalAllowed(input.action)) throw new ApiError('SELF_APPROVAL_DENIED', { action: input.action });
   const ttl = policy<{ seconds: number }>('ApprovalTtlPolicy')?.seconds ?? 120;
   const g: ApprovalGrant = {
     id: nextId('grant'), action: input.action, targetType: input.targetType, targetId: input.targetId, context: input.context, contextHash: hashOf(input.context),
     requesterUserId: ctx.user!.id, approverUserId: approver.id, branchId: ctx.branchId, terminalId: ctx.terminal?.id ?? null,
-    issuedAt: ctx.nowIso, expiresAtMs: ctx.now + ttl * 1000, consumedAt: null, consumedBy: null, reason: input.reason,
+    issuedAt: ctx.nowIso, expiresAtMs: ctx.now + ttl * 1000, consumedAt: null, consumedBy: null, reason: input.reason, credentialKind: kind, overridePermission: lend,
   };
   db.grants.unshift(g);
-  ctx.audit(`grant ${g.action} for ${g.targetId} by ${approver.username}`, g.targetId, true, g.id);
+  ctx.audit(`grant ${g.action} for ${g.targetId} by ${approver.username} (${kind})`, g.targetId, true, g.id, { credentialKind: kind });
   return g;
 }

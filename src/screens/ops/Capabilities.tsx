@@ -1,5 +1,7 @@
-// Product capabilities: switch whole parts of the product on or off for the business or one branch.
+// Product capabilities (licensed modules): switch whole parts of the product on or off for the business or one branch.
 // Off hides the related screens and the server refuses their operations with a clear message.
+// r3C (meeting T1 ~1600–1615): licensed modules belong to the vendor — only the NerdPOS support/vendor role
+// (vendor:capabilities) sees this screen and can switch them; the owner and their IT do not ('*' excludes vendor:*).
 import React, { useState } from 'react';
 import * as Icons from 'lucide-react';
 import { useQuery, useCommand, useDev } from '../../app/hooks';
@@ -17,6 +19,12 @@ export default function Capabilities() {
   const q = useQuery<any>('Capability.List');
   const { run, busy } = useCommand();
   const items: any[] = q.data?.items ?? [];
+  if (q.data && q.data.manage === false) return (
+    <div className="space-y-4" data-screen="CAP">
+      <Section title={t('إمكانيات النظام')} badge={<StateBadge ops={['Capability.List']} />} />
+      <Banner tone="warning" title={t('الشاشة دي لفريق NerdPOS بس')}>{t('الأجزاء المرخصة من السيستم بيفتحها ويقفلها فريق NerdPOS حسب الترخيص — مش صاحب المطعم ولا الـIT بتاعه. كلّم الدعم لو محتاج جزء جديد.')}</Banner>
+    </div>
+  );
   const branchName = tv(store.db.branches.find((b) => b.id === (me?.branchId ?? auth.branchId))?.name) ?? '—';
   const title = (c: any) => L({ ar: c.title, en: c.titleEn });
   const set = (c: any, enabled: boolean | null) => run('Profile.SetCapability', { params: { capability: c.id }, body: enabled === null ? { scopeType: scope, inherit: true } : { scopeType: scope, enabled } }, { success: enabled === null ? t('رجعت زي إعداد النشاط') : enabled ? t('{x} اتفتحت', { x: title(c) }) : t('{x} اتقفلت — الشاشات بتاعتها اختفت', { x: title(c) }) });
@@ -26,6 +34,7 @@ export default function Capabilities() {
       <Section title={t('إمكانيات النظام')} badge={<StateBadge ops={['Capability.List', 'Profile.SetCapability']} />}
         sub={t('افتح أو اقفل أجزاء كاملة من السيستم حسب طريقة شغل المطعم. اللي بيتقفل بتختفي شاشاته من كل الأجهزة، ولو حد حاول يستخدمه السيستم بيقوله إنه مقفول.')}
         actions={<Tabs value={scope} onChange={setScope} tabs={[{ id: 'TENANT', label: t('النشاط كله') }, { id: 'BRANCH', label: `${t('الفرع ده بس')} (${branchName})` }]} />} />
+      <Banner tone="warning" title={t('شاشة فريق NerdPOS — مش ظاهرة للمطعم')}>{t('الأجزاء دي مرتبطة بترخيص المطعم. صاحب المطعم والمدير والـIT بتوعهم ما بيشوفوش الشاشة دي ومش يقدروا يغيّروها؛ أي تغيير بيتسجل باسمك في سجل النشاط.')}</Banner>
       {scope === 'BRANCH' && <Banner tone="info">{t('إعداد الفرع بيغلب إعداد النشاط. "زي النشاط" بيشيل استثناء الفرع.')}</Banner>}
       <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
         {items.map((c) => {

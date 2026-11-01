@@ -24,7 +24,7 @@ export interface LineDraft {
 
 type ComboSel = { productId: string; variantId: string | null; modifierOptionIds: string[] };
 
-export function ProductDialog({ product, channel, onClose, onAdd, seatsEnabled, guestCount }: { product: any; channel: string; onClose: () => void; onAdd: (l: LineDraft) => Promise<void> | void; seatsEnabled?: boolean; guestCount?: number }) {
+export function ProductDialog({ product, channel, onClose, onAdd, seatsEnabled, guestCount, salesChannelId }: { product: any; channel: string; salesChannelId?: string | null; onClose: () => void; onAdd: (l: LineDraft) => Promise<void> | void; seatsEnabled?: boolean; guestCount?: number }) {
   const { auth } = useDev();
   const groupsQ = useQuery<any>('ModifierGroup.List', { query: {} });
   const allProducts = useQuery<any>('Catalog.Search', { query: { active: true, limit: 500, channel } });
@@ -92,7 +92,7 @@ export function ProductDialog({ product, channel, onClose, onAdd, seatsEnabled, 
     setQuote((q) => ({ ...q, loading: true }));
     const h = setTimeout(() => {
       const { note: _n, seat: _s, ...body } = draft;
-      call(auth, 'Pricing.QuoteItem', { params: { productId: product.id }, body: { ...body, branchId: auth.branchId, channel, quantity: qty || '1' } })
+      call(auth, 'Pricing.QuoteItem', { params: { productId: product.id }, body: { ...body, branchId: auth.branchId, channel, ...(salesChannelId ? { salesChannelId } : {}), quantity: qty || '1' } })
         .then((r) => alive && setQuote({ data: r.data, loading: false }))
         .catch((e) => alive && setQuote({ error: e, loading: false }));
     }, 200);

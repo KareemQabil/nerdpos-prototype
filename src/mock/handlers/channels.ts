@@ -141,7 +141,7 @@ export const channelHandlers: Record<string, Handler> = {
     const src = SOURCES[e.source];
     const cust = findOrCreateCustomer(ctx, { name: e.customer.name, phone: e.customer.phone, address: e.customer.address ?? null, source: 'ONLINE' });
     const channel = e.fulfillment === 'DELIVERY' ? 'DELIVERY' : 'TAKEAWAY';
-    let o = subCall(ctx, 'Order.Create', {}, { channel, customerId: cust?.id, label: `${src.ar} ${e.externalRef}`, note: e.note ?? undefined });
+    let o = subCall(ctx, 'Order.Create', {}, { channel, customerId: cust?.id, label: `${src.ar} ${e.externalRef}`, note: e.note ?? undefined, ...(ctx.body.salesChannelId ? { salesChannelId: ctx.body.salesChannelId } : {}) /* r3C: the sales channel picked on accept (e.g. طلبات) */ });
     const order = db.orders.find((x) => x.id === o.id)!;
     if (!cust) { order.customerName = e.customer.name; order.customerPhone = e.customer.phone; }
     order.externalOrderId = e.id;

@@ -1,0 +1,3267 @@
+[
+{
+"id": "Q-001",
+"family": "Sales & finance",
+"role": "owner",
+"ar": "أنا بعت بكام النهاردة؟",
+"en": "How much did I sell today?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"net_item_sales"
+],
+"dimensions": [
+"business_date"
+],
+"shape": "number",
+"clarify": "YES: gross/net before tax?"
+},
+{
+"id": "Q-002",
+"family": "Sales & finance",
+"role": "owner",
+"ar": "إيه الفرق بين مبيعات النهاردة والتحصيل؟",
+"en": "Why do today’s sales differ from collections?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"net_item_sales",
+"tender_collected"
+],
+"dimensions": [
+"business_date"
+],
+"shape": "explanation",
+"clarify": "NO"
+},
+{
+"id": "Q-003",
+"family": "Sales & finance",
+"role": "owner",
+"ar": "مبيعات أمس مقارنة بنفس يوم الأسبوع اللي فات؟",
+"en": "How were yesterday’s sales versus the same weekday last week?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"net_item_sales"
+],
+"dimensions": [
+"business_date"
+],
+"shape": "chart",
+"clarify": "NO"
+},
+{
+"id": "Q-004",
+"family": "Sales & finance",
+"role": "owner",
+"ar": "إحنا لسه ما قفلناش اليوم، التقرير ده نهائي؟",
+"en": "The day is still open—is this report final?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"net_item_sales"
+],
+"dimensions": [
+"business_date"
+],
+"shape": "explanation",
+"clarify": "NO"
+},
+{
+"id": "Q-005",
+"family": "Sales & finance",
+"role": "owner",
+"ar": "قد إيه ضريبة وخدمة أخدنا على أوردرات الصالة؟",
+"en": "How much tax and service charge was collected on dine-in orders?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"tax_amount",
+"service_charge"
+],
+"dimensions": [
+"channel",
+"business_date"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-006",
+"family": "Sales & finance",
+"role": "owner",
+"ar": "ليه مبيعات الساعة ١١ بالليل وقعت؟",
+"en": "Why did sales drop at 11pm?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"net_item_sales",
+"order_count"
+],
+"dimensions": [
+"hour",
+"business_date"
+],
+"shape": "explanation",
+"clarify": "YES: compare against which baseline?"
+},
+{
+"id": "Q-007",
+"family": "Sales & finance",
+"role": "owner",
+"ar": "وريني الشيكات اللي عاملة الرقم ده",
+"en": "Show me the checks behind this number",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"net_item_sales"
+],
+"dimensions": [
+"business_date",
+"check"
+],
+"shape": "table",
+"clarify": "YES: which chart/value?"
+},
+{
+"id": "Q-008",
+"family": "Sales & finance",
+"role": "owner",
+"ar": "مبيعات أول الأسبوع ده فيها مرتجعات من أسبوع قديم؟",
+"en": "Does this week’s sales include returns from old weeks?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"return_sales_adjustment"
+],
+"dimensions": [
+"business_week"
+],
+"shape": "explanation",
+"clarify": "NO"
+},
+{
+"id": "Q-009",
+"family": "Sales & finance",
+"role": "owner",
+"ar": "الخصومات زادت قد إيه الأسبوع ده؟",
+"en": "How much did discounts increase this week?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"discount_amount"
+],
+"dimensions": [
+"business_week"
+],
+"shape": "chart",
+"clarify": "YES: compared to which week?"
+},
+{
+"id": "Q-010",
+"family": "Sales & finance",
+"role": "owner",
+"ar": "إيه أنشط ساعة في فرع المعادي؟",
+"en": "What was the busiest hour in the Maadi branch?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"order_count"
+],
+"dimensions": [
+"branch",
+"hour"
+],
+"shape": "chart",
+"clarify": "YES: busiest by orders or revenue?"
+},
+{
+"id": "Q-011",
+"family": "Sales & finance",
+"role": "owner",
+"ar": "إيه مصدر رقم صافي المبيعات؟",
+"en": "What exactly is the source of net sales?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"net_item_sales"
+],
+"dimensions": [
+"business_date"
+],
+"shape": "explanation",
+"clarify": "NO"
+},
+{
+"id": "Q-012",
+"family": "Menu & product",
+"role": "chef",
+"ar": "إيه أكتر صنف اتباع النهاردة؟",
+"en": "Which item sold the most today?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"sold_quantity"
+],
+"dimensions": [
+"product",
+"business_date"
+],
+"shape": "table",
+"clarify": "YES: by quantity or revenue?"
+},
+{
+"id": "Q-013",
+"family": "Menu & product",
+"role": "chef",
+"ar": "ليه الكنافة خسرانة؟",
+"en": "Why is kunafa losing money?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"menu_contribution"
+],
+"dimensions": [
+"product",
+"branch"
+],
+"shape": "explanation",
+"clarify": "YES: confirm recipe costing available"
+},
+{
+"id": "Q-014",
+"family": "Menu & product",
+"role": "chef",
+"ar": "وريني النجوم والخيول في المنيو",
+"en": "Show Stars and Horses in my menu matrix",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"menu_contribution_pct",
+"menu_popularity"
+],
+"dimensions": [
+"product",
+"category"
+],
+"shape": "chart",
+"clarify": "NO"
+},
+{
+"id": "Q-015",
+"family": "Menu & product",
+"role": "chef",
+"ar": "الأحجام الكبيرة بتكسبنا أكتر؟",
+"en": "Do large sizes make us more money?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"menu_contribution"
+],
+"dimensions": [
+"size",
+"product"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-016",
+"family": "Menu & product",
+"role": "chef",
+"ar": "الإضافات بتاعت البيتزا ليها هامش كام؟",
+"en": "What margin do pizza modifiers generate?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"menu_contribution_pct"
+],
+"dimensions": [
+"modifier",
+"product"
+],
+"shape": "number",
+"clarify": "NO"
+},
+{
+"id": "Q-017",
+"family": "Menu & product",
+"role": "chef",
+"ar": "إيه الأصناف اللي كانت سلو موفر؟",
+"en": "Which items were slow-moving?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"sold_quantity"
+],
+"dimensions": [
+"product",
+"business_week"
+],
+"shape": "table",
+"clarify": "YES: define threshold"
+},
+{
+"id": "Q-018",
+"family": "Menu & product",
+"role": "chef",
+"ar": "حصلت إلغاءات كتير في المشروبات؟",
+"en": "Were there many voids for beverages?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"void_line_count"
+],
+"dimensions": [
+"category",
+"business_date"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-019",
+"family": "Menu & product",
+"role": "chef",
+"ar": "مين الكومبو اللي بيبيع أكتر؟",
+"en": "Which combo sells the most?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"sold_quantity"
+],
+"dimensions": [
+"product",
+"business_week"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-020",
+"family": "Menu & product",
+"role": "chef",
+"ar": "المشروم والموتزاريلا بيتطلبوا مع بعض؟",
+"en": "Do mushroom and mozzarella get ordered together?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"sold_quantity"
+],
+"dimensions": [
+"modifier",
+"product"
+],
+"shape": "chart",
+"clarify": "NO"
+},
+{
+"id": "Q-021",
+"family": "Menu & product",
+"role": "chef",
+"ar": "تقدر تقولّي تكلفة الساندوتش من مكوناته؟",
+"en": "Can you calculate sandwich recipe cost?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"food_theoretical_cost"
+],
+"dimensions": [
+"product"
+],
+"shape": "table",
+"clarify": "YES: recipe version/cost basis"
+},
+{
+"id": "Q-022",
+"family": "Menu & product",
+"role": "chef",
+"ar": "وريني الأصناف اللي ملهاش وصفة تكلفة",
+"en": "Show items missing recipe cost",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"menu_contribution"
+],
+"dimensions": [
+"product"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-023",
+"family": "Tables & service",
+"role": "floor_manager",
+"ar": "عدد الضيوف النهاردة كام؟",
+"en": "How many guests did we serve today?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"guest_count"
+],
+"dimensions": [
+"business_date"
+],
+"shape": "number",
+"clarify": "NO"
+},
+{
+"id": "Q-024",
+"family": "Tables & service",
+"role": "floor_manager",
+"ar": "الترابيزة ٤ قعدت قد إيه؟",
+"en": "How long did table 4 stay occupied?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"avg_dining_minutes"
+],
+"dimensions": [
+"table",
+"business_date"
+],
+"shape": "number",
+"clarify": "NO"
+},
+{
+"id": "Q-025",
+"family": "Tables & service",
+"role": "floor_manager",
+"ar": "عندي كام شيك لسه مفتوح؟",
+"en": "How many checks are still open?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"check_count"
+],
+"dimensions": [
+"check",
+"branch"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-026",
+"family": "Tables & service",
+"role": "floor_manager",
+"ar": "التلات أفراد قسموا الشيك إزاي؟",
+"en": "How was this bill split for the three guests?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"recognized_sales_total"
+],
+"dimensions": [
+"table_visit",
+"check"
+],
+"shape": "table",
+"clarify": "YES: which visit?"
+},
+{
+"id": "Q-027",
+"family": "Tables & service",
+"role": "floor_manager",
+"ar": "في شيك اتعمله سبليت ومجموعه مختلف؟",
+"en": "Did any split checks fail to reconcile?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"reconciliation_errors"
+],
+"dimensions": [
+"check",
+"branch"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-028",
+"family": "Tables & service",
+"role": "floor_manager",
+"ar": "أكتر ترابيزة بتقعد وقت قد إيه؟",
+"en": "Which table has the longest dining times?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"avg_dining_minutes"
+],
+"dimensions": [
+"table",
+"business_week"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-029",
+"family": "Tables & service",
+"role": "floor_manager",
+"ar": "مين أكتر ويتر بيقفل شيكات بسرعة؟",
+"en": "Which waiter closes checks fastest?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"avg_dining_minutes"
+],
+"dimensions": [
+"staff",
+"business_week"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-030",
+"family": "Tables & service",
+"role": "floor_manager",
+"ar": "متوسط الصرف للفرد في الصالة؟",
+"en": "What is average spend per diner?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"avg_guest_spend"
+],
+"dimensions": [
+"channel",
+"business_week"
+],
+"shape": "number",
+"clarify": "NO"
+},
+{
+"id": "Q-031",
+"family": "Tables & service",
+"role": "floor_manager",
+"ar": "التنظيف واخد وقت كتير بعد كل ترابيزة؟",
+"en": "Is cleaning slowing table turnover?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"table_turns"
+],
+"dimensions": [
+"table",
+"daypart"
+],
+"shape": "explanation",
+"clarify": "NO"
+},
+{
+"id": "Q-032",
+"family": "Tables & service",
+"role": "floor_manager",
+"ar": "ليه عندي أوردر واحد و٣ شيكات؟",
+"en": "Why does one order have three checks?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"order_count",
+"check_count"
+],
+"dimensions": [
+"check"
+],
+"shape": "explanation",
+"clarify": "NO"
+},
+{
+"id": "Q-033",
+"family": "Tables & service",
+"role": "floor_manager",
+"ar": "وريني زيارة الترابيزة من أولها لآخرها",
+"en": "Show full table visit timeline",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"table_turns"
+],
+"dimensions": [
+"table_visit"
+],
+"shape": "timeline",
+"clarify": "YES: select visit"
+},
+{
+"id": "Q-034",
+"family": "Channels & delivery",
+"role": "delivery_manager",
+"ar": "الدليفري مكسبه قد إيه بعد العمولة؟",
+"en": "What do we make on delivery after aggregator commission?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"net_item_sales",
+"aggregator_commission"
+],
+"dimensions": [
+"channel"
+],
+"shape": "table",
+"clarify": "YES: before food and driver cost?"
+},
+{
+"id": "Q-035",
+"family": "Channels & delivery",
+"role": "delivery_manager",
+"ar": "مين أعلى تطبيق في المبيعات؟",
+"en": "Which app drives the most sales?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"net_item_sales"
+],
+"dimensions": [
+"channel",
+"business_week"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-036",
+"family": "Channels & delivery",
+"role": "delivery_manager",
+"ar": "طلبات المنطقة دي بتتأخر؟",
+"en": "Are deliveries to this zone late?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"delivery_avg_minutes"
+],
+"dimensions": [
+"zone"
+],
+"shape": "chart",
+"clarify": "YES: select zone"
+},
+{
+"id": "Q-037",
+"family": "Channels & delivery",
+"role": "delivery_manager",
+"ar": "عندنا كام محاولة توصيل فشلت؟",
+"en": "How many delivery attempts failed?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"order_count"
+],
+"dimensions": [
+"zone",
+"driver"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-038",
+"family": "Channels & delivery",
+"role": "delivery_manager",
+"ar": "مين الطيار الأسرع؟",
+"en": "Which courier is fastest?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"delivery_avg_minutes"
+],
+"dimensions": [
+"driver",
+"business_week"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-039",
+"family": "Channels & delivery",
+"role": "delivery_manager",
+"ar": "رسوم التوصيل بتغطّي مصاريفه؟",
+"en": "Do delivery charges cover delivery expenses?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"delivery_fee_net"
+],
+"dimensions": [
+"zone",
+"channel"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-040",
+"family": "Channels & delivery",
+"role": "delivery_manager",
+"ar": "طلبات واتساب ضمن المبيعات دي؟",
+"en": "Are WhatsApp orders included in this sales total?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"order_count"
+],
+"dimensions": [
+"channel"
+],
+"shape": "explanation",
+"clarify": "NO"
+},
+{
+"id": "Q-041",
+"family": "Channels & delivery",
+"role": "delivery_manager",
+"ar": "قارن التيك أواي بالدليفري في رمضان",
+"en": "Compare takeaway and delivery during Ramadan",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"net_item_sales"
+],
+"dimensions": [
+"channel",
+"business_week"
+],
+"shape": "chart",
+"clarify": "YES: which Ramadan/year?"
+},
+{
+"id": "Q-042",
+"family": "Channels & delivery",
+"role": "delivery_manager",
+"ar": "أكتر منطقة بتطلب ساندوتشات؟",
+"en": "Which zone buys the most sandwiches?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"sold_quantity"
+],
+"dimensions": [
+"zone",
+"product"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-043",
+"family": "Channels & delivery",
+"role": "delivery_manager",
+"ar": "عمولة التطبيق كانت كام امبارح؟",
+"en": "What was yesterday’s app commission?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"aggregator_commission"
+],
+"dimensions": [
+"channel",
+"business_date"
+],
+"shape": "number",
+"clarify": "NO"
+},
+{
+"id": "Q-044",
+"family": "Channels & delivery",
+"role": "delivery_manager",
+"ar": "هات كل طلبات الدليفري اللي رجعت",
+"en": "List returned delivery orders",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"refund_count"
+],
+"dimensions": [
+"channel",
+"business_date"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-045",
+"family": "Payments & cash",
+"role": "accountant",
+"ar": "عجز الدرج عند مين؟",
+"en": "Which cashier has a drawer shortage?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"cash_variance"
+],
+"dimensions": [
+"staff",
+"drawer"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-046",
+"family": "Payments & cash",
+"role": "accountant",
+"ar": "الكاش كام والفيزا كام والمحافظ كام؟",
+"en": "How much cash card and wallet collection was there?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"tender_collected"
+],
+"dimensions": [
+"payment_method",
+"business_date"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-047",
+"family": "Payments & cash",
+"role": "accountant",
+"ar": "الدرج اتفتح من غير بيع كام مرة؟",
+"en": "How many non-sale drawer openings occurred?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"approval_count"
+],
+"dimensions": [
+"drawer",
+"business_date"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-048",
+"family": "Payments & cash",
+"role": "accountant",
+"ar": "إيه الفرق بين X و Z عندنا؟",
+"en": "How do our X and Z reports differ?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"cash_expected",
+"cash_counted"
+],
+"dimensions": [
+"drawer"
+],
+"shape": "explanation",
+"clarify": "NO"
+},
+{
+"id": "Q-049",
+"family": "Payments & cash",
+"role": "accountant",
+"ar": "مين قفل ورديته بعجز؟",
+"en": "Who closed a shift short?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"cash_variance"
+],
+"dimensions": [
+"staff",
+"business_date"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-050",
+"family": "Payments & cash",
+"role": "accountant",
+"ar": "في مدفوعات معلقة من فيزا؟",
+"en": "Are there pending card tenders?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"payment_count"
+],
+"dimensions": [
+"payment_method"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-051",
+"family": "Payments & cash",
+"role": "accountant",
+"ar": "ليه الكاش المتوقع مختلف عن اللي اتعد؟",
+"en": "Why does expected cash differ from counted cash?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"cash_expected",
+"cash_counted"
+],
+"dimensions": [
+"drawer"
+],
+"shape": "explanation",
+"clarify": "YES: which drawer/session?"
+},
+{
+"id": "Q-052",
+"family": "Payments & cash",
+"role": "accountant",
+"ar": "في دفعه اتسجلت مرتين؟",
+"en": "Was any payment recorded twice?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"reconciliation_errors"
+],
+"dimensions": [
+"payment_method",
+"check"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-053",
+"family": "Payments & cash",
+"role": "accountant",
+"ar": "مين عمل مسحوب نقدي النهاردة؟",
+"en": "Who made cash withdrawals today?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"cash_expected"
+],
+"dimensions": [
+"staff",
+"drawer"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-054",
+"family": "Payments & cash",
+"role": "accountant",
+"ar": "كل وسائل الدفع متطابقة مع الدفعات الناجحة؟",
+"en": "Do tender reports reconcile to successful payment records?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"tender_collected"
+],
+"dimensions": [
+"payment_method"
+],
+"shape": "explanation",
+"clarify": "NO"
+},
+{
+"id": "Q-055",
+"family": "Payments & cash",
+"role": "accountant",
+"ar": "هات كل مرتجع اتصرف كاش من درج ٢",
+"en": "Show cash refunds paid from drawer 2",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"tender_refunded"
+],
+"dimensions": [
+"drawer",
+"payment_method"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-056",
+"family": "Controls & exception",
+"role": "auditor",
+"ar": "مين أكتر كاشير بيلغي أصناف قبل الدفع؟",
+"en": "Which cashier voids the most items before payment?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"void_line_count"
+],
+"dimensions": [
+"staff",
+"business_week"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-057",
+"family": "Controls & exception",
+"role": "auditor",
+"ar": "في فويد بعد ما اليوم اتقفل؟",
+"en": "Were there refunds after business-day close?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"refund_count"
+],
+"dimensions": [
+"business_date",
+"approval_actor"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-058",
+"family": "Controls & exception",
+"role": "auditor",
+"ar": "مين وافق على المرتجع ده؟",
+"en": "Who approved this refund?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"approval_count"
+],
+"dimensions": [
+"approval_actor"
+],
+"shape": "explanation",
+"clarify": "YES: select refund ID"
+},
+{
+"id": "Q-059",
+"family": "Controls & exception",
+"role": "auditor",
+"ar": "إيه الحاجات اللي اتلغت بعد طباعة شيك مبدئي؟",
+"en": "Which lines were removed after preliminary bill printing?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"void_line_count"
+],
+"dimensions": [
+"check",
+"staff"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-060",
+"family": "Controls & exception",
+"role": "auditor",
+"ar": "ليه الخصومات زادت عند ويتر معين؟",
+"en": "Why have discounts increased for one waiter?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"discount_amount"
+],
+"dimensions": [
+"staff"
+],
+"shape": "explanation",
+"clarify": "YES: which waiter/period?"
+},
+{
+"id": "Q-061",
+"family": "Controls & exception",
+"role": "auditor",
+"ar": "فين تقرير شورت فويد ولونج فويد؟",
+"en": "Where is the restockable-vs-waste void report?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"stock_waste_qty"
+],
+"dimensions": [
+"void_reason"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-062",
+"family": "Controls & exception",
+"role": "auditor",
+"ar": "في حد وافق على عملية هو نفسه عملها؟",
+"en": "Did anyone self-approve a sensitive action?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"approval_count"
+],
+"dimensions": [
+"approval_actor"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-063",
+"family": "Controls & exception",
+"role": "auditor",
+"ar": "مبلغ المرتجع أعلى من الأصلي؟",
+"en": "Did any refunds exceed the original paid amount?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"reconciliation_errors"
+],
+"dimensions": [
+"check"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-064",
+"family": "Controls & exception",
+"role": "auditor",
+"ar": "كل المرتجعات لها سبب وأصل فاتورة؟",
+"en": "Do all returns have a reason and original check?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"refund_count"
+],
+"dimensions": [
+"void_reason"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-065",
+"family": "Controls & exception",
+"role": "auditor",
+"ar": "هات المرفوض من موافقات المدير",
+"en": "Show denied manager authorizations",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"approval_count"
+],
+"dimensions": [
+"approval_actor"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-066",
+"family": "Controls & exception",
+"role": "auditor",
+"ar": "إيه وجبات الموظفين اللي عَدّت الحد؟",
+"en": "Which staff meals exceeded policy limits?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"comps_value"
+],
+"dimensions": [
+"staff",
+"business_date"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-067",
+"family": "Labor & people",
+"role": "manager",
+"ar": "إيه متوسط مبيعات كل ويتر؟",
+"en": "What are average sales per waiter?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"net_item_sales"
+],
+"dimensions": [
+"staff"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-068",
+"family": "Labor & people",
+"role": "manager",
+"ar": "تكلفة العمالة كنسبة من المبيعات؟",
+"en": "What percent of sales is labor cost?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"labor_cost",
+"net_item_sales"
+],
+"dimensions": [
+"business_week"
+],
+"shape": "number",
+"clarify": "NO"
+},
+{
+"id": "Q-069",
+"family": "Labor & people",
+"role": "manager",
+"ar": "الساعات الإضافية زادت؟",
+"en": "Did overtime hours increase?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"labor_hours"
+],
+"dimensions": [
+"role",
+"business_week"
+],
+"shape": "chart",
+"clarify": "NO"
+},
+{
+"id": "Q-070",
+"family": "Labor & people",
+"role": "manager",
+"ar": "مين عنده ورديات كتير مقارنة بالمبيعات؟",
+"en": "Who is scheduled too much relative to sales?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"labor_hours",
+"net_item_sales"
+],
+"dimensions": [
+"staff",
+"daypart"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-071",
+"family": "Labor & people",
+"role": "manager",
+"ar": "المبيعات لكل ساعة عمل كام؟",
+"en": "What is sales per labor hour?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"net_item_sales",
+"labor_hours"
+],
+"dimensions": [
+"business_date"
+],
+"shape": "number",
+"clarify": "NO"
+},
+{
+"id": "Q-072",
+"family": "Labor & people",
+"role": "manager",
+"ar": "مين عدّل بصمات الحضور؟",
+"en": "Who edited attendance records?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"approval_count"
+],
+"dimensions": [
+"staff"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-073",
+"family": "Labor & people",
+"role": "manager",
+"ar": "كام عامل اشتغل امبارح؟",
+"en": "How many employees worked yesterday?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"labor_hours"
+],
+"dimensions": [
+"business_date"
+],
+"shape": "number",
+"clarify": "NO"
+},
+{
+"id": "Q-074",
+"family": "Labor & people",
+"role": "manager",
+"ar": "تكلفة آخر شيفت مقارنة بالمبيعات؟",
+"en": "How did last shift labor cost compare with sales?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"labor_cost",
+"net_item_sales"
+],
+"dimensions": [
+"role"
+],
+"shape": "chart",
+"clarify": "NO"
+},
+{
+"id": "Q-075",
+"family": "Labor & people",
+"role": "manager",
+"ar": "في شيفتات ملهاش قفل؟",
+"en": "Are there shifts without closeout?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"cash_counted"
+],
+"dimensions": [
+"staff"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-076",
+"family": "Labor & people",
+"role": "manager",
+"ar": "ليه الفروع مختلفة في إنتاجية الموظفين؟",
+"en": "Why does labor productivity differ by branch?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"labor_hours",
+"net_item_sales"
+],
+"dimensions": [
+"branch",
+"role"
+],
+"shape": "explanation",
+"clarify": "NO"
+},
+{
+"id": "Q-077",
+"family": "Labor & people",
+"role": "manager",
+"ar": "مفيش داتا رواتب، تقدر تحسب تكلفة العمالة؟",
+"en": "Can you calculate labor cost without payroll data?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"labor_cost"
+],
+"dimensions": [
+"role"
+],
+"shape": "unavailable",
+"clarify": "NO"
+},
+{
+"id": "Q-078",
+"family": "Customers & loyalty",
+"role": "marketing",
+"ar": "كام عميل جديد جالنا الأسبوع ده؟",
+"en": "How many new customers came this week?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"new_customers"
+],
+"dimensions": [
+"business_week"
+],
+"shape": "number",
+"clarify": "NO"
+},
+{
+"id": "Q-079",
+"family": "Customers & loyalty",
+"role": "marketing",
+"ar": "العملاء اللي رجعوا تاني نسبتهم كام؟",
+"en": "What percent of customers returned?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"repeat_rate"
+],
+"dimensions": [
+"customer_cohort"
+],
+"shape": "number",
+"clarify": "NO"
+},
+{
+"id": "Q-080",
+"family": "Customers & loyalty",
+"role": "marketing",
+"ar": "مين عمل أوردرات أكتر في رمضان؟",
+"en": "Which customers ordered most during Ramadan?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"order_count"
+],
+"dimensions": [
+"customer_cohort"
+],
+"shape": "table",
+"clarify": "YES: identity/consent/period?"
+},
+{
+"id": "Q-081",
+"family": "Customers & loyalty",
+"role": "marketing",
+"ar": "أقوى فوج عملاء عندنا من يناير؟",
+"en": "Which January cohort retained best?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"repeat_rate"
+],
+"dimensions": [
+"customer_cohort"
+],
+"shape": "chart",
+"clarify": "NO"
+},
+{
+"id": "Q-082",
+"family": "Customers & loyalty",
+"role": "marketing",
+"ar": "الولاء بيرجع فلوسه؟",
+"en": "Does the loyalty program pay off?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"repeat_rate",
+"net_item_sales"
+],
+"dimensions": [
+"channel"
+],
+"shape": "explanation",
+"clarify": "YES: control group required"
+},
+{
+"id": "Q-083",
+"family": "Customers & loyalty",
+"role": "marketing",
+"ar": "العميل ده اشترى بإجمالي كام؟",
+"en": "How much has this customer spent?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"net_item_sales"
+],
+"dimensions": [
+"customer_cohort"
+],
+"shape": "number",
+"clarify": "YES: identify permitted customer"
+},
+{
+"id": "Q-084",
+"family": "Customers & loyalty",
+"role": "marketing",
+"ar": "في عملاء محتمل يرجعوا لو بعتنا عرض؟",
+"en": "Which customers may respond to a return offer?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"repeat_rate"
+],
+"dimensions": [
+"customer_cohort"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-085",
+"family": "Customers & loyalty",
+"role": "marketing",
+"ar": "النقاط اللي اتصرفت متسجلة صح؟",
+"en": "Are redeemed loyalty points reconciled?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"reconciliation_errors"
+],
+"dimensions": [
+"customer_cohort"
+],
+"shape": "explanation",
+"clarify": "NO"
+},
+{
+"id": "Q-086",
+"family": "Customers & loyalty",
+"role": "marketing",
+"ar": "الزبون بياخد كام زيارة عشان يرجع؟",
+"en": "How many visits precede retention?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"order_count"
+],
+"dimensions": [
+"customer_cohort"
+],
+"shape": "chart",
+"clarify": "NO"
+},
+{
+"id": "Q-087",
+"family": "Customers & loyalty",
+"role": "marketing",
+"ar": "مين العملاء اللي بياناتهم ناقصة؟",
+"en": "Which customers have incomplete required data?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"new_customers"
+],
+"dimensions": [
+"customer_cohort"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-088",
+"family": "Customers & loyalty",
+"role": "marketing",
+"ar": "البيانات دي ينفع أبعتهاله واتساب؟",
+"en": "Can we message these customers on WhatsApp?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"new_customers"
+],
+"dimensions": [
+"customer_cohort"
+],
+"shape": "explanation",
+"clarify": "YES: consent/marketing permission required"
+},
+{
+"id": "Q-089",
+"family": "Kitchen & preparation",
+"role": "chef",
+"ar": "المطبخ متأخر النهاردة فين؟",
+"en": "Which kitchen station is delayed today?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"kds_late_count"
+],
+"dimensions": [
+"device",
+"daypart"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-090",
+"family": "Kitchen & preparation",
+"role": "chef",
+"ar": "متوسط وقت البيتزا كام؟",
+"en": "What is pizza station’s average time?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"kds_avg_ticket_minutes"
+],
+"dimensions": [
+"device"
+],
+"shape": "number",
+"clarify": "NO"
+},
+{
+"id": "Q-091",
+"family": "Kitchen & preparation",
+"role": "chef",
+"ar": "كام شاي لسه على الشيف؟",
+"en": "How many tea items are pending in kitchen?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"sold_quantity"
+],
+"dimensions": [
+"product",
+"device"
+],
+"shape": "number",
+"clarify": "NO"
+},
+{
+"id": "Q-092",
+"family": "Kitchen & preparation",
+"role": "chef",
+"ar": "التذكرة دي اتأخرت قبل الشيف يبدأ ولا بعد؟",
+"en": "Was this ticket delayed before prep started or after?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"kds_avg_ticket_minutes"
+],
+"dimensions": [
+"device"
+],
+"shape": "timeline",
+"clarify": "YES: start is optional"
+},
+{
+"id": "Q-093",
+"family": "Kitchen & preparation",
+"role": "chef",
+"ar": "إيه أكتر صنف بيتعمله إعادة تجهيز؟",
+"en": "Which item is refired most often?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"stock_waste_qty"
+],
+"dimensions": [
+"product"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-094",
+"family": "Kitchen & preparation",
+"role": "chef",
+"ar": "أوقات الزحمة بتأثر على المطبخ إزاي؟",
+"en": "How do peak periods affect kitchen speed?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"kds_avg_ticket_minutes",
+"order_count"
+],
+"dimensions": [
+"daypart"
+],
+"shape": "chart",
+"clarify": "NO"
+},
+{
+"id": "Q-095",
+"family": "Kitchen & preparation",
+"role": "chef",
+"ar": "الشيف بيشوف أصناف محطة تانية؟",
+"en": "Can a station chef see another station’s items?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"reconciliation_errors"
+],
+"dimensions": [
+"device"
+],
+"shape": "explanation",
+"clarify": "NO"
+},
+{
+"id": "Q-096",
+"family": "Kitchen & preparation",
+"role": "chef",
+"ar": "الطلبات اللي جاهزة للتسليم واقفة ليه؟",
+"en": "Why are ready orders stuck at dispatch?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"kds_late_count"
+],
+"dimensions": [
+"device"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-097",
+"family": "Kitchen & preparation",
+"role": "chef",
+"ar": "فرق وقت استقبال التذكرة والتجهيز؟",
+"en": "What is the difference between ticket receive and prep times?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"kds_avg_ticket_minutes"
+],
+"dimensions": [
+"device"
+],
+"shape": "explanation",
+"clarify": "NO"
+},
+{
+"id": "Q-098",
+"family": "Kitchen & preparation",
+"role": "chef",
+"ar": "متوسط وقت الأوردر الكبير؟",
+"en": "What is average prep time for large orders?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"kds_avg_ticket_minutes"
+],
+"dimensions": [
+"product"
+],
+"shape": "chart",
+"clarify": "YES: define large orders"
+},
+{
+"id": "Q-099",
+"family": "Kitchen & preparation",
+"role": "chef",
+"ar": "تحليل تأخيرات الساعة ٩ بالليل؟",
+"en": "Analyze kitchen delays at 9pm",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"kds_late_count"
+],
+"dimensions": [
+"hour"
+],
+"shape": "chart",
+"clarify": "NO"
+},
+{
+"id": "Q-100",
+"family": "Inventory & food cost",
+"role": "stock_manager",
+"ar": "إيه الخامات الناقصة النهاردة؟",
+"en": "Which ingredients are low today?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"stock_on_hand"
+],
+"dimensions": [
+"inventory_item"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-101",
+"family": "Inventory & food cost",
+"role": "stock_manager",
+"ar": "فرق الجرد عندنا كام؟",
+"en": "What is our stock count variance?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"stock_variance_qty"
+],
+"dimensions": [
+"inventory_item",
+"location"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-102",
+"family": "Inventory & food cost",
+"role": "stock_manager",
+"ar": "الهالك زاد في الفرع ده؟",
+"en": "Has waste increased at this location?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"stock_waste_qty"
+],
+"dimensions": [
+"branch",
+"business_week"
+],
+"shape": "chart",
+"clarify": "NO"
+},
+{
+"id": "Q-103",
+"family": "Inventory & food cost",
+"role": "stock_manager",
+"ar": "التكلفة النظرية للبرجر كام؟",
+"en": "What is the theoretical cost of the burger?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"food_theoretical_cost"
+],
+"dimensions": [
+"product"
+],
+"shape": "number",
+"clarify": "NO"
+},
+{
+"id": "Q-104",
+"family": "Inventory & food cost",
+"role": "stock_manager",
+"ar": "ليه الزيت أغلى من الشهر اللي فات؟",
+"en": "Why is oil more expensive than last month?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"supplier_price_change"
+],
+"dimensions": [
+"inventory_item",
+"supplier"
+],
+"shape": "explanation",
+"clarify": "NO"
+},
+{
+"id": "Q-105",
+"family": "Inventory & food cost",
+"role": "stock_manager",
+"ar": "قيمة المخزون الحالية كام؟",
+"en": "What is the current inventory value?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"inventory_value"
+],
+"dimensions": [
+"branch"
+],
+"shape": "number",
+"clarify": "NO"
+},
+{
+"id": "Q-106",
+"family": "Inventory & food cost",
+"role": "stock_manager",
+"ar": "وريني حركة خامة الدقيق",
+"en": "Show flour movement history",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"stock_on_hand"
+],
+"dimensions": [
+"inventory_item"
+],
+"shape": "timeline",
+"clarify": "NO"
+},
+{
+"id": "Q-107",
+"family": "Inventory & food cost",
+"role": "stock_manager",
+"ar": "المخزون اللي عندنا يكفينا كام يوم؟",
+"en": "How many days will current stock last?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"stock_on_hand",
+"food_theoretical_cost"
+],
+"dimensions": [
+"inventory_item"
+],
+"shape": "number",
+"clarify": "YES: need demand forecast"
+},
+{
+"id": "Q-108",
+"family": "Inventory & food cost",
+"role": "stock_manager",
+"ar": "الساندوتش اللي اترجع اتسجل هالك؟",
+"en": "Was the returned sandwich recorded as waste?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"stock_waste_qty"
+],
+"dimensions": [
+"product",
+"void_reason"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-109",
+"family": "Inventory & food cost",
+"role": "stock_manager",
+"ar": "الأصناف اللي مالهاش Recipe كام؟",
+"en": "How many items lack a recipe?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"food_theoretical_cost"
+],
+"dimensions": [
+"product"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-110",
+"family": "Inventory & food cost",
+"role": "stock_manager",
+"ar": "النسبة الحقيقية للفود كوست كام؟",
+"en": "What is actual food-cost percentage?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"food_theoretical_cost",
+"net_item_sales"
+],
+"dimensions": [
+"business_week"
+],
+"shape": "number",
+"clarify": "YES: theoretical vs actual?"
+},
+{
+"id": "Q-111",
+"family": "Purchasing & suppliers",
+"role": "buyer",
+"ar": "أنا اشتريت بضاعة بكام امبارح؟",
+"en": "What did I buy yesterday?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"goods_received_value"
+],
+"dimensions": [
+"supplier",
+"business_date"
+],
+"shape": "number",
+"clarify": "YES: ordered, received or paid?"
+},
+{
+"id": "Q-112",
+"family": "Purchasing & suppliers",
+"role": "buyer",
+"ar": "مين المورد اللي غلّى أكتر؟",
+"en": "Which supplier increased prices most?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"supplier_price_change"
+],
+"dimensions": [
+"supplier",
+"inventory_item"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-113",
+"family": "Purchasing & suppliers",
+"role": "buyer",
+"ar": "أوامر الشراء اللي لسه ما اتسلّمتش؟",
+"en": "Which purchase orders remain unreceived?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"po_ordered_value",
+"goods_received_value"
+],
+"dimensions": [
+"supplier"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-114",
+"family": "Purchasing & suppliers",
+"role": "buyer",
+"ar": "طلبنا ١٠٠ واستلمنا ٦٠، ظهروا إزاي؟",
+"en": "We ordered 100 but received 60—how is it represented?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"po_ordered_value",
+"goods_received_value"
+],
+"dimensions": [
+"inventory_item"
+],
+"shape": "explanation",
+"clarify": "NO"
+},
+{
+"id": "Q-115",
+"family": "Purchasing & suppliers",
+"role": "buyer",
+"ar": "سعر لتر الزيت عند كل مورد؟",
+"en": "Price per liter of oil by supplier?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"supplier_price_change"
+],
+"dimensions": [
+"supplier",
+"inventory_item"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-116",
+"family": "Purchasing & suppliers",
+"role": "buyer",
+"ar": "كمية إعادة الطلب المقترحة؟",
+"en": "What is suggested reorder quantity?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"stock_on_hand"
+],
+"dimensions": [
+"inventory_item"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-117",
+"family": "Purchasing & suppliers",
+"role": "buyer",
+"ar": "مين الموردين اللي بيتأخروا؟",
+"en": "Which suppliers deliver late?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"goods_received_value"
+],
+"dimensions": [
+"supplier"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-118",
+"family": "Purchasing & suppliers",
+"role": "buyer",
+"ar": "الفواتير اللي مش مطابقة للاستلام؟",
+"en": "Which invoices do not match goods receipt?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"reconciliation_errors"
+],
+"dimensions": [
+"supplier"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-119",
+"family": "Purchasing & suppliers",
+"role": "buyer",
+"ar": "إيه الأصناف اللي سعرها زاد في آخر ٣ أسابيع؟",
+"en": "Which ingredients rose in price over three weeks?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"supplier_price_change"
+],
+"dimensions": [
+"inventory_item"
+],
+"shape": "chart",
+"clarify": "NO"
+},
+{
+"id": "Q-120",
+"family": "Purchasing & suppliers",
+"role": "buyer",
+"ar": "الشراء الأسبوع ده مقارنة باللي قبله؟",
+"en": "How does purchasing compare with last week?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"goods_received_value"
+],
+"dimensions": [
+"business_week"
+],
+"shape": "chart",
+"clarify": "NO"
+},
+{
+"id": "Q-121",
+"family": "Purchasing & suppliers",
+"role": "buyer",
+"ar": "هات أصل أمر شراء المورد ده",
+"en": "Open this supplier purchase order",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"po_ordered_value"
+],
+"dimensions": [
+"supplier"
+],
+"shape": "table",
+"clarify": "YES: which order?"
+},
+{
+"id": "Q-122",
+"family": "Promotions & marketing",
+"role": "marketing",
+"ar": "عرض الخميس زوّد المبيعات؟",
+"en": "Did Thursday’s promotion increase sales?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"net_item_sales",
+"discount_amount"
+],
+"dimensions": [
+"business_week"
+],
+"shape": "explanation",
+"clarify": "YES: control period/cohort"
+},
+{
+"id": "Q-123",
+"family": "Promotions & marketing",
+"role": "marketing",
+"ar": "خصومات الكوبونات كلفتنا كام؟",
+"en": "How much did coupons cost us?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"discount_amount"
+],
+"dimensions": [
+"business_week"
+],
+"shape": "number",
+"clarify": "NO"
+},
+{
+"id": "Q-124",
+"family": "Promotions & marketing",
+"role": "marketing",
+"ar": "مين أكتر عرض اتباع؟",
+"en": "Which offer was redeemed most?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"discount_count"
+],
+"dimensions": [
+"business_week"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-125",
+"family": "Promotions & marketing",
+"role": "marketing",
+"ar": "الخصومات بعد العشرة بالليل نافعانا؟",
+"en": "Are late-night discounts useful?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"net_item_sales",
+"discount_amount"
+],
+"dimensions": [
+"hour"
+],
+"shape": "chart",
+"clarify": "NO"
+},
+{
+"id": "Q-126",
+"family": "Promotions & marketing",
+"role": "marketing",
+"ar": "العملاء الجدد جُم من عرض إيه؟",
+"en": "Which promotion acquired new customers?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"new_customers"
+],
+"dimensions": [
+"customer_cohort"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-127",
+"family": "Promotions & marketing",
+"role": "marketing",
+"ar": "العرض زوّد عدد الأوردرات ولا المتوسط؟",
+"en": "Did the offer increase orders or check size?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"order_count",
+"avg_check"
+],
+"dimensions": [
+"business_week"
+],
+"shape": "explanation",
+"clarify": "NO"
+},
+{
+"id": "Q-128",
+"family": "Promotions & marketing",
+"role": "marketing",
+"ar": "أقترح عرض للكنافة بس متنفذوش",
+"en": "Suggest a kunafa offer but do not execute it",
+"intent": "SAFE_ACTION_DRAFT",
+"metrics": [
+"menu_contribution",
+"net_item_sales"
+],
+"dimensions": [
+"product"
+],
+"shape": "action_draft",
+"clarify": "NO"
+},
+{
+"id": "Q-129",
+"family": "Promotions & marketing",
+"role": "marketing",
+"ar": "تأثير الإلغاء على أرقام العرض؟",
+"en": "How did cancellations affect promotion results?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"void_line_count",
+"discount_amount"
+],
+"dimensions": [
+"business_week"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-130",
+"family": "Promotions & marketing",
+"role": "marketing",
+"ar": "لما غيرنا سعر الشاي حصل إيه؟",
+"en": "What happened when tea price changed?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"sold_quantity",
+"net_item_sales"
+],
+"dimensions": [
+"product"
+],
+"shape": "chart",
+"clarify": "NO"
+},
+{
+"id": "Q-131",
+"family": "Promotions & marketing",
+"role": "marketing",
+"ar": "المبيعات الإضافية حقيقية ولا مجرد نقل من يوم تاني؟",
+"en": "Is promotion lift genuine or cannibalization?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"net_item_sales"
+],
+"dimensions": [
+"business_week"
+],
+"shape": "explanation",
+"clarify": "YES: need control"
+},
+{
+"id": "Q-132",
+"family": "Promotions & marketing",
+"role": "marketing",
+"ar": "مين وافق على العرض ده؟",
+"en": "Who approved this promotion?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"approval_count"
+],
+"dimensions": [
+"approval_actor"
+],
+"shape": "explanation",
+"clarify": "NO"
+},
+{
+"id": "Q-133",
+"family": "Reservations",
+"role": "floor_manager",
+"ar": "نسبة عدم الحضور في الحجوزات كام؟",
+"en": "What is reservation no-show rate?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"table_turns"
+],
+"dimensions": [
+"business_week"
+],
+"shape": "unavailable",
+"clarify": "NO"
+},
+{
+"id": "Q-134",
+"family": "Reservations",
+"role": "floor_manager",
+"ar": "عربون الحجز متسجل فين؟",
+"en": "Where is the reservation deposit recorded?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"tender_collected"
+],
+"dimensions": [
+"business_date"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-135",
+"family": "Reservations",
+"role": "floor_manager",
+"ar": "مين جاي النهاردة الساعة ٨؟",
+"en": "Who is reserved for 8pm tonight?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"table_turns"
+],
+"dimensions": [
+"hour"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-136",
+"family": "Reservations",
+"role": "floor_manager",
+"ar": "هل الإشغال بيزيد في الويك إند؟",
+"en": "Is occupancy higher on weekends?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"table_turns"
+],
+"dimensions": [
+"business_week"
+],
+"shape": "chart",
+"clarify": "NO"
+},
+{
+"id": "Q-137",
+"family": "Reservations",
+"role": "floor_manager",
+"ar": "عدد الترابيزات اللي اتلغى حجزها؟",
+"en": "How many reservations were canceled?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"table_turns"
+],
+"dimensions": [
+"business_week"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-138",
+"family": "Reservations",
+"role": "floor_manager",
+"ar": "عندنا حجوزات مش متطابقة مع الترابيزات؟",
+"en": "Do reservations and table assignments mismatch?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"reconciliation_errors"
+],
+"dimensions": [
+"table"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-139",
+"family": "Reservations",
+"role": "floor_manager",
+"ar": "وقت انتظار الضيف قد إيه؟",
+"en": "How long do reserved guests wait?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"avg_dining_minutes"
+],
+"dimensions": [
+"table"
+],
+"shape": "number",
+"clarify": "NO"
+},
+{
+"id": "Q-140",
+"family": "Reservations",
+"role": "floor_manager",
+"ar": "مفيش موديول حجوزات، هتقول صفر؟",
+"en": "There is no reservations module—will you return zero?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"table_turns"
+],
+"dimensions": [
+"branch"
+],
+"shape": "unavailable",
+"clarify": "NO"
+},
+{
+"id": "Q-141",
+"family": "Reservations",
+"role": "floor_manager",
+"ar": "إيه أقوى يوم للحجز المسبق؟",
+"en": "Which day has most advance bookings?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"table_turns"
+],
+"dimensions": [
+"business_week"
+],
+"shape": "chart",
+"clarify": "NO"
+},
+{
+"id": "Q-142",
+"family": "Reservations",
+"role": "floor_manager",
+"ar": "في عربون اترد يوم مختلف؟",
+"en": "Were deposits refunded on a later day?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"tender_refunded"
+],
+"dimensions": [
+"business_date"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-143",
+"family": "Reservations",
+"role": "floor_manager",
+"ar": "الحجوزات اللي اتعملها No-show؟",
+"en": "Show no-show reservations",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"table_turns"
+],
+"dimensions": [
+"table"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-144",
+"family": "Fiscal & compliance",
+"role": "accountant",
+"ar": "في إيصالات ضريبية مرفوضة؟",
+"en": "Are there rejected ETA e-receipts?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"eta_failed_count"
+],
+"dimensions": [
+"fiscal_status"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-145",
+"family": "Fiscal & compliance",
+"role": "accountant",
+"ar": "إيصالات النهاردة اتبعتت ولا معلقة؟",
+"en": "Were today’s fiscal receipts submitted or pending?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"eta_receipt_count"
+],
+"dimensions": [
+"fiscal_status",
+"business_date"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-146",
+"family": "Fiscal & compliance",
+"role": "accountant",
+"ar": "فرق ضريبة المبيعات عن الإيصالات كام؟",
+"en": "How much VAT differs between POS and ETA receipts?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"tax_amount"
+],
+"dimensions": [
+"tax_group"
+],
+"shape": "explanation",
+"clarify": "NO"
+},
+{
+"id": "Q-147",
+"family": "Fiscal & compliance",
+"role": "accountant",
+"ar": "المرتجع اتبعت كإيصال مرتجع صحيح؟",
+"en": "Was the refund submitted as a correct return receipt?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"eta_receipt_count"
+],
+"dimensions": [
+"fiscal_status"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-148",
+"family": "Fiscal & compliance",
+"role": "accountant",
+"ar": "الإيصال اتأخر عن النافذة المسموحة؟",
+"en": "Was a receipt submitted outside the allowed window?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"eta_failed_count"
+],
+"dimensions": [
+"fiscal_status"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-149",
+"family": "Fiscal & compliance",
+"role": "accountant",
+"ar": "سعر الضريبة ده مناسب للفرع ده؟",
+"en": "Is this VAT rate applicable to this establishment?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"tax_amount"
+],
+"dimensions": [
+"branch",
+"tax_group"
+],
+"shape": "explanation",
+"clarify": "YES: legal/accountant validation"
+},
+{
+"id": "Q-150",
+"family": "Fiscal & compliance",
+"role": "accountant",
+"ar": "هات رقم UUID بتاع الإيصال",
+"en": "Show the ETA receipt UUID",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"eta_receipt_count"
+],
+"dimensions": [
+"fiscal_status"
+],
+"shape": "table",
+"clarify": "YES: choose receipt"
+},
+{
+"id": "Q-151",
+"family": "Fiscal & compliance",
+"role": "accountant",
+"ar": "في إيصالات اتلغت ومفيش أصل؟",
+"en": "Any return fiscal receipts without originals?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"eta_failed_count"
+],
+"dimensions": [
+"fiscal_status"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-152",
+"family": "Fiscal & compliance",
+"role": "accountant",
+"ar": "إحنا لسه على SANDBOX ولا إنتاج؟",
+"en": "Are we on ETA sandbox or production?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"eta_receipt_count"
+],
+"dimensions": [
+"fiscal_status"
+],
+"shape": "explanation",
+"clarify": "NO"
+},
+{
+"id": "Q-153",
+"family": "Fiscal & compliance",
+"role": "accountant",
+"ar": "ملخص ضرائب شهر أكتوبر",
+"en": "Summarize October VAT by group",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"tax_amount"
+],
+"dimensions": [
+"tax_group",
+"business_date"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-154",
+"family": "Fiscal & compliance",
+"role": "accountant",
+"ar": "ينفع نمسح مبيعات قبل إرسالها للضرائب؟",
+"en": "May we erase real sales before reporting taxes?",
+"intent": "SAFE_REFUSAL",
+"metrics": [
+"eta_receipt_count"
+],
+"dimensions": [
+"fiscal_status"
+],
+"shape": "refusal_safe",
+"clarify": "NO"
+},
+{
+"id": "Q-155",
+"family": "Accounting & reconciliation",
+"role": "accountant",
+"ar": "هاتلي تقرير نهاية اليوم للمحاسب",
+"en": "Give me the accountant EOD pack",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"net_item_sales",
+"tender_collected",
+"cash_variance"
+],
+"dimensions": [
+"business_date"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-156",
+"family": "Accounting & reconciliation",
+"role": "accountant",
+"ar": "مين صرف المرتجعات من أي درج؟",
+"en": "Which cashier drawer paid each refund?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"tender_refunded"
+],
+"dimensions": [
+"drawer",
+"staff"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-157",
+"family": "Accounting & reconciliation",
+"role": "accountant",
+"ar": "في فرق قرش بسبب الـSplit؟",
+"en": "Is there a one-piaster discrepancy from a split?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"reconciliation_errors"
+],
+"dimensions": [
+"check"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-158",
+"family": "Accounting & reconciliation",
+"role": "accountant",
+"ar": "إجمالي قيود اليوم متوازن؟",
+"en": "Do today’s financial postings balance?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"reconciliation_errors"
+],
+"dimensions": [
+"business_date"
+],
+"shape": "explanation",
+"clarify": "NO"
+},
+{
+"id": "Q-159",
+"family": "Accounting & reconciliation",
+"role": "accountant",
+"ar": "رقم المبيعات في Z مختلف ليه عن Dashboard؟",
+"en": "Why does Z sales differ from dashboard sales?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"net_item_sales"
+],
+"dimensions": [
+"business_date"
+],
+"shape": "explanation",
+"clarify": "NO"
+},
+{
+"id": "Q-160",
+"family": "Accounting & reconciliation",
+"role": "accountant",
+"ar": "حركة InstaPay مطابقه لإثبات الدفع؟",
+"en": "Do InstaPay tenders match payment evidence?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"tender_collected"
+],
+"dimensions": [
+"payment_method"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-161",
+"family": "Accounting & reconciliation",
+"role": "accountant",
+"ar": "وريني الحسابات قبل وبعد مردود أمس",
+"en": "Show financial entries before and after yesterday’s return",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"tender_refunded",
+"return_sales_adjustment"
+],
+"dimensions": [
+"business_date"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-162",
+"family": "Accounting & reconciliation",
+"role": "accountant",
+"ar": "التقرير ده As Of الساعة كام؟",
+"en": "At what timestamp is this report snapshot?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"data_freshness_minutes"
+],
+"dimensions": [
+"business_date"
+],
+"shape": "explanation",
+"clarify": "NO"
+},
+{
+"id": "Q-163",
+"family": "Accounting & reconciliation",
+"role": "accountant",
+"ar": "المبيعات غير المحصلة بتظهر فين؟",
+"en": "Where do unpaid receivables appear?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"recognized_sales_total",
+"tender_collected"
+],
+"dimensions": [
+"business_date"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-164",
+"family": "Accounting & reconciliation",
+"role": "accountant",
+"ar": "الرسوم ضافتها ضريبة ولا لأ؟",
+"en": "Was service charge included in tax base?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"service_charge",
+"tax_amount"
+],
+"dimensions": [
+"tax_group"
+],
+"shape": "explanation",
+"clarify": "NO"
+},
+{
+"id": "Q-165",
+"family": "Accounting & reconciliation",
+"role": "accountant",
+"ar": "قد إيه أرباحنا النهاردة؟",
+"en": "How much profit did we make today?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"net_item_sales",
+"food_theoretical_cost",
+"labor_cost"
+],
+"dimensions": [
+"business_date"
+],
+"shape": "explanation",
+"clarify": "YES: gross profit vs net P&L"
+},
+{
+"id": "Q-166",
+"family": "Multi-branch",
+"role": "owner",
+"ar": "قارن فروعنا النهاردة",
+"en": "Compare our branches today",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"net_item_sales"
+],
+"dimensions": [
+"branch",
+"business_date"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-167",
+"family": "Multi-branch",
+"role": "owner",
+"ar": "أكتر فرع بيعمل خصومات؟",
+"en": "Which branch discounts most?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"discount_amount"
+],
+"dimensions": [
+"branch"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-168",
+"family": "Multi-branch",
+"role": "owner",
+"ar": "في فرع متأخر في المزامنة؟",
+"en": "Which branch has sync lag?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"data_freshness_minutes"
+],
+"dimensions": [
+"branch",
+"sync_status"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-169",
+"family": "Multi-branch",
+"role": "owner",
+"ar": "ليه فرع المعادي أعلى من فرع أكتوبر؟",
+"en": "Why does Maadi outperform October branch?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"net_item_sales",
+"order_count"
+],
+"dimensions": [
+"branch"
+],
+"shape": "explanation",
+"clarify": "YES: metric/baseline"
+},
+{
+"id": "Q-170",
+"family": "Multi-branch",
+"role": "owner",
+"ar": "نسبة المرتجعات بين الفروع؟",
+"en": "Refund rates across branches?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"refund_count"
+],
+"dimensions": [
+"branch"
+],
+"shape": "chart",
+"clarify": "NO"
+},
+{
+"id": "Q-171",
+"family": "Multi-branch",
+"role": "owner",
+"ar": "أي فرع هامش المنيو أعلى؟",
+"en": "Which branch has higher menu contribution?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"menu_contribution_pct"
+],
+"dimensions": [
+"branch"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-172",
+"family": "Multi-branch",
+"role": "owner",
+"ar": "مين عنده عجز كاش مستمر؟",
+"en": "Which branch repeatedly has shortages?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"cash_variance"
+],
+"dimensions": [
+"branch"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-173",
+"family": "Multi-branch",
+"role": "owner",
+"ar": "مبيعات كل فرع في نفس ساعة الذروة؟",
+"en": "Compare store peak hour sales",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"net_item_sales"
+],
+"dimensions": [
+"branch",
+"hour"
+],
+"shape": "chart",
+"clarify": "NO"
+},
+{
+"id": "Q-174",
+"family": "Multi-branch",
+"role": "owner",
+"ar": "الإضافات في الدليفري مختلفة بين الفروع؟",
+"en": "Do delivery modifiers differ across branches?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"sold_quantity"
+],
+"dimensions": [
+"modifier",
+"branch"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-175",
+"family": "Multi-branch",
+"role": "owner",
+"ar": "قارن المخزون بقيمته في الفروع",
+"en": "Compare inventory valuations across stores",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"inventory_value"
+],
+"dimensions": [
+"branch"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-176",
+"family": "Multi-branch",
+"role": "owner",
+"ar": "التقارير دي هتشوف فيها فرع مش بتاعي؟",
+"en": "Can I see a branch I am not authorized for?",
+"intent": "SAFE_REFUSAL",
+"metrics": [
+"net_item_sales"
+],
+"dimensions": [
+"branch"
+],
+"shape": "denied",
+"clarify": "NO"
+},
+{
+"id": "Q-177",
+"family": "Forecast & planning",
+"role": "owner",
+"ar": "نتوقع نبيع بكام بكرة؟",
+"en": "What is forecast sales for tomorrow?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"net_item_sales"
+],
+"dimensions": [
+"business_date"
+],
+"shape": "forecast",
+"clarify": "YES: forecast availability/confidence"
+},
+{
+"id": "Q-178",
+"family": "Forecast & planning",
+"role": "owner",
+"ar": "إيه الخامات اللي نطلبها للأسبوع الجاي؟",
+"en": "Which ingredients should we reorder next week?",
+"intent": "SAFE_ACTION_DRAFT",
+"metrics": [
+"stock_on_hand"
+],
+"dimensions": [
+"inventory_item"
+],
+"shape": "action_draft",
+"clarify": "NO"
+},
+{
+"id": "Q-179",
+"family": "Forecast & planning",
+"role": "owner",
+"ar": "رمضان الجاي نزوّد الشيفت؟",
+"en": "Should we increase staffing next Ramadan?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"labor_hours",
+"net_item_sales"
+],
+"dimensions": [
+"business_week"
+],
+"shape": "explanation",
+"clarify": "YES: target/budget"
+},
+{
+"id": "Q-180",
+"family": "Forecast & planning",
+"role": "owner",
+"ar": "إيه خطر نفاد مخزون الشاي؟",
+"en": "What is the tea stock-out risk?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"stock_on_hand"
+],
+"dimensions": [
+"inventory_item"
+],
+"shape": "forecast",
+"clarify": "NO"
+},
+{
+"id": "Q-181",
+"family": "Forecast & planning",
+"role": "owner",
+"ar": "قد إيه الثقة في التوقع؟",
+"en": "What is the forecast confidence range?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"net_item_sales"
+],
+"dimensions": [
+"business_date"
+],
+"shape": "forecast",
+"clarify": "NO"
+},
+{
+"id": "Q-182",
+"family": "Forecast & planning",
+"role": "owner",
+"ar": "أكتر أيام الأسبوع طلبًا؟",
+"en": "What are our busiest weekdays?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"order_count"
+],
+"dimensions": [
+"business_week"
+],
+"shape": "chart",
+"clarify": "NO"
+},
+{
+"id": "Q-183",
+"family": "Forecast & planning",
+"role": "owner",
+"ar": "لو الأسعار زادت ١٠٪، الكمية هتتأثر قد إيه؟",
+"en": "What if prices increase 10%?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"net_item_sales",
+"sold_quantity"
+],
+"dimensions": [
+"product"
+],
+"shape": "scenario",
+"clarify": "YES: elasticity assumptions"
+},
+{
+"id": "Q-184",
+"family": "Forecast & planning",
+"role": "owner",
+"ar": "كم شيف مطلوب الجمعة؟",
+"en": "How many chefs should work Friday?",
+"intent": "SAFE_ACTION_DRAFT",
+"metrics": [
+"kds_late_count",
+"order_count"
+],
+"dimensions": [
+"daypart"
+],
+"shape": "action_draft",
+"clarify": "YES: staffing module/constraints"
+},
+{
+"id": "Q-185",
+"family": "Forecast & planning",
+"role": "owner",
+"ar": "وريني أثر سيناريو مبيعات أقل ٢٠٪",
+"en": "Show a -20% demand scenario",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"net_item_sales"
+],
+"dimensions": [
+"business_week"
+],
+"shape": "scenario",
+"clarify": "NO"
+},
+{
+"id": "Q-186",
+"family": "Forecast & planning",
+"role": "owner",
+"ar": "هل توقعك مبني على سنتين بيانات؟",
+"en": "Is your forecast based on two years of data?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"net_item_sales"
+],
+"dimensions": [
+"business_week"
+],
+"shape": "explanation",
+"clarify": "NO"
+},
+{
+"id": "Q-187",
+"family": "Forecast & planning",
+"role": "owner",
+"ar": "تقدر تشغّل أمر الشراء من غير موافقة؟",
+"en": "Can you place a purchase order without approval?",
+"intent": "SAFE_REFUSAL",
+"metrics": [
+"stock_on_hand"
+],
+"dimensions": [
+"inventory_item"
+],
+"shape": "denied",
+"clarify": "NO"
+},
+{
+"id": "Q-188",
+"family": "System health & quality",
+"role": "admin",
+"ar": "آخر داتا وصلت من الكاشير إمتى؟",
+"en": "When did the cashier last sync?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"data_freshness_minutes"
+],
+"dimensions": [
+"device"
+],
+"shape": "number",
+"clarify": "NO"
+},
+{
+"id": "Q-189",
+"family": "System health & quality",
+"role": "admin",
+"ar": "في معاملات اتحسبت مرتين بعد الأوفلاين؟",
+"en": "Did offline replay double count orders?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"reconciliation_errors"
+],
+"dimensions": [
+"sync_status",
+"device"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-190",
+"family": "System health & quality",
+"role": "admin",
+"ar": "إيه المقاييس اللي مش متاحة وليه؟",
+"en": "Which metrics are unavailable and why?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"data_freshness_minutes"
+],
+"dimensions": [
+"branch"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-191",
+"family": "System health & quality",
+"role": "admin",
+"ar": "التقرير ده نهائي ولا مبدئي؟",
+"en": "Is this report final or provisional?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"data_freshness_minutes"
+],
+"dimensions": [
+"business_date"
+],
+"shape": "explanation",
+"clarify": "NO"
+},
+{
+"id": "Q-192",
+"family": "System health & quality",
+"role": "admin",
+"ar": "في إيصالات معلقة أكتر من المعتاد؟",
+"en": "Are fiscal submissions unusually delayed?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"eta_failed_count"
+],
+"dimensions": [
+"fiscal_status"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-193",
+"family": "System health & quality",
+"role": "admin",
+"ar": "حالة الطابعة في الفرع ده؟",
+"en": "What is the printer status at this branch?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"reconciliation_errors"
+],
+"dimensions": [
+"device"
+],
+"shape": "table",
+"clarify": "NO"
+},
+{
+"id": "Q-194",
+"family": "System health & quality",
+"role": "admin",
+"ar": "في موديول مخزن مقفول وبيطلع صفر؟",
+"en": "Is a disabled inventory module incorrectly showing zero?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"stock_on_hand"
+],
+"dimensions": [
+"branch"
+],
+"shape": "unavailable",
+"clarify": "NO"
+},
+{
+"id": "Q-195",
+"family": "System health & quality",
+"role": "admin",
+"ar": "كل حجز/طلب ليه ID ثابت؟",
+"en": "Does every order have a stable ID?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"order_count"
+],
+"dimensions": [
+"order"
+],
+"shape": "explanation",
+"clarify": "NO"
+},
+{
+"id": "Q-196",
+"family": "System health & quality",
+"role": "admin",
+"ar": "مين يقدر يشوف بيانات العملاء؟",
+"en": "Who can view customer information?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"new_customers"
+],
+"dimensions": [
+"role"
+],
+"shape": "explanation",
+"clarify": "NO"
+},
+{
+"id": "Q-197",
+"family": "System health & quality",
+"role": "admin",
+"ar": "إيه سبب اختلاف تقريرين على نفس الفترة؟",
+"en": "Why do two reports disagree for the same period?",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"reconciliation_errors"
+],
+"dimensions": [
+"business_date"
+],
+"shape": "explanation",
+"clarify": "YES: which reports/filters?"
+},
+{
+"id": "Q-198",
+"family": "System health & quality",
+"role": "admin",
+"ar": "وريني كل الاختبارات اللي اتفشلت للريبورت",
+"en": "Show all failed reporting reconciliation tests",
+"intent": "QUERY_OR_EXPLAIN",
+"metrics": [
+"reconciliation_errors"
+],
+"dimensions": [
+"business_date"
+],
+"shape": "table",
+"clarify": "NO"
+}
+]

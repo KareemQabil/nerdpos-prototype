@@ -23,10 +23,11 @@ function emit() {
 export const SEEDED_LABELS: Record<string, { ar: string; en: string; short: string }> = {
   t_cash: { ar: 'كاشير (درج)', en: 'Cashier (drawer)', short: 'T1' },
   t_floor: { ar: 'تابلت الويتر', en: 'Waiter tablet', short: 'T2' },
-  t_kds: { ar: 'شاشة المطبخ', en: 'Kitchen screen', short: 'K1' },
+  t_kds: { ar: 'شاشة المطبخ (التسليم)', en: 'Kitchen screen (dispatch)', short: 'K1' },
   t_admin: { ar: 'مكتب المدير', en: 'Manager office', short: 'ADM' },
   t_second_floor: { ar: 'تابلت الفرع التاني', en: 'Second branch tablet', short: 'B2' },
   t_cash2: { ar: 'كاشير التيك أواي', en: 'Takeaway cashier', short: 'T3' },
+  t_kds2: { ar: 'شاشة المشويات', en: 'Grill screen', short: 'K2' },
   BO: { ar: 'باك أوفيس (من غير جهاز)', en: 'Back office (no terminal)', short: 'BO' },
 };
 

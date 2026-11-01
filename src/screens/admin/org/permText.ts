@@ -11,10 +11,12 @@ export const MODULE_TEXT: Record<string, string> = {
   recipe: 'الوصفات', production: 'التحضير', purchasing: 'المشتريات', purchaseorder: 'أوامر الشراء', goodsreceipt: 'استلام البضاعة',
   supplierreturn: 'مرتجع الموردين', supplier: 'الموردين', customer: 'العملاء', customeraddress: 'عناوين العملاء', loyalty: 'نقاط الولاء',
   delivery: 'الدليفري', channel: 'الطلبات الأونلاين', outbox: 'العمليات في الخلفية', sync: 'المزامنة', reconciliation: 'المطابقة', platform: 'النظام',
+  saleschannel: 'قنوات البيع', vendor: 'فريق NerdPOS (مش المطعم)', // r3C
   menu: 'المنيوهات', promotion: 'العروض', floor: 'خريطة الصالة', driver: 'الطيارين', deposit: 'العربون', reservation: 'الحجوزات',
 };
 
 const ACTION_TEXT: Record<string, string> = {
+  capabilities: 'يفتح ويقفل أجزاء السيستم المرخصة', // r3C
   read: 'يشوف', create: 'يعمل جديد', update: 'يعدّل', manage: 'يدير', configure: 'يظبط', upsert: 'يضيف ويعدّل', upsertitem: 'يضيف ويعدّل أصناف',
   fire: 'يبعت للمطبخ', void: 'يلغي الشيك كله', voidline: 'يلغي صنف اتبعت', cancel: 'يلغي', confirm: 'يأكد', complete: 'يقفل', addlines: 'يضيف أصناف',
   updateline: 'يعدّل صنف', removeline: 'يشيل صنف', applydiscount: 'يعمل خصم', removediscount: 'يشيل خصم', comp: 'يعمل ضيافة', changechannel: 'يغيّر نوع الطلب',

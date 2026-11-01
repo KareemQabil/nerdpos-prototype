@@ -1,8 +1,8 @@
 // Stock item drawer: balances per warehouse, units & packs, min/target levels, lots & expiry, cost history,
 // where the item is used in recipes, and its movements. Adjustment and waste start from here.
 import React, { useEffect, useState } from 'react';
-import { Save, Plus, Trash2, SlidersHorizontal, Scale, PackagePlus } from 'lucide-react';
-import { useCommand, useQuery } from '../../app/hooks';
+import { Save, Plus, Trash2, SlidersHorizontal, Scale, PackagePlus, ScanSearch } from 'lucide-react';
+import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
 import { Banner, Button, Field, Input, KV, Modal, Drawer, Money, Pill, Select, Spinner, StateBadge, Switch, Table, Tabs, Textarea } from '../../ui';
 import { t, L, tv } from '../../i18n';
@@ -20,9 +20,10 @@ export function ItemDrawer({ itemId, onClose, initialTab = 'stock' }: { itemId: 
   const [waste, setWaste] = useState<string | null>(null);
   useEffect(() => setTab(initialTab), [itemId, initialTab]);
   const it = q.data;
+  const { nav, screen } = useDev();
   return (
     <Drawer width="xl" open={!!itemId} onClose={onClose} title={it ? <span className="flex items-center gap-2">{L(it.name)} <span className="text-sm text-dim">{tv(it.category)}</span></span> : t('صنف مخزن')}
-      badge={<>{it && !it.active && <Pill tone="neutral">{t('موقوف')}</Pill>}{it?.kind === 'PREP' && <Pill tone="violet">{t('تجهيزة مطبخ')}</Pill>}{it?.kind === 'RESALE' && <Pill tone="info">{t('بيتباع زي ما هو')}</Pill>}<StateBadge ops={OPS} /></>}>
+      badge={<>{it && !it.active && <Pill tone="neutral">{t('موقوف')}</Pill>}{it?.kind === 'PREP' && <Pill tone="violet">{t('تجهيزة مطبخ')}</Pill>}{it?.kind === 'RESALE' && <Pill tone="info">{t('بيتباع زي ما هو')}</Pill>}<StateBadge ops={OPS} />{it && screen !== 'item360' && <Button size="sm" variant="subtle" data-fb="item:open-360" onClick={() => { onClose(); nav('item360', { kind: 'item', id: it.id }); }}><ScanSearch className="w-3.5 h-3.5" />{t('صفحة الصنف كاملة')}</Button>}</>}>
       {!it ? <Spinner /> : (
         <div className="space-y-4">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">

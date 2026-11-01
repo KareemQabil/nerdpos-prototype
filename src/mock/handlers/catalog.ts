@@ -1,4 +1,5 @@
 import { ApiError } from '../errors';
+import { previewInstant } from '../clock'; // r3B: read-only menu preview at a chosen time
 import type { Handler, Ctx } from '../kernel';
 import { nextId } from '../store';
 import { policy } from '../policies';
@@ -11,6 +12,7 @@ import { promotionLive } from '../promo-engine';
 import { upsertPromotion, promotionView, findByCode } from './promotions';
 import { effectiveAvailability, menuCheck, menuState, optionSoldOut, branchBusinessDate, activeVariants } from '../menu-engine';
 import { planPriceWindow, applyPriceWindow } from '../menu-prices';
+import { resolveSalesChannel, salesChannelById, priceKeyOf } from '../sales-channels'; // sales channels (E13)
 import { menuSheetsOf, validateMenuSheets, applyMenuSheets } from '../menu-import';
 
 /** nextId, skipping ids the seed already uses (seed price rules are pr_1…pr_N and promotions promo_1, promo_2). */
@@ -187,11 +189,12 @@ export const catalogHandlers: Record<string, Handler> = {
     // menu area (proposed query fields): channel → menuNow per product (dayparts, channel and branch menus); q → name/sku/barcode search
     const qq = (ctx.query.q ?? '').trim().toLowerCase();
     const channel = (['DINE_IN', 'TAKEAWAY', 'DELIVERY'].includes(ctx.query.channel) ? ctx.query.channel : undefined) as Channel | undefined;
+    const previewAt = previewInstant(ctx.query.previewAt, ctx.now); // r3B trusted time: "what the cashier sees at HH:MM" without moving the clock
     const items = ctx.db.products
       .filter((p) => (!ctx.query.categoryId || p.categoryId === ctx.query.categoryId) && (ctx.query.active === undefined || String(p.active) === ctx.query.active) && (showDirection() || !p.direction))
       .filter((p) => !qq || p.name.ar.toLowerCase().includes(qq) || p.name.en.toLowerCase().includes(qq) || p.sku.toLowerCase().includes(qq) || (p.variants ?? []).some((v) => (v.sku ?? '').toLowerCase() === qq || (v.barcode ?? '') === qq))
-      .map((p) => productView(ctx.db, p, ctx.branchId, { channel, now: ctx.now }));
-    return page(items, ctx.query);
+      .map((p) => productView(ctx.db, p, ctx.branchId, { channel, now: previewAt ?? ctx.now }));
+    return { ...page(items, ctx.query), previewAt: previewAt ? new Date(previewAt).toISOString() : null }; // r3B: read-only preview, the clock is untouched
   },
   'Product.Get': (ctx) => {
     const p = ctx.db.products.find((x) => x.id === ctx.params.productId);
@@ -338,7 +341,8 @@ export const catalogHandlers: Record<string, Handler> = {
     const branchId = b.branchId ?? ctx.branchId;
     need(branchId, 'CONTEXT_REQUIRED');
     if (ctx.branchId && branchId !== ctx.branchId) throw new ApiError('PERMISSION_DENIED', { reason: 'other branch' });
-    return quoteItem(ctx.db, { branchId, channel: b.channel ?? 'DINE_IN', productId: ctx.params.productId, quantity: String(b.quantity ?? '1'), modifierOptionIds: b.modifierOptionIds ?? [], variantId: b.variantId, halfProductId: b.halfProductId, comboSelections: b.comboSelections, at: ctx.now, modifierLevels: b.modifierLevels, modifierPlacement: b.modifierPlacement, nestedOptionIds: b.nestedOptionIds });
+    const sc = b.salesChannelId ? resolveSalesChannel(ctx.db, (b.channel ?? salesChannelById(ctx.db, b.salesChannelId)?.orderType ?? 'DINE_IN') as Channel, b.salesChannelId) : null; // sales channels (E13)
+    return quoteItem(ctx.db, { salesChannelId: sc?.id ?? null, branchId, channel: sc?.orderType ?? b.channel ?? 'DINE_IN', productId: ctx.params.productId, quantity: String(b.quantity ?? '1'), modifierOptionIds: b.modifierOptionIds ?? [], variantId: b.variantId, halfProductId: b.halfProductId, comboSelections: b.comboSelections, at: ctx.now, modifierLevels: b.modifierLevels, modifierPlacement: b.modifierPlacement, nestedOptionIds: b.nestedOptionIds });
   },
   'Catalog.SetPrice': (ctx) => {
     const db = ctx.db;
@@ -346,6 +350,11 @@ export const catalogHandlers: Record<string, Handler> = {
     const p = db.products.find((x) => x.id === ctx.params.productId);
     need(p, 'CATALOG_PRODUCT_NOT_FOUND');
     need(db.branches.some((x) => x.id === b.branchId), 'ORGANIZATION_BRANCH_NOT_FOUND');
+    // sales channels (E13, proposed field): salesChannelId = the price list of one channel (default channel = the order type's list)
+    const sc = b.salesChannelId ? salesChannelById(db, b.salesChannelId) : null;
+    if (b.salesChannelId) need(sc, 'SALES_CHANNEL_NOT_FOUND', { salesChannelId: b.salesChannelId });
+    if (sc) b.channel = sc.orderType;
+    const priceKey = priceKeyOf(sc);
     need(['DINE_IN', 'TAKEAWAY', 'DELIVERY'].includes(b.channel), 'VALIDATION_FAILED', { field: 'channel' });
     need(isMoney(b.amount) && D(b.amount).gte(0), 'VALIDATION_FAILED', { field: 'amount' });
     if (b.currency && b.currency !== 'EGP') throw new ApiError('VALIDATION_FAILED', { field: 'currency', rule: 'branch currency EGP' });
@@ -361,18 +370,19 @@ export const catalogHandlers: Record<string, Handler> = {
     if (from > ctx.now + 366 * 86_400_000) throw new ApiError('VALIDATION_FAILED', { field: 'effectiveFrom', rule: 'at most 366 days ahead' });
     if (from > ctx.now + 60_000 && policy<string>('PriceSchedulingPolicy') === 'IMMEDIATE_ONLY') throw new ApiError('PRICE_SCHEDULING_NOT_ALLOWED');
     // doc 22 §3 over the rows of scope S = (product[, size], branch, channel) — menu-prices.ts
-    const plan = planPriceWindow(db, ctx.now, { productId: p!.id, variantId, branchId: b.branchId, channel: b.channel, amount, from, to });
+    const plan = planPriceWindow(db, ctx.now, { productId: p!.id, variantId, branchId: b.branchId, channel: b.channel, salesChannelId: priceKey, amount, from, to });
     const basis = plan.E ?? plan.C;
     ctx.requireApproval({ action: 'PRICE_CHANGE', targetType: 'catalog.Product', targetId: p!.id, context: { productId: p!.id, branchId: b.branchId, channel: b.channel, effectiveFrom: new Date(from).toISOString(), changeKind: plan.changeKind, basisRuleId: basis?.id ?? null, basisRuleVersion: basis?.version ?? null, oldAmount: plan.old, newAmount: amount, changePercent: plan.changePercent, firstPrice: plan.firstPrice, decrease: !!plan.old && D(amount).lessThan(plan.old), ...(variantId ? { variantId } : {}) }, grantId: b.approvalGrantId });
-    const { rule, closedRule } = applyPriceWindow(db, plan, ctx.user!.id, ctx.nowIso, (prefix) => freshId(ctx.db, prefix));
-    ctx.audit(`price ${p!.sku}${variantId ? '/' + variantId : ''} ${b.branchId}/${b.channel} ${plan.changeKind} ${plan.old ?? '—'} → ${amount}`, p!.id, true, b.approvalGrantId);
+    // pinned (F2-05): a single-item override that the next bulk change skips unless it is explicitly included
+    const { rule, closedRule } = applyPriceWindow(db, plan, ctx.user!.id, ctx.nowIso, (prefix) => freshId(ctx.db, prefix), b.pinned === true ? { pinned: true } : b.pinned === false ? { pinned: false } : {});
+    ctx.audit(`price ${p!.sku}${variantId ? '/' + variantId : ''} ${b.branchId}/${sc ? sc.name.en : b.channel}${rule.pinned ? ' (pinned: bulk changes skip it)' : ''} ${plan.changeKind} ${plan.old ?? '—'} → ${amount}`, p!.id, true, b.approvalGrantId);
     return { rule, closedRule, changeKind: plan.changeKind, replacedRuleId: closedRule?.id ?? null, firstPrice: plan.firstPrice, changePercent: plan.changePercent };
   },
   'Product.PriceHistory': (ctx) => {
     // menu area: rows carry variantId (null = the product price); ?variantId= filters one size, ?variantId=BASE the product price only
     const vq = ctx.query.variantId;
     const rows = ctx.db.priceRules
-      .filter((r) => r.productId === ctx.params.productId && (!ctx.query.branchId || r.branchId === ctx.query.branchId) && (!ctx.query.channel || r.channel === ctx.query.channel) && (!vq || (vq === 'BASE' ? !r.variantId : r.variantId === vq)))
+      .filter((r) => r.productId === ctx.params.productId && (!ctx.query.branchId || r.branchId === ctx.query.branchId) && (!ctx.query.channel || r.channel === ctx.query.channel) && (ctx.query.salesChannelId === undefined || (r.salesChannelId ?? null) === priceKeyOf(salesChannelById(ctx.db, ctx.query.salesChannelId))) && (!vq || (vq === 'BASE' ? !r.variantId : r.variantId === vq)))
       .sort((a, b) => b.effectiveFrom - a.effectiveFrom)
       .map((r) => ({ ...r, variantId: r.variantId ?? null, effectiveFromIso: new Date(r.effectiveFrom).toISOString(), effectiveToIso: r.effectiveTo ? new Date(r.effectiveTo).toISOString() : null, state: r.effectiveFrom > ctx.now ? 'SCHEDULED' : r.effectiveTo !== null && r.effectiveTo <= ctx.now ? 'ENDED' : 'CURRENT' }));
     return page(rows, ctx.query);
