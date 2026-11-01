@@ -86,7 +86,7 @@ export const DIM_PHRASES: [string[], string][] = [
   [['اوقات الزحمه', 'peak periods', 'الفتره', 'daypart'], 'daypart'],
   [['قارن فروعنا', 'compare our branches', 'اكتر فرع', 'which branch', 'اي فرع', 'بين الفروع', 'across branches', 'الفروع', 'كل فرع', 'each store', 'store peak', 'across stores', 'by branch'], 'branch'],
   [['مين اعلي تطبيق', 'which app', 'قارن التيك اواي بالدليفري', 'takeaway and delivery', 'حسب القناه', 'by channel'], 'channel'],
-  [['عدت الحد', 'exceeded policy', 'مين اكتر كاشير', 'which cashier', 'عند مين', 'مين قفل', 'who closed', 'مين عمل', 'who made', 'كل ويتر', 'per waiter', 'ويتر معين', 'one waiter', 'مين الطيار', 'which courier', 'مين اكتر ويتر', 'which waiter', 'مين صرف', 'which cashier drawer'], 'staff'],
+  [['عدت الحد', 'exceeded policy', 'مين عنده', 'مين اكتر كاشير', 'which cashier', 'عند مين', 'مين قفل', 'who closed', 'مين عمل', 'who made', 'كل ويتر', 'per waiter', 'ويتر معين', 'one waiter', 'مين الطيار', 'which courier', 'مين اكتر ويتر', 'which waiter', 'مين صرف', 'which cashier drawer'], 'staff'],
   [['اكتر صنف', 'which item', 'الاصناف', 'items', 'مين الكومبو', 'which combo', 'منطقه بتطلب', 'buys the most'], 'product'],
   [['المشروبات', 'beverages', 'حسب القسم'], 'category'],
   [['اكتر عرض', 'which offer', 'حسب السبب', 'by reason'], 'void_reason'],
