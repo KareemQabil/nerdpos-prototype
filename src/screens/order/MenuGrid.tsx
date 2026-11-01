@@ -8,7 +8,7 @@ import { Package, Search, AlertTriangle, PackageX, Clock, Eye, EyeOff, Layers, P
 import { useDev, useQuery } from '../../app/hooks';
 import { call, ApiFailure } from '../../api/client';
 import { clock } from '../../mock/clock';
-import { Pill, StateBadge, Input, Modal, Button, EmptyState, Skeleton } from '../../ui';
+import { Pill, StateBadge, Input, Modal, Button, EmptyState, Skeleton, toast } from '../../ui';
 import { Tech } from '../../app/tech';
 import { t, L, tv, getLang } from '../../i18n';
 import { cn, money } from '../../lib/format';
@@ -118,12 +118,49 @@ export function MenuGrid({ channel, onPick, disabled, salesChannelId }: { channe
   const epoch = useMemo(() => items.map((p) => `${p.id}:${p.version}:${p.availability?.state}:${p.menuNow?.onMenu ?? ''}`).join(',') + '|' + gs.map((g) => `${g.id}:${g.version}:${g.options.filter((o: any) => o.soldOut).map((o: any) => o.id).join('.')}`).join(',') + '|' + JSON.stringify(display.data?.value ?? null) + '|' + Math.floor(clock.offset() / 60000), [items, gs, display.data, minute]); // eslint-disable-line react-hooks/exhaustive-deps
   const quoteOf = useTileQuotes(groups.data ? visible.filter(onMenu).map((p) => p.id) : [], channel, auth.branchId, epoch, salesChannelId);
   const catsShown = (cats.data?.items ?? []).filter((c: any) => listed.some((p) => p.categoryId === c.id));
+  // Barcode scanner (P1-028): a scanner types the code fast and ends with Enter. Works without focusing any field;
+  // typing in an input is left alone. The same exact-code match runs when Enter is pressed in the search box.
+  const byCode = (code: string) => {
+    const c = code.trim().toLowerCase();
+    if (!c) return null;
+    return items.find((p) => p.sku?.toLowerCase() === c || (p.variants ?? []).some((v: any) => (v.barcode ?? '').toLowerCase() === c || (v.sku ?? '').toLowerCase() === c)) ?? null;
+  };
+  const pickCode = (code: string) => {
+    const p = byCode(code);
+    if (!p) { toast('warning', t('مفيش صنف بالكود ده'), code); return false; }
+    if (p.availability?.state === 'SOLD_OUT' || !onMenu(p)) { toast('warning', t('الصنف ده مش متاح دلوقتي'), L(p.name)); return false; }
+    onPick(p);
+    return true;
+  };
+  const pickRef = React.useRef(pickCode);
+  pickRef.current = pickCode;
+  useEffect(() => {
+    if (disabled) return;
+    let buf = '';
+    let last = 0;
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const now = performance.now();
+      if (now - last > 60) buf = '';
+      last = now;
+      if (e.key === 'Enter') {
+        if (buf.length >= 4) { e.preventDefault(); pickRef.current(buf); }
+        buf = '';
+        return;
+      }
+      if (e.key.length === 1) buf += e.key;
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [disabled]);
   const running = (overview.data?.dayparts ?? []).filter((d: any) => d.runningNow);
   const nextUp = (overview.data?.dayparts ?? []).filter((d: any) => !d.runningNow && d.active && d.nextStart).sort((a: any, b: any) => a.nextStart.localeCompare(b.nextStart))[0];
   return (
     <div className="@container/menu flex flex-col gap-3 min-h-0 h-full">
       <div className="flex items-center gap-2 shrink-0">
-        <div className="relative flex-1"><Search className="w-4 h-4 absolute top-1/2 -translate-y-1/2 start-3 text-dim" /><Input data-fb="menu-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('دوّر على صنف أو كود…')} className="ps-9 h-11" /></div>
+        <div className="relative flex-1"><Search className="w-4 h-4 absolute top-1/2 -translate-y-1/2 start-3 text-dim" /><Input data-fb="menu-search" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && byCode(q) && pickCode(q)) setQ(''); }} placeholder={t('دوّر على صنف أو كود…')} className="ps-9 h-11" /></div>
         <button data-fb="menu:soldout-board" onClick={() => setBoard(true)} title={t('خلص النهارده')} className={cn('shrink-0 h-11 px-3 rounded-xl border text-sm inline-flex items-center gap-1.5', soldOutCount ? 'border-[color-mix(in_srgb,var(--error)_45%,transparent)] text-[var(--error)] bg-[color-mix(in_srgb,var(--error)_10%,transparent)]' : 'border-[var(--glass-border)] text-soft surface-1')}>
           <PackageX className="w-4 h-4" /><span className="hidden @[460px]/menu:inline">{t('خلص النهارده')}</span>{soldOutCount > 0 && <span className="num text-xs font-bold">{soldOutCount}</span>}
         </button>

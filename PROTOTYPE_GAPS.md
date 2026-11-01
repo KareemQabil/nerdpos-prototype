@@ -176,7 +176,38 @@ All 53 inventory/purchasing operations (SPECIFIED / BUILT_ON_MAIN) are simulated
 | O9 | **[DEMO]** Reconciliation. | The bank settlement file is simulated (with ≥ 3 card payments the last is missing to create a difference); acknowledging needs a reason and never changes numbers. |
 | O10 | **[PROPOSED]** Capabilities. | 12 switches (business/branch); off hides the screens and the server refuses their operations with `CAPABILITY_NOT_AVAILABLE`. |
 
-## 14. Prototype limitations
+## 14. Round 3 — authority, trusted time, venue configuration, journeys, reports engine
+
+Design rationale: `docs/round3/DESIGN.md`; per-note and per-task status: `docs/round3/TRACEABILITY.md`.
+
+**Authority & reversals**
+- **[PROPOSED]** Ops `Order.CancelStaffMeal`, `StaffMeal.Allowance`, `Reversal.Find`, `VoidReview.Find`, `VoidReview.Decide`.
+- **[CONTRACT]** Extended inputs: `Order.RemoveLine/UpdateLine/Cancel` take `reasonCode`/`reason` (a quantity decrease is a removal); `Order.VoidLine/Void` and `Refund.Request` lines take `disposition`; `Approval.Grant` takes `CARD`/`FINGERPRINT` and `overridePermission`.
+- **[PROPOSED]** Approval actions `LINE_REMOVE_UNSENT` (default ALWAYS — owner decision), `RETURN_AFTER_CLOSE`, `STAFF_MEAL`; policies `SupervisorOverridePolicy`, `ApprovalCredentialPolicy`, `StaffMealAllowancePolicy` (200 EGP/day, sale price or cost), `SplitLimitPolicy`; permissions `approve:staff_meal`, `approve:return_after_close`, `voidreview:decide`; new role "accountant" (`demo-accountant`).
+- **[ASSUMED]** Stage S1 = a pre-bill printed after the line was added, or the line was sent to the kitchen; S0 removals reuse `approve:line_void`; refund line disposition defaults to "waste held"; staff-meal cost basis falls back to sale price when no recipe exists.
+- **[DEMO]** Manager card and fingerprint are simulated (fake card codes / reader ids in the seed). No hardware tested.
+
+**Trusted time**
+- **[DEMO]** The mock runs in the browser, so "server time" is the browser clock kept monotonic; the real product must take time from the server. No UI can move the accounting clock (owner decision); time-based views are read-only previews (`Catalog.Search previewAt`).
+
+**Venue configuration**
+- **[PROPOSED]** `KdsScreen.List/Configure` (stations per screen, dispatch flag, Start hidden/optional/required); `DocTemplate.Get/Update` (logo ≤ 200 KB, header/footer, 80/58 mm, A4); policies `TenderReferencePolicy`, `ShortOrderNumberPolicy` (default DAILY — the meeting called it optional), `SecondLanguagePolicy`.
+- **[ASSUMED]** Internal tender codes kept (`DIGITAL_WALLET` = wallet, `ONLINE` = prepaid, `LOYALTY` = points); an unconfigured KDS screen shows all stations and can hand off; "required Start": bumping an item counts as starting; duplicate reference scope = method + provider + business day + branch.
+- **[PROPOSED]** Sales channels as records: `SalesChannel.List/Upsert` (order type + own prices or follow another channel ± %); orders carry `salesChannelId`. Per-user permissions: `User.PermissionOverrides`, `User.SetPermissionOverride`, `User.RemovePermissionOverride`. Licensing is vendor-only (`vendor:capabilities`, persona «دعم NerdPOS»).
+- **[GAP]** Dayparts, promotions and service charge still key on the order type, not the sales channel; receipts and reports don't show the channel name yet.
+
+**Journeys**
+- **[PROPOSED]** `StoreRequest.*`, `SupplierInvoice.*`, `Procurement.Chain`, `InventoryItem.PackAdvice/SetPackOffer`, `Item.Lifecycle`, `Search.Global`, `Search.Status`; permissions `storerequest:create`, `supplierinvoice:post`.
+- **[ASSUMED]** Supplier invoices are simplified (an invoice price difference doesn't re-cost stock; no payment step; supplier returns not subtracted); pack advice uses 4-week usage and ≤ 8 weeks / shelf life; the follow list is per person on the device.
+- **[DEMO]** Barcode scanning is a keyboard-wedge simulation (fast keystrokes + Enter); no USB scanner tested.
+
+**Reports engine**
+- **[PROPOSED]** `Report.Query`, `Report.Explain`, `Report.Bridge`, `Report.Analyze`, `Report.Ask`, `Metric.List`, `Report.Catalog`; registry of 85 metrics / 34 dimensions; 19 certified report manifests.
+- **[QUESTION — accountant]** Encoded defaults: refund ex-tax part pro-rata over the original check (OD13); discount after tax treated as an item discount; comps excluded from gross sales; service charge never in net sales; week starts Saturday (OD11); dayparts 4–11 / 11–16 / 16–22 / 22–4; kitchen target 15 min; Kasavana–Smith menu matrix.
+- **[GAP]** NOT_AVAILABLE by design until a source exists: labour, payroll, customer cohorts (OD06), aggregator commission, delivery fee net, forecast, refires, item affinity, supplier lateness, three-way match, return e-receipts, items × zone. VAT by tax group returns the check-level total.
+- **[DEMO]** Fixture days use cash rounding 0.25 (policy currently OFF) to exercise the rounding report; days before launch answer from imported daily totals ("HISTORY"). The assistant's 198-question scores were tuned on the same bank — an unseen question set is still needed.
+
+## 15. Prototype limitations
 
 - Single-browser simulation: "devices" share one localStorage database; no real concurrency, only simulated races.
 - Offline mode is simulated per device in the client (queue + replay); there is no real service worker or local database.
