@@ -9,6 +9,7 @@ import { Tech } from '../../app/tech';
 import { Val, fmt, ReportHeader, ReconList, useEvidence, type EvidenceSpec } from './parts';
 import { ExpertReview } from './ExpertReview';
 
+const AUD: Record<string, string> = { owner: 'صاحب المطعم', accountant: 'المحاسب', manager: 'المدير', cashier: 'الكاشير', auditor: 'المراجع', chef: 'الشيف', stock_manager: 'أمين المخزن', buyer: 'المشتريات', floor_manager: 'مدير الصالة', delivery_manager: 'مدير الدليفري', marketing: 'التسويق' };
 const metaOf = (run: any, id: string) => run.header.metrics.find((m: any) => m.id === id);
 const unitOf = (run: any, id: string) => metaOf(run, id)?.unit;
 
@@ -198,7 +199,7 @@ export function ReportView({ run, onTemplate }: { run: any; onTemplate: () => vo
     <div className="space-y-3" data-fb="reports:result">
       <ReportHeader h={run.header} onShowRecon={() => setRecon(!recon)} />
       {recon && <Card title={t('قواعد المطابقة للفترة')} description={t('كل قاعدة يا متطابقة، يا الفرق متشرح بحركات مربوطة، يا بتتعلم «مش متشرح».')}><ReconList checks={run.bridgeChecks} /></Card>}
-      <div className="text-sm text-soft flex items-start gap-2"><Info className="w-4 h-4 mt-0.5 shrink-0" /><span>{L(run.manifest.purpose)} <span className="text-dim">{t('القرار')}: {L(run.manifest.decision)} · {t('بيتابعه')}: {run.manifest.audience.join('، ')} · {t('التنقل')}: {L(run.manifest.drilldown)}</span></span></div>
+      <div className="text-sm text-soft flex items-start gap-2"><Info className="w-4 h-4 mt-0.5 shrink-0" /><span>{L(run.manifest.purpose)} <span className="text-dim">{t('القرار')}: {L(run.manifest.decision)} · {t('بيتابعه')}: {run.manifest.audience.map((a: string) => t(AUD[a] ?? a)).join('، ')} · {t('التنقل')}: {L(run.manifest.drilldown)}</span></span></div>
       {run.manifest.notes?.map((n: any, i: number) => <Banner key={i} tone="info">{L(n)}</Banner>)}
       {run.blocks.map((b: any) => (
         <Card key={b.id} title={L(b.title)} className="min-w-0" data-fb={`block:${b.id}`} actions={<Tech><span className="num text-[10px] text-dim" dir="ltr">{b.kind} · {b.metrics.join(',')}{b.dimensions?.length ? ' × ' + b.dimensions.join(',') : ''}</span></Tech>}>

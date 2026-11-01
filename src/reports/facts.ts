@@ -115,7 +115,7 @@ const buildLine: Builder = (db, s) => {
         dims: { ...base, product: l.productId, category: l.categoryId, size: l.variant?.id ?? null, modifier: l.modifiers.map((x) => x.optionId).sort().join('+') || null, tax_group: l.taxPolicy?.id ?? null },
         n: { gross: gross[i], discount: disc[i], inside_tax: inside[i], net: m4(net), qty: l.quantity, ...(c.cost !== null ? { cost: c.cost } : {}), dine_in_net: o.channel === 'DINE_IN' ? m4(net) : '0' },
         key: { cost_basis: c.basis, product: l.productId },
-        ref: { kind: 'LINE', id: l.id, orderId: o.id, label: `${checkLabel(db, o)} — ${l.name.ar} ×${Number(l.quantity)}`, businessDate: o.completedBusinessDate, at: o.completedAt, amount: m4(net), note: c.basis === 'NO_RECIPE' ? 'no-recipe' : c.basis === 'CURRENT_FALLBACK' ? 'cost-current' : null },
+        ref: { kind: 'LINE', id: l.id, orderId: o.id, label: `${checkLabel(db, o)} — ${l.name.ar} ×${Number(l.quantity)}`, businessDate: o.completedBusinessDate, at: o.completedAt, amount: m4(net), note: null },
       });
     });
   }
@@ -152,7 +152,7 @@ const buildRefund: Builder = (db, s) => db.refunds.filter((r) => r.state === 'PA
     dims: { ...dayDims(db, r.businessDate!), branch: o.branchId, payment_method: TENDER[r.method] ?? r.method, drawer: r.paidSessionId ?? null, staff: r.paidBy ?? session?.userId ?? r.decidedBy ?? null, approval_actor: r.approverId ?? db.grants.find((g) => g.id === r.approvalGrantId)?.approverUserId ?? r.decidedBy ?? null, void_reason: r.reasonCode, stage: st.stage, check: o.id, channel: o.channel },
     n: { amount: r.amount, net: m4(ratio(p.net)), tax: m4(ratio(p.tax)), service: m4(ratio(p.service)), one: '1' },
     key: { originalBd: st.originalBd ?? '', stageDerived: st.derived ? '1' : '0' },
-    ref: { kind: 'REFUND', id: r.id, orderId: o.id, label: `مرتجع على #${o.number} (يوم ${st.originalBd}) — ${r.method === 'CASH' ? 'كاش' : r.method}`, businessDate: r.businessDate, at: r.paidAt, amount: r.amount, note: st.derived ? 'stage-derived' : null },
+    ref: { kind: 'REFUND', id: r.id, orderId: o.id, label: `مرتجع على #${o.number} (يوم ${st.originalBd}) — ${({ CASH: 'كاش', CARD: 'كارت', DIGITAL_WALLET: 'محفظة' } as Record<string, string>)[r.method] ?? r.method}`, businessDate: r.businessDate, at: r.paidAt, amount: r.amount, note: st.derived ? 'stage-derived' : null },
   } satisfies Fact];
 });
 

@@ -18,8 +18,8 @@ function Rows({ rows, unit, onOpen }: { rows: any[]; unit?: string; onOpen: (ord
       rows={rows.map((e) => [
         <div className="min-w-0"><div className="truncate">{e.label}</div>{e.note && <div className="text-[10px] text-dim">{t(NOTE[e.note] ?? e.note)}</div>}<Tech><span className="num text-[10px] text-dim">{e.id}</span></Tech></div>,
         <Pill size="sm" tone="neutral">{t(KIND[e.kind] ?? e.kind)}</Pill>,
-        <span className="num text-xs">{e.businessDate ?? (e.at ? dateTime(e.at) : '—')}</span>,
-        <span className="num">{e.amount === null || e.amount === undefined ? '—' : unit === 'EGP' || !unit ? fmt(e.amount) : fmt(e.amount, unit)}</span>,
+        <span className="num text-xs whitespace-nowrap">{e.businessDate ?? (e.at ? dateTime(e.at) : '—')}</span>,
+        <span className="num whitespace-nowrap">{e.amount === null || e.amount === undefined ? '—' : unit === 'EGP' || !unit ? fmt(e.amount) : fmt(e.amount, unit)}</span>,
         e.orderId ? <Button size="sm" variant="ghost" onClick={() => onOpen(e.orderId)} data-fb={`evidence-open:${e.orderId}`}><Receipt className="w-3.5 h-3.5" />{t('افتح الشيك')}</Button> : null,
       ])} />
   );
@@ -32,7 +32,7 @@ export function EvidenceDrawer({ spec, onClose }: { spec: EvidenceSpec | null; o
   const r = q.data;
   const open = (orderId: string) => { onClose(); nav('receipt', { orderId }); };
   return (
-    <Drawer open={!!spec} onClose={onClose} width="lg" icon={<FileSearch className="w-5 h-5" />} badge={<StateBadge ops={['Report.Explain']} />}
+    <Drawer open={!!spec} onClose={onClose} width="xl" icon={<FileSearch className="w-5 h-5" />} badge={<StateBadge ops={['Report.Explain']} />}
       title={list ? spec?.label : r ? L(r.metric.label) : t('الإثبات')}
       description={t('السجلات الأصلية اللي ورا الرقم — مش متغيرة. دوس «افتح الشيك» تشوف الشيك نفسه.')}>
       {list ? <Rows rows={spec!.filters!.__evidence} onOpen={open} /> : q.loading && !r ? <Spinner /> : q.error ? <Banner tone="error">{errorText(q.error)}</Banner> : r && (

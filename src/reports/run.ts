@@ -14,7 +14,7 @@ import { BUILDERS } from './facts';
 
 export interface RunSpec { from: string; to?: string; branchIds?: string[]; asOf?: string; filters?: Record<string, string> }
 
-const fmtValue = (v: any) => (v?.availability === 'AVAILABLE' ? v.value : v?.availability === 'NOT_DEFINED' ? '—' : 'CAPABILITY_NOT_AVAILABLE');
+const fmtValue = (v: any, metric?: string) => { if (v?.availability !== 'AVAILABLE') return v?.availability === 'NOT_DEFINED' ? '—' : 'CAPABILITY_NOT_AVAILABLE'; const u = metric ? metricById.get(metric)?.unit : 'EGP'; if (!u || u.startsWith('EGP')) return v.value; const n = Number(v.value); return u === '%' ? `${n.toFixed(1)}%` : u === 'minutes' ? `${n.toFixed(1)}` : String(Number.isInteger(n) ? n : Number(n.toFixed(3))); };
 
 export function venueOf(db: DB, branchIds: string[], caller: Caller) {
   const tpl = (db as any).r3b?.docTemplate ?? null;
@@ -62,8 +62,8 @@ function sectionsOf(db: DB, blocks: any[]) {
   for (const b of blocks) {
     if (b.result) {
       const r = b.result;
-      if (!r.dimensions.length) out.push({ id: b.id, title: b.title, columns: ['المقياس', 'القيمة'], rows: r.metrics.map((m: string) => [lab(m), fmtValue(r.totals[m])]) });
-      else out.push({ id: b.id, title: b.title, columns: [...r.dimensions.map((d: string) => DIMENSIONS.find((x) => x.id === d)?.label.ar ?? d), ...r.metrics.map(lab)], rows: [...r.rows.map((x: any) => [...r.dimensions.map((d: string) => x.labels[d]?.ar ?? x.dims[d]), ...r.metrics.map((m: string) => fmtValue(x.values[m]))]), ['الإجمالي (محسوب من جديد)', ...r.dimensions.slice(1).map(() => ''), ...r.metrics.map((m: string) => fmtValue(r.totals[m]))]] });
+      if (!r.dimensions.length) out.push({ id: b.id, title: b.title, columns: ['المقياس', 'القيمة'], rows: r.metrics.map((m: string) => [lab(m), fmtValue(r.totals[m], m)]) });
+      else out.push({ id: b.id, title: b.title, columns: [...r.dimensions.map((d: string) => DIMENSIONS.find((x) => x.id === d)?.label.ar ?? d), ...r.metrics.map(lab)], rows: [...r.rows.map((x: any) => [...r.dimensions.map((d: string) => x.labels[d]?.ar ?? x.dims[d]), ...r.metrics.map((m: string) => fmtValue(x.values[m], m))]), ['الإجمالي (محسوب من جديد)', ...r.dimensions.slice(1).map(() => ''), ...r.metrics.map((m: string) => fmtValue(r.totals[m], m))]] });
     } else if (b.bridge) {
       out.push({ id: b.id, title: b.title, columns: ['البند', 'المبلغ'], rows: [...b.bridge.sales.map((x: any) => [x.label.ar, x.amount]), ['', ''], ...b.bridge.money.map((x: any) => [x.label.ar, x.amount]), ['الفرق (فواتير − متحصل)', b.bridge.gap.difference], ...b.bridge.gap.explanations.map((e: any) => [e.label.ar, e.amount]), ['غير مفسَّر', b.bridge.gap.unexplained]] });
     } else if (b.drawers) {

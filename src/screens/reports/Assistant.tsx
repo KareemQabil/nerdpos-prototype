@@ -37,7 +37,7 @@ function QueryResult({ r }: { r: any }) {
   );
 }
 
-function AnswerCard({ a, onClarify, busy }: { a: any; onClarify: (id: string) => void; busy: boolean }) {
+function AnswerCard({ a, onClarify, busy }: { a: any; onClarify: (id: string, label: string) => void; busy: boolean }) {
   const open = React.useContext(EvidenceCtx);
   const st = STATUS[a.status] ?? STATUS.UNPARSED;
   const Icon = st.icon;
@@ -46,7 +46,7 @@ function AnswerCard({ a, onClarify, busy }: { a: any; onClarify: (id: string) =>
     <div className="space-y-2" data-fb={`ask-answer:${a.status}`}>
       <div className="flex items-center gap-2"><Pill tone={st.tone} size="sm"><Icon className="w-3.5 h-3.5 inline me-1" />{t(st.label)}</Pill><Tech><span className="num text-[10px] text-dim" dir="ltr">{a.parsed?.intent} · {a.parsed?.rules?.join(' | ')}</span></Tech></div>
       <div className="text-[15px] leading-relaxed">{L(a.text)}</div>
-      {a.clarify && <div className="flex flex-wrap gap-1.5">{a.clarify.options.map((o: any) => <Button key={o.id} size="sm" variant="outline" disabled={busy} onClick={() => onClarify(o.id)} data-fb={`ask-clarify:${o.id}`}>{L(o.label)}</Button>)}</div>}
+      {a.clarify && <div className="flex flex-wrap gap-1.5">{a.clarify.options.map((o: any) => <Button key={o.id} size="sm" variant="outline" disabled={busy} onClick={() => onClarify(o.id, L(o.label))} data-fb={`ask-clarify:${o.id}`}>{L(o.label)}</Button>)}</div>}
       {a.shape === 'table' || a.shape === 'chart' ? <QueryResult r={a.data} /> : null}
       {a.shape === 'bridge' && a.data?.sales && <Bridge run={{ period: { from: a.data.scope.from, to: a.data.scope.to }, branchIds: a.data.scope.branchIds }} br={a.data} />}
       {a.shape === 'matrix' && run && <Matrix run={run} mm={a.data} />}
@@ -72,15 +72,15 @@ export function AskPanel({ compact }: { compact?: boolean }) {
   const { auth } = useDev();
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
-  const [items, setItems] = useState<{ q: string; a?: any; err?: string; clarify?: string }[]>([]);
+  const [items, setItems] = useState<{ q: string; a?: any; err?: string; clarify?: string; choice?: string }[]>([]);
   const [ev, setEv] = useState<EvidenceSpec | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
-  const ask = async (question: string, clarify?: string) => {
+  const ask = async (question: string, clarify?: string, choice?: string) => {
     if (!question.trim()) return;
     setBusy(true);
     try {
       const r = await call<any>(auth, 'Report.Ask', { query: { question, clarify, lang: getLang() } });
-      setItems((xs) => [...xs, { q: question, a: r.data, clarify }]);
+      setItems((xs) => [...xs, { q: question, a: r.data, clarify, choice }]);
     } catch (e) { setItems((xs) => [...xs, { q: question, err: errorText(e) }]); } finally { setBusy(false); setQ(''); setTimeout(() => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), 50); }
   };
   const families = useMemo(() => { const m = new Map<string, any[]>(); for (const b of bank as any[]) m.set(b.family, [...(m.get(b.family) ?? []), b]); return [...m.entries()]; }, []);
@@ -96,8 +96,8 @@ export function AskPanel({ compact }: { compact?: boolean }) {
         )}
         {items.map((it, i) => (
           <div key={i} className="space-y-2">
-            <div className="flex justify-end"><div className="max-w-[85%] rounded-2xl rounded-be-sm bg-[var(--primary-container)] px-3 py-2 text-sm">{it.q}{it.clarify && <span className="block text-[10px] text-dim">{t('اختيارك')}: {it.clarify}</span>}</div></div>
-            <Card padding="sm">{it.err ? <Banner tone="error">{it.err}</Banner> : <AnswerCard a={it.a} busy={busy} onClarify={(id) => ask(it.q, id)} />}</Card>
+            <div className="flex justify-end"><div className="max-w-[85%] rounded-2xl rounded-be-sm bg-[var(--primary-container)] px-3 py-2 text-sm">{it.q}{it.choice && <span className="block text-[11px] text-dim">{t('اختيارك')}: {it.choice}</span>}</div></div>
+            <Card padding="sm">{it.err ? <Banner tone="error">{it.err}</Banner> : <AnswerCard a={it.a} busy={busy} onClarify={(id, label) => ask(it.q, id, label)} />}</Card>
           </div>
         ))}
         {busy && <Spinner />}

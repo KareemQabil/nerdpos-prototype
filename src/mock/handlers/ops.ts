@@ -15,7 +15,6 @@ import { buildFiscal } from '../outbox';
 import { D, m4 } from '../money';
 import { checkVersion, need, page, requireBranch, userName } from './util';
 import { handlers } from './index';
-import { outputHandlers } from './output';
 import { CAPABILITIES, capabilityOn, blockingCapability, OFFLINE_ALLOWLIST } from '../ops-registry';
 import { nextRun } from '../seed-ops';
 import { deviceName } from '../../demo/people';
@@ -661,35 +660,6 @@ export const opsHandlers: Record<string, Handler> = {
       out.push({ businessDate: d, source: live ? 'LIVE' : h ? 'HISTORY' : 'NONE', netSales: src?.netSales ?? m4(0), orders: src?.orders ?? 0, guests: src?.guests ?? 0, avgCheck: src && src.orders ? m4(D(src.netSales).dividedBy(src.orders)) : m4(0), byHour: src?.byHour ?? Array(24).fill(0), byMethod: src?.byMethod ?? {}, topItems: src?.topItems ?? [] });
     }
     return { items: out, today };
-  },
-  'Report.Export': (ctx) => {
-    const b = ctx.body ?? {};
-    need(b.reportId, 'VALIDATION_FAILED', { field: 'reportId' });
-    const format: 'CSV' | 'XLSX' = b.format === 'XLSX' ? 'XLSX' : 'CSV';
-    const res = outputHandlers['Report.Run']({ ...ctx, params: { reportId: b.reportId }, query: { fromBusinessDate: b.fromBusinessDate, toBusinessDate: b.toBusinessDate ?? b.fromBusinessDate } }) as any;
-    const sheets = (res.sections ?? []).map((s: any) => ({ id: s.id, title: s.title, columns: s.columns ?? null, rows: s.rows ?? [] }));
-    const code = ctx.db.branches.find((x) => x.id === ctx.branchId)?.code ?? 'BR';
-    const filename = `nerdpos-${b.reportId}-${code}-${b.fromBusinessDate}${b.toBusinessDate && b.toBusinessDate !== b.fromBusinessDate ? '_' + b.toBusinessDate : ''}.${format.toLowerCase()}`;
-    const rec = { id: nextId('rexp'), reportId: b.reportId, from: b.fromBusinessDate, to: b.toBusinessDate ?? b.fromBusinessDate, format, at: ctx.nowIso, by: ctx.user!.id, rows: sheets.reduce((a: number, s: any) => a + s.rows.length, 0), filename };
-    (ctx.db.reportExports ??= []).unshift(rec);
-    if (ctx.db.reportExports.length > 50) ctx.db.reportExports.length = 50;
-    ctx.audit(`report export ${b.reportId} ${format}`, rec.id);
-    return { status: 201, body: { ...rec, title: res.title, period: res.period, provisional: res.provisional, sheets } };
-  },
-  'Report.Schedule': (ctx) => {
-    const b = ctx.body ?? {};
-    const def = (outputHandlers['Report.List'](ctx) as any).items.find((r: any) => r.id === b.reportId);
-    if (!def) throw new ApiError('REPORT_NOT_FOUND');
-    need(b.frequency === 'DAILY' || b.frequency === 'WEEKLY', 'VALIDATION_FAILED', { field: 'frequency' });
-    need(/^\d{2}:\d{2}$/.test(b.time ?? ''), 'VALIDATION_FAILED', { field: 'time' });
-    if (b.frequency === 'WEEKLY') need(Number(b.weekday) >= 0 && Number(b.weekday) <= 6, 'VALIDATION_FAILED', { field: 'weekday' });
-    const recipients: string[] = (b.recipients ?? []).map((x: string) => String(x).trim()).filter(Boolean).slice(0, 10);
-    need(recipients.length > 0, 'VALIDATION_FAILED', { field: 'recipients', rule: 'at least one person' });
-    const next = nextRun(ctx.now, b.frequency, b.frequency === 'WEEKLY' ? Number(b.weekday) : null, b.time);
-    const s: ReportSchedule = { id: nextId('rs'), reportId: def.id, reportTitle: def.title, frequency: b.frequency, weekday: b.frequency === 'WEEKLY' ? Number(b.weekday) : null, time: b.time, format: b.format === 'CSV' ? 'CSV' : 'XLSX', recipients, branchId: requireBranch(ctx), active: true, createdAt: ctx.nowIso, createdBy: ctx.user!.id, nextRunAt: new Date(next).toISOString(), nextRunMs: next, runs: [], version: 1 };
-    (ctx.db.reportSchedules ??= []).push(s);
-    ctx.audit(`report schedule ${s.reportId} ${s.frequency} ${s.time}`, s.id);
-    return { status: 201, body: scheduleView(ctx, s) };
   },
   'Report.ScheduleFind': (ctx) => page((ctx.db.reportSchedules ?? []).filter((s) => s.branchId === ctx.branchId).map((s) => scheduleView(ctx, s)), ctx.query),
   'Report.ScheduleUpdate': (ctx) => {

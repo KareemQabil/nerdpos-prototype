@@ -448,6 +448,7 @@ export function explain(db: DB, caller: Caller, spec: { metric: string; cell?: R
       if (inner?.t === 'diff_requires') amt = f.n.cost !== undefined ? m4(D(f.n.net).minus(f.n.cost)) : null;
       if (f.kind === 'history' && inner && 'field' in inner && HISTORY[mm.id]) amt = f.n[HISTORY[mm.id].field] ?? f.ref.amount ?? null;
       if (distinct) { const k = f.key?.[(inner as any).key] ?? f.id; const dup = seenKeys.has(k); seenKeys.add(k); return { ...f.ref, amount: dup ? '0' : inner!.t === 'distinct_sum' ? f.n[(inner as any).field] || '0' : '1', note: dup ? 'same-order (counted once)' : f.ref.note }; }
+      if ((field === 'cost' || inner?.t === 'diff_requires') && f.key?.cost_basis) return { ...f.ref, amount: amt, note: f.key.cost_basis === 'NO_RECIPE' ? 'no-recipe' : f.key.cost_basis === 'CURRENT_FALLBACK' ? 'cost-current' : null };
       return { ...f.ref, amount: amt };
     }).filter((x) => x.amount === null || !D(x.amount).isZero() || distinct || (field !== 'positive' && field !== 'rounded' && field !== 'line' && field !== 'order' && field !== 'pending' && field !== 'missing' && field !== 'no_sale' && field !== 'withdrawal' && field !== 'correction' && field !== 'dine_in_net' && field !== 'late' && field !== 'done' && field !== 'accepted' && field !== 'rejected' && field !== 'granted' && field !== 'denied' && field !== 'self' && field !== 'no_show' && field !== 'delivered' && field !== 'failed'));
     const sum = evidence.every((x) => x.amount !== null) ? m4(evidence.reduce((a, x) => a.plus(D(x.amount!)), D(0))) : null;
@@ -455,9 +456,9 @@ export function explain(db: DB, caller: Caller, spec: { metric: string; cell?: R
   };
   collect(m, 1, 'value');
   let proof: { equation: string; holds: boolean | null } = { equation: '', holds: null };
-  if (m.terms) { const s = parts.reduce((a, p) => a.plus(D(p.sum ?? 0).times(p.sign)), D(0)); proof = { equation: parts.map((p) => `${p.sign < 0 ? '− ' : '+ '}${p.label.ar} ${p.sum}`).join(' ') + ` = ${m4(s)}`, holds: total.value !== null ? D(total.value).equals(s) : null }; }
-  else if (m.numerator) { const n = parts.find((p) => p.role === 'numerator'), d = parts.find((p) => p.role === 'denominator'); proof = { equation: `${n?.label.ar} ${n?.sum} ÷ ${d?.label.ar} ${d?.sum}${m.scale ? ' × ' + m.scale : ''}`, holds: total.value !== null && n?.sum && d?.sum && !D(d.sum).isZero() ? D(total.value).equals(D(m4(D(n.sum).dividedBy(d.sum).times(m.scale ?? 1)))) : null }; }
-  else if (parts[0]?.sum !== null && total.value !== null && !['share', 'snapshot', 'price_change', 'freshness'].includes(EVAL[m.id]?.t)) proof = { equation: `Σ ${parts[0].evidence.length} = ${parts[0].sum}`, holds: D(parts[0].sum!).equals(D(total.value)) };
+  if (m.terms) { const s = parts.reduce((a, p) => a.plus(D(p.sum ?? 0).times(p.sign)), D(0)); proof = { equation: parts.map((p) => `${p.sign < 0 ? '− ' : '+ '}${p.label.ar} ${D(p.sum ?? 0).toFixed(2)}`).join(' ') + ` = ${s.toFixed(2)}`, holds: total.value !== null ? D(total.value).equals(s) : null }; }
+  else if (m.numerator) { const n = parts.find((p) => p.role === 'numerator'), d = parts.find((p) => p.role === 'denominator'); proof = { equation: `${n?.label.ar} ${D(n?.sum ?? 0).toFixed(2)} ÷ ${d?.label.ar} ${D(d?.sum ?? 0).toFixed(2)}${m.scale ? ' × ' + m.scale : ''}`, holds: total.value !== null && n?.sum && d?.sum && !D(d.sum).isZero() ? D(total.value).equals(D(m4(D(n.sum).dividedBy(d.sum).times(m.scale ?? 1)))) : null }; }
+  else if (parts[0]?.sum !== null && total.value !== null && !['share', 'snapshot', 'price_change', 'freshness'].includes(EVAL[m.id]?.t)) proof = { equation: `Σ ${parts[0].evidence.length} = ${D(parts[0].sum!).toFixed(2)}`, holds: D(parts[0].sum!).equals(D(total.value)) };
   return { metric: { id: m.id, label: m.label, version: m.version, definition: m.definition, formula: m.formula, unit: m.unit, pitfalls: m.pitfalls }, value: total, cell: spec.cell ?? {}, meta: r.meta, parts, proof };
 }
 

@@ -108,8 +108,8 @@ console.log('\n=== Drawer bridge (FIN-09, doc 27 checks 2–3)');
   const d = br.drawers.find((x: any) => x.sessionId === 'ses_hist_y1');
   const sum = d.lines.reduce((a: any, l: any) => a.plus(l.amount), D(0));
   ok(d && D(sum).equals(d.expected), 'opening + cash in − refunds − pay-outs = expected', `${d.lines.map((l: any) => `${l.label} ${l.amount}`).join(' | ')} = ${d.expected}`);
-  ok(d.variance === '-30.0000' && d.checks.find((c: any) => c.id === 'drawer_variance')?.status === 'EXPLAINED', 'counted 30 short, explained by the cashier reason + approval');
-  ok(br.drawers.every((x: any) => x.checks.filter((c: any) => c.id !== 'drawer_variance').every((c: any) => c.status === 'MATCHED')), 'every drawer: cash tenders = drawer ledger, Z = Σ entries');
+  ok(d.variance === '-30.0000' && d.checks.find((c: any) => c.id.startsWith('drawer_variance'))?.status === 'EXPLAINED', 'counted 30 short, explained by the cashier reason + approval');
+  ok(br.drawers.every((x: any) => x.checks.filter((c: any) => !c.id.startsWith('drawer_variance')).every((c: any) => c.status === 'MATCHED')), 'every drawer: cash tenders = drawer ledger, Z = Σ entries');
   ok(br.gap.status !== 'UNEXPLAINED', `billed vs collected: difference ${br.gap.difference} explained (${br.gap.explanations.map((e: any) => e.label.en + ' ' + e.amount).join(', ')}), unexplained ${br.gap.unexplained}`);
   ok(br.checks.filter((c: any) => !c.id.startsWith('drawer')).every((c: any) => c.status !== 'UNEXPLAINED'), `all ${br.checks.length} certified checks matched/explained (status ${br.status})`, br.checks.filter((c: any) => c.status === 'UNEXPLAINED').map((c: any) => c.id).join(','));
   // FIN-09 synthetic arithmetic on the same function: opening 100 + cash 50 − refund 20 − pay-out 10 = 120

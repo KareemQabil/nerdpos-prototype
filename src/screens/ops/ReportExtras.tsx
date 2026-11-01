@@ -138,11 +138,13 @@ export function ExportButtons({ reportId, from, to }: { reportId: string; from: 
       if (format === 'CSV') {
         const esc = (v: unknown) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
         const lines: string[] = [esc(L(r.title)) + ',' + esc(`${r.period?.from ?? from} → ${r.period?.to ?? to ?? from}`)];
+        if (r.meta) lines.push(esc(t('لحد')) + ',' + esc(r.meta.asOf), esc(t('الحالة')) + ',' + esc(r.meta.provisional ? t('مبدئي') : t('نهائي')), esc(t('المطابقة')) + ',' + esc(r.meta.reconciliation), esc(t('اتطلع بواسطة')) + ',' + esc(r.generatedBy ?? ''), esc(t('التعريفات')) + ',' + esc(r.meta.metrics.map((m: any) => `${L(m.label)} v${m.version}`).join(' | ')));
         for (const s of r.sheets) { lines.push('', esc(L(s.title))); for (const row of sheetRows(s)) lines.push(row.map(esc).join(',')); }
         ok = await saveFile(r.filename, '﻿' + lines.join('\n'), 'text/csv;charset=utf-8');
       } else {
         const XLSX = await import('xlsx');
         const wb = XLSX.utils.book_new();
+        if (r.meta) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([[L(r.title)], [t('الفترة'), `${r.period?.from} → ${r.period?.to}`], [t('لحد'), r.meta.asOf], [t('الحالة'), r.meta.provisional ? t('مبدئي') : t('نهائي')], [t('المطابقة'), r.meta.reconciliation], [t('اتطلع بواسطة'), r.generatedBy ?? ''], [], [t('المقياس'), t('النسخة')], ...r.meta.metrics.map((m: any) => [L(m.label), m.version])]), t('عن التقرير').slice(0, 30));
         r.sheets.forEach((s: any, i: number) => { const ws = XLSX.utils.aoa_to_sheet(sheetRows(s)); (ws as any)['!cols'] = [{ wch: 28 }, { wch: 16 }, { wch: 16 }, { wch: 16 }]; XLSX.utils.book_append_sheet(wb, ws, (L(s.title) || `S${i + 1}`).replace(/[\\/?*[\]:]/g, ' ').slice(0, 30)); });
         const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
         ok = await saveFile(r.filename, new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));

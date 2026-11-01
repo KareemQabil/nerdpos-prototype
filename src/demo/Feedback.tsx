@@ -125,19 +125,21 @@ export function FeedbackPanel() {
   const s = useFeedback();
   const [filter, setFilter] = useState('');
   const items = s.items.filter((i) => !filter || i.type === filter);
-  const json = () => JSON.stringify(s.items.map(({ id, device, mockClock, ...rest }) => ({ ...rest, device, mockClock })), null, 2);
+  // reports engine: the expert review sign-offs of each report («مراجعة الخبير») travel with the feedback
+  const expertReviews = () => { try { return JSON.parse(localStorage.getItem('nerdpos.expertReview.v1') ?? '[]'); } catch { return []; } };
+  const json = () => { const reviews = expertReviews(); return JSON.stringify([...s.items.map(({ id, device, mockClock, ...rest }) => ({ ...rest, device, mockClock })), ...(reviews.length ? [{ type: 'expert_review', reports: reviews }] : [])], null, 2); };
   const download = () => {
     saveFile('feedback.json', json(), 'application/json').then((ok) => ok && toast('success', t('ملف الملاحظات اتحفظ'))).catch(() => copy());
   };
   const copy = async () => { try { await navigator.clipboard.writeText(json()); toast('success', t('الملاحظات اتنسخت — الصقها في رسالة')); } catch { toast('error', t('النسخ مش متاح في المتصفح ده')); } };
-  const importFile = (f: File) => f.text().then((txt) => { const arr = JSON.parse(txt); if (Array.isArray(arr)) { feedback.replace([...arr.map((x: any, i: number) => ({ id: `fb_i_${i}_${Date.now()}`, ...x })), ...s.items]); toast('success', t('اتضافت {n} ملاحظة', { n: arr.length })); } }).catch(() => toast('error', t('ملف مش صالح')));
+  const importFile = (f: File) => f.text().then((txt) => { const arr = JSON.parse(txt); if (Array.isArray(arr)) { const fb = arr.filter((x: any) => x?.type !== 'expert_review'); feedback.replace([...fb.map((x: any, i: number) => ({ id: `fb_i_${i}_${Date.now()}`, ...x })), ...s.items]); toast('success', t('اتضافت {n} ملاحظة', { n: fb.length })); } }).catch(() => toast('error', t('ملف مش صالح')));
   return (
     <div className="flex flex-col h-full" data-screen="FEEDBACK">
       <div className="px-4 py-3 border-b line">
         <div className="font-bold">{t('ملاحظاتي')} <span className="text-dim font-normal">({s.items.length})</span></div>
         <div className="text-[11px] text-dim">{t('شغّل «ملاحظة» من الشريط اللي فوق واضغط على أي حاجة في الشاشة. لما تخلص، نزّل الملف وابعته للفريق.')}</div>
         <div className="flex gap-2 mt-2 flex-wrap">
-          <Button size="sm" variant="primary" onClick={download} disabled={!s.items.length}><Download className="w-4 h-4" />{t('نزّل الملاحظات')}<Tech><span className="num text-[10px] opacity-70">feedback.json</span></Tech></Button>
+          <Button size="sm" variant="primary" onClick={download} disabled={!s.items.length && !expertReviews().length}><Download className="w-4 h-4" />{t('نزّل الملاحظات')}<Tech><span className="num text-[10px] opacity-70">feedback.json</span></Tech></Button>
           <Button size="sm" onClick={copy} disabled={!s.items.length}><Copy className="w-4 h-4" />{t('نسخ')}</Button>
           <label className="h-8 px-3 rounded-xl surface-2 border border-[var(--glass-border)] text-xs flex items-center gap-1 cursor-pointer"><Upload className="w-4 h-4" />{t('افتح ملف ملاحظات')}<input type="file" accept="application/json" className="hidden" onChange={(e) => e.target.files?.[0] && importFile(e.target.files[0])} /></label>
           <Select value={filter} onChange={(e) => setFilter(e.target.value)} options={[{ value: '', label: t('الكل') }, { value: 'wrong', label: t('غلط') }, { value: 'missing', label: t('ناقص') }, { value: 'unclear', label: t('مش واضح') }, { value: 'extra', label: t('زيادة') }]} className="max-w-[120px] !py-1 text-xs" />

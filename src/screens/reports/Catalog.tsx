@@ -55,7 +55,7 @@ function Layers6({ c, onReport, onAsk }: { c: any; onReport: () => void; onAsk: 
             <div className="text-[11px] text-soft">
               {l.id === 'L0' && t('{a} مصدر فيه أحداث', { a: l.available })}
               {l.id === 'L1' && <>{t('{a} متاح · {n} مش متاح (بالسبب)', { a: l.available, n: l.notAvailable })}<br />{t('{c} معتمد · {m} سوق · {p} مقترح', { c: l.byAuthority.CANONICAL, m: l.byAuthority.MARKET, p: l.byAuthority.PROPOSED })}<br />{t('{d} بُعد', { d: l.dimensions })}</>}
-              {l.id === 'L2' && t('{p} من القايمة التجريبية (15) + {x} إضافي · {g} تقارير قديمة شغالة زي ما هي', { p: l.pilot, x: l.items - l.pilot, g: l.legacy })}
+              {l.id === 'L2' && t('{p} من القايمة التجريبية + {x} إضافي (التقريب، الإلغاءات بالمراحل، طابور المراجعة، مصفوفة المنيو) · {g} تقارير قديمة شغالة زي ما هي', { p: l.pilot, x: l.items - l.pilot, g: l.legacy })}
               {l.id === 'L3' && t('مقارنة فترات، اتجاه، «ليه اتغير» (حجم × سعر × تشكيلة + غير مفسَّر)، مصفوفة المنيو')}
               {l.id === 'L4' && t('أي رقم ← الشيكات والسطور والدفعات اللي وراه، ومجموعهم = الرقم')}
               {l.id === 'A' && t('مساعد بقواعد ثابتة، متجرّب على {n} سؤال', { n: l.items })}
