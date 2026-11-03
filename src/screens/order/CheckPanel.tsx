@@ -3,7 +3,8 @@
 import React, { useState } from 'react';
 import { ChefHat, Minus, Plus, Trash2, Ban, ArrowRightLeft, Send, Lock, Tag, Gift, XCircle, Printer, Wallet, Split, Merge, PenLine, Armchair, RefreshCw, History, CheckCircle2, Clock, AlertTriangle, Shuffle, Receipt, Users, StickyNote, ChevronDown, ChevronUp, MoreHorizontal } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';
-import { Button, Pill, Modal, Field, Select, Input, Textarea, Money, StateBadge, Banner, EmptyState, Tabs, Timeline, Skeleton } from '../../ui';
+import { Button, Pill, Modal, Field, Select, Input, Textarea, Money, StateBadge, Banner, EmptyState, Tabs, Timeline, Skeleton, Kbd } from '../../ui';
+import { inTopLayer } from '../../ui/Numpad';
 import { Tech } from '../../app/tech';
 import { t, L, tLabel } from '../../i18n';
 import { cn, money, qty, time } from '../../lib/format';
@@ -27,10 +28,19 @@ function ReasonText({ kind, code }: { kind: string; code?: string | null }) {
 }
 const firstName = (s?: string | null) => (s ? personName(null, s) : '');
 
-export function CheckPanel({ order, refetch, mode, onCheckSwitch }: { order: any; refetch: () => void; mode: 'FLOOR' | 'COUNTER'; onCheckSwitch?: (id: string) => void }) {
+/** Dialogs of the check that a parent (the sale screen's action bar) can open: discount, comp, cancel, … */
+export type CheckDialog = 'discount' | 'comp' | 'cancel' | 'voidOrder' | 'move' | 'split' | 'merge' | 'channel' | 'history';
+
+/**
+ * The check. `variant="cart"` is the sale screen's cart: lines and totals only — the screen's action bar owns the
+ * actions (`actionRef` opens a dialog by name). `qty` switches the stepper and swipe-to-remove per work profile.
+ */
+export function CheckPanel({ order, refetch, mode, onCheckSwitch, variant = 'panel', actionRef, qty: qtyMethods }: { order: any; refetch: () => void; mode: 'FLOOR' | 'COUNTER'; onCheckSwitch?: (id: string) => void; variant?: 'panel' | 'cart'; actionRef?: React.MutableRefObject<((k: CheckDialog) => void) | null>; qty?: { stepper?: boolean; swipe?: boolean } }) {
   const { nav, can, auth, kind } = useDev();
   const { run, busy } = useCommand();
   const [dlg, setDlg] = useState<null | { k: string; line?: any }>(null);
+  const cart = variant === 'cart';
+  if (actionRef) actionRef.current = (k) => (k === 'history' ? setShowHist(true) : setDlg({ k }));
   const [showHist, setShowHist] = useState(false);
   const fireP = useQuery<any>('Settings.Effective', { query: { policyId: 'FireTimingPolicy', scopeType: 'BRANCH', scopeId: auth.branchId } });
   const seatsP = useQuery<any>('Settings.Effective', { query: { policyId: 'SeatsPolicy', scopeType: 'TENANT', scopeId: 'biz' } });
@@ -59,7 +69,7 @@ export function CheckPanel({ order, refetch, mode, onCheckSwitch }: { order: any
   };
   /** Someone without the permission can still ask: a manager authorises in place (supervisor override). */
   const canAsk = (perm: string) => can(perm) || can('approval:grant');
-  const [showBreak, setShowBreak] = useState(() => typeof window === 'undefined' || window.innerHeight > 860);
+  const [showBreak, setShowBreak] = useState(() => !cart && (typeof window === 'undefined' || window.innerHeight > 860));
   const [moreOpen, setMoreOpen] = useState(false);
   type ActDef = { icon: React.ReactElement; label: string; onClick: () => void; disabled?: boolean; danger?: boolean; proposed?: boolean };
   const acts: ActDef[] = ([
@@ -90,15 +100,15 @@ export function CheckPanel({ order, refetch, mode, onCheckSwitch }: { order: any
           </div>
           <button title={t('سجل الشيك')} aria-label={t('سجل الشيك')} onClick={() => setShowHist(true)} className="w-10 h-10 rounded-xl surface-1 border border-[var(--glass-border)] flex items-center justify-center hover:bg-[var(--surface-2)] shrink-0" data-fb="check-history"><History className="w-4 h-4" /></button>
         </div>
-        {order.kind !== 'STAFF_MEAL' && <CustomerChip order={order} />}
+        {order.kind !== 'STAFF_MEAL' && (!cart || order.customerId || order.customerName) && <CustomerChip order={order} />}
         {siblings.length > 1 && (
           <div className="flex gap-1 overflow-x-auto scrollbar-hide">{siblings.map((c: any) => <button key={c.id} onClick={() => onCheckSwitch?.(c.id)} className={cn('px-3 h-9 rounded-lg text-xs border whitespace-nowrap', c.id === order.id ? 'bg-[var(--primary)] text-[var(--primary-foreground)] border-transparent font-bold' : 'surface-1 border-[var(--glass-border)]')}>{t('شيك')} {c.checkNo} · <span className="num">{money(c.payable, false)}</span></button>)}</div>
         )}
       </div>
 
       {/* lines */}
-      <div className="flex-1 overflow-y-auto p-2.5 space-y-2.5">
-        {order.lines.length === 0 && <EmptyState compact icon={<Receipt />} title={t('الشيك فاضي')} text={t('دوس على أي صنف من المنيو يتضاف هنا.')} />}
+      <div className="flex-1 overflow-y-auto p-2.5 space-y-2.5" data-fb="cart-lines">
+        {order.lines.length === 0 && <EmptyState compact icon={<Receipt />} title={t('لا توجد أصناف')} />}
         {rounds.map((r) => {
           const info = roundInfo(r);
           const lines = order.lines.filter((l: any) => l.fireRound === r && l.status !== 'REMOVED');
@@ -108,19 +118,19 @@ export function CheckPanel({ order, refetch, mode, onCheckSwitch }: { order: any
                 <span className="font-bold flex items-center gap-1.5"><ChefHat className="w-3.5 h-3.5 text-dim" />{t('الدفعة')} <span className="num">{r}</span>{info?.firedAt && <span className="text-dim font-normal num">· {time(info.firedAt)}</span>}{info?.via === 'CONFIRM' && <span className="text-dim font-normal">· {t('مع التأكيد')}</span>}</span>
                 <RoundStatus info={info} orderId={order.id} />
               </div>
-              <div className="divide-y divide-[var(--line)]">{lines.map((l: any) => <LineRow key={l.id} l={l} locked draft={draft} onVoid={canAsk('order:voidline') ? () => setDlg({ k: 'void', line: l }) : undefined} onMod={() => setDlg({ k: 'kmod', line: l })} onSeat={() => setDlg({ k: 'seat', line: l })} seats={seats} />)}</div>
+              <div className="divide-y divide-[var(--line)]">{lines.map((l: any) => <LineRow key={l.id} l={l} locked draft={draft} cart={cart} onVoid={canAsk('order:voidline') ? () => setDlg({ k: 'void', line: l }) : undefined} onMod={() => setDlg({ k: 'kmod', line: l })} onSeat={() => setDlg({ k: 'seat', line: l })} seats={seats} />)}</div>
             </div>
           );
         })}
         {unfired.length > 0 && (
-          <div className="rounded-xl border-2 border-dashed border-[color-mix(in_srgb,var(--primary)_40%,transparent)] overflow-hidden" data-fb="check-unsent">
-            <div className="px-3 py-1.5 text-xs font-bold text-[var(--primary)] flex items-center justify-between bg-[var(--primary-container)]"><span className="flex items-center gap-1.5"><Send className="w-3.5 h-3.5" />{t('لسه ما اتبعتش')} <span className="num">({unfired.length})</span></span><span className="text-soft font-normal">{t('تقدر تعدّل أو تشيل')}</span></div>
-            <div className="divide-y divide-[var(--line)]">{unfired.map((l: any) => <LineRow key={l.id} l={l} draft={draft} prebilled={lineStage(order, l) === 'S1'} onQty={(d) => qtyChange(l, d)} onRemove={() => qtyChange(l, -999)} onSeat={() => setDlg({ k: 'seat', line: l })} seats={seats} busy={busy} />)}</div>
+          <div className={cn('overflow-hidden', cart && !showFire && rounds.length === 0 ? 'rounded-xl border line' : 'rounded-xl border-2 border-dashed border-[color-mix(in_srgb,var(--primary)_40%,transparent)]')} data-fb="check-unsent">
+            {(!cart || rounds.length > 0 || showFire) && <div className="px-3 py-1.5 text-xs font-bold text-[var(--primary)] flex items-center justify-between bg-[var(--primary-container)]"><span className="flex items-center gap-1.5"><Send className="w-3.5 h-3.5 rtl:-scale-x-100" />{t('لم يُرسل بعد')} <span className="num">({unfired.length})</span></span></div>}
+            <div className="divide-y divide-[var(--line)]">{unfired.map((l: any) => <LineRow key={l.id} l={l} draft={draft} cart={cart} prebilled={lineStage(order, l) === 'S1'} onQty={qtyMethods?.stepper === false ? undefined : (d) => qtyChange(l, d)} onRemove={() => qtyChange(l, -999)} swipe={qtyMethods?.swipe !== false} onSeat={() => setDlg({ k: 'seat', line: l })} seats={seats} busy={busy} />)}</div>
           </div>
         )}
         {removed.length > 0 && (
           <div className="rounded-xl border border-dashed line px-3 py-2 space-y-1" data-fb="check-removed">
-            <div className="text-[11px] font-bold text-soft flex items-center gap-1"><History className="w-3.5 h-3.5" />{t('أصناف اتشالت (متسجلة في السجل)')}</div>
+            <div className="text-[11px] font-bold text-soft flex items-center gap-1"><History className="w-3.5 h-3.5" />{t('أصناف محذوفة')}</div>
             {removed.map((l: any) => (
               <div key={l.id} className="text-[11px] text-dim flex items-center gap-1.5 flex-wrap" data-fb={`removed:${l.sku}`}>
                 <span className="line-through">{L(l.name)} ×<span className="num">{qty(l.removed?.quantity ?? l.quantity)}</span></span>
@@ -155,12 +165,12 @@ export function CheckPanel({ order, refetch, mode, onCheckSwitch }: { order: any
           <button className="font-extrabold text-base flex items-center gap-1 text-start" onClick={() => setShowBreak(!showBreak)} data-fb="check-totals-toggle" title={showBreak ? t('اخفي التفاصيل') : t('اعرض التفاصيل')}>{t('الإجمالي')}<ChevronDown className={cn('w-4 h-4 text-dim transition-transform', showBreak && 'rotate-180')} /></button>
           <Money v={T.payable} className="text-[28px] leading-none tracking-tight text-[var(--primary)]" />
         </div>
-        {order.settlement && order.settlement.paid !== '0.0000' && <div className="text-xs flex justify-between"><span className="text-dim">{t('اتدفع')} <span className="num">{money(order.settlement.paid)}</span></span><span>{t('الباقي')} <b className="num">{money(order.settlement.remaining)}</b></span></div>}
-        {showBreak && <div className="text-[10px] text-dim" title={optionText('PricingOrderPolicy', null, order.policy.pricingOrder).help}>{optionText('PricingOrderPolicy', null, order.policy.pricingOrder).label} · {t('التقريب لأقرب قرش')}<Tech><span className="num"> · {order.policy.pricingOrder} · {order.policy.rounding.mode}/{order.policy.rounding.scale}</span></Tech></div>}
+        {order.settlement && order.settlement.paid !== '0.0000' && <div className="text-xs flex justify-between" data-fb="cart-paid"><span className="text-dim">{t('المدفوع')} <Money v={order.settlement.paid} className="font-semibold" /></span><span>{t('المتبقي')} <Money v={order.settlement.remaining} /></span></div>}
+        {showBreak && !cart && <div className="text-[10px] text-dim" title={optionText('PricingOrderPolicy', null, order.policy.pricingOrder).help}>{optionText('PricingOrderPolicy', null, order.policy.pricingOrder).label} · {t('التقريب لأقرب قرش')}<Tech><span className="num"> · {order.policy.pricingOrder} · {order.policy.rounding.mode}/{order.policy.rounding.scale}</span></Tech></div>}
       </div>
 
-      {/* actions */}
-      <div className="border-t line p-2.5 space-y-2">
+      {/* actions (the sale screen's action bar replaces them in the cart) */}
+      {!cart && <div className="border-t line p-2.5 space-y-2">
         {draft && order.kind !== 'STAFF_MEAL' && acts.length > 0 && (
           <div className="grid grid-cols-4 gap-1.5" data-fb="check-actions">
             {(moreOpen || acts.length <= 4 ? acts : acts.slice(0, 3)).map((x) => <Act key={x.label} {...x} />)}
@@ -175,7 +185,7 @@ export function CheckPanel({ order, refetch, mode, onCheckSwitch }: { order: any
         {draft && !showFire && order.kind !== 'STAFF_MEAL' && <div className="text-[11px] text-dim text-center">{t('الأصناف بتروح المطبخ لوحدها أول ما الشيك يتأكد.')}</div>}
         {draft && kind === 'FLOOR' && order.visitId && <div className="text-[11px] text-dim text-center">{t('التحصيل بيكون على جهاز الكاشير.')}</div>}
         {order.status === 'COMPLETED' && <Button variant="secondary" size="lg" className="w-full" onClick={() => nav('receipt', { orderId: order.id })}><Receipt className="w-4 h-4" />{t('الإيصال')}</Button>}
-      </div>
+      </div>}
 
       {dlg?.k === 'void' && <VoidLineDialog order={order} line={dlg.line} onClose={() => setDlg(null)} />}
       {dlg?.k === 'remove' && <RemoveLineDialog order={order} line={dlg.line} to={(dlg as any).n} onClose={() => setDlg(null)} />}
@@ -195,7 +205,7 @@ export function CheckPanel({ order, refetch, mode, onCheckSwitch }: { order: any
 }
 
 export function StatusPill({ s }: { s: string }) {
-  const m: Record<string, [string, any]> = { DRAFT: ['مفتوح', 'primary'], CONFIRMED: ['اتأكد — مستني الدفع', 'warning'], COMPLETED: ['اتقفل', 'success'], CANCELLED: ['ملغي', 'neutral'], VOIDED: ['ملغي بموافقة', 'error'], MERGED: ['اتدمج', 'neutral'] };
+  const m: Record<string, [string, any]> = { DRAFT: ['مفتوح', 'primary'], CONFIRMED: ['بانتظار الدفع', 'warning'], COMPLETED: ['مغلق', 'success'], CANCELLED: ['ملغى', 'neutral'], VOIDED: ['ملغى بموافقة', 'error'], MERGED: ['مدموج', 'neutral'] };
   const [ar, tone] = m[s] ?? ['—', 'neutral'];
   return <Pill tone={tone} dot>{t(ar)}<Tech><span className="num opacity-70">{s}</span></Tech></Pill>;
 }
@@ -208,7 +218,7 @@ function Act({ icon, label, onClick, disabled, danger, proposed }: { icon: React
   return (
     <button data-fb={`check-action:${label}`} onClick={onClick} disabled={disabled} className={cn('relative min-h-[48px] rounded-xl flex flex-col items-center justify-center gap-0.5 px-1 text-[11px] font-bold border transition-colors disabled:opacity-30', danger ? 'border-[color-mix(in_srgb,var(--error)_35%,transparent)] text-[var(--error)] bg-[color-mix(in_srgb,var(--error)_8%,transparent)] hover:bg-[color-mix(in_srgb,var(--error)_16%,transparent)]' : 'border-[var(--glass-border)] surface-1 text-soft hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]')}>
       {React.cloneElement(icon as React.ReactElement<any>, { className: 'w-4 h-4' })}<span className="leading-tight text-center">{label}</span>
-      {proposed && <span className="absolute top-1 end-1 w-1.5 h-1.5 rounded-full" style={{ background: 'var(--violet)' }} title={t('مقترح')} />}
+      {proposed && <Tech><span className="absolute top-1 end-1 w-1.5 h-1.5 rounded-full" style={{ background: 'var(--violet)' }} title={t('مقترح')} /></Tech>}
     </button>
   );
 }
@@ -226,17 +236,42 @@ function RoundStatus({ info, orderId }: { info: any; orderId: string }) {
   );
 }
 
-function LineRow({ l, locked, draft, onQty, onRemove, onVoid, onMod, onSeat, seats, busy, prebilled }: { l: any; locked?: boolean; draft: boolean; onQty?: (d: number) => void; onRemove?: () => void; onVoid?: () => void; onMod?: () => void; onSeat?: () => void; seats?: boolean; busy?: boolean; prebilled?: boolean }) {
+/** Swipe a cart line sideways to remove it (the trash button does the same). Returns the row's drag offset. */
+function useSwipe(enabled: boolean, onSwipe: () => void) {
+  const [dx, setDx] = useState(0);
+  const st = React.useRef<{ x: number; y: number; id: number; on: boolean } | null>(null);
+  if (!enabled) return { dx: 0, handlers: {} };
+  const end = () => { const d = dx; st.current = null; setDx(0); if (Math.abs(d) > 90) onSwipe(); };
+  return {
+    dx,
+    handlers: {
+      onPointerDown: (e: React.PointerEvent) => { if ((e.target as HTMLElement).closest('button')) return; st.current = { x: e.clientX, y: e.clientY, id: e.pointerId, on: false }; },
+      onPointerMove: (e: React.PointerEvent) => {
+        const s0 = st.current; if (!s0 || s0.id !== e.pointerId) return;
+        const x = e.clientX - s0.x, y = e.clientY - s0.y;
+        if (!s0.on) { if (Math.abs(x) < 12 || Math.abs(x) < Math.abs(y)) return; s0.on = true; (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId); }
+        setDx(Math.max(-140, Math.min(140, x)));
+      },
+      onPointerUp: end,
+      onPointerCancel: () => { st.current = null; setDx(0); },
+    },
+  };
+}
+
+function LineRow({ l, locked, draft, onQty, onRemove, onVoid, onMod, onSeat, seats, busy, prebilled, cart, swipe }: { l: any; locked?: boolean; draft: boolean; onQty?: (d: number) => void; onRemove?: () => void; onVoid?: () => void; onMod?: () => void; onSeat?: () => void; seats?: boolean; busy?: boolean; prebilled?: boolean; cart?: boolean; swipe?: boolean }) {
   const voided = l.status === 'VOIDED';
   const editable = draft && !voided && !locked;
+  const sw = useSwipe(!!(editable && swipe && onRemove), () => onRemove?.());
   return (
-    <div className={cn('px-2.5 py-2 text-sm', voided && 'opacity-60')} data-fb={`line:${l.sku}`}>
+    <div className="relative overflow-hidden">
+      {sw.dx !== 0 && <div className={cn('absolute inset-0 flex items-center px-4 text-xs font-bold text-white bg-[var(--error)]', sw.dx > 0 ? 'justify-start' : 'justify-end')} aria-hidden><Trash2 className="w-4 h-4" /></div>}
+    <div {...sw.handlers} style={sw.dx ? { transform: `translateX(${sw.dx}px)`, touchAction: 'pan-y' } : { touchAction: 'pan-y' }} className={cn('relative px-2.5 py-2 text-sm bg-[var(--glass-bg-strong)]', !sw.dx && 'transition-transform', voided && 'opacity-60')} data-fb={`line:${l.sku}`}>
       <div className="flex items-start gap-2">
-        {editable ? (
+        {editable && onQty ? (
           <div className="flex items-center shrink-0 rounded-xl surface-2 p-0.5">
-            <MiniBtn onClick={() => onQty!(1)} disabled={busy} title={t('أكتر')} fb="line-plus"><Plus className="w-4 h-4" /></MiniBtn>
-            <span className="num font-extrabold text-[var(--primary)] min-w-6 text-center">{qty(l.quantity)}</span>
-            <MiniBtn onClick={() => onQty!(-1)} disabled={busy} title={Number(l.quantity) <= 1 ? t('شيل الصنف') : t('أقل')} fb="line-minus" danger={Number(l.quantity) <= 1}>{Number(l.quantity) <= 1 ? <Trash2 className="w-4 h-4" /> : <Minus className="w-4 h-4" />}</MiniBtn>
+            <MiniBtn big={cart} onClick={() => onQty!(1)} disabled={busy} title={t('زيادة')} fb="line-plus"><Plus className="w-4 h-4" /></MiniBtn>
+            <span className="num font-bold text-[var(--primary)] min-w-6 text-center">{qty(l.quantity)}</span>
+            <MiniBtn big={cart} onClick={() => onQty!(-1)} disabled={busy} title={Number(l.quantity) <= 1 ? t('حذف الصنف') : t('إنقاص')} fb="line-minus" danger={Number(l.quantity) <= 1}>{Number(l.quantity) <= 1 ? <Trash2 className="w-4 h-4" /> : <Minus className="w-4 h-4" />}</MiniBtn>
           </div>
         ) : <span className="shrink-0 min-w-9 h-9 px-1 rounded-lg bg-[var(--primary-container)] text-[var(--primary)] font-extrabold text-sm flex items-center justify-center num">{qty(l.quantity)}</span>}
         <div className="flex-1 min-w-0 pt-1.5">
@@ -256,30 +291,39 @@ function LineRow({ l, locked, draft, onQty, onRemove, onVoid, onMod, onSeat, sea
           {l.movedFrom && <div className="text-[10px] text-dim">{t('اتنقل من شيك تاني')}</div>}
           {draft && !voided && locked && (
             <div className="flex items-center gap-1 mt-1">
-              <span className="text-[10px] text-dim flex items-center gap-1 me-auto"><Lock className="w-3 h-3" />{t('اتبعت')}</span>
+              <span className="text-[10px] text-dim flex items-center gap-1 me-auto"><Lock className="w-3 h-3" />{t('أُرسل')}</span>
               {seats && <MiniBtn onClick={onSeat!} title={t('الكرسي')}><Armchair className="w-4 h-4" /></MiniBtn>}
               <MiniBtn onClick={onMod!} title={t('ملاحظة للمطبخ بعد الإرسال')}><PenLine className="w-4 h-4" /></MiniBtn>
               {onVoid && <button data-fb="void-line" onClick={onVoid} className="h-8 px-2.5 rounded-lg text-xs font-bold text-[var(--error)] border border-[color-mix(in_srgb,var(--error)_35%,transparent)] bg-[color-mix(in_srgb,var(--error)_8%,transparent)] flex items-center gap-1"><Ban className="w-3.5 h-3.5" />{t('إلغاء')}</button>}
             </div>
           )}
         </div>
-        <div className="text-end shrink-0 pt-1 flex flex-col items-end gap-1">
-          <div className={cn('num font-extrabold', voided && 'line-through')}>{money(l.lineTotal)}</div>
+        <div className={cn('text-end shrink-0 flex gap-1', cart ? 'items-start' : 'flex-col items-end pt-1')}>
+          <div className={cn('flex flex-col items-end gap-1', cart && 'pt-2.5')}>
+          <Money v={l.lineTotal} className={cn('font-bold', voided && 'line-through')} />
           {qty(l.quantity) !== '1' && <div className="num text-[10px] text-dim">{money(l.unitTotal, false)} × {qty(l.quantity)}</div>}
-          {editable && (
+          </div>
+          {editable && cart && (
+            <div className="flex items-center">
+              {seats && <MiniBtn big onClick={onSeat!} title={t('الكرسي')}><Armchair className="w-4 h-4" /></MiniBtn>}
+              {(Number(l.quantity) > 1 || !onQty) && <MiniBtn big onClick={onRemove!} title={t('حذف الصنف')} danger fb="line-remove"><Trash2 className="w-4 h-4" /></MiniBtn>}
+            </div>
+          )}
+          {editable && !cart && (
             <div className="flex items-center">
               {seats && <MiniBtn onClick={onSeat!} title={t('الكرسي')}><Armchair className="w-4 h-4" /></MiniBtn>}
-              {Number(l.quantity) > 1 && <MiniBtn onClick={onRemove!} title={t('شيل الصنف')} danger fb="line-remove"><Trash2 className="w-4 h-4" /></MiniBtn>}
+              {(Number(l.quantity) > 1 || !onQty) && <MiniBtn big={cart} onClick={onRemove!} title={t('حذف الصنف')} danger fb="line-remove"><Trash2 className="w-4 h-4" /></MiniBtn>}
             </div>
           )}
         </div>
       </div>
     </div>
+    </div>
   );
 }
 const CHIP: Record<string, string> = { violet: 'var(--violet)', warning: 'var(--warning-text)', info: 'var(--info)' };
 const Chip = ({ tone, children }: { tone: 'violet' | 'warning' | 'info'; children: React.ReactNode }) => <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold" style={{ color: CHIP[tone], background: `color-mix(in srgb, ${CHIP[tone]} 13%, transparent)` }}>{children}</span>;
-const MiniBtn = ({ onClick, children, title, disabled, danger, fb }: { onClick: () => void; children: React.ReactNode; title: string; disabled?: boolean; danger?: boolean; fb?: string }) => <button title={title} aria-label={title} disabled={disabled} onClick={onClick} data-fb={fb} className={cn('w-9 h-8 rounded-lg flex items-center justify-center hover:bg-[var(--surface-3)] disabled:opacity-30', danger ? 'text-[var(--error)]' : 'text-soft')}>{children}</button>;
+const MiniBtn = ({ onClick, children, title, disabled, danger, fb, big }: { onClick: () => void; children: React.ReactNode; title: string; disabled?: boolean; danger?: boolean; fb?: string; big?: boolean }) => <button title={title} aria-label={title} disabled={disabled} onClick={onClick} data-fb={fb} className={cn('rounded-lg flex items-center justify-center hover:bg-[var(--surface-3)] disabled:opacity-30', big ? 'w-11 h-11' : 'w-9 h-8', danger ? 'text-[var(--error)]' : 'text-soft')}>{children}</button>;
 
 export function ReasonDialog({ title, kind, onOk, onClose, ops, note, requireNote, danger, children }: { title: string; kind: string; onOk: (code: string, note?: string) => Promise<any>; onClose: () => void; ops: string[]; note?: string; requireNote?: boolean; danger?: boolean; children?: React.ReactNode }) {
   const reasons = useReasons(kind);
@@ -288,16 +332,26 @@ export function ReasonDialog({ title, kind, onOk, onClose, ops, note, requireNot
   const [busy, setBusy] = useState(false);
   const rc = reasons.find((r) => r.code === code);
   const needNote = requireNote || rc?.requiresNote;
+  const ok = !!code && !(needNote && !txt.trim()) && !busy;
+  const submit = async () => { if (!ok) return; setBusy(true); const r = await onOk(code, txt || undefined); setBusy(false); if (r) onClose(); };
+  const panel = React.useRef<HTMLDivElement>(null);
+  const subRef = React.useRef(submit);
+  subRef.current = submit;
+  React.useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Enter' && (e.target as HTMLElement)?.tagName !== 'TEXTAREA' && inTopLayer(panel.current)) { e.preventDefault(); subRef.current(); } };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, []);
+  void note; // explanations live in training material, not on the screen
   return (
-    <Modal open onClose={onClose} title={title} badge={<StateBadge ops={ops} />} footer={<><Button variant="ghost" onClick={onClose}>{t('رجوع')}</Button><Button variant={danger ? 'danger' : 'primary'} loading={busy} disabled={!code || (needNote && !txt.trim())} onClick={async () => { setBusy(true); const r = await onOk(code, txt || undefined); setBusy(false); if (r) onClose(); }} data-fb="reason-ok">{t('تنفيذ')}</Button></>}>
-      <div className="space-y-4">
-        {note && <Banner tone={danger ? 'warning' : 'info'}>{note}</Banner>}
+    <Modal open onClose={onClose} title={title} badge={<StateBadge ops={ops} />} footer={<><Button variant="ghost" size="lg" onClick={onClose}>{t('رجوع')}</Button><Button variant={danger ? 'danger' : 'primary'} size="lg" loading={busy} disabled={!ok} onClick={submit} data-fb="reason-ok">{t('تأكيد')}<Kbd className="!bg-black/10 !border-black/10 !text-current">Enter</Kbd></Button></>}>
+      <div className="space-y-4" ref={panel}>
         {children}
         <Field label={t('السبب')} hint={<Tech>ReasonCodePolicy · {kind}</Tech>}>
-          <div className="grid grid-cols-2 gap-1.5">{reasons.map((r) => <button key={r.id} onClick={() => setCode(r.code)} data-fb={`reason:${r.code}`} className={cn('min-h-[48px] px-3 py-2 rounded-xl border text-sm text-start', code === r.code ? 'border-[var(--primary)] bg-[var(--primary-container)] font-bold' : 'border-[var(--glass-border)] surface-1 hover:bg-[var(--surface-2)]')}><div>{L(r.label)}</div>{r.requiresNote && <div className="text-[10px] text-dim font-normal">{t('لازم تكتب ملاحظة')}</div>}<Tech><div className="text-[10px] num text-dim">{r.code}</div></Tech></button>)}</div>
-          {reasons.length === 0 && <span className="text-xs text-dim">{t('مفيش أسباب متسجلة للنوع ده — المدير يضيفها من الإعدادات.')}</span>}
+          <div className="grid grid-cols-2 gap-1.5">{reasons.map((r) => <button key={r.id} onClick={() => setCode(r.code)} data-fb={`reason:${r.code}`} className={cn('min-h-[52px] px-3 py-2 rounded-xl border text-sm text-start', code === r.code ? 'border-[var(--primary)] bg-[var(--primary-container)] font-bold' : 'border-[var(--glass-border)] surface-1 hover:bg-[var(--surface-2)]')}><div>{L(r.label)}</div>{r.requiresNote && <div className="text-[10px] text-dim font-normal">{t('تتطلب ملاحظة')}</div>}<Tech><div className="text-[10px] num text-dim">{r.code}</div></Tech></button>)}</div>
+          {reasons.length === 0 && <span className="text-xs text-dim">{t('لا توجد أسباب مسجلة')}</span>}
         </Field>
-        <Field label={needNote ? t('ملاحظة (مطلوبة)') : t('ملاحظة (اختياري)')}><Textarea value={txt} onChange={(e) => setTxt(e.target.value)} maxLength={200} /></Field>
+        <Field label={needNote ? t('ملاحظة (مطلوبة)') : t('ملاحظة (اختيارية)')}><Textarea value={txt} onChange={(e) => setTxt(e.target.value)} maxLength={200} className="!min-h-[56px]" /></Field>
       </div>
     </Modal>
   );
@@ -328,12 +382,12 @@ function RemoveLineDialog({ order, line, to, onClose }: { order: any; line: any;
   const stage = lineStage(order, line);
   const full = to < 1;
   const v = order.version;
-  return <ReasonDialog danger title={full ? `${t('شيل صنف')}: ${L(line.name)}` : `${t('تقليل')} ${L(line.name)}: ${qty(line.quantity)} ← ${to}`} kind="LINE_VOID" ops={['Order.RemoveLine', 'Order.UpdateLine', 'Approval.Grant']} onClose={onClose}
+  return <ReasonDialog danger title={full ? `${t('حذف صنف')}: ${L(line.name)}` : `${t('إنقاص')} ${L(line.name)}: ${qty(line.quantity)} ← ${to}`} kind="LINE_VOID" ops={['Order.RemoveLine', 'Order.UpdateLine', 'Approval.Grant']} onClose={onClose}
     note={stage === 'S1' ? t('الصنف ده ظهر للزبون في الشيك المبدئي. الشيل محتاج سبب وموافقة مدير، ومتسجل باسمك واسم المدير — مش هيختفي من السجل.') : t('حتى قبل الإرسال، الشيل محتاج موافقة مدير (حسب إعدادات المطعم)، ومتسجل في سجل الشيك باسمك واسم المدير.')}
     onOk={(rc, note) => full
       ? run('Order.RemoveLine', { params: { orderId: order.id, lineId: line.id }, query: { expectedVersion: v, expectedLineVersion: line.version }, body: { expectedVersion: v, expectedLineVersion: line.version, reasonCode: rc, reason: note } }, { success: t('الصنف اتشال واتسجل') })
       : run('Order.UpdateLine', { params: { orderId: order.id, lineId: line.id }, body: { expectedVersion: v, expectedLineVersion: line.version, quantity: String(to), reasonCode: rc, reason: note } }, { success: t('الكمية اتقللت واتسجلت') })}>
-    <div className="flex items-center gap-2 text-xs"><Pill tone={stage === 'S1' ? 'warning' : 'info'} data-fb="remove-stage">{t(STAGE_TEXT[stage].short)}</Pill><span className="text-dim">{t(STAGE_TEXT[stage].long)}</span></div>
+    <div className="flex items-center gap-2 text-xs"><Pill tone={stage === 'S1' ? 'warning' : 'info'} data-fb="remove-stage">{t(STAGE_TEXT[stage].short)}</Pill></div>
   </ReasonDialog>;
 }
 

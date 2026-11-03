@@ -6,7 +6,8 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowRight, Banknote, CreditCard, Smartphone, CheckCircle2, Receipt, PiggyBank, Star, Delete, Printer, Plus, Wallet, Globe } from 'lucide-react';
 import { useDev, useQuery, useCommand, useUnknowns } from '../app/hooks';
-import { PageHeader, StateBadge, Button, Card, Money, Field, Input, Select, Banner, Pill, Skeleton, Stepper, Kbd, EmptyState } from '../ui';
+import { PageHeader, StateBadge, Button, Card, Money, Field, Input, Select, Banner, Pill, Skeleton, Stepper, Kbd, EmptyState, Numpad } from '../ui';
+import { changePreview, sign, quickCash, minAmount } from '../lib/cash';
 import { t, L } from '../i18n';
 import { cn, money, qty } from '../lib/format';
 import { StatusPill } from './order/CheckPanel';
@@ -164,10 +165,11 @@ function TenderBox({ order, remaining, onChange }: { order: any; remaining: stri
   const [tipAmt, setTipAmt] = useState('');
   const tipsOn = tip.data?.value === 'ON';
   const rem = plainNum(remaining);
-  const remN = Number(rem);
-  const quick = [...new Set([5, 10, 20, 50, 100, 200, 500].filter((n) => n >= 50 || remN < 50).map((n) => Math.ceil(remN / n) * n).filter((v) => v > remN))].slice(0, 4);
-  const tenderN = Number(tendered || rem);
-  const preview = method === 'CASH' && tendered ? tenderN - remN : 0;
+  // previews only (Decimal on server strings); the real change comes back with the payment
+  const quick = quickCash(remaining);
+  const diff = method === 'CASH' && tendered ? changePreview(tendered, rem) : null;
+  const previewSign = diff ? sign(diff) : 0;
+  const preview = diff ? diff.replace('-', '') : '0';
   const pay = async () => {
     const tender: any = method === 'CASH' ? { method, tendered: tendered || rem } : { method, amount: amount || rem, reference: refRule !== 'OFF' && ref.trim() ? ref.trim() : undefined, walletProvider: method === 'DIGITAL_WALLET' ? provider : method === 'ONLINE' ? (prepaidVia === 'APP' ? 'DELIVERY_APP' : 'PAYMENT_LINK') : undefined };
     if (tipsOn && tipAmt) tender.tip = tipAmt;
@@ -214,18 +216,12 @@ function TenderBox({ order, remaining, onChange }: { order: any; remaining: stri
             <div className="rounded-2xl surface-1 border line px-4 py-3 flex items-center justify-between gap-3">
               <div className="min-w-0"><div className="text-xs text-dim">{t('الزبون إدّى')}</div><input data-fb="cash-tendered" value={tendered} onChange={(e) => setTendered(e.target.value.replace(/[^0-9.]/g, ''))} onKeyDown={(e) => { if (e.key === 'Enter' && !busy) pay(); }} inputMode="decimal" placeholder={rem} className="num bg-transparent outline-none font-extrabold w-full placeholder:text-[var(--text-dim)] placeholder:opacity-60" style={{ textAlign: 'start', fontSize: 34, lineHeight: 1.15 }} /></div>
               <div className="text-end shrink-0">
-                <div className="text-xs text-dim">{preview > 0 ? t('الباقي للزبون') : preview < 0 ? t('دفع جزئي — هيفضل') : t('الباقي')}</div>
-                <div className={cn('num text-2xl font-extrabold', preview > 0 ? 'text-[var(--success)]' : preview < 0 ? 'text-[var(--warning-text)]' : 'text-dim')}>{money(String(Math.abs(preview)), false)}</div>
+                <div className="text-xs text-dim">{previewSign > 0 ? t('الباقي للعميل') : previewSign < 0 ? t('دفعة جزئية · يتبقى') : t('الباقي')}</div>
+                <div className={cn('num text-2xl font-extrabold', previewSign > 0 ? 'text-[var(--success)]' : previewSign < 0 ? 'text-[var(--warning-text)]' : 'text-dim')}>{money(preview, false)}</div>
               </div>
             </div>
             <div className="grid grid-cols-[minmax(0,3fr)_minmax(0,1.15fr)] gap-1.5">
-              <div className="grid grid-cols-4 gap-1.5" data-fb="cash-keypad">
-                {['7', '8', '9', '<', '4', '5', '6', 'C', '1', '2', '3', '.', '0', '00'].map((k) => (
-                  <button key={k} onClick={() => (k === '00' ? (key('0'), key('0')) : key(k))} className={cn('h-11 rounded-xl border text-xl font-bold num flex items-center justify-center transition-colors active:scale-[.97]', k === 'C' || k === '<' ? 'surface-2 border-[var(--glass-border)] text-soft !text-sm' : 'bg-[var(--card-raised)] border-[var(--glass-border)] hover:bg-[var(--surface-2)]', k === '0' && 'col-span-2', k === '00' && 'col-span-2')} aria-label={k === '<' ? t('امسح رقم') : k === 'C' ? t('امسح الكل') : k}>
-                    {k === '<' ? <Delete className="w-5 h-5 ltr:rotate-180" /> : k === 'C' ? t('مسح') : k}
-                  </button>
-                ))}
-              </div>
+              <Numpad mode="amount" size="md" fb="cash-keypad" onKey={(k) => (k === 'back' ? key('<') : k === 'clear' ? key('C') : k === '00' ? (key('0'), key('0')) : key(k))} />
               <div className="flex flex-col gap-1.5">
                 <QuickCash fb="cash-quick:exact" on={tendered === rem} onClick={() => setTendered(rem)}><span className="text-[10px] block leading-tight text-soft">{t('بالظبط')}</span><span className="num text-sm">{rem}</span></QuickCash>
                 {quick.slice(0, 3).map((v) => <QuickCash key={v} fb={`cash-quick:${v}`} on={tendered === String(v)} onClick={() => setTendered(String(v))}><span className="num text-lg">{v}</span></QuickCash>)}
@@ -263,7 +259,7 @@ function TenderBox({ order, remaining, onChange }: { order: any; remaining: stri
           <div className="sticky bottom-0 -mx-4 -mb-4 px-4 pb-4 pt-2 rounded-b-2xl bg-[linear-gradient(to_top,var(--glass-bg-strong)_70%,transparent)]">
           <Button variant="primary" size="xl" className="w-full !h-16 text-xl" loading={busy} disabled={refRule === 'REQUIRED' && !ref.trim()} onClick={pay} data-fb="capture">
             {method === 'CASH' ? <Banknote className="w-6 h-6" /> : method === 'CARD' ? <CreditCard className="w-6 h-6" /> : method === 'ONLINE' ? <Globe className="w-6 h-6" /> : <Smartphone className="w-6 h-6" />}
-            {t('ادفع')} <span className="num">{method === 'CASH' ? money(String(Math.min(tenderN, remN))) : money(amount || rem)}</span>
+            {t('تأكيد الدفع')} <span className="num">{method === 'CASH' ? money(minAmount(tendered || rem, rem)) : money(amount || rem)}</span>
           </Button>
           </div>
         )}

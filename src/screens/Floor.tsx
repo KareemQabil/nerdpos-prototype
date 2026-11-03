@@ -5,7 +5,8 @@
 import React, { useState } from 'react';
 import { Users, Clock, Plus, ArrowRightLeft, Link2, Unlink, DoorClosed, Wallet, ClipboardList, UserCog, CalendarClock, Minus, Sparkles, Map as MapIcon, LayoutGrid, Brush, ZoomIn, ZoomOut, Maximize2, Receipt, ChevronLeft, Armchair } from 'lucide-react';
 import { useDev, useQuery, useCommand, errorText } from '../app/hooks';
-import { PageHeader, StateBadge, Pill, Drawer, Button, Banner, Money, EmptyState, Tabs, SegmentedControl, Skeleton, useNow } from '../ui';
+import { PageHeader, StateBadge, Pill, Modal, Button, Banner, Money, EmptyState, Tabs, SegmentedControl, Skeleton, useNow } from '../ui';
+import { Tech } from '../app/tech';
 import { personName, personLabel, userLabel } from '../demo/people';
 import { t, L } from '../i18n';
 import { cn, money, time } from '../lib/format';
@@ -172,7 +173,7 @@ function CleanSheet({ tb, onClose, onSeat, title, sub }: { tb: any; onClose: () 
   const { run, busy } = useCommand();
   const clean = async () => { if (await run('Table.MarkClean', { params: { tableId: tb.id }, body: { state: 'CLEAN' } }, { success: t('ترابيزة {n} نضيفة وجاهزة', { n: tb.name }) })) onClose(); };
   return (
-    <Drawer open onClose={onClose} title={title} description={sub} badge={<StateBadge ops={['Table.MarkClean']} />} width="sm"
+    <Modal open onClose={onClose} title={title} description={sub} badge={<StateBadge ops={['Table.MarkClean']} />} size="sm"
       footer={<><Button variant="ghost" onClick={onSeat}>{t('اقعد ضيوف عليها على طول')}</Button><Button variant="success" size="lg" loading={busy} onClick={clean} data-fb="table-mark-clean"><Sparkles className="w-4 h-4" />{t('اتنضفت — جاهزة')}</Button></>}>
       <div className="space-y-4">
         <div className="rounded-2xl p-4 text-center border" style={{ background: LOOK.DIRTY.fill, borderColor: LOOK.DIRTY.edge }}>
@@ -182,7 +183,7 @@ function CleanSheet({ tb, onClose, onSeat, title, sub }: { tb: any; onClose: () 
         </div>
         <p className="text-sm text-dim leading-relaxed">{t('الترابيزة بتتعلم «محتاجة تنضيف» أول ما القعدة تتقفل. لما الرانر ينضفها يدوس «اتنضفت» فترجع خضرا للويترز.')}</p>
       </div>
-    </Drawer>
+    </Modal>
   );
 }
 
@@ -201,7 +202,7 @@ function OpenTable({ tb, onClose, title, sub }: { tb: any; onClose: () => void; 
   };
   const chips = Array.from({ length: Math.max(6, Math.min(12, tb.capacity + 2)) }, (_, i) => i + 1);
   return (
-    <Drawer open onClose={onClose} title={title} description={sub} badge={<StateBadge ops={['TableVisit.Open']} />} width="sm"
+    <Modal open onClose={onClose} title={title} description={sub} badge={<StateBadge ops={['TableVisit.Open']} />} size="sm"
       footer={<><Button variant="ghost" loading={busy} onClick={() => open(false)} data-fb="open-table">{t('افتح الترابيزة بس')}</Button><Button variant="primary" size="lg" loading={busy} onClick={() => open(true)} data-fb="open-table-check"><Plus className="w-4 h-4" />{t('افتح + شيك جديد')}</Button></>}>
       <div className="space-y-5">
         {tb.reservation && <Banner tone="info" title={t('محجوزة')}>{tb.reservation.customer} · <span className="num">{time(tb.reservation.at)}</span> · {tb.reservation.partySize} {t('أفراد')}</Banner>}
@@ -222,7 +223,7 @@ function OpenTable({ tb, onClose, title, sub }: { tb: any; onClose: () => void; 
           <Button size="sm" variant="ghost" onClick={async () => { if (await run('Table.MarkClean', { params: { tableId: tb.id }, body: { state: 'DIRTY' } }, { success: t('اتعلمت محتاجة تنضيف') })) onClose(); }} data-fb="table-mark-dirty"><Brush className="w-3.5 h-3.5" />{t('علّمها محتاجة تنضيف')}</Button>
         </div>
       </div>
-    </Drawer>
+    </Modal>
   );
 }
 
@@ -244,7 +245,7 @@ function VisitSheet({ tableId, visitId, onClose, tables, title, sub }: { tableId
   const canPay = kind !== 'FLOOR' && can('payment:capture');
   const total = openChecks.reduce((a: number, c: any) => a + Number(c.payable), 0);
   return (
-    <Drawer open onClose={onClose} width="md" title={v ? <span className="flex items-center gap-2">{title}{v.joinedTableNames?.length ? <span className="text-soft text-base font-bold">+ {v.joinedTableNames.join(' + ')}</span> : null}</span> : title} description={sub}
+    <Modal open onClose={onClose} size="md" title={v ? <span className="flex items-center gap-2">{title}{v.joinedTableNames?.length ? <span className="text-soft text-base font-bold">+ {v.joinedTableNames.join(' + ')}</span> : null}</span> : title} description={sub}
       badge={<StateBadge ops={['TableVisit.List', 'Order.Create', 'TableVisit.Close', 'TableVisit.Transfer']} />}
       footer={v && <>
         <Button variant="danger" onClick={close} loading={busy} data-fb="close-table" disabled={openChecks.length > 0} title={openChecks.length ? t('الترابيزة عليها شيك مفتوح') : ''}><DoorClosed className="w-4 h-4" />{t('اقفل الترابيزة')}</Button>
@@ -277,7 +278,7 @@ function VisitSheet({ tableId, visitId, onClose, tables, title, sub }: { tableId
                   {live && (
                     <div className="flex gap-2 mt-2.5">
                       <Button size="lg" className="flex-1" onClick={() => nav('order', { orderId: c.id, back: 'floor' })} data-fb={`visit-open-check:${c.checkNo}`}>{t('افتح الشيك')}<ChevronLeft className="w-4 h-4 ltr:rotate-180" /></Button>
-                      {canPay && <Button size="lg" variant="success" className="flex-1" onClick={() => nav('pay', { orderId: c.id, back: 'floor' })} data-fb="visit-pay"><Wallet className="w-4 h-4" />{t('تحصيل')}</Button>}
+                      {canPay && <Button size="lg" variant="success" className="flex-1" onClick={() => (kind === 'CASH' ? nav('counter', { orderId: c.id, mode: 'collect' }) : nav('pay', { orderId: c.id, back: 'floor' }))} data-fb="visit-pay"><Wallet className="w-4 h-4" />{t('تحصيل')}</Button>}
                     </div>
                   )}
                 </div>
@@ -318,7 +319,7 @@ function VisitSheet({ tableId, visitId, onClose, tables, title, sub }: { tableId
           <p className="text-[11px] text-dim leading-relaxed">{t('الترابيزة مينفعش تتقفل وعليها شيك مفتوح. لما تتقفل بتتعلم «محتاجة تنضيف» لحد ما حد ينضفها.')}</p>
         </div>
       )}
-    </Drawer>
+    </Modal>
   );
 }
 
@@ -329,7 +330,7 @@ function QuickAct({ icon, label, onClick, on, proposed, fb }: { icon: React.Reac
   return (
     <button onClick={onClick} data-fb={fb} className={cn('relative min-h-[64px] rounded-2xl border px-2 py-2 flex flex-col items-center justify-center gap-1 text-xs font-bold text-center transition-colors [&>svg]:w-5 [&>svg]:h-5', on ? 'border-[var(--primary)] bg-[var(--primary-container)] text-[var(--primary)]' : 'surface-1 border-[var(--glass-border)] hover:bg-[var(--surface-2)]')}>
       {icon}<span className="leading-tight">{label}</span>
-      {proposed && <span className="absolute top-1.5 end-1.5 w-1.5 h-1.5 rounded-full" style={{ background: 'var(--violet)' }} title={t('مقترح')} />}
+      {proposed && <Tech><span className="absolute top-1.5 end-1.5 w-1.5 h-1.5 rounded-full" style={{ background: 'var(--violet)' }} title={t('مقترح')} /></Tech>}
     </button>
   );
 }

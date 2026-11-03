@@ -24,7 +24,7 @@ export interface LineDraft {
 
 type ComboSel = { productId: string; variantId: string | null; modifierOptionIds: string[] };
 
-export function ProductDialog({ product, channel, onClose, onAdd, seatsEnabled, guestCount, salesChannelId }: { product: any; channel: string; salesChannelId?: string | null; onClose: () => void; onAdd: (l: LineDraft) => Promise<void> | void; seatsEnabled?: boolean; guestCount?: number }) {
+export function ProductDialog({ product, channel, onClose, onAdd, seatsEnabled, guestCount, salesChannelId, initialQty }: { product: any; channel: string; salesChannelId?: string | null; onClose: () => void; onAdd: (l: LineDraft) => Promise<void> | void; seatsEnabled?: boolean; guestCount?: number; initialQty?: string }) {
   const { auth } = useDev();
   const groupsQ = useQuery<any>('ModifierGroup.List', { query: {} });
   const allProducts = useQuery<any>('Catalog.Search', { query: { active: true, limit: 500, channel } });
@@ -39,7 +39,7 @@ export function ProductDialog({ product, channel, onClose, onAdd, seatsEnabled, 
   const [nested, setNested] = useState<Record<string, string[]>>({});
   const [levels, setLevels] = useState<Record<string, Level>>({});
   const [placement, setPlacement] = useState<Record<string, Placement>>({});
-  const [qty, setQty] = useState('1');
+  const [qty, setQty] = useState(initialQty || '1');
   const [note, setNote] = useState('');
   const [variant, setVariant] = useState<string | null>(defVariant);
   const [half, setHalf] = useState<string | null>(null);

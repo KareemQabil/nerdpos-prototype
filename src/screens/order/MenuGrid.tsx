@@ -4,11 +4,11 @@
 // items show as "خلص"; a "خلص النهارده" board is one tap away; pictures, calories and allergens on the tiles.
 import React, { useEffect, useMemo, useState } from 'react';
 import { policy } from '../../mock/policies'; // round 3: SecondLanguagePolicy.menu (read-only)
-import { Package, Search, AlertTriangle, PackageX, Clock, Eye, EyeOff, Layers, Pizza, Ruler } from 'lucide-react';
+import { Package, Search, AlertTriangle, PackageX, Clock, Eye, EyeOff, Layers, Pizza, Ruler, MoreHorizontal } from 'lucide-react';
 import { useDev, useQuery } from '../../app/hooks';
 import { call, ApiFailure } from '../../api/client';
 import { clock } from '../../mock/clock';
-import { Pill, StateBadge, Input, Modal, Button, EmptyState, Skeleton, toast } from '../../ui';
+import { Pill, StateBadge, Input, Modal, Button, EmptyState, Skeleton, toast, Money } from '../../ui';
 import { Tech } from '../../app/tech';
 import { t, L, tv, getLang } from '../../i18n';
 import { cn, money } from '../../lib/format';
@@ -90,7 +90,11 @@ function useClockTick(onTick: () => void) {
   }, []);
 }
 
-export function MenuGrid({ channel, onPick, disabled, salesChannelId }: { channel: string; onPick: (p: any) => void; disabled?: boolean; salesChannelId?: string | null }) {
+/**
+ * `onOptions` (long-press on a tile, or its visible ⋯ button) opens quantity / options / note for that item.
+ * `toolbarStart` / `toolbarEnd` add controls to the search row (the sale screen's mode switch and typed quantity).
+ */
+export function MenuGrid({ channel, onPick, disabled, salesChannelId, onOptions, toolbarStart, toolbarEnd, size = 'md' }: { channel: string; onPick: (p: any) => void; disabled?: boolean; salesChannelId?: string | null; onOptions?: (p: any) => void; toolbarStart?: React.ReactNode; toolbarEnd?: React.ReactNode; size?: 'md' | 'lg' }) {
   const { auth, can } = useDev();
   const cats = useQuery<any>('Category.List', { query: { active: true } });
   const products = useQuery<any>('Catalog.Search', { query: { active: true, limit: 500, channel } });
@@ -160,8 +164,10 @@ export function MenuGrid({ channel, onPick, disabled, salesChannelId }: { channe
   return (
     <div className="@container/menu flex flex-col gap-3 min-h-0 h-full">
       <div className="flex items-center gap-2 shrink-0">
-        <div className="relative flex-1"><Search className="w-4 h-4 absolute top-1/2 -translate-y-1/2 start-3 text-dim" /><Input data-fb="menu-search" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && byCode(q) && pickCode(q)) setQ(''); }} placeholder={t('دوّر على صنف أو كود…')} className="ps-9 h-11" /></div>
-        <button data-fb="menu:soldout-board" onClick={() => setBoard(true)} title={t('خلص النهارده')} className={cn('shrink-0 h-11 px-3 rounded-xl border text-sm inline-flex items-center gap-1.5', soldOutCount ? 'border-[color-mix(in_srgb,var(--error)_45%,transparent)] text-[var(--error)] bg-[color-mix(in_srgb,var(--error)_10%,transparent)]' : 'border-[var(--glass-border)] text-soft surface-1')}>
+        {toolbarStart}
+        <div className="relative flex-1 min-w-0"><Search className="w-4 h-4 absolute top-1/2 -translate-y-1/2 start-3 text-dim" /><Input data-fb="menu-search" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && byCode(q) && pickCode(q)) setQ(''); if (e.key === 'Escape' && q) { e.stopPropagation(); setQ(''); } }} placeholder={t('ابحث بالاسم أو الكود')} className={cn('ps-9', size === 'lg' ? '!h-12' : '!h-11')} /></div>
+        {toolbarEnd}
+        <button data-fb="menu:soldout-board" onClick={() => setBoard(true)} title={t('خلص النهارده')} className={cn('shrink-0 px-3 rounded-xl border text-sm inline-flex items-center gap-1.5', size === 'lg' ? 'h-12' : 'h-11', soldOutCount ? 'border-[color-mix(in_srgb,var(--error)_45%,transparent)] text-[var(--error)] bg-[color-mix(in_srgb,var(--error)_10%,transparent)]' : 'border-[var(--glass-border)] text-soft surface-1')}>
           <PackageX className="w-4 h-4" /><span className="hidden @[460px]/menu:inline">{t('خلص النهارده')}</span>{soldOutCount > 0 && <span className="num text-xs font-bold">{soldOutCount}</span>}
         </button>
         <StateBadge ops={['Category.List', 'Catalog.Search', 'ModifierGroup.List', 'Pricing.QuoteItem', 'Menu.Overview']} />
@@ -169,25 +175,25 @@ export function MenuGrid({ channel, onPick, disabled, salesChannelId }: { channe
       {(running.length > 0 || offMenu.length > 0) && (
         <div className="flex items-center gap-2 flex-wrap text-xs shrink-0" data-fb="menu:daypart">
           <Clock className="w-3.5 h-3.5 text-dim" />
-          {running.map((d: any) => <span key={d.id} className="px-2 py-0.5 rounded-full font-bold" style={{ background: (d.color ?? '#22d3ee') + '26', color: d.color ?? 'var(--primary)' }}>{t('دلوقتي')}: {L(d.name)} <span className="num font-normal">{d.start}–{d.end}</span></span>)}
-          {nextUp && <span className="text-dim">{t('بعدها')}: {L(nextUp.name)} <span className="num">{timeText(nextUp.nextStart)}</span></span>}
+          {running.map((d: any) => <span key={d.id} className="px-2 py-0.5 rounded-full font-bold" style={{ background: (d.color ?? '#22d3ee') + '26', color: d.color ?? 'var(--primary)' }}>{t('الآن')}: {L(d.name)} <span className="num font-normal">{d.start}–{d.end}</span></span>)}
+          {nextUp && <span className="text-dim">{t('التالي')}: {L(nextUp.name)} <span className="num">{timeText(nextUp.nextStart)}</span></span>}
           {offMenu.length > 0 && (
             <button data-fb="menu:show-off-hours" onClick={() => setShowAll(!showAll)} className="ms-auto inline-flex items-center gap-1 text-dim hover:text-soft">
               {showAll ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-              {showAll ? t('اخفي اللي برا مواعيده') : t('{n} صنف برا مواعيده — اعرضهم', { n: offMenu.length })}
+              {showAll ? t('إخفاء الأصناف خارج وقتها') : t('{n} صنف خارج وقته', { n: offMenu.length })}
             </button>
           )}
         </div>
       )}
-      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide shrink-0" data-fb="category-rail">
+      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide shrink-0" data-fb="category-rail" role="tablist">
         <CatPill on={!cat} onClick={() => setCat(null)} label={t('الكل')} count={listed.length} />
         {catsShown.map((c: any) => <CatPill key={c.id} on={cat === c.id} onClick={() => setCat(c.id)} label={L(c.name)} count={listed.filter((p) => p.categoryId === c.id).length} proposed={c.id === 'cat_direction'} />)}
       </div>
       {(products.loading || cats.loading) && !items.length ? <div className="grid gap-2.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(132px, 1fr))' }}>{Array.from({ length: 10 }, (_, i) => <Skeleton key={i} className="h-40 rounded-xl" />)}</div> : visible.length === 0 ? (
-        <EmptyState compact icon={<Search />} title={q ? t('مفيش صنف بالاسم ده') : t('مفيش أصناف في المنيو دلوقتي')} text={q ? t('جرّب جزء من الاسم أو الكود.') : t('المنيو الشغالة دلوقتي مفيهاش أصناف للنوع ده من الطلبات.')} action={q ? <Button size="sm" onClick={() => setQ('')}>{t('امسح البحث')}</Button> : undefined} />
+        <EmptyState compact icon={<Search />} title={q ? t('لا يوجد صنف بهذا الاسم') : t('لا توجد أصناف متاحة الآن')} action={q ? <Button size="sm" onClick={() => setQ('')}>{t('مسح البحث')}</Button> : undefined} />
       ) : (
-        <div className="grid gap-2.5 overflow-y-auto pe-1 pb-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(132px, 1fr))', gridAutoRows: 'max-content', alignContent: 'start' }}>
-          {visible.map((p) => <Tile key={p.id} p={p} quote={quoteOf(p.id)} onPick={() => onPick(p)} disabled={disabled} />)}
+        <div className="grid gap-2.5 overflow-y-auto pe-1 pb-2" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${size === 'lg' ? 148 : 132}px, 1fr))`, gridAutoRows: 'max-content', alignContent: 'start' }} data-fb="menu-tiles">
+          {visible.map((p) => <Tile key={p.id} p={p} quote={quoteOf(p.id)} onPick={() => onPick(p)} onOptions={onOptions ? () => onOptions(p) : undefined} disabled={disabled} />)}
         </div>
       )}
       <Modal open={board} onClose={() => setBoard(false)} xwide title={<span className="inline-flex items-center gap-2"><PackageX className="w-5 h-5 text-[var(--error)]" />{t('خلص النهارده')}</span>} badge={<StateBadge ops={['SoldOut.Board', 'Product.SetAvailability', 'ModifierOption.SetAvailability']} />}
@@ -204,12 +210,15 @@ function CatPill({ on, onClick, label, count, proposed }: { on: boolean; onClick
     <button onClick={onClick} className={cn('shrink-0 px-4 h-11 rounded-xl text-sm border flex items-center gap-2 transition-all', on ? 'bg-[var(--primary)] text-[var(--primary-foreground)] font-bold border-transparent shadow-[0_4px_16px_-6px_var(--primary-glow)]' : 'surface-1 text-soft border-[var(--glass-border)] hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]')}>
       <span>{label}</span>
       <span className={cn('text-xs px-1.5 rounded-full', on ? 'bg-black/15' : 'surface-3 text-dim')}>{count}</span>
-      {proposed && <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--violet)' }} title={t('مقترح')} />}
+      {proposed && <Tech><span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--violet)' }} title={t('مقترح')} /></Tech>}
     </button>
   );
 }
 
-function Tile({ p, quote, onPick, disabled }: { p: any; quote?: QuoteState; onPick: () => void; disabled?: boolean }) {
+function Tile({ p, quote, onPick, onOptions, disabled }: { p: any; quote?: QuoteState; onPick: () => void; onOptions?: () => void; disabled?: boolean }) {
+  // long-press (touch or mouse) opens quantity / options / note; the visible ⋯ button does the same
+  const lp = React.useRef<{ t: ReturnType<typeof setTimeout> | null; fired: boolean }>({ t: null, fired: false });
+  const stop = () => { if (lp.current.t) clearTimeout(lp.current.t); lp.current.t = null; };
   const err = quote?.error;
   const off = p.menuNow && !p.menuNow.onMenu;
   const st = p.availability?.state;
@@ -220,8 +229,13 @@ function Tile({ p, quote, onPick, disabled }: { p: any; quote?: QuoteState; onPi
   const d = quote?.data;
   const reason = off ? L({ ar: p.menuNow.reasonAr, en: p.menuNow.reasonEn }) : soldOut ? (tv(p.availability?.reason) ?? t('خلص النهارده')) : tv(err?.details?.reasonAr) ?? tv(p.availability?.reason) ?? '';
   return (
-    <button data-fb={`tile:${p.sku}`} disabled={disabled || blocked} onClick={onPick} title={reason}
-      className={cn('relative overflow-hidden rounded-xl bg-[var(--card-raised)] border border-[var(--glass-border)] flex flex-col text-start transition-all hover:border-[color-mix(in_srgb,var(--primary)_55%,transparent)] hover:shadow-[0_6px_24px_-10px_var(--primary-glow)] active:scale-[.96]', blocked && 'opacity-55 cursor-not-allowed hover:border-[var(--glass-border)] hover:shadow-none')}>
+    <div className="relative min-w-0">
+    <button data-fb={`tile:${p.sku}`} disabled={disabled || blocked} title={reason}
+      onClick={() => { if (lp.current.fired) { lp.current.fired = false; return; } onPick(); }}
+      onPointerDown={onOptions ? () => { lp.current.fired = false; stop(); lp.current.t = setTimeout(() => { lp.current.fired = true; onOptions(); }, 480); } : undefined}
+      onPointerUp={stop} onPointerLeave={stop} onPointerCancel={stop}
+      onContextMenu={onOptions ? (e) => e.preventDefault() : undefined}
+      className={cn('relative w-full overflow-hidden rounded-xl bg-[var(--card-raised)] border border-[var(--glass-border)] flex flex-col text-start transition-all hover:border-[color-mix(in_srgb,var(--primary)_55%,transparent)] hover:shadow-[0_6px_24px_-10px_var(--primary-glow)] active:scale-[.96] select-none [-webkit-touch-callout:none]', blocked && 'opacity-55 cursor-not-allowed hover:border-[var(--glass-border)] hover:shadow-none')}>
       <div className="relative aspect-[4/3] w-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${p.colorCode ?? '#64748b'}40, var(--surface-2))` }}>
         {p.imageUrl ? <img src={p.imageUrl} alt="" className={cn('w-full h-full object-cover', (soldOut || off) && 'grayscale')} /> : <Package className="w-10 h-10 text-dim opacity-60" />}
         <div className="absolute top-2 end-2 flex flex-col gap-1 items-end">
@@ -229,7 +243,7 @@ function Tile({ p, quote, onPick, disabled }: { p: any; quote?: QuoteState; onPi
           {!soldOut && unavailable && <Pill tone="error">{st === 'BLOCKED' ? t('متوقف') : t('غير متاح')}</Pill>}
           {off && <Pill tone="neutral">{p.menuNow.nextStart ? t('من {h}', { h: timeText(p.menuNow.nextStart) }) : t('مش في المنيو دلوقتي')}</Pill>}
           {noPrice && <Pill tone="warning">{err?.code === 'PRICE_NOT_FOUND' ? t('السعر مش متاح') : err?.network ? t('السعر ما اتحملش') : t('مش متاح')}</Pill>}
-          {p.direction && <Pill tone="violet">{t('مقترح')}</Pill>}
+          {p.direction && <Tech><Pill tone="violet">{t('مقترح')}</Pill></Tech>}
         </div>
         <div className="absolute top-2 start-2 flex flex-col gap-1 items-start">
           {p.combo?.length > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-500/80 text-white font-bold inline-flex items-center gap-0.5"><Layers className="w-3 h-3" />{t('وجبة')}</span>}
@@ -242,12 +256,14 @@ function Tile({ p, quote, onPick, disabled }: { p: any; quote?: QuoteState; onPi
       <div className="p-2.5 flex flex-col gap-0.5">
         <div className="font-bold text-sm leading-tight truncate">{L(p.name)}</div>
         {menuSecondLang() && otherName(p.name) && <div className="text-[10px] text-dim leading-tight truncate" data-fb="tile-name2">{otherName(p.name)}</div>}
-                <span className="num text-[var(--primary)] font-extrabold text-[15px]" style={{ textAlign: 'start' }}>{d ? money(d.display?.unitTotal ?? d.unitTotal) : quote || off ? '—' : '…'}</span>
+        {d ? <Money v={d.display?.unitTotal ?? d.unitTotal} className="text-[var(--primary)] text-base self-start" /> : <span className="num text-[var(--primary)] font-bold text-[15px] self-start">{quote || off ? '—' : '…'}</span>}
         {d?.display?.taxIncluded && <span className="text-[9px] text-dim leading-none">{L(d.display.label)}</span>}
         {p.calories != null && <div className="text-[9px] text-dim num">{p.calories} {t('سعر حراري')}</div>}
         <Tech>{d && <div className="text-[9px] text-dim num" dir="ltr">{d.priceRuleId} · {d.unitTotal}</div>}</Tech>
       </div>
     </button>
+    {onOptions && !blocked && !disabled && <button type="button" onClick={onOptions} data-fb={`tile-options:${p.sku}`} title={t('الكمية والخيارات')} aria-label={t('الكمية والخيارات')} className="absolute top-1.5 end-1.5 w-10 h-10 rounded-full flex items-center justify-center text-white bg-black/30 hover:bg-black/50 backdrop-blur-sm"><MoreHorizontal className="w-5 h-5" /></button>}
+    </div>
   );
 }
 

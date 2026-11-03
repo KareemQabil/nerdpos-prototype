@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { History, Wallet, Receipt, ClipboardList, ArrowRightLeft, CalendarDays } from 'lucide-react';
 import { TransferSessionDialog } from './ops/TransferSessionDialog';
 import { useDev, useQuery } from '../app/hooks';
-import { PageHeader, Input, Table, Money, Button, Toolbar, SearchInput, FilterChips, EmptyState, Drawer, KV, StateBadge } from '../ui';
+import { PageHeader, Input, Table, Money, Button, Toolbar, SearchInput, FilterChips, EmptyState, Modal, KV, StateBadge } from '../ui';
 import { t, L } from '../i18n';
 import { time, money, qty } from '../lib/format';
 import { StatusPill, HistoryDialog } from './order/CheckPanel';
@@ -66,13 +66,13 @@ function CheckDrawer({ o, onClose, onOpen, onHistory, onMove }: { o: any; onClos
   const d = full.data ?? o;
   const T = d.totals;
   return (
-    <Drawer open onClose={onClose} width="md" title={<span className="flex items-center gap-2">{t('شيك')} <span className="num">#{o.number}</span><StatusPill s={o.status} /></span>} description={placeOf(o)} badge={<StateBadge ops={['Order.Get']} />}
+    <Modal open onClose={onClose} size="md" title={<span className="flex items-center gap-2">{t('شيك')} <span className="num">#{o.number}</span><StatusPill s={o.status} /></span>} description={placeOf(o)} badge={<StateBadge ops={['Order.Get']} />}
       footer={<>
         <Button variant="ghost" onClick={onHistory}><History className="w-4 h-4" />{t('السجل')}</Button>
         {live(o) && o.sessionId && can('session:close') && <Button variant="ghost" onClick={onMove} data-fb={`check-transfer:${o.number}`}><ArrowRightLeft className="w-4 h-4" />{t('نقل لدرج تاني')}</Button>}
         <div className="flex-1" />
         {o.status !== 'DRAFT' && <Button onClick={() => nav('receipt', { orderId: o.id })}><Receipt className="w-4 h-4" />{t('الإيصال')}</Button>}
-        {live(o) && can('payment:capture') && kind !== 'FLOOR' && <Button variant="success" onClick={() => nav('pay', { orderId: o.id, back: 'checks' })}><Wallet className="w-4 h-4" />{t('تحصيل')}</Button>}
+        {live(o) && can('payment:capture') && kind !== 'FLOOR' && <Button variant="success" onClick={() => (kind === 'CASH' ? nav('counter', { orderId: o.id, ...(o.visitId ? { mode: 'collect' } : {}) }) : nav('pay', { orderId: o.id, back: 'checks' }))} data-fb="check-collect"><Wallet className="w-4 h-4" />{t('تحصيل')}</Button>}
         {live(o) && <Button variant="primary" onClick={onOpen}><ClipboardList className="w-4 h-4" />{t('افتح الشيك')}</Button>}
       </>}>
       <div className="space-y-4">
@@ -85,6 +85,6 @@ function CheckDrawer({ o, onClose, onOpen, onHistory, onMove }: { o: any; onClos
           </div>
         ) : <EmptyState compact text={t('بنحمّل التفاصيل…')} />}
       </div>
-    </Drawer>
+    </Modal>
   );
 }
