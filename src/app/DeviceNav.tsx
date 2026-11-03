@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useDev, useQuery } from './hooks';
 import { REF_TYPES, refType, refTypeLabel, refTarget, follow, useFollowList, refsParam, TONE_DOT, type RefType, type StatusView } from '../screens/search/refs';
-import { devices } from './devices';
+import { devices, markKeyPane, keyPane } from './devices';
 import { SCREENS, SCREEN_GROUPS, type Kind, type ScreenDef, type ScreenGroup } from './registry';
 import { call } from '../api/client';
 import { store } from '../mock/store';
@@ -85,8 +85,7 @@ const setPrefs = (p: Partial<Prefs>) => { prefs = { ...prefs, ...p }; try { loca
 const usePrefs = () => useSyncExternalStore((cb) => { pl.add(cb); return () => pl.delete(cb); }, () => prefs);
 
 // ───────── which pane gets Ctrl+K (the one last touched; the main one by default)
-let lastPane: string | null = null;
-export const markPane = (id: string) => { lastPane = id; };
+export const markPane = (id: string) => markKeyPane(id);
 const paletteBus = new Set<(id: string) => void>();
 export const openPalette = (id: string) => paletteBus.forEach((f) => f(id));
 
@@ -104,7 +103,7 @@ export function Sidebar({ paneWidth, compact }: { paneWidth: number; compact?: b
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K' || e.code === 'KeyK')) {
-        const target = lastPane && document.querySelector(`[data-device="${lastPane}"]`) ? lastPane : devices.state().primary;
+        const target = keyPane();
         if (target === id) { e.preventDefault(); setPalette(true); }
       }
     };

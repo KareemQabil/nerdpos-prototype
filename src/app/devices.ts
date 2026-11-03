@@ -47,6 +47,11 @@ export function getDevice(id: string): DeviceState {
   return d;
 }
 
+// The pane that takes keyboard shortcuts: the one last touched (two panes side by side), else the main one.
+let lastPane: string | null = null;
+export const markKeyPane = (id: string) => { lastPane = id; };
+export const keyPane = (): string => (lastPane && typeof document !== 'undefined' && document.querySelector(`[data-device="${lastPane}"]`) ? lastPane : st.primary);
+
 export const devices = {
   get: getDevice,
   update(id: string, patch: Partial<DeviceState>) {
