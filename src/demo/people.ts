@@ -85,6 +85,9 @@ export const DEVICE_NAMES: Record<string, DeviceName> = {
   t_kds2: { name: 'شاشة المشويات', short: 'المشويات', en: 'Grill screen', shortEn: 'Grill', hint: 'شاشة محطة المشويات: بتعرض أصناف المشويات بس، و«جاهز» بيبعت الطلب لشاشة التسليم' },
   t_cash2: { name: 'كاشير التيك أواي', short: 'التيك أواي', en: 'Takeaway counter', shortEn: 'Takeaway', hint: 'كاشير تاني بدرج لطلبات التيك أواي' },
   BO: { name: 'الإدارة من أي مكان', short: 'الإدارة', en: 'Back office', shortEn: 'Back office', hint: 'الإدارة من أي كمبيوتر (من غير جهاز في المطعم): المنيو والإعدادات والتقارير' },
+  // ux-04: display screens (attached to a terminal; no sign-in of their own)
+  d_callboard: { name: 'شاشة النداء', short: 'شاشة النداء', en: 'Call board', shortEn: 'Call board', hint: 'شاشة أرقام الطلبات للعملاء: قيد التحضير وجاهز، تعمل مع شاشة التسليم' },
+  d_customer: { name: 'شاشة العميل', short: 'شاشة العميل', en: 'Customer display', shortEn: 'Customer display', hint: 'الشاشة المواجهة للعميل عند الكاشير: الأصناف والإجمالي والدفع' },
 };
 const SHORT_TO_ID: Record<string, string> = { T1: 't_cash', T2: 't_floor', K1: 't_kds', K2: 't_kds2', ADM: 't_admin', B2: 't_second_floor', BO: 'BO' };
 const KIND_NAME: Record<string, string> = { CASH: 'جهاز الكاشير', FLOOR: 'تابلت الويتر', KDS: 'شاشة المطبخ', ADMIN: 'كمبيوتر المدير' };
@@ -103,6 +106,8 @@ const DEVICE_HINT_EN: Record<string, string> = {
   t_cash2: 'A second cashier with a drawer for takeaway orders',
   t_kds2: 'The grill station screen: grill items only; “Ready” sends the order to the dispatch screen',
   BO: 'Management from any computer (no device in the restaurant): menu, settings and reports',
+  d_callboard: 'The order-number board for guests: preparing and ready, driven by the dispatch screen',
+  d_customer: 'The guest-facing screen at the cashier: items, total and payment',
 };
 
 /** A device id, a top-bar code (T1…) or a terminal code (DEMO-CASH-1, CASH-1…) → a plain device name. */

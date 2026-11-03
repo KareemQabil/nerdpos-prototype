@@ -29,11 +29,22 @@ export const SEEDED_LABELS: Record<string, { ar: string; en: string; short: stri
   t_cash2: { ar: 'كاشير التيك أواي', en: 'Takeaway cashier', short: 'T3' },
   t_kds2: { ar: 'شاشة المشويات', en: 'Grill screen', short: 'K2' },
   BO: { ar: 'باك أوفيس (من غير جهاز)', en: 'Back office (no terminal)', short: 'BO' },
+  d_callboard: { ar: 'شاشة النداء', en: 'Call board', short: 'CB' },
+  d_customer: { ar: 'شاشة العميل', en: 'Customer display', short: 'CD' },
 };
+
+/** ux-04: display screens are attached to a terminal (HDMI / second screen) and use its session — no sign-in of their
+ *  own. The call board follows the dispatch kitchen screen, the customer display a cashier terminal (both changeable). */
+export const DISPLAY_DEVICES: Record<string, { kind: 'CALLBOARD' | 'CUSTOMER'; host: string }> = {
+  d_callboard: { kind: 'CALLBOARD', host: 't_kds' },
+  d_customer: { kind: 'CUSTOMER', host: 't_cash' },
+};
+export const isDisplay = (id: string) => id in DISPLAY_DEVICES;
 
 export function deviceIds(): string[] {
   const ids = store.db.terminals.filter((t) => t.lifecycle === 'ACTIVE').map((t) => t.id);
-  return [...ids, 'BO'];
+  const displays = Object.entries(DISPLAY_DEVICES).filter(([, d]) => ids.includes(d.host)).map(([id]) => id);
+  return [...ids, 'BO', ...displays];
 }
 
 export function getDevice(id: string): DeviceState {
@@ -41,7 +52,7 @@ export function getDevice(id: string): DeviceState {
   if (existing) return existing;
   const t = store.db.terminals.find((x) => x.id === id);
   const kind = t?.kind;
-  const screen = kind === 'KDS' ? 'kitchen' : kind === 'FLOOR' ? 'floor' : kind === 'CASH' ? 'counter' : 'home';
+  const screen = isDisplay(id) ? 'display' : kind === 'KDS' ? 'kitchen' : kind === 'FLOOR' ? 'floor' : kind === 'CASH' ? 'counter' : 'home';
   const d: DeviceState = { id, terminalId: t ? t.id : null, branchId: t?.branchId ?? store.db.branches[0]?.id ?? null, token: null, userName: null, screen, params: {} };
   st.devices[id] = d;
   return d;

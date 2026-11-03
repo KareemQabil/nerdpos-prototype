@@ -29,6 +29,7 @@ import { ShortcutsOverlay } from './ShortcutsOverlay';
 import { StaffMealDialog, StaffMealsList } from '../control/StaffMeal';
 import { SalesChannelPicker } from '../channels/common';
 import { CustomerPicker } from '../customers/common';
+import { customerDisplay } from '../../app/customerDisplay';
 
 type Mode = 'sell' | 'collect';
 type NewType = 'TAKEAWAY' | 'DINE_IN';
@@ -99,6 +100,9 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
   };
   useEffect(() => () => { if (undoTimer.current) clearTimeout(undoTimer.current); }, []);
   useNow(30000);
+  // the customer display of this terminal mirrors the check on screen (lines and totals come from the server there)
+  useEffect(() => { customerDisplay.publish(deviceId, { orderId: order?.id ?? orderId ?? null, lastLineId: flash ?? null }); }, [deviceId, orderId, order?.id, order?.version, flash]);
+  useEffect(() => () => customerDisplay.publish(deviceId, { orderId: null, lastLineId: null, paying: null }), [deviceId]);
   const checkAction = useRef<((k: CheckDialog) => void) | null>(null);
   const moreRef = useRef<(() => void) | null>(null);
 

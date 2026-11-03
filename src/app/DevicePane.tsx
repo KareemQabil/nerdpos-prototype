@@ -4,7 +4,7 @@ import { hasPermission } from '../mock/types-channels'; // r3C
 import React, { Suspense, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { LogOut, Lock, KeyRound, Delete, ShieldAlert, WifiOff, RefreshCw, Monitor, CalendarDays, Clock3, Wallet, ShoppingCart, Armchair, ChefHat, Briefcase, Building2, Check, Zap, Inbox } from 'lucide-react';
 import { DeviceProvider, useQuery, useApprovals, useUnknowns, retryUnknown, errorText, type DevCtx, useDev } from './hooks';
-import { devices, deviceLabel, useDevicesState } from './devices';
+import { devices, deviceLabel, useDevicesState, isDisplay } from './devices';
 import { screenById, type Kind } from './registry';
 import { call, ApiFailure } from '../api/client';
 import { demo } from '../mock/demo';
@@ -40,7 +40,15 @@ function useWidth<T extends HTMLElement>() {
   return [ref, w] as const;
 }
 
+const DisplayPane = React.lazy(() => import('../screens/display/DisplayPane'));
+
 export function DevicePane({ id, compact }: { id: string; compact?: boolean }) {
+  // ux-04: a display screen (call board, customer display) has no sign-in, sidebar or header of its own
+  if (isDisplay(id)) return <div onPointerDownCapture={() => markPane(id)} className="device-frame h-full flex flex-col min-w-0 rounded-2xl overflow-hidden border border-[var(--glass-border)]" data-device={id}><Suspense fallback={<div className="flex-1 flex items-center justify-center"><Spinner /></div>}><DisplayPane id={id} /></Suspense></div>;
+  return <TerminalPane id={id} compact={compact} />;
+}
+
+function TerminalPane({ id, compact }: { id: string; compact?: boolean }) {
   const ds = useDevicesState();
   const d = ds.devices[id] ?? devices.get(id);
   const auth = devices.auth(id);

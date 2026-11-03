@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useSyncExternalStore } from 'react';
-import { Columns2, SlidersHorizontal, MessageSquarePlus, ScrollText, PlayCircle, FlaskConical, Languages, Box, Library, HelpCircle, Code2, Armchair, ShoppingCart, ChefHat, Briefcase, Building2, Monitor, MoreHorizontal, WifiOff, Sun, Moon, Gem, X } from 'lucide-react';
+import { Columns2, SlidersHorizontal, MessageSquarePlus, ScrollText, PlayCircle, FlaskConical, Languages, Box, Library, HelpCircle, Code2, Armchair, ShoppingCart, ChefHat, Briefcase, Building2, Monitor, MoreHorizontal, WifiOff, Sun, Moon, Gem, X, Tv, MonitorSmartphone } from 'lucide-react';
 import { DevicePane } from './app/DevicePane';
-import { devices, deviceIds, deviceLabel, useDevicesState } from './app/devices';
+import { devices, deviceIds, deviceLabel, useDevicesState, isDisplay, DISPLAY_DEVICES } from './app/devices';
 import { useStoreVersion } from './app/hooks';
 import { Toasts, ConfirmHost } from './ui';
 import { t, setLang, useLang } from './i18n';
@@ -22,7 +22,7 @@ import { Popover } from './demo/Popover';
 import { sim } from './mock/sim';
 
 type Panel = null | 'policy' | 'feedback' | 'log' | 'walk' | 'scenarios';
-const KIND_ICON: Record<string, React.ElementType> = { CASH: ShoppingCart, FLOOR: Armchair, KDS: ChefHat, ADMIN: Briefcase, BO: Building2 };
+const KIND_ICON: Record<string, React.ElementType> = { CASH: ShoppingCart, FLOOR: Armchair, KDS: ChefHat, ADMIN: Briefcase, BO: Building2, CALLBOARD: Tv, CUSTOMER: MonitorSmartphone };
 
 export default function App() {
   useStoreVersion();
@@ -56,9 +56,11 @@ export default function App() {
           {ids.map((id) => {
             const overflow = !CORE_DEVICES.includes(id);
             const on = id === primary || (ds.split && id === secondary);
+            if (isDisplay(id) && !on) return null; // display screens live under their own menu
             return <DeviceBtn key={id} id={id} on={on} primary={id === primary} className={overflow && !on ? 'hidden min-[1560px]:flex' : undefined} />;
           })}
-          {ids.some((id) => !CORE_DEVICES.includes(id) && !(id === primary || (ds.split && id === secondary))) && <MoreDevices ids={ids.filter((id) => !CORE_DEVICES.includes(id))} />}
+          {ids.some((id) => !CORE_DEVICES.includes(id) && !isDisplay(id) && !(id === primary || (ds.split && id === secondary))) && <MoreDevices ids={ids.filter((id) => !CORE_DEVICES.includes(id) && !isDisplay(id))} />}
+          {ids.some(isDisplay) && <MoreDevices ids={ids.filter(isDisplay)} displays />}
           <button data-fb="device-split" data-on={ds.split} onClick={() => devices.setSplit(!ds.split)} title={t('اعرض جهازين جنب بعض — مثلًا الويتر والمطبخ')} className="chrome-btn ms-0.5"><Columns2 className="w-4 h-4" /><span className="hidden min-[1800px]:inline">{t('جهازين')}</span></button>
         </div>
         <div className="flex-1 min-w-2" />
@@ -120,9 +122,10 @@ function Divider() { return <span className="w-px h-6 bg-[var(--line)] shrink-0 
 function deviceInfo(id: string, lang: 'ar' | 'en', tech: boolean) {
   const ds = devices.state();
   const l = deviceLabel(id, lang);
-  const d = ds.devices[id];
+  const disp = isDisplay(id) ? DISPLAY_DEVICES[id] : null; // ux-04: a display uses its host terminal's session
+  const d = ds.devices[disp ? disp.host : id];
   const term = store.db.terminals.find((x) => x.id === id);
-  const kind = term?.kind ?? 'BO';
+  const kind = disp ? disp.kind : term?.kind ?? 'BO';
   const Icon = KIND_ICON[kind] ?? Monitor;
   const name = (lang === 'en' ? DEVICE_NAMES[id]?.shortEn ?? DEVICE_NAMES[id]?.en : DEVICE_NAMES[id]?.short) ?? deviceName(id, kind, term?.name);
   const who = d?.token ? personName(null, d.userName) : null;
@@ -149,15 +152,17 @@ function DeviceBtn({ id, on, primary, className }: { id: string; on: boolean; pr
   );
 }
 
-function MoreDevices({ ids }: { ids: string[] }) {
+function MoreDevices({ ids, displays }: { ids: string[]; displays?: boolean }) {
   const lang = useLang();
   const tech = useTech();
   return (
-    <span className="min-[1560px]:hidden">
-      <Popover width={300} title={t("أجهزة تانية: الفرع التاني وكاشير التيك أواي وأي جهاز جديد")} button={(o) => <button data-fb="device-more" data-on={o} className="chrome-btn"><MoreHorizontal className="w-4 h-4" /><span className="sr-only">{t('أجهزة تانية')}</span></button>}>
+    <span className={displays ? undefined : 'min-[1560px]:hidden'}>
+      <Popover width={300} title={displays ? t('شاشات العرض: شاشة النداء وشاشة العميل') : t("أجهزة تانية: الفرع التاني وكاشير التيك أواي وأي جهاز جديد")} button={(o) => displays
+        ? <button data-fb="device-displays" data-on={o} className="chrome-btn"><Tv className="w-4 h-4" /><span className="sr-only">{t('شاشات العرض')}</span></button>
+        : <button data-fb="device-more" data-on={o} className="chrome-btn"><MoreHorizontal className="w-4 h-4" /><span className="sr-only">{t('أجهزة تانية')}</span></button>}>
         {(close) => (
           <div className="space-y-1">
-            <div className="text-xs font-bold text-soft mb-1">{t('أجهزة تانية')}</div>
+            <div className="text-xs font-bold text-soft mb-1">{displays ? t('شاشات العرض') : t('أجهزة تانية')}</div>
             {ids.map((id) => {
               const { Icon, name, who, tip } = deviceInfo(id, lang, tech);
               return (

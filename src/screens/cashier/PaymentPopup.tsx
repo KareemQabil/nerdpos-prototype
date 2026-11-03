@@ -15,6 +15,7 @@ import { changePreview, sign, plainAmount, quickCash } from '../../lib/cash';
 import { tenderLabel, tenderGroupLabel, providerLabel } from '../../demo/tenderText';
 import { LoyaltyRedeemBox, EarnedNote } from '../customers/PayExtras';
 import { Tech } from '../../app/tech';
+import { customerDisplay } from '../../app/customerDisplay';
 
 type Method = 'CASH' | 'CARD' | 'DIGITAL_WALLET' | 'ONLINE' | 'LOYALTY' | 'DEPOSIT';
 const ICON: Record<Method, React.ReactElement> = { CASH: <Banknote />, CARD: <CreditCard />, DIGITAL_WALLET: <Smartphone />, ONLINE: <Globe />, LOYALTY: <Star />, DEPOSIT: <PiggyBank /> };
@@ -75,6 +76,13 @@ export function PaymentPopup({ orderId, onClose, onNext }: { orderId: string; on
   const paidSome = !draft && s && s.paid !== '0.0000';
   const canPay = plain && !busy && !unknown && !over && sign(value) > 0 && !(refRule === 'REQUIRED' && !ref.trim()) && !done;
 
+  // the customer display shows what is being paid: due, the amount typed, change (same Decimal preview as here)
+  useEffect(() => {
+    if (!order || done) return;
+    customerDisplay.publish(auth.deviceId, { orderId, paying: { method, walletProvider: method === 'DIGITAL_WALLET' ? provider : null, due, entered: value, change, short } });
+  }, [auth.deviceId, orderId, !!order, done, method, provider, due, value, change, short]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (done) customerDisplay.publish(auth.deviceId, { orderId, paying: null, paid: { orderId, change: done.change, method, at: Date.now() } }); }, [done]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => customerDisplay.publish(auth.deviceId, { paying: null }), [auth.deviceId]);
   const pick = (m: Method) => { setMethod(m); setEntry(''); setErr(null); };
   const key = (k: NumpadKey) => { setErr(null); setEntry((cur) => applyNumpadKey(cur, k)); };
 
