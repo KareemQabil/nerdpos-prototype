@@ -201,15 +201,15 @@ export const orderHandlers: Record<string, Handler> = {
     const unit = ctx.db.units.find((u) => u.id === ctx.db.products.find((p) => p.id === line!.productId)?.unitId);
     if (unit && D(qty).decimalPlaces() > unit.precision) throw new ApiError('QUANTITY_PRECISION_UNSUPPORTED', { precision: unit.precision });
     const before = line!.quantity;
-    // r3A: reducing the quantity removes units — same stage authority and trace as removing the line
+    // Owner decision (ux-03): lowering the quantity of an UNSENT line is not a void — no approval and no reason are
+    // required; it is still written to the check history, the audit and the reversal trace. Removing the whole line
+    // (Order.RemoveLine) keeps the removal rule, and a sent line is changed only by Order.VoidLine (LINE_VOID approval).
     let cut: { stage: 'S0' | 'S1'; g: any; qty: string; value: string } | null = null;
     if (D(qty).lt(D(before))) {
       const stage = lineStage(o, line!);
       const q = D(before).minus(D(qty)).toString();
       const value = m4(D(line!.unitTotal).times(q));
-      if (stage === 'S1') reasonCheck(ctx, 'LINE_VOID', ctx.body.reasonCode, ctx.body.reason);
-      const g = ctx.requireApproval({ action: STAGE_ACTION[stage], targetType: 'orders.OrderLine', targetId: line!.id, context: { orderId: o.id, lineId: line!.id, lineVersion: line!.version, quantity: q, lineAmount: value, stage, reasonCode: ctx.body.reasonCode ?? null, fromQuantity: before, toQuantity: q6(qty) }, grantId: ctx.body.approvalGrantId });
-      cut = { stage, g, qty: q, value };
+      cut = { stage, g: null, qty: q, value };
     }
     if (ctx.body.modifiers) {
       const fresh = newLine(ctx, o, { productId: line!.productId, quantity: qty, modifiers: ctx.body.modifiers, variantId: line!.variant?.id, note: ctx.body.note ?? line!.note });
@@ -224,7 +224,7 @@ export const orderHandlers: Record<string, Handler> = {
       recordReversal(ctx, { o, line: line!, quantity: cut.qty, value: cut.value, stage: cut.stage, kind: 'QTY_DECREASE', grant: cut.g, reasonCode: ctx.body.reasonCode, reason: ctx.body.reason, disposition: 'NOT_PREPARED' });
       ctx.audit(`qty ${line!.name.en} ${before} → ${line!.quantity} on ${o.number}`, line!.id, true, cut.g?.id, { stage: cut.stage });
     }
-    bump(ctx, o, 'LINE_UPDATED', { ar: `${line!.name.ar}: الكمية ${before} ← ${line!.quantity}${cut ? ` — ${approvedText(ctx.db, cut.g)}` : ''}`, en: `${line!.name.en}: qty ${before} → ${line!.quantity}` }, cut ? { stage: cut.stage, grantId: cut.g?.id, approverId: cut.g?.approverUserId } : undefined);
+    bump(ctx, o, 'LINE_UPDATED', { ar: `${line!.name.ar}: الكمية ${before} ← ${line!.quantity}${cut ? ' — تقليل كمية قبل الإرسال (من غير موافقة)' : ''}`, en: `${line!.name.en}: qty ${before} → ${line!.quantity}${cut ? ' (decrease before sending, no approval)' : ''}` }, cut ? { stage: cut.stage, grantId: cut.g?.id, approverId: cut.g?.approverUserId } : undefined);
     return orderView(ctx.db, o);
   },
   'Order.RemoveLine': (ctx) => {
@@ -394,7 +394,30 @@ export const orderHandlers: Record<string, Handler> = {
     reasonCheck(ctx, 'LINE_VOID', ctx.body.reasonCode, ctx.body.reason);
     // r3A: disposition of the item (short vs long void) — bound to the approval so the manager sees it
     const disp = voidDisposition(ctx.db, line!, checkDisposition(ctx.body.disposition));
-    const g = ctx.requireApproval({ action: 'LINE_VOID', targetType: 'orders.OrderLine', targetId: line!.id, context: { orderId: o.id, lineId: line!.id, lineVersion: line!.version, reasonCode: ctx.body.reasonCode, lineAmount: line!.lineTotal, fireRound: line!.fireRound, ...(ctx.body.disposition ? { disposition: disp, stage: 'S1' } : {}) }, grantId: ctx.body.approvalGrantId });
+    // ux-03 owner decision: lowering the quantity of a SENT line is a partial void (optional `quantity` = units voided)
+    const part = ctx.body.quantity !== undefined && ctx.body.quantity !== null ? String(ctx.body.quantity) : null;
+    if (part !== null) {
+      if (!isMoney(part) || D(part).lte(0) || D(part).gt(D(line!.quantity))) throw new ApiError('VALIDATION_FAILED', { field: 'quantity', rule: '0 < quantity <= line quantity' });
+    }
+    const partial = part !== null && D(part).lt(D(line!.quantity));
+    const voidValue = partial ? m4(D(line!.unitTotal).times(D(part!))) : line!.lineTotal;
+    const g = ctx.requireApproval({ action: 'LINE_VOID', targetType: 'orders.OrderLine', targetId: line!.id, context: { orderId: o.id, lineId: line!.id, lineVersion: line!.version, reasonCode: ctx.body.reasonCode, lineAmount: voidValue, fireRound: line!.fireRound, ...(partial ? { quantity: q6(part!), fromQuantity: line!.quantity } : {}), ...(ctx.body.disposition ? { disposition: disp, stage: 'S1' } : {}) }, grantId: ctx.body.approvalGrantId });
+    if (partial) {
+      // the voided units become their own VOIDED line (history stays immutable); the sent line keeps the rest
+      const rest = q6(D(line!.quantity).minus(D(part!)).toString());
+      const cut: OrderLine = { ...line!, id: nextId('line'), quantity: q6(part!), lineTotal: voidValue, version: 1, kitchenMods: [], status: 'VOIDED' };
+      cut.voided = { at: ctx.nowIso, by: ctx.user!.id, reasonCode: ctx.body.reasonCode, reason: ctx.body.reason, approvalGrantId: g?.id, disposition: legacyDisposition(disp), approverId: g?.approverUserId, dispositionKind: disp, stage: 'S1', terminal: ctx.terminal?.code ?? null, byName: userName(ctx.db, ctx.user!.id), approverName: g ? userName(ctx.db, g.approverUserId) : null };
+      line!.quantity = rest;
+      line!.lineTotal = m4(D(line!.unitTotal).times(D(rest)));
+      line!.version++;
+      o.lines.splice(o.lines.indexOf(line!) + 1, 0, cut);
+      for (const tk of ctx.db.tickets.filter((x) => x.orderId === o.id)) for (const it of tk.items) if (it.lineId === line!.id && it.status === 'ACTIVE') { it.quantity = rest; it.mods = [...(it.mods ?? []), { at: ctx.nowIso, text: `-${q6(part!)}` }]; tk.version++; }
+      recordReversal(ctx, { o, line: cut, quantity: cut.quantity, value: voidValue, stage: 'S1', kind: 'LINE_VOID', grant: g, reasonCode: ctx.body.reasonCode, reason: ctx.body.reason, disposition: disp });
+      bump(ctx, o, 'LINE_VOIDED', { ar: `اتلغى جزء بعد الإرسال: ${line!.name.ar} ×${cut.quantity} من ${D(rest).plus(D(part!)).toString()} (${ctx.body.reasonCode}) — ${DISP_AR[disp]} — ${approvedText(ctx.db, g)}`, en: `partial void of fired line ${line!.name.en} ×${cut.quantity}` }, { lineId: line!.id, voidLineId: cut.id, stage: 'S1', disposition: disp, grantId: g?.id, approverId: g?.approverUserId });
+      ctx.audit(`partial line void ${line!.name.en} ×${cut.quantity} on ${o.number}`, line!.id, true, g?.id, { stage: 'S1' });
+      event('OrderLineVoided', o.id, `${o.number} ${line!.name.en} ×${cut.quantity}`);
+      return orderView(ctx.db, o);
+    }
     line!.status = 'VOIDED';
     line!.version++;
     line!.voided = { at: ctx.nowIso, by: ctx.user!.id, reasonCode: ctx.body.reasonCode, reason: ctx.body.reason, approvalGrantId: g?.id, disposition: legacyDisposition(disp), approverId: g?.approverUserId, dispositionKind: disp, stage: 'S1', terminal: ctx.terminal?.code ?? null, byName: userName(ctx.db, ctx.user!.id), approverName: g ? userName(ctx.db, g.approverUserId) : null };
