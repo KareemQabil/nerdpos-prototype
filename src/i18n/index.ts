@@ -60,9 +60,28 @@ const LABEL_FRAGMENTS: [RegExp, string][] = [
   [/^تسوية /g, 'Settlement '], [/ عملية\)/g, ' transactions)'], [/^درج /g, 'Drawer '], [/^من /g, 'from '], [/(\d) م$/g, '$1 PM'], [/(\d) ص$/g, '$1 AM'],
   [/^مبيعات يوم (\S+) \(بيانات العرض\)$/g, 'Sales on $1 (demo data)'], [/^خبز-/g, 'BREAD-'],
 ];
-/** Translate a server-made label: a whole known string via en.ts, otherwise known fragments. Arabic mode returns it unchanged. */
+// Arabic mode: server-made labels/values use the glossary terms (docs/ux/WRITING_GUIDE.md). A whole known string comes
+// from arMsa; otherwise colloquial glossary words are swapped (an optional و/ف + بال/لل/كال/ال/ب/ل/ك prefix is kept).
+const AR_L = 'ء-ي';
+const arTerm = (from: string, to: string): [RegExp, string] => [new RegExp(`(?<![${AR_L}])([وف]?(?:بال|لل|كال|ال|ب|ل|ك)?)${from}(?![${AR_L}])`, 'g'), `$1${to}`];
+const AR_GLOSSARY: [RegExp, string][] = [
+  [/إقفال يوم /g, 'إغلاق يوم '], [/من غير إيصال/g, 'بلا إيصال'], [/من غير درج/g, 'بلا درج'],
+  // Owner decision: شيك، ترابيزة، ويتر، تيك أواي، دليفري، طيار stay as they are; only non-owner colloquial words are swapped.
+  arTerm('ويترية', 'ويترز'), arTerm('منيوهات', 'قوائم'), arTerm('منيو', 'قائمة'), arTerm('سيستم', 'نظام'),
+];
+function arLabel(v: string): string {
+  if (!v || !AR_RE.test(v)) return v;
+  const known = arMsa[v];
+  if (known) return known;
+  let s = v;
+  for (const [re, rep] of AR_GLOSSARY) s = s.replace(re, rep);
+  return s;
+}
+
+/** Translate a server-made label: a whole known string via en.ts, otherwise known fragments. Arabic mode applies the glossary pass. */
 export function tLabel(v: string | null | undefined): string {
-  if (!v || lang !== 'en') return v ?? '';
+  if (!v) return v ?? '';
+  if (lang !== 'en') return arLabel(v);
   if (en[v]) return en[v];
   let s = v;
   for (const [re, rep] of LABEL_FRAGMENTS) s = s.replace(re, rep);
@@ -72,8 +91,8 @@ export function tLabel(v: string | null | undefined): string {
 /** Pick a localized server value {ar, en}. */
 export function L(v: { ar?: string; en?: string } | string | null | undefined): string {
   if (!v) return '';
-  if (typeof v === 'string') return v;
-  return (lang === 'en' ? v.en || (v.ar && en[v.ar]) || miss(v.ar ?? '') : v.ar || v.en) ?? '';
+  if (typeof v === 'string') return lang === 'en' ? v : arLabel(v);
+  return (lang === 'en' ? v.en || (v.ar && en[v.ar]) || miss(v.ar ?? '') : arLabel(v.ar || v.en || '')) ?? '';
 }
 
 // initialise document direction
