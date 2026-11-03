@@ -116,7 +116,7 @@ function Tile({ icon, label, onClick, proposed, fb }: { icon: React.ReactNode; l
   return (
     <button onClick={onClick} data-fb={fb} className="relative min-h-[76px] rounded-2xl border border-[var(--glass-border)] surface-1 hover:bg-[var(--surface-2)] flex flex-col items-center justify-center gap-1.5 px-2 text-sm font-bold text-center [&>svg]:w-5 [&>svg]:h-5 [&>svg]:text-[var(--primary)]">
       {icon}<span className="leading-tight">{label}</span>
-      {proposed && <span className="absolute top-2 end-2 w-1.5 h-1.5 rounded-full" style={{ background: 'var(--violet)' }} title={t('مقترح')} />}
+      {proposed && <Tech><span className="absolute top-2 end-2 w-1.5 h-1.5 rounded-full" style={{ background: 'var(--violet)' }} title={t('مقترح')} /></Tech>}
     </button>
   );
 }

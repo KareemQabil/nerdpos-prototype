@@ -78,14 +78,14 @@ function NewReservation({ drawer, onClose }: { drawer: boolean; onClose: () => v
     if (r) onClose();
   };
   return (
-    <Drawer open onClose={onClose} title={t('حجز جديد')} badge={<Pill tone="violet" size="sm">{t('مقترح')}</Pill>} width="md" icon={<CalendarPlus />}
+    <Drawer open onClose={onClose} title={t('حجز جديد')} badge={<Tech><Pill tone="violet" size="sm">{t('مقترح')}</Pill></Tech>} width="md" icon={<CalendarPlus />}
       footer={<><Button variant="ghost" onClick={onClose}>{t('رجوع')}</Button><Button variant="primary" size="lg" loading={busy} disabled={!f.customer || !f.phone} onClick={create} data-fb="reservation-create">{t('احجز')}</Button></>}>
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <Field label={t('الاسم')} required><Input value={f.customer} onChange={(e) => setF({ ...f, customer: e.target.value })} /></Field>
-          <Field label={<span className="flex items-center gap-1"><Phone className="w-3 h-3" />{t('الموبايل')}</span>} required><Input value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} className="num" dir="ltr" inputMode="tel" /></Field>
+          <Field icon={<Phone />} label={t('الموبايل')} required><Input value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} className="num" dir="ltr" inputMode="tel" /></Field>
         </div>
-        <Field label={<span className="flex items-center gap-1"><Users className="w-3 h-3" />{t('عدد الأفراد')}</span>}>
+        <Field icon={<Users />} label={t('عدد الأفراد')}>
           <div className="flex gap-1.5 flex-wrap">{['2', '3', '4', '5', '6', '8', '10'].map((n) => <button key={n} onClick={() => setF({ ...f, partySize: n })} className={f.partySize === n ? 'w-11 h-11 rounded-xl font-bold num bg-[var(--primary)] text-[var(--primary-foreground)]' : 'w-11 h-11 rounded-xl font-bold num surface-1 border border-[var(--glass-border)]'}>{n}</button>)}</div>
         </Field>
         <div className="grid grid-cols-2 gap-3">

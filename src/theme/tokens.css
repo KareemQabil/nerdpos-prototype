@@ -19,8 +19,9 @@
   --color-warning: var(--warning);
   --color-error: var(--error);
   --color-info: var(--info);
-  --font-sans: 'Almarai', 'Inter', system-ui, sans-serif;
-  --font-numbers: 'Arial', 'Inter', sans-serif;
+  --font-sans: 'IBM Plex Sans Arabic', 'Noto Sans Arabic', 'Segoe UI', Tahoma, system-ui, sans-serif;
+  --font-display: 'Almarai', 'IBM Plex Sans Arabic', 'Noto Sans Arabic', 'Segoe UI', Tahoma, sans-serif;
+  --font-numbers: 'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, system-ui, sans-serif;
   --animate-fade-in: fade-in 0.2s ease-out;
   --animate-scale-in: scale-in 0.2s ease-out;
   --animate-slide-up: slide-up 0.3s ease-out;
@@ -189,14 +190,19 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 html, body, #root { height: 100%; }
-html { font-family: 'Almarai', 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+html { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; font-feature-settings: 'tnum' 1; }
+/* Almarai is for headings and display text only */
+h1, h2, h3, .font-display { font-family: var(--font-display); }
 body { margin: 0; background: var(--app-bg); color: var(--foreground); }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
 input, select, textarea { font: inherit; color: inherit; }
 
-/* Numbers and prices are always LTR, Arial */
-.num, [data-numeric] { direction: ltr; unicode-bidi: isolate; font-family: 'Arial', 'Inter', sans-serif; font-variant-numeric: tabular-nums; }
+/* Numbers and prices are always LTR with tabular figures (IBM Plex Sans Arabic) */
+.num, [data-numeric] { direction: ltr; unicode-bidi: isolate; font-family: var(--font-numbers); font-variant-numeric: tabular-nums; }
+/* An amount: number and currency on one baseline, currency smaller; follows the reading direction (RTL: number first). */
+.amount { display: inline-flex; align-items: baseline; gap: .28em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.amount > .amount-unit { font-size: .58em; font-weight: 600; color: var(--text-soft); letter-spacing: 0; }
 
 /* Component classes live in the components layer so Tailwind utilities (ps-9, py-1, bg-…) can override them. */
 @layer components {
@@ -206,6 +212,7 @@ input, select, textarea { font: inherit; color: inherit; }
   .glass-light { background: var(--glass-bg-light); backdrop-filter: blur(16px); border: 1px solid var(--glass-border); }
   .glass-overlay { background: rgba(0,0,0,.55); backdrop-filter: blur(4px); }
   .glass-input { background: var(--surface-1); border: 1px solid var(--border); border-radius: .75rem; padding: .55rem .8rem; min-height: 2.5rem; transition: border-color .15s ease, box-shadow .15s ease, background .15s ease; outline: none; }
+  input.glass-input:not([type="checkbox"]):not([type="radio"]), select.glass-input { height: 2.625rem; padding-top: 0; padding-bottom: 0; }
   .glass-input:hover:not(:disabled):not(:focus) { border-color: color-mix(in srgb, var(--primary) 35%, var(--border)); }
   .glass-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow-dim); background: var(--surface-2); }
   .glass-input:disabled { opacity: .55; cursor: not-allowed; }
@@ -266,7 +273,7 @@ input, select, textarea { font: inherit; color: inherit; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
 
 /* Receipt paper */
-.paper { background: #fffef8; color: #111; font-family: 'Almarai', 'Arial', sans-serif; }
+.paper { background: #fffef8; color: #111; font-family: var(--font-sans); }
 .paper .num { font-family: 'Courier New', monospace; }
 
 @layer components {

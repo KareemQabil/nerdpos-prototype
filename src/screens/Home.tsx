@@ -119,19 +119,19 @@ function SalesToday({ bd, daily }: { bd: string; daily: ReturnType<typeof useQue
     <div className="space-y-4">
       <StatGrid>
         <StatCard fb="home:kpi:net_sales" label={t('صافي المبيعات النهارده')} tone="primary" icon={<TrendingUp className="w-4 h-4" />} onClick={() => nav('reports')}
-          value={loading ? <Skeleton className="h-7 w-28" /> : <span className="num">{fmt(netToday)} <span className="text-sm font-normal text-dim">{t('جنيه')}</span></span>}
+          loading={loading} value={fmt(netToday)} unit={t('جنيه')}
           hint={netToday ? <span className="flex flex-col gap-0.5"><Delta now={netToday} before={ydSoFar} label={t('عن امبارح لحد نفس الساعة')} /><Delta now={netToday} before={lwSoFar} label={t('عن نفس اليوم الأسبوع اللي فات')} /></span>
             : <span className="flex flex-col gap-0.5"><span>{t('لسه مفيش بيع النهارده')}</span><span>{t('امبارح لحد نفس الساعة: {m} جنيه', { m: fmt(ydSoFar) })}</span></span>} />
         <StatCard fb="home:kpi:order_count" label={t('عدد الشيكات المقفولة')} icon={<Receipt className="w-4 h-4" />}
-          value={loading ? <Skeleton className="h-7 w-16" /> : <span className="num">{ordersToday}</span>}
+          loading={loading} value={ordersToday}
           hint={ordersToday ? <span className="flex flex-col gap-0.5"><Delta now={ordersToday} before={ydOrdersSoFar} label={t('عن امبارح لحد نفس الساعة')} /><Delta now={ordersToday} before={lwOrdersSoFar} label={t('عن نفس اليوم الأسبوع اللي فات')} /></span>
             : <span className="flex flex-col gap-0.5"><span>{t('امبارح لحد نفس الساعة: {n} شيك', { n: ydOrdersSoFar })}</span><span>{t('امبارح كله: {n} شيك', { n: yday?.orders ?? 0 })}</span></span>} />
         <StatCard fb="home:kpi:average_order_value" label={t('متوسط الشيك')} icon={<Wallet className="w-4 h-4" />}
-          value={loading ? <Skeleton className="h-7 w-20" /> : <span className="num">{fmt(avgToday)} <span className="text-sm font-normal text-dim">{t('جنيه')}</span></span>}
+          loading={loading} value={fmt(avgToday)} unit={t('جنيه')}
           hint={avgToday ? <span className="flex flex-col gap-0.5"><Delta now={avgToday} before={avg(yday)} label={t('عن متوسط امبارح')} /><Delta now={avgToday} before={avg(lastWeek)} label={t('عن نفس اليوم الأسبوع اللي فات')} /></span>
             : <span className="flex flex-col gap-0.5"><span>{t('متوسط امبارح: {m} جنيه', { m: fmt(avg(yday)) })}</span><span>{t('الأسبوع اللي فات: {m} جنيه', { m: fmt(avg(lastWeek)) })}</span></span>} />
         <StatCard fb="home:kpi:outstanding" label={t('شيكات مستنية الدفع')} icon={<Hourglass className="w-4 h-4" />} tone={outstanding.length ? 'warning' : 'neutral'} onClick={() => nav('checks')}
-          value={loading ? <Skeleton className="h-7 w-16" /> : <span className="num">{outstanding.length}</span>}
+          loading={loading} value={outstanding.length}
           hint={outstanding.length ? t('عليها {m} لسه ما اتدفعتش', { m: money(String(outstandingSum)) }) : t('كل الشيكات اللي اتأكدت اتدفعت')} />
       </StatGrid>
       <div className="grid xl:grid-cols-[1.5fr_1fr] gap-4">
