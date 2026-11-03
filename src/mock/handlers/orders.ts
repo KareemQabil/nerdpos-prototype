@@ -211,9 +211,22 @@ export const orderHandlers: Record<string, Handler> = {
       const value = m4(D(line!.unitTotal).times(q));
       cut = { stage, g: null, qty: q, value };
     }
-    if (ctx.body.modifiers) {
-      const fresh = newLine(ctx, o, { productId: line!.productId, quantity: qty, modifiers: ctx.body.modifiers, variantId: line!.variant?.id, note: ctx.body.note ?? line!.note });
-      Object.assign(line!, { quantity: fresh.quantity, unitPrice: fresh.unitPrice, modifiers: fresh.modifiers, unitTotal: fresh.unitTotal, lineTotal: fresh.lineTotal, priceRuleId: fresh.priceRuleId });
+    // ux-04 extension: the size (variant) of an UNSENT line may change; the server re-prices it with the same options.
+    // A sent line never reaches here (LINE_ALREADY_FIRED above): changing it is a void + a new line, with its approval.
+    const beforeVariant = line!.variant ?? null;
+    let variantId: string | undefined = line!.variant?.id;
+    if (ctx.body.variantId !== undefined && ctx.body.variantId !== (line!.variant?.id ?? null)) {
+      const product = ctx.db.products.find((p) => p.id === line!.productId);
+      const v = (product?.variants ?? []).find((x) => x.id === ctx.body.variantId && x.active);
+      need(v, 'VALIDATION_FAILED', { field: 'variantId', rule: 'an active size of this item' });
+      need(!(line!.children ?? []).length, 'VALIDATION_FAILED', { field: 'variantId', rule: 'a combo or half-and-half line is removed and added again' });
+      variantId = v!.id;
+    }
+    const variantChanged = variantId !== (line!.variant?.id ?? undefined);
+    if (ctx.body.modifiers || variantChanged) {
+      const keep = !ctx.body.modifiers ? (line!.modifiers ?? []) : null; // a size change keeps the options and their levels
+      const fresh = newLine(ctx, o, { productId: line!.productId, quantity: qty, modifiers: ctx.body.modifiers ?? keep, variantId, note: ctx.body.note ?? line!.note, ...(keep ? { modifierLevels: Object.fromEntries(keep.filter((m: any) => m.level).map((m: any) => [m.optionId, m.level])) } : {}) });
+      Object.assign(line!, { quantity: fresh.quantity, unitPrice: fresh.unitPrice, modifiers: fresh.modifiers, unitTotal: fresh.unitTotal, lineTotal: fresh.lineTotal, priceRuleId: fresh.priceRuleId, variant: fresh.variant, children: fresh.children, taxSplit: fresh.taxSplit });
     } else {
       line!.quantity = q6(qty);
       line!.lineTotal = m4(D(line!.unitTotal).times(D(qty)));
@@ -224,6 +237,12 @@ export const orderHandlers: Record<string, Handler> = {
       recordReversal(ctx, { o, line: line!, quantity: cut.qty, value: cut.value, stage: cut.stage, kind: 'QTY_DECREASE', grant: cut.g, reasonCode: ctx.body.reasonCode, reason: ctx.body.reason, disposition: 'NOT_PREPARED' });
       ctx.audit(`qty ${line!.name.en} ${before} → ${line!.quantity} on ${o.number}`, line!.id, true, cut.g?.id, { stage: cut.stage });
     }
+    if (variantChanged) {
+      const from = beforeVariant?.name ?? { ar: '—', en: '—' }, to = line!.variant?.name ?? { ar: '—', en: '—' };
+      bump(ctx, o, 'LINE_UPDATED', { ar: `${line!.name.ar}: المقاس ${from.ar} ← ${to.ar} (قبل الإرسال)`, en: `${line!.name.en}: size ${from.en} → ${to.en} (before sending)` }, { field: 'variant', from: beforeVariant?.id ?? null, to: line!.variant?.id ?? null });
+      ctx.audit(`size ${line!.name.en} ${from.en} → ${to.en} on ${o.number}`, line!.id);
+    }
+    if (D(qty).eq(D(before)) && variantChanged) return orderView(ctx.db, o);
     bump(ctx, o, 'LINE_UPDATED', { ar: `${line!.name.ar}: الكمية ${before} ← ${line!.quantity}${cut ? ' — تقليل كمية قبل الإرسال (من غير موافقة)' : ''}`, en: `${line!.name.en}: qty ${before} → ${line!.quantity}${cut ? ' (decrease before sending, no approval)' : ''}` }, cut ? { stage: cut.stage, grantId: cut.g?.id, approverId: cut.g?.approverUserId } : undefined);
     return orderView(ctx.db, o);
   },

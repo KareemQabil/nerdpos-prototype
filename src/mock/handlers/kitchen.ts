@@ -71,9 +71,9 @@ export const kitchenHandlers: Record<string, Handler> = {
       .filter((t) => !merged.has(t.id) && (!ctx.query.stationId || t.stationId === ctx.query.stationId) && (!mine || ctx.query.allStations === 'true' || mine.has(t.stationId) || (screen.dispatch && screen.isKds)) && (!states || states.includes(t.state)))
       .filter((t) => !doneWithin || t.state !== 'DONE' || (t.doneAt && ctx.now - Date.parse(t.doneAt) <= doneWithin * 60000))
       .filter((t) => ctx.db.stations.find((s) => s.id === t.stationId)?.branchId === ctx.branchId)
-      .map((t) => ({ ...ticketView(ctx, t, kt), onMyScreen: !mine || mine.has(t.stationId) })) // a dispatch screen also sees the other stations' tickets (consolidated hand-off)
+      .map((t) => withScreenTiming({ ...ticketView(ctx, t, kt), onMyScreen: !mine || mine.has(t.stationId) }, screen)) // a dispatch screen also sees the other stations' tickets (consolidated hand-off)
       .sort((a, b) => (a.priority === 'RUSH' ? 0 : 1) - (b.priority === 'RUSH' ? 0 : 1) || a.createdAtMs - b.createdAtMs);
-    return { ...page(items, ctx.query), timing: kt, refireReasons: REFIRE_REASONS, screen };
+    return { ...page(items, ctx.query), timing: screen.warnMinutes && screen.lateMinutes ? { targetMinutes: screen.warnMinutes, alertMinutes: screen.lateMinutes, fromScreen: true } : kt, refireReasons: REFIRE_REASONS, screen };
   },
   // ───────── round 3: kitchen screens (F3-02, F2-06, E04–E06)
   'KdsScreen.List': (ctx) => ({ items: ctx.db.terminals.filter((t) => t.kind === 'KDS' && t.branchId === ctx.branchId && t.lifecycle === 'ACTIVE').map((t) => ({ ...screenView(ctx, t.id), terminalName: t.name, terminalCode: t.code })), hasDispatch: branchHasDispatch(ctx.db, ctx.branchId) }),
@@ -85,15 +85,25 @@ export const kitchenHandlers: Record<string, Handler> = {
     for (const id of ids) { const st = ctx.db.stations.find((x) => x.id === id && x.branchId === ctx.branchId); need(st, 'KITCHEN_STATION_NOT_FOUND', { stationId: id }); }
     const start = String(ctx.body.start ?? 'HIDDEN');
     need(['HIDDEN', 'OPTIONAL', 'REQUIRED'].includes(start), 'VALIDATION_FAILED', { field: 'start', rule: 'HIDDEN | OPTIONAL | REQUIRED' });
+    // ux-04 extension: the screen's own timer colours and per-item bump
+    const mins = (v: unknown) => (v === undefined || v === null || v === '' ? null : Number(v));
+    const warn = mins(ctx.body.warnMinutes), late = mins(ctx.body.lateMinutes);
+    need((warn === null) === (late === null), 'VALIDATION_FAILED', { field: 'warnMinutes', rule: 'warnMinutes and lateMinutes are set together' });
+    if (warn !== null && late !== null) {
+      need(Number.isInteger(warn) && warn >= 1 && warn <= 120, 'VALIDATION_FAILED', { field: 'warnMinutes', rule: '1–120 whole minutes' });
+      need(Number.isInteger(late) && late > warn && late <= 180, 'VALIDATION_FAILED', { field: 'lateMinutes', rule: 'whole minutes, more than warnMinutes, at most 180' });
+    }
     const list = r3bOf(ctx.db).kdsScreens;
     let c = list.find((x) => x.terminalId === term!.id);
     if (c && ctx.body.expectedVersion !== undefined) checkVersion(c, ctx.body.expectedVersion);
     const before = c ? { ...c } : null;
     if (!c) { c = { terminalId: term!.id, stationIds: [], dispatch: true, start: 'HIDDEN', version: 0, updatedAt: '', updatedBy: '' }; list.push(c); }
     Object.assign(c, { stationIds: ids, dispatch: ctx.body.dispatch !== false, start, updatedAt: ctx.nowIso, updatedBy: ctx.user!.id });
+    if (ctx.body.warnMinutes !== undefined || ctx.body.lateMinutes !== undefined) Object.assign(c, { warnMinutes: warn, lateMinutes: late });
+    if (ctx.body.itemBump !== undefined) c.itemBump = ctx.body.itemBump !== false;
     c.version++;
     const names = ids.map((id) => ctx.db.stations.find((x) => x.id === id)?.name).join(', ') || 'ALL';
-    ctx.audit(`kitchen screen ${term!.code}: stations ${names}; dispatch ${c.dispatch}; start ${c.start}${before ? ` (was ${before.stationIds.length || 'ALL'} / ${before.dispatch} / ${before.start})` : ''}`, term!.id);
+    ctx.audit(`kitchen screen ${term!.code}: stations ${names}; dispatch ${c.dispatch}; start ${c.start}; timer ${c.warnMinutes ?? '-'}/${c.lateMinutes ?? '-'}; item bump ${c.itemBump !== false}${before ? ` (was ${before.stationIds.length || 'ALL'} / ${before.dispatch} / ${before.start})` : ''}`, term!.id);
     event('KdsScreenConfigured', term!.id, `${term!.code} → ${names}`);
     return screenView(ctx, term!.id);
   },
@@ -125,10 +135,15 @@ export const kitchenHandlers: Record<string, Handler> = {
     need(t, 'KITCHEN_TICKET_NOT_FOUND');
     const it = t!.items.find((i) => i.lineId === ctx.params.itemId);
     need(it, 'KITCHEN_ITEM_PROGRESS_NOT_FOUND');
+    const scr = screenView(ctx);
+    if (!scr.itemBump) throw new ApiError('VALIDATION_FAILED', { field: 'itemId', rule: 'this kitchen screen bumps whole tickets only' });
+    if (t!.state === 'DONE') throw new ApiError('KITCHEN_TRANSITION_INVALID', { from: t!.state, rule: 'a handed-off ticket is recalled first' });
+    if (it!.status === 'CANCELLED') throw new ApiError('KITCHEN_TRANSITION_INVALID', { from: 'CANCELLED', rule: 'a voided item is not cooked' });
     (it as any).bumped = !(it as any).bumped;
-    if (t!.state === 'NEW' && screenView(ctx).start === 'REQUIRED') { t!.state = 'IN_PROGRESS'; t!.startedAt = t!.startedAt ?? ctx.nowIso; } // working an item counts as starting
+    if (t!.state === 'NEW' && scr.start === 'REQUIRED') { t!.state = 'IN_PROGRESS'; t!.startedAt = t!.startedAt ?? ctx.nowIso; } // working an item counts as starting
     t!.version++;
     if (t!.items.every((i) => i.status === 'CANCELLED' || (i as any).bumped)) { t!.state = 'READY'; t!.readyAt = ctx.nowIso; }
+    else if (t!.state === 'READY' && !(it as any).bumped) { t!.state = 'IN_PROGRESS'; t!.readyAt = null; } // undoing an item puts the ticket back to cooking
     return t;
   },
   'Ticket.Recall': (ctx) => {
@@ -136,6 +151,15 @@ export const kitchenHandlers: Record<string, Handler> = {
     need(t, 'KITCHEN_TICKET_NOT_FOUND');
     if (ctx.body?.expectedVersion !== undefined) checkVersion(t!, ctx.body.expectedVersion);
     if (t!.state !== 'DONE' && t!.state !== 'READY') throw new ApiError('KITCHEN_TRANSITION_INVALID', { from: t!.state, to: 'IN_PROGRESS' });
+    // ux-04 extension: undo of a hand-off a moment ago — the ticket goes back to «ready for hand-off», not to cooking
+    if (ctx.body?.undo === true) {
+      if (t!.state !== 'DONE' || !t!.doneAt || ctx.now - Date.parse(t!.doneAt) > UNDO_WINDOW_MS) throw new ApiError('KITCHEN_TRANSITION_INVALID', { from: t!.state, to: 'READY', rule: `undo only within ${UNDO_WINDOW_MS / 1000} s of the hand-off` });
+      if (!screenView(ctx).canHandOff) throw new ApiError('KDS_DISPATCH_ONLY', { terminal: ctx.terminal?.code ?? null });
+      t!.state = 'READY'; t!.doneAt = null; t!.version++;
+      metaOf(ctx, t!.id).history.unshift({ at: ctx.nowIso, by: ctx.user!.id, text: { ar: 'تراجع عن التسليم', en: 'hand-off undone' } });
+      event('KitchenTicketHandOffUndone', t!.orderId, `${t!.orderNumber} r${t!.round}`);
+      return ticketView(ctx, t!);
+    }
     const from = t!.state;
     t!.state = 'IN_PROGRESS'; t!.readyAt = null; t!.doneAt = null;
     t!.version++;
@@ -146,6 +170,7 @@ export const kitchenHandlers: Record<string, Handler> = {
     return ticketView(ctx, t!);
   },
   ...kdsHandlers(),
+  ...callBoardHandlers(),
   'Kitchen.OrderFulfillment': (ctx) => {
     const o = getOrder(ctx, ctx.params.orderId, 'ORDER_NOT_FOUND');
     return {
@@ -208,6 +233,7 @@ function ticketView(ctx: Ctx, t: KitchenTicket, kt?: { targetMinutes: number; al
     stationName: st?.name, priority: m?.priority ?? 'NORMAL', refireOf: m?.refireOf ?? null, refireReason: m?.refireReason ?? null, refireReasonText: m?.refireReason ? REFIRE_REASONS[m.refireReason] ?? { ar: m.refireReason, en: m.refireReason } : null, refireNote: m?.refireNote ?? null,
     transferredFromName: m?.transferredFrom && m.transferredFrom !== 'MERGED' ? ctx.db.stations.find((s) => s.id === m.transferredFrom)?.name ?? null : null, recalledAt: m?.recalledAt ?? null,
     history: m?.history ?? [], guestCount: visit?.guestCount ?? order?.guestCount ?? null, customerName: order?.customerName ?? null,
+    calledAt: m?.calledAt ?? null, orderLabel: order?.label ?? null, orderKind: order?.kind ?? null,
     siblings: siblings.map((x) => ({ id: x.id, stationId: x.stationId, stationName: ctx.db.stations.find((s) => s.id === x.stationId)?.name, state: x.state })),
   };
 }
@@ -300,6 +326,77 @@ function screenView(ctx: Ctx, terminalId?: string) {
   return {
     terminalId: tid, isKds, configured: c.configured, stationIds, stationNames: stationIds.map((id) => ctx.db.stations.find((s) => s.id === id)?.name ?? id),
     dispatch: c.dispatch, start: c.start, version: c.version, updatedAt: c.updatedAt || null,
+    warnMinutes: c.warnMinutes ?? null, lateMinutes: c.lateMinutes ?? null, itemBump: c.itemBump !== false,
     canHandOff: !isKds || c.dispatch || !hasDispatch, hasDispatch,
+  };
+}
+
+const UNDO_WINDOW_MS = 120_000;
+
+/** ux-04: a screen with its own timer colours re-tones every ticket (green < warn ≤ amber < late ≤ red). */
+function withScreenTiming<T extends { ageMinutes: number; warn: boolean; late: boolean; targetMinutes: number; alertMinutes: number }>(x: T, screen: { warnMinutes: number | null; lateMinutes: number | null }): T {
+  if (!screen.warnMinutes || !screen.lateMinutes) return x;
+  return { ...x, targetMinutes: screen.warnMinutes, alertMinutes: screen.lateMinutes, warn: x.ageMinutes >= screen.warnMinutes, late: x.ageMinutes >= screen.lateMinutes };
+}
+
+// ───────── ux-04: calling an order's number to the call board, and the call board itself
+/** Orders that are collected by number (no table): takeaway, delivery pick-up and counter dine-in. */
+const collectedByNumber = (o: { tableId?: string | null; visitId?: string | null; kind?: string } | undefined) => !!o && !o.tableId && !o.visitId && o.kind !== 'STAFF_MEAL';
+
+function callBoardHandlers(): Record<string, Handler> {
+  return {
+    /** The dispatch screen calls the order's number: it moves to «جاهز» on the call board (again = call it once more). */
+    'Kitchen.CallOrder': (ctx) => {
+      const o = ctx.db.orders.find((x) => x.id === ctx.params.orderId && x.branchId === ctx.branchId);
+      need(o, 'ORDER_NOT_FOUND');
+      if (!screenView(ctx).canHandOff) throw new ApiError('KDS_DISPATCH_ONLY', { terminal: ctx.terminal?.code ?? null });
+      const merged = new Set((ctx.db.ticketMeta ?? []).filter((m) => m.transferredFrom === 'MERGED').map((m) => m.ticketId));
+      const open = ctx.db.tickets.filter((t) => t.orderId === o!.id && !merged.has(t.id) && t.state !== 'DONE');
+      need(open.length, 'VALIDATION_FAILED', { field: 'orderId', rule: 'the order has no ticket waiting for hand-off' });
+      if (open.some((t) => t.state !== 'READY') && ctx.body?.force !== true) throw new ApiError('KITCHEN_TRANSITION_INVALID', { from: 'IN_PROGRESS', to: 'CALLED', rule: 'every station of the order is ready first' });
+      const again = open.some((t) => (ctx.db.ticketMeta ?? []).find((m) => m.ticketId === t.id)?.calledAt);
+      for (const t of open) {
+        const m = metaOf(ctx, t.id);
+        m.calledAt = ctx.nowIso; m.calledBy = ctx.user!.id;
+        m.history.unshift({ at: ctx.nowIso, by: ctx.user!.id, text: again ? { ar: 'أعيد النداء على الرقم', en: 'number called again' } : { ar: 'نودي على الرقم في شاشة النداء', en: 'number called on the call board' } });
+        t.version++;
+      }
+      event('OrderCalled', o!.id, `${o!.number}${o!.shortNo ? ' #' + o!.shortNo : ''}${again ? ' (again)' : ''}`);
+      return { orderId: o!.id, number: o!.number, shortNo: o!.shortNo ?? null, calledAt: ctx.nowIso, again };
+    },
+    /** What the call board shows: numbers being prepared and numbers called (ready). A number leaves «جاهز» when the
+     *  order is handed off or `readyMinutes` after it was called. Only orders collected by number are shown. */
+    'CallBoard.View': (ctx) => {
+      const readyMinutes = Math.max(1, Math.min(120, Number(ctx.query.readyMinutes ?? 10) || 10));
+      const auto = ctx.query.auto === 'true' || ctx.query.auto === '1';
+      const merged = new Set((ctx.db.ticketMeta ?? []).filter((m) => m.transferredFrom === 'MERGED').map((m) => m.ticketId));
+      const byOrder = new Map<string, KitchenTicket[]>();
+      for (const t of ctx.db.tickets) {
+        if (merged.has(t.id) || ctx.db.stations.find((s) => s.id === t.stationId)?.branchId !== ctx.branchId) continue;
+        byOrder.set(t.orderId, [...(byOrder.get(t.orderId) ?? []), t]);
+      }
+      const preparing: any[] = [], ready: any[] = [];
+      for (const [orderId, list] of byOrder) {
+        const o = ctx.db.orders.find((x) => x.id === orderId);
+        if (!collectedByNumber(o)) continue;
+        const open = list.filter((t) => t.state !== 'DONE');
+        if (!open.length) continue; // handed off: gone from the board
+        const metas = open.map((t) => (ctx.db.ticketMeta ?? []).find((m) => m.ticketId === t.id));
+        const calledAt = metas.map((m) => m?.calledAt).filter(Boolean).sort().pop() ?? null;
+        const allReady = open.every((t) => t.state === 'READY');
+        const readyAt = allReady ? open.map((t) => t.readyAt).filter(Boolean).sort().pop() ?? null : null;
+        const since = calledAt ?? (auto && allReady ? readyAt : null);
+        const no = o!.shortNo ?? o!.number;
+        if (since) {
+          const mins = Math.floor((ctx.now - Date.parse(since)) / 60000);
+          if (mins < readyMinutes) ready.push({ orderId, no, short: !!o!.shortNo, calledAt: since, minutes: mins });
+          continue; // called longer ago than readyMinutes: off the board
+        }
+        preparing.push({ orderId, no, short: !!o!.shortNo, since: list.map((t) => t.createdAt).sort()[0] });
+      }
+      preparing.sort((a, b) => a.since.localeCompare(b.since));
+      ready.sort((a, b) => b.calledAt.localeCompare(a.calledAt));
+      return { preparing, ready, readyMinutes, auto, at: ctx.nowIso };
+    },
   };
 }

@@ -13,6 +13,11 @@ export interface KdsScreenConfig {
   /** dispatch / expo screen: only these show "جاهز للتسليم" and hand the order over */
   dispatch: boolean;
   start: KdsStartPolicy;
+  /** ux-04: timer colours of this screen — green below warnMinutes, amber below lateMinutes, red from lateMinutes.
+   *  null/absent = the station target and the KitchenTimingPolicy alert. */
+  warnMinutes?: number | null; lateMinutes?: number | null;
+  /** ux-04: tapping one item marks it ready (default on); off = only the whole ticket is bumped */
+  itemBump?: boolean;
   version: number; updatedAt: string; updatedBy: string;
 }
 

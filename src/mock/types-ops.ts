@@ -18,6 +18,7 @@ export interface TicketMeta {
   ticketId: string; priority: 'NORMAL' | 'RUSH'; priorityAt?: string; priorityBy?: string;
   refireOf?: string | null; refireReason?: string | null; refireNote?: string | null;
   transferredFrom?: string | null; transferReason?: string | null; recalledAt?: string | null;
+  /** ux-04: the dispatch screen called the order's number to the call board (Kitchen.CallOrder) */ calledAt?: string | null; calledBy?: string | null;
   history: { at: string; by: string; text: Loc }[];
 }
 

@@ -20,7 +20,7 @@ export function seedR3B(db: DB, nowMs: number) {
   const grill = db.stations.find((s) => s.id === 'st_grill');
   r.kdsScreens = [
     { terminalId: 't_kds', stationIds: [], dispatch: true, start: 'HIDDEN', version: 1, updatedAt: nowIso, updatedBy: 'provisioning' },
-    { terminalId: 't_kds2', stationIds: grill ? [grill.id] : [], dispatch: false, start: 'OPTIONAL', version: 1, updatedAt: nowIso, updatedBy: 'provisioning' },
+    { terminalId: 't_kds2', stationIds: grill ? [grill.id] : [], dispatch: false, start: 'OPTIONAL', warnMinutes: 8, lateMinutes: 15, itemBump: true, version: 1, updatedAt: nowIso, updatedBy: 'provisioning' }, // ux-04: its own timer colours
   ];
   r.docTemplate = {
     logoDataUrl: SAMPLE_LOGO, logoName: 'logo-sample.svg', logoWidthPct: 60, logoOnReceipt: true, logoOnReports: true,

@@ -219,6 +219,16 @@ Principle kept from round 3: the depth sits in the engine, the screens stay simp
 - **Cut for simplicity (engine supports more):** A4 portrait/landscape + 80 mm only (no A3/Letter, no margin controls); six ready calculated columns instead of a formula editor; one column breakdown in the UI (engine: two); four colour presets instead of a rule editor; one condition on a number; comparisons/extra numbers on the first number only and in the total column of a cross-tab.
 - **[DEMO]** Schedules record the send, they don't email; PDF pages are images (text not selectable) and use the browser's Arabic font when offline; only the last 24 schedule outputs are kept in browser storage; studio data is seeded lazily on first use (no schema bump).
 
+## 15a. UX slice 04 — kitchen screen, call board, customer display, size change, pre-bill barcode
+
+- **[PROPOSED]** `Kitchen.CallOrder` (`kitchen:advanceticket`, dispatch screens only → `KDS_DISPATCH_ONLY`; every station ready first; again = re-announce), `CallBoard.View` (`kitchen:read`; preparing / ready, a number leaves on hand-off or `readyMinutes` after the call, `auto` = ready counts as called; orders with a table are not shown), `CustomerDisplay.View` (`order:read`; branding, active promotions, the check's lines, server totals, settlement, last tender, e-receipt link — nothing else).
+- **[PROPOSED] Input extensions** (backward compatible, listed in `src/mock/ux-contracts.ts`): `Order.UpdateLine.variantId` (UNSENT lines only — a sent line keeps `LINE_ALREADY_FIRED`; re-priced by the server with the same options; history «المقاس: … ← …» and audit); `KdsScreen.Configure.warnMinutes/lateMinutes/itemBump` (timer colours of the screen, per-item bump on/off); `Ticket.Recall.undo` (a hand-off undone within 2 minutes goes back to ready, not to cooking).
+- **[RULE]** `TicketItem.Bump` refuses a voided item and a handed-off ticket; un-marking an item of a ready ticket puts it back to cooking.
+- **[ASSUMED]** A display screen (call board, customer display) is attached to a terminal and reads with that terminal's session (call board → dispatch kitchen screen, customer display → cashier terminal; changeable on the display). Its own settings (look, minutes on «جاهز», automatic call, branding strip) live on the display device.
+- **[ASSUMED]** The customer display learns which check is on the cashier's screen and what is being typed in the payment popup from the terminal itself (same device); every amount it shows is the server's (the change while typing is the same Decimal preview the cashier sees).
+- **[DEMO]** The e-receipt QR on the thank-you screen is a placeholder link (`receipt.nerdpos.example`); sounds are Web Audio tones (played only after the first touch, mute per screen).
+- The pre-bill prints the check number as a Code 128 barcode (not a QR — the QR stays the e-receipt); scanning it in collect mode opens the check.
+
 ## 16. Prototype limitations
 
 - Single-browser simulation: "devices" share one localStorage database; no real concurrency, only simulated races.

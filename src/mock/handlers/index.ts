@@ -20,6 +20,7 @@ import { inventoryHandlers } from './inventory'; // inventory & purchasing area
 import { reversalHandlers } from './reversals'; // r3A: removal trace, void review, staff-meal allowance & cancel
 import { salesChannelHandlers } from './channels-sales'; // sales channels (E13)
 import { templateHandlers } from './templates'; // round 3 r3B: receipt / document template
+import { displayHandlers } from './displays'; // ux-04: customer display read model
 
 /** Operation id → simulated handler. Operations without a handler answer CAPABILITY_NOT_AVAILABLE ("not simulated"). */
 export const handlers: Record<string, Handler> = {
@@ -37,6 +38,7 @@ export const handlers: Record<string, Handler> = {
   ...reversalHandlers,
   ...salesChannelHandlers,
   ...templateHandlers,
+  ...displayHandlers,
 };
 
 // operations & system area (ops.ts): its handlers, then the capability gate around every handler
