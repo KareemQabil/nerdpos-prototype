@@ -82,7 +82,11 @@ export function orderView(db: DB, o: Order) {
     settlement: o.status === 'CONFIRMED' || o.status === 'COMPLETED' ? settlementOf(db, o) : null,
     rounds: o.rounds.map((r) => {
       const d = deliveries.find((x) => x.round === r.round);
-      return { ...r, delivery: d ? { state: d.state, attempts: d.attempts, lastError: d.lastError, ticketIds: d.ticketIds } : null };
+      // ux-03 read model: the kitchen progress of the round = its slowest ticket (NEW < IN_PROGRESS < READY < DONE)
+      const tks = (db.tickets ?? []).filter((x) => x.orderId === o.id && x.round === r.round);
+      const rank = ['NEW', 'IN_PROGRESS', 'READY', 'DONE'] as const;
+      const kitchen = tks.length ? rank[Math.min(...tks.map((x) => rank.indexOf(x.state)))] : null;
+      return { ...r, delivery: d ? { state: d.state, attempts: d.attempts, lastError: d.lastError, ticketIds: d.ticketIds } : null, kitchen };
     }),
     unfiredCount: unfired,
     fireModeBound: fireMode,

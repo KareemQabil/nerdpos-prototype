@@ -13,6 +13,9 @@ import { CustomerChip } from '../customers/common'; // crm area: customer on the
 import { optionText, ruleSentence } from '../../demo/policyText';
 import { personName, deviceName, personText } from '../../demo/people';
 import { lineStage, STAGE_TEXT, DISPOSITION_TEXT, DISPOSITIONS } from '../../mock/control-registry'; // r3A: stages and dispositions
+import { approvalRule } from '../../mock/policies';
+import { addQty, cmpQty, subQty, sumQty } from '../../lib/cash';
+import { QtyPopover, LineEditorPopover } from './LineEditors';
 
 export function useReasons(kind: string) {
   const r = useQuery<any>('ReasonCode.List', { query: { kind, active: true } });
@@ -30,12 +33,14 @@ const firstName = (s?: string | null) => (s ? personName(null, s) : '');
 
 /** Dialogs of the check that a parent (the sale screen's action bar) can open: discount, comp, cancel, … */
 export type CheckDialog = 'discount' | 'comp' | 'cancel' | 'voidOrder' | 'move' | 'split' | 'merge' | 'channel' | 'history';
+/** A change of an unsent line the sale screen can offer to undo (it undoes it with the normal commands). */
+export type LineChange = { kind: 'qty'; lineId: string; name: any; from: string; to: string } | { kind: 'remove'; line: any };
 
 /**
  * The check. `variant="cart"` is the sale screen's cart: lines and totals only — the screen's action bar owns the
  * actions (`actionRef` opens a dialog by name). `qty` switches the stepper and swipe-to-remove per work profile.
  */
-export function CheckPanel({ order, refetch, mode, onCheckSwitch, variant = 'panel', actionRef, qty: qtyMethods }: { order: any; refetch: () => void; mode: 'FLOOR' | 'COUNTER'; onCheckSwitch?: (id: string) => void; variant?: 'panel' | 'cart'; actionRef?: React.MutableRefObject<((k: CheckDialog) => void) | null>; qty?: { stepper?: boolean; swipe?: boolean } }) {
+export function CheckPanel({ order, refetch, mode, onCheckSwitch, variant = 'panel', actionRef, qty: qtyMethods, onLineChange, flashLineId, seatsOn }: { order: any; refetch: () => void; mode: 'FLOOR' | 'COUNTER'; onCheckSwitch?: (id: string) => void; variant?: 'panel' | 'cart'; actionRef?: React.MutableRefObject<((k: CheckDialog) => void) | null>; qty?: { stepper?: boolean; swipe?: boolean }; onLineChange?: (c: LineChange) => void; flashLineId?: string | null; seatsOn?: boolean }) {
   const { nav, can, auth, kind } = useDev();
   const { run, busy } = useCommand();
   const [dlg, setDlg] = useState<null | { k: string; line?: any }>(null);
@@ -56,17 +61,26 @@ export function CheckPanel({ order, refetch, mode, onCheckSwitch, variant = 'pan
   const removed = order.lines.filter((l: any) => l.status === 'REMOVED');
   const T = order.totals;
   const v = order.version;
-  const seats = !!seatsP.data?.value && mode === 'FLOOR';
+  const seats = !!seatsP.data?.value && (mode === 'FLOOR' || !!seatsOn) && !!order.visitId;
   const canPay = (draft || order.status === 'CONFIRMED') && can('payment:capture') && kind !== 'FLOOR';
-  const items = active.reduce((a: number, l: any) => a + Number(l.quantity), 0);
+  const items = sumQty(active.map((l: any) => l.quantity));
+  const [qtyEdit, setQtyEdit] = useState<null | { line: any; anchor: HTMLElement }>(null);
+  const [lineEdit, setLineEdit] = useState<null | { line: any; anchor: HTMLElement }>(null);
+  const removeNeedsApproval = approvalRule('LINE_REMOVE_UNSENT', { branchId: auth.branchId }).mode !== 'NEVER';
 
-  const fire = () => run('Order.Fire', { params: { orderId: order.id }, body: { expectedVersion: v } }, { success: t('اتبعت للمطبخ'), label: t('إرسال للمطبخ') });
-  // r3A [OWNER]: every removal before payment needs a manager and a reason — the − and the trash open the removal dialog
-  const qtyChange = (l: any, d: number) => {
-    const n = Math.round(Number(l.quantity) + d);
-    if (d < 0) return setDlg({ k: 'remove', line: l, n: n < 1 ? 0 : n } as any);
-    return run('Order.UpdateLine', { params: { orderId: order.id, lineId: l.id }, body: { expectedVersion: v, expectedLineVersion: l.version, quantity: String(n) } });
+  const fire = () => run('Order.Fire', { params: { orderId: order.id }, body: { expectedVersion: v } }, { success: t('تم الإرسال للمطبخ'), label: t('إرسال للمطبخ') });
+  // Owner decision (ux-03): lowering an unsent quantity is free (traced on the server); 0 or removing the line is a
+  // void and keeps the removal rule; a sent line is lowered only by a (partial) void with its approval.
+  const setQtyTo = async (l: any, to: string) => {
+    if (l.fireRound !== null) {
+      if (cmpQty(to, l.quantity) >= 0) return;
+      return setDlg({ k: 'void', line: l, part: cmpQty(to, '0') > 0 ? subQty(l.quantity, to) : null } as any);
+    }
+    if (cmpQty(to, '0') <= 0) return setDlg({ k: 'remove', line: l } as any);
+    const r = await run('Order.UpdateLine', { params: { orderId: order.id, lineId: l.id }, body: { expectedVersion: v, expectedLineVersion: l.version, quantity: to } });
+    if (r) onLineChange?.({ kind: 'qty', lineId: l.id, name: l.name, from: l.quantity, to });
   };
+  const qtyChange = (l: any, d: number) => setQtyTo(l, addQty(l.quantity, d));
   /** Someone without the permission can still ask: a manager authorises in place (supervisor override). */
   const canAsk = (perm: string) => can(perm) || can('approval:grant');
   const [showBreak, setShowBreak] = useState(() => !cart && (typeof window === 'undefined' || window.innerHeight > 860));
@@ -100,6 +114,7 @@ export function CheckPanel({ order, refetch, mode, onCheckSwitch, variant = 'pan
           </div>
           <button title={t('سجل الشيك')} aria-label={t('سجل الشيك')} onClick={() => setShowHist(true)} className="w-10 h-10 rounded-xl surface-1 border border-[var(--glass-border)] flex items-center justify-center hover:bg-[var(--surface-2)] shrink-0" data-fb="check-history"><History className="w-4 h-4" /></button>
         </div>
+        {(order.label || order.note) && <div className="flex flex-wrap gap-1.5 text-xs" data-fb="check-label">{order.label && <span className="px-2 py-1 rounded-lg bg-[var(--primary-container)] text-[var(--primary)] font-bold">{order.label}</span>}{order.note && <span className="px-2 py-1 rounded-lg surface-2 text-soft inline-flex items-center gap-1"><StickyNote className="w-3 h-3" />{order.note}</span>}</div>}
         {order.kind !== 'STAFF_MEAL' && (!cart || order.customerId || order.customerName) && <CustomerChip order={order} />}
         {siblings.length > 1 && (
           <div className="flex gap-1 overflow-x-auto scrollbar-hide">{siblings.map((c: any) => <button key={c.id} onClick={() => onCheckSwitch?.(c.id)} className={cn('px-3 h-9 rounded-lg text-xs border whitespace-nowrap', c.id === order.id ? 'bg-[var(--primary)] text-[var(--primary-foreground)] border-transparent font-bold' : 'surface-1 border-[var(--glass-border)]')}>{t('شيك')} {c.checkNo} · <span className="num">{money(c.payable, false)}</span></button>)}</div>
@@ -118,14 +133,14 @@ export function CheckPanel({ order, refetch, mode, onCheckSwitch, variant = 'pan
                 <span className="font-bold flex items-center gap-1.5"><ChefHat className="w-3.5 h-3.5 text-dim" />{t('الدفعة')} <span className="num">{r}</span>{info?.firedAt && <span className="text-dim font-normal num">· {time(info.firedAt)}</span>}{info?.via === 'CONFIRM' && <span className="text-dim font-normal">· {t('مع التأكيد')}</span>}</span>
                 <RoundStatus info={info} orderId={order.id} />
               </div>
-              <div className="divide-y divide-[var(--line)]">{lines.map((l: any) => <LineRow key={l.id} l={l} locked draft={draft} cart={cart} onVoid={canAsk('order:voidline') ? () => setDlg({ k: 'void', line: l }) : undefined} onMod={() => setDlg({ k: 'kmod', line: l })} onSeat={() => setDlg({ k: 'seat', line: l })} seats={seats} />)}</div>
+              <div className="divide-y divide-[var(--line)]">{lines.map((l: any) => <LineRow key={l.id} l={l} locked draft={draft} cart={cart} flash={l.id === flashLineId} onVoid={canAsk('order:voidline') ? () => setDlg({ k: 'void', line: l }) : undefined} onMod={() => setDlg({ k: 'kmod', line: l })} onSeat={() => setDlg({ k: 'seat', line: l })} seats={seats} onQtyEdit={draft && l.status === 'ACTIVE' && canAsk('order:voidline') ? (a) => setQtyEdit({ line: l, anchor: a }) : undefined} onEdit={draft && l.status === 'ACTIVE' ? (a) => setLineEdit({ line: l, anchor: a }) : undefined} />)}</div>
             </div>
           );
         })}
         {unfired.length > 0 && (
           <div className={cn('overflow-hidden', cart && !showFire && rounds.length === 0 ? 'rounded-xl border line' : 'rounded-xl border-2 border-dashed border-[color-mix(in_srgb,var(--primary)_40%,transparent)]')} data-fb="check-unsent">
             {(!cart || rounds.length > 0 || showFire) && <div className="px-3 py-1.5 text-xs font-bold text-[var(--primary)] flex items-center justify-between bg-[var(--primary-container)]"><span className="flex items-center gap-1.5"><Send className="w-3.5 h-3.5 rtl:-scale-x-100" />{t('لم يُرسل بعد')} <span className="num">({unfired.length})</span></span></div>}
-            <div className="divide-y divide-[var(--line)]">{unfired.map((l: any) => <LineRow key={l.id} l={l} draft={draft} cart={cart} prebilled={lineStage(order, l) === 'S1'} onQty={qtyMethods?.stepper === false ? undefined : (d) => qtyChange(l, d)} onRemove={() => qtyChange(l, -999)} swipe={qtyMethods?.swipe !== false} onSeat={() => setDlg({ k: 'seat', line: l })} seats={seats} busy={busy} />)}</div>
+            <div className="divide-y divide-[var(--line)]">{unfired.map((l: any) => <LineRow key={l.id} l={l} draft={draft} cart={cart} flash={l.id === flashLineId} prebilled={lineStage(order, l) === 'S1'} onQty={qtyMethods?.stepper === false ? undefined : (d) => qtyChange(l, d)} onRemove={() => setDlg({ k: 'remove', line: l })} lockRemove={removeNeedsApproval} swipe={qtyMethods?.swipe !== false} onSeat={() => setDlg({ k: 'seat', line: l })} seats={seats} busy={busy} onQtyEdit={draft ? (a) => setQtyEdit({ line: l, anchor: a }) : undefined} onEdit={draft ? (a) => setLineEdit({ line: l, anchor: a }) : undefined} />)}</div>
           </div>
         )}
         {removed.length > 0 && (
@@ -153,7 +168,7 @@ export function CheckPanel({ order, refetch, mode, onCheckSwitch, variant = 'pan
       {/* totals (server) */}
       <div className="border-t line px-4 py-2.5 space-y-1 text-sm surface-1" data-fb="check-totals">
         {showBreak && <>
-          <Row k={<>{t('الأصناف')} <span className="num text-dim text-xs">({qty(String(items))})</span></>} v={T.itemsSubtotal} />
+          <Row k={<>{t('الأصناف')} <span className="num text-dim text-xs">({qty(items)})</span></>} v={T.itemsSubtotal} />
           {T.discountTotal !== '0.0000' && !T.comp && <Row k={t('الخصم')} v={'-' + T.discountTotal} tone="error" />}
           {T.serviceRate && <Row k={<>{t('خدمة')} <span className="num">{qty(T.serviceRate)}%</span></>} v={T.serviceCharge} />}
           {!T.serviceRate && order.channel === 'DINE_IN' && order.service && <div className="text-[11px] text-dim">{t('مفيش خدمة على الشيك ده')}<Tech> ({order.service.origin})</Tech></div>}
@@ -187,8 +202,10 @@ export function CheckPanel({ order, refetch, mode, onCheckSwitch, variant = 'pan
         {order.status === 'COMPLETED' && <Button variant="secondary" size="lg" className="w-full" onClick={() => nav('receipt', { orderId: order.id })}><Receipt className="w-4 h-4" />{t('الإيصال')}</Button>}
       </div>}
 
-      {dlg?.k === 'void' && <VoidLineDialog order={order} line={dlg.line} onClose={() => setDlg(null)} />}
-      {dlg?.k === 'remove' && <RemoveLineDialog order={order} line={dlg.line} to={(dlg as any).n} onClose={() => setDlg(null)} />}
+      {dlg?.k === 'void' && <VoidLineDialog order={order} line={dlg.line} part={(dlg as any).part ?? null} onClose={() => setDlg(null)} />}
+      {dlg?.k === 'remove' && <RemoveLineDialog order={order} line={dlg.line} onClose={() => setDlg(null)} onDone={(line) => onLineChange?.({ kind: 'remove', line })} />}
+      {qtyEdit && <QtyPopover anchor={qtyEdit.anchor} line={qtyEdit.line} sent={qtyEdit.line.fireRound !== null} lockZero={qtyEdit.line.fireRound !== null || removeNeedsApproval} lockLower={qtyEdit.line.fireRound !== null} onClose={() => setQtyEdit(null)} onApply={(q) => { const l = qtyEdit.line; setQtyEdit(null); setQtyTo(l, q); }} />}
+      {lineEdit && <LineEditorPopover anchor={lineEdit.anchor} order={order} line={order.lines.find((x: any) => x.id === lineEdit.line.id) ?? lineEdit.line} seats={seats} lockRemove={removeNeedsApproval} onClose={() => setLineEdit(null)} onRemove={() => setDlg({ k: 'remove', line: lineEdit.line })} onVoid={canAsk('order:voidline') ? () => setDlg({ k: 'void', line: lineEdit.line }) : undefined} />}
       {dlg?.k === 'kmod' && <KitchenModDialog order={order} line={dlg.line} onClose={() => setDlg(null)} />}
       {dlg?.k === 'seat' && <SeatDialog order={order} line={dlg.line} onClose={() => setDlg(null)} />}
       {dlg?.k === 'discount' && <DiscountDialog order={order} onClose={() => setDlg(null)} />}
@@ -223,10 +240,12 @@ function Act({ icon, label, onClick, disabled, danger, proposed }: { icon: React
   );
 }
 
+const KITCHEN_STATE: Record<string, [string, 'neutral' | 'warning' | 'success' | 'info']> = { NEW: ['بانتظار التحضير', 'neutral'], IN_PROGRESS: ['قيد التحضير', 'warning'], READY: ['جاهز للتقديم', 'success'], DONE: ['تم التقديم', 'info'] };
 function RoundStatus({ info, orderId }: { info: any; orderId: string }) {
   const { run, busy } = useCommand();
   const d = info?.delivery;
   if (!d) return <Pill tone="neutral" size="sm"><Clock className="w-3 h-3" />{t('في الطريق للمطبخ')}</Pill>;
+  if (d.state === 'DELIVERED' && info.kitchen && KITCHEN_STATE[info.kitchen]) { const [k, tone] = KITCHEN_STATE[info.kitchen]; return <Pill tone={tone} size="sm" dot><span data-fb={`round-kitchen:${info.round}`} data-state={info.kitchen}>{t(k)}</span></Pill>; }
   if (d.state === 'DELIVERED') return <Pill tone="success" size="sm" title={t('وصلت {n} تذكرة للمطبخ', { n: d.ticketIds.length })}><CheckCircle2 className="w-3 h-3" />{t('وصل المطبخ')}</Pill>;
   if (d.state === 'PENDING') return <Pill tone="warning" size="sm"><Clock className="w-3 h-3" />{t('مستني')}</Pill>;
   return (
@@ -240,16 +259,18 @@ function RoundStatus({ info, orderId }: { info: any; orderId: string }) {
 function useSwipe(enabled: boolean, onSwipe: () => void) {
   const [dx, setDx] = useState(0);
   const st = React.useRef<{ x: number; y: number; id: number; on: boolean } | null>(null);
-  if (!enabled) return { dx: 0, handlers: {} };
+  const swiped = React.useRef(false); // a swipe that started on the line name must not also open the line editor
+  if (!enabled) return { dx: 0, handlers: {}, swiped };
   const end = () => { const d = dx; st.current = null; setDx(0); if (Math.abs(d) > 90) onSwipe(); };
   return {
     dx,
+    swiped,
     handlers: {
-      onPointerDown: (e: React.PointerEvent) => { if ((e.target as HTMLElement).closest('button')) return; st.current = { x: e.clientX, y: e.clientY, id: e.pointerId, on: false }; },
+      onPointerDown: (e: React.PointerEvent) => { const b = (e.target as HTMLElement).closest('button'); if (b && b.dataset.fb !== 'line-open') return; swiped.current = false; st.current = { x: e.clientX, y: e.clientY, id: e.pointerId, on: false }; },
       onPointerMove: (e: React.PointerEvent) => {
         const s0 = st.current; if (!s0 || s0.id !== e.pointerId) return;
         const x = e.clientX - s0.x, y = e.clientY - s0.y;
-        if (!s0.on) { if (Math.abs(x) < 12 || Math.abs(x) < Math.abs(y)) return; s0.on = true; (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId); }
+        if (!s0.on) { if (Math.abs(x) < 12 || Math.abs(x) < Math.abs(y)) return; s0.on = true; swiped.current = true; (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId); }
         setDx(Math.max(-140, Math.min(140, x)));
       },
       onPointerUp: end,
@@ -258,24 +279,34 @@ function useSwipe(enabled: boolean, onSwipe: () => void) {
   };
 }
 
-function LineRow({ l, locked, draft, onQty, onRemove, onVoid, onMod, onSeat, seats, busy, prebilled, cart, swipe }: { l: any; locked?: boolean; draft: boolean; onQty?: (d: number) => void; onRemove?: () => void; onVoid?: () => void; onMod?: () => void; onSeat?: () => void; seats?: boolean; busy?: boolean; prebilled?: boolean; cart?: boolean; swipe?: boolean }) {
+function LineRow({ l, locked, draft, onQty, onRemove, onVoid, onMod, onSeat, seats, busy, prebilled, cart, swipe, flash, onQtyEdit, onEdit, lockRemove }: { l: any; locked?: boolean; draft: boolean; onQty?: (d: number) => void; onRemove?: () => void; onVoid?: () => void; onMod?: () => void; onSeat?: () => void; seats?: boolean; busy?: boolean; prebilled?: boolean; cart?: boolean; swipe?: boolean; flash?: boolean; onQtyEdit?: (anchor: HTMLElement) => void; onEdit?: (anchor: HTMLElement) => void; lockRemove?: boolean }) {
   const voided = l.status === 'VOIDED';
   const editable = draft && !voided && !locked;
   const sw = useSwipe(!!(editable && swipe && onRemove), () => onRemove?.());
+  const rowRef = React.useRef<HTMLDivElement>(null);
+  // the line just added or changed scrolls into view and glows for a moment
+  React.useEffect(() => { if (flash) rowRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, [flash, l.version]);
+  const one = cmpQty(l.quantity, '1') <= 0;
+  const qtyText = <span className="num">{qty(l.quantity)}</span>;
+  const qtyBtn = (cls: string) => onQtyEdit && !voided
+    ? <button type="button" onClick={(e) => onQtyEdit(e.currentTarget)} data-fb="line-qty" title={t('تعديل الكمية')} aria-label={t('تعديل الكمية')} className={cn(cls, 'hover:ring-2 hover:ring-[var(--primary)] focus-visible:ring-2 focus-visible:ring-[var(--primary)] outline-none')}>{qtyText}</button>
+    : <span className={cls}>{qtyText}</span>;
   return (
-    <div className="relative overflow-hidden">
+    <div className="relative overflow-hidden" ref={rowRef}>
       {sw.dx !== 0 && <div className={cn('absolute inset-0 flex items-center px-4 text-xs font-bold text-white bg-[var(--error)]', sw.dx > 0 ? 'justify-start' : 'justify-end')} aria-hidden><Trash2 className="w-4 h-4" /></div>}
-    <div {...sw.handlers} style={sw.dx ? { transform: `translateX(${sw.dx}px)`, touchAction: 'pan-y' } : { touchAction: 'pan-y' }} className={cn('relative px-2.5 py-2 text-sm bg-[var(--glass-bg-strong)]', !sw.dx && 'transition-transform', voided && 'opacity-60')} data-fb={`line:${l.sku}`}>
+    <div {...sw.handlers} style={sw.dx ? { transform: `translateX(${sw.dx}px)`, touchAction: 'pan-y' } : { touchAction: 'pan-y' }} className={cn('relative px-2.5 py-2 text-sm bg-[var(--glass-bg-strong)]', !sw.dx && 'transition-transform', voided && 'opacity-60', flash && 'line-flash')} data-fb={`line:${l.sku}`} data-line-id={l.id} data-flash={flash || undefined}>
       <div className="flex items-start gap-2">
         {editable && onQty ? (
           <div className="flex items-center shrink-0 rounded-xl surface-2 p-0.5">
             <MiniBtn big={cart} onClick={() => onQty!(1)} disabled={busy} title={t('زيادة')} fb="line-plus"><Plus className="w-4 h-4" /></MiniBtn>
-            <span className="num font-bold text-[var(--primary)] min-w-6 text-center">{qty(l.quantity)}</span>
-            <MiniBtn big={cart} onClick={() => onQty!(-1)} disabled={busy} title={Number(l.quantity) <= 1 ? t('حذف الصنف') : t('إنقاص')} fb="line-minus" danger={Number(l.quantity) <= 1}>{Number(l.quantity) <= 1 ? <Trash2 className="w-4 h-4" /> : <Minus className="w-4 h-4" />}</MiniBtn>
+            {qtyBtn('min-w-8 h-9 px-1 rounded-lg font-bold text-[var(--primary)] text-center')}
+            <MiniBtn big={cart} onClick={() => (one ? onRemove?.() : onQty!(-1))} disabled={busy} title={one ? t('حذف الصنف') : t('إنقاص')} fb="line-minus" danger={one} lock={one && lockRemove}>{one ? <Trash2 className="w-4 h-4" /> : <Minus className="w-4 h-4" />}</MiniBtn>
           </div>
-        ) : <span className="shrink-0 min-w-9 h-9 px-1 rounded-lg bg-[var(--primary-container)] text-[var(--primary)] font-extrabold text-sm flex items-center justify-center num">{qty(l.quantity)}</span>}
+        ) : qtyBtn('shrink-0 min-w-9 h-9 px-1 rounded-lg bg-[var(--primary-container)] text-[var(--primary)] font-extrabold text-sm flex items-center justify-center')}
         <div className="flex-1 min-w-0 pt-1.5">
-          <div className={cn('font-bold leading-snug', voided && 'line-through')}>{L(l.name)} {l.seat ? <span className="text-[10px] px-1.5 py-0.5 rounded-md surface-3 font-bold align-middle">{t('كرسي')} <span className="num">{l.seat}</span></span> : null}{l.shareOf ? <span className="text-[10px] text-dim font-normal"> · {t('حصة')} <span className="num">{l.shareOf.index}/{l.shareOf.parts}</span></span> : null}</div>
+          {onEdit && !voided
+            ? <button type="button" onClick={(e) => { if (sw.swiped.current) { sw.swiped.current = false; return; } onEdit(e.currentTarget.closest('[data-line-id]') as HTMLElement ?? e.currentTarget); }} data-fb="line-open" className={cn('font-bold leading-snug text-start w-full rounded-md hover:text-[var(--primary)] focus-visible:outline-2 focus-visible:outline-[var(--primary)]', voided && 'line-through')}>{L(l.name)} {l.seat ? <SeatChip n={l.seat} /> : null}{l.shareOf ? <span className="text-[10px] text-dim font-normal"> · {t('حصة')} <span className="num">{l.shareOf.index}/{l.shareOf.parts}</span></span> : null}</button>
+            : <div className={cn('font-bold leading-snug', voided && 'line-through')}>{L(l.name)} {l.seat ? <SeatChip n={l.seat} /> : null}{l.shareOf ? <span className="text-[10px] text-dim font-normal"> · {t('حصة')} <span className="num">{l.shareOf.index}/{l.shareOf.parts}</span></span> : null}</div>}
           {(l.variant || l.modifiers.length > 0 || l.children?.length) && (
             <div className="flex flex-wrap gap-1 mt-1">
               {l.variant && <Chip tone="violet">{L(l.variant.name)}</Chip>}
@@ -287,9 +318,9 @@ function LineRow({ l, locked, draft, onQty, onRemove, onVoid, onMod, onSeat, sea
           {l.allergens?.length ? <div className="text-[11px] text-[var(--warning-text)] font-bold flex items-center gap-1"><AlertTriangle className="w-3 h-3" />{l.allergens.map((a: string) => t(ALLERGEN_AR[a] ?? a)).join(t('، '))}</div> : null}
           {l.kitchenMods?.map((m: any) => <div key={m.id} className="text-[11px] text-[var(--info)]">{t('ملاحظة للمطبخ')}: {m.text}</div>)}
           {voided && <div className="text-[11px] text-[var(--error)]">{t('اتلغى')} · <ReasonText kind="LINE_VOID" code={l.voided.reasonCode} /> · {l.voided.dispositionKind ? t(DISPOSITION_TEXT[l.voided.dispositionKind as 'NOT_PREPARED'].label) : l.voided.disposition === 'WASTE' ? t('اتعمل واترمى (هالك)') : l.voided.disposition === 'NOT_PREPARED' ? t('ما اتعملش') : '—'}{l.voided.byName ? ` · ${firstName(l.voided.byName)}` : ''}{l.voided.approverName ? ` ${t('بموافقة')} ${firstName(l.voided.approverName)}` : ''}</div>}
-          {prebilled && !voided && <div className="text-[10px] text-[var(--warning-text)] flex items-center gap-1"><Printer className="w-3 h-3" />{t('ظهر للزبون في الشيك المبدئي — الشيل محتاج سبب وموافقة مدير')}</div>}
+          {prebilled && !voided && <div className="text-[10px] text-[var(--warning-text)] flex items-center gap-1"><Printer className="w-3 h-3" />{t('ظهر للعميل في الشيك المبدئي')}</div>}
           {l.movedFrom && <div className="text-[10px] text-dim">{t('اتنقل من شيك تاني')}</div>}
-          {draft && !voided && locked && (
+          {draft && !voided && locked && !cart && (
             <div className="flex items-center gap-1 mt-1">
               <span className="text-[10px] text-dim flex items-center gap-1 me-auto"><Lock className="w-3 h-3" />{t('أُرسل')}</span>
               {seats && <MiniBtn onClick={onSeat!} title={t('الكرسي')}><Armchair className="w-4 h-4" /></MiniBtn>}
@@ -303,16 +334,11 @@ function LineRow({ l, locked, draft, onQty, onRemove, onVoid, onMod, onSeat, sea
           <Money v={l.lineTotal} className={cn('font-bold', voided && 'line-through')} />
           {qty(l.quantity) !== '1' && <div className="num text-[10px] text-dim">{money(l.unitTotal, false)} × {qty(l.quantity)}</div>}
           </div>
-          {editable && cart && (
+          {draft && !voided && locked && cart && onVoid && <MiniBtn big onClick={onVoid} title={t('إلغاء الصنف')} danger fb="void-line" lock><Ban className="w-4 h-4" /></MiniBtn>}
+          {editable && (
             <div className="flex items-center">
-              {seats && <MiniBtn big onClick={onSeat!} title={t('الكرسي')}><Armchair className="w-4 h-4" /></MiniBtn>}
-              {(Number(l.quantity) > 1 || !onQty) && <MiniBtn big onClick={onRemove!} title={t('حذف الصنف')} danger fb="line-remove"><Trash2 className="w-4 h-4" /></MiniBtn>}
-            </div>
-          )}
-          {editable && !cart && (
-            <div className="flex items-center">
-              {seats && <MiniBtn onClick={onSeat!} title={t('الكرسي')}><Armchair className="w-4 h-4" /></MiniBtn>}
-              {(Number(l.quantity) > 1 || !onQty) && <MiniBtn big={cart} onClick={onRemove!} title={t('حذف الصنف')} danger fb="line-remove"><Trash2 className="w-4 h-4" /></MiniBtn>}
+              {seats && !cart && <MiniBtn onClick={onSeat!} title={t('الكرسي')}><Armchair className="w-4 h-4" /></MiniBtn>}
+              {(!one || !onQty) && <MiniBtn big={cart} onClick={onRemove!} title={t('حذف الصنف')} danger fb="line-remove" lock={lockRemove}><Trash2 className="w-4 h-4" /></MiniBtn>}
             </div>
           )}
         </div>
@@ -321,9 +347,11 @@ function LineRow({ l, locked, draft, onQty, onRemove, onVoid, onMod, onSeat, sea
     </div>
   );
 }
+/** Seat of a line as a small chip (dine-in, SeatsPolicy on). */
+export const SeatChip = ({ n }: { n: number }) => <span className="ms-1 text-[10px] px-1.5 py-0.5 rounded-md bg-[color-mix(in_srgb,var(--info)_16%,transparent)] text-[var(--info)] font-bold align-middle inline-flex items-center gap-0.5" data-fb={`seat-chip:${n}`}><Armchair className="w-3 h-3" /><span className="num">{n}</span></span>;
 const CHIP: Record<string, string> = { violet: 'var(--violet)', warning: 'var(--warning-text)', info: 'var(--info)' };
 const Chip = ({ tone, children }: { tone: 'violet' | 'warning' | 'info'; children: React.ReactNode }) => <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold" style={{ color: CHIP[tone], background: `color-mix(in srgb, ${CHIP[tone]} 13%, transparent)` }}>{children}</span>;
-const MiniBtn = ({ onClick, children, title, disabled, danger, fb, big }: { onClick: () => void; children: React.ReactNode; title: string; disabled?: boolean; danger?: boolean; fb?: string; big?: boolean }) => <button title={title} aria-label={title} disabled={disabled} onClick={onClick} data-fb={fb} className={cn('rounded-lg flex items-center justify-center hover:bg-[var(--surface-3)] disabled:opacity-30', big ? 'w-11 h-11' : 'w-9 h-8', danger ? 'text-[var(--error)]' : 'text-soft')}>{children}</button>;
+const MiniBtn = ({ onClick, children, title, disabled, danger, fb, big, lock }: { onClick: () => void; children: React.ReactNode; title: string; disabled?: boolean; danger?: boolean; fb?: string; big?: boolean; lock?: boolean }) => <button title={lock ? `${title} · ${t('يتطلب موافقة')}` : title} aria-label={title} disabled={disabled} onClick={onClick} data-fb={fb} data-lock={lock || undefined} className={cn('relative rounded-lg flex items-center justify-center hover:bg-[var(--surface-3)] disabled:opacity-30', big ? 'w-11 h-11' : 'w-9 h-8', danger ? 'text-[var(--error)]' : 'text-soft')}>{children}{lock && <Lock className="absolute top-1 end-1 w-2.5 h-2.5 text-[var(--warning-text)]" />}</button>;
 
 export function ReasonDialog({ title, kind, onOk, onClose, ops, note, requireNote, danger, children }: { title: string; kind: string; onOk: (code: string, note?: string) => Promise<any>; onClose: () => void; ops: string[]; note?: string; requireNote?: boolean; danger?: boolean; children?: React.ReactNode }) {
   const reasons = useReasons(kind);
@@ -367,26 +395,26 @@ export function DispositionPicker({ value, onChange, allowAuto = true }: { value
   );
 }
 
-function VoidLineDialog({ order, line, onClose }: { order: any; line: any; onClose: () => void }) {
+function VoidLineDialog({ order, line, onClose, part }: { order: any; line: any; onClose: () => void; part?: string | null }) {
   const { run } = useCommand();
   const [disp, setDisp] = useState('');
-  return <ReasonDialog danger title={`${t('إلغاء صنف اتبعت')}: ${L(line.name)}`} kind="LINE_VOID" ops={['Order.VoidLine', 'Approval.Grant']} onClose={onClose} note={t('الصنف اتبعت للمطبخ فمينفعش يتشال من غير أثر. الإلغاء محتاج موافقة مدير (ينفع على نفس الجهاز)، وبيظهر مشطوب على شاشة المطبخ ومتسجل باسمك واسم المدير.')}
-    onOk={(rc, note) => run('Order.VoidLine', { params: { orderId: order.id, lineId: line.id }, body: { expectedVersion: order.version, reasonCode: rc, reason: note, ...(disp ? { disposition: disp } : {}) } }, { success: t('الصنف اتلغى') })}>
+  return <ReasonDialog danger title={part ? `${t('إلغاء جزء من صنف مُرسل')}: ${L(line.name)} ${qty(line.quantity)} ← ${qty(subQty(line.quantity, part))}` : `${t('إلغاء صنف اتبعت')}: ${L(line.name)}`} kind="LINE_VOID" ops={['Order.VoidLine', 'Approval.Grant']} onClose={onClose}
+    onOk={(rc, note) => run('Order.VoidLine', { params: { orderId: order.id, lineId: line.id }, body: { expectedVersion: order.version, reasonCode: rc, reason: note, ...(part ? { quantity: part } : {}), ...(disp ? { disposition: disp } : {}) } }, { success: part ? t('تم إلغاء جزء من الصنف') : t('تم إلغاء الصنف') })}>
     <DispositionPicker value={disp} onChange={setDisp} />
   </ReasonDialog>;
 }
 
-/** r3A: removing (or reducing) a line that was not sent — S0 before the guest saw it, S1 after a pre-bill. */
-function RemoveLineDialog({ order, line, to, onClose }: { order: any; line: any; to: number; onClose: () => void }) {
+/** r3A: removing a line that was not sent — S0 before the guest saw it, S1 after a pre-bill. A void: the removal rule applies. */
+function RemoveLineDialog({ order, line, onClose, onDone }: { order: any; line: any; onClose: () => void; onDone?: (line: any) => void }) {
   const { run } = useCommand();
   const stage = lineStage(order, line);
-  const full = to < 1;
   const v = order.version;
-  return <ReasonDialog danger title={full ? `${t('حذف صنف')}: ${L(line.name)}` : `${t('إنقاص')} ${L(line.name)}: ${qty(line.quantity)} ← ${to}`} kind="LINE_VOID" ops={['Order.RemoveLine', 'Order.UpdateLine', 'Approval.Grant']} onClose={onClose}
-    note={stage === 'S1' ? t('الصنف ده ظهر للزبون في الشيك المبدئي. الشيل محتاج سبب وموافقة مدير، ومتسجل باسمك واسم المدير — مش هيختفي من السجل.') : t('حتى قبل الإرسال، الشيل محتاج موافقة مدير (حسب إعدادات المطعم)، ومتسجل في سجل الشيك باسمك واسم المدير.')}
-    onOk={(rc, note) => full
-      ? run('Order.RemoveLine', { params: { orderId: order.id, lineId: line.id }, query: { expectedVersion: v, expectedLineVersion: line.version }, body: { expectedVersion: v, expectedLineVersion: line.version, reasonCode: rc, reason: note } }, { success: t('الصنف اتشال واتسجل') })
-      : run('Order.UpdateLine', { params: { orderId: order.id, lineId: line.id }, body: { expectedVersion: v, expectedLineVersion: line.version, quantity: String(to), reasonCode: rc, reason: note } }, { success: t('الكمية اتقللت واتسجلت') })}>
+  return <ReasonDialog danger title={`${t('حذف صنف')}: ${L(line.name)}`} kind="LINE_VOID" ops={['Order.RemoveLine', 'Approval.Grant']} onClose={onClose}
+    onOk={async (rc, note) => {
+      const r = await run('Order.RemoveLine', { params: { orderId: order.id, lineId: line.id }, query: { expectedVersion: v, expectedLineVersion: line.version }, body: { expectedVersion: v, expectedLineVersion: line.version, reasonCode: rc, reason: note } }, { success: t('تم حذف الصنف وتسجيله') });
+      if (r) onDone?.(line);
+      return r;
+    }}>
     <div className="flex items-center gap-2 text-xs"><Pill tone={stage === 'S1' ? 'warning' : 'info'} data-fb="remove-stage">{t(STAGE_TEXT[stage].short)}</Pill></div>
   </ReasonDialog>;
 }

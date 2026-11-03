@@ -43,7 +43,7 @@ export const floorHandlers: Record<string, Handler> = {
     return page(tables.map((t) => {
       const v = openVisitOn(ctx, t.id);
       const res = ctx.db.reservations.find((r) => r.tableId === t.id && r.state === 'BOOKED');
-      return { ...t, ...placeOf(ctx, t), occupancy: v ? { visitId: v.id, primary: v.tableId === t.id, guestCount: v.guestCount, serverName: userName(ctx.db, v.serverUserId), openedAt: v.openedAt, minutesSeated: Math.floor((ctx.now - v.openedAtMs) / 60000), checks: openChecks(ctx, v.id).length, payable: m4(openChecks(ctx, v.id).reduce((a, o) => a + Number(computeTotals(o).payable), 0)) } : null, reservation: res ? { id: res.id, at: res.at, customer: res.customer, partySize: res.partySize } : null };
+      return { ...t, ...placeOf(ctx, t), occupancy: v ? { visitId: v.id, primary: v.tableId === t.id, guestCount: v.guestCount, serverUserId: v.serverUserId, serverName: userName(ctx.db, v.serverUserId), openedAt: v.openedAt, minutesSeated: Math.floor((ctx.now - v.openedAtMs) / 60000), checks: openChecks(ctx, v.id).length, payable: m4(openChecks(ctx, v.id).reduce((a, o) => a + Number(computeTotals(o).payable), 0)) } : null, reservation: res ? { id: res.id, at: res.at, customer: res.customer, partySize: res.partySize } : null };
     }), ctx.query);
   },
   'Table.Create': (ctx) => {

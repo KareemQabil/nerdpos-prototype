@@ -154,7 +154,7 @@ export function Popup({ open, onClose, title, children, footer, size = 'md', bar
  * Popover anchored to a button (1–2 fields, quick choices, overflow menus). Opens above or below the anchor,
  * aligned to its inline start or end (RTL aware), closes on Esc and outside press.
  */
-export function Popover({ anchor, open, onClose, children, side = 'top', align = 'end', width = 280, className, fb }: { anchor: HTMLElement | null; open: boolean; onClose: () => void; children: React.ReactNode; side?: 'top' | 'bottom'; align?: 'start' | 'end'; width?: number; className?: string; fb?: string }) {
+export function Popover({ anchor, open, onClose, children, side = 'top', align = 'end', width = 280, className, fb, label }: { anchor: HTMLElement | null; open: boolean; onClose: () => void; children: React.ReactNode; side?: 'top' | 'bottom' | 'auto'; align?: 'start' | 'end'; width?: number; className?: string; fb?: string; label?: string }) {
   useEscape(open, onClose);
   const ref = useRef<HTMLDivElement>(null);
   const [, force] = useState(0);
@@ -173,10 +173,14 @@ export function Popover({ anchor, open, onClose, children, side = 'top', align =
   // inline start of the anchor: right edge in RTL, left edge in LTR
   let left = (align === 'start') === rtl ? r.right - width : r.left;
   left = Math.max(8, Math.min(left, vw - width - 8));
-  const style: React.CSSProperties = { position: 'fixed', left, width, zIndex: 90, ...(side === 'top' ? { bottom: window.innerHeight - r.top + 8 } : { top: r.bottom + 8 }) };
+  // 'auto': the side with more room; the panel never runs off the screen (it scrolls inside instead)
+  const below = window.innerHeight - r.bottom - 16, above = r.top - 16 - 48;
+  const s = side === 'auto' ? (below >= 340 || below >= above ? 'bottom' : 'top') : side;
+  const room = Math.max(160, Math.min(window.innerHeight * 0.8, s === 'top' ? above : below));
+  const style: React.CSSProperties = { position: 'fixed', left, width, zIndex: 90, maxHeight: room, ...(s === 'top' ? { bottom: window.innerHeight - r.top + 8 } : { top: r.bottom + 8 }) };
   const device = (anchor.closest('[data-device]') as HTMLElement | null)?.dataset.device;
   return createPortal(
-    <div ref={ref} style={style} role="menu" data-device={device} data-fb={fb} className={cn('overlay-panel rounded-2xl p-1.5 animate-scale-in max-h-[70vh] overflow-y-auto', className)}>{children}</div>,
+    <div ref={ref} style={style} role="menu" aria-label={label} data-device={device} data-fb={fb} className={cn('overlay-panel rounded-2xl p-1.5 animate-scale-in overflow-y-auto', className)}>{children}</div>,
     document.body,
   );
 }

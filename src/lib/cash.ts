@@ -48,3 +48,29 @@ export function quickCash(due: string, count = 3): string[] {
 export function addQty(q: string, n: string | number): string {
   return D(q).plus(D(String(n))).toString();
 }
+
+/** Sum of server amounts (strings) at scale 4 — for a display total of several checks. */
+export function sumAmounts(xs: (string | null | undefined)[]): string {
+  return xs.reduce<ReturnType<typeof D>>((a, x) => (isNum(x ?? '') ? a.plus(D(x!)) : a), D(0)).toFixed(4);
+}
+
+/** Compare two quantities (decimal strings): -1, 0 or 1. */
+export function cmpQty(a: string, b: string): number {
+  return D(a || '0').comparedTo(D(b || '0'));
+}
+
+/** a − b for quantities, as a plain decimal string. */
+export function subQty(a: string, b: string): string {
+  return D(a || '0').minus(D(b || '0')).toString();
+}
+
+/** A typed quantity is usable: a number above zero with at most `decimals` decimal places. */
+export function validQty(v: string, decimals: number): boolean {
+  if (!/^\d+(\.\d+)?$/.test(v)) return false;
+  return D(v).greaterThanOrEqualTo(0) && D(v).decimalPlaces() <= decimals;
+}
+
+/** Sum of quantities (decimal strings) as a plain decimal string. */
+export function sumQty(xs: string[]): string {
+  return xs.reduce<ReturnType<typeof D>>((a, x) => a.plus(D(x || '0')), D(0)).toString();
+}

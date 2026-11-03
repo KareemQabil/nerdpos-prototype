@@ -289,3 +289,12 @@ input, select, textarea { font: inherit; color: inherit; }
 @utility line { border-color: var(--line); }
 @utility text-dim { color: var(--text-dim); }
 @utility text-soft { color: var(--text-soft); }
+
+/* ux-03: the cart line just added / changed glows for a moment; a tapped product tile gives a short press feedback */
+@keyframes line-flash { 0% { background: color-mix(in srgb, var(--primary) 26%, var(--glass-bg-strong)); box-shadow: inset 3px 0 0 var(--primary); } 100% { background: var(--glass-bg-strong); box-shadow: inset 3px 0 0 transparent; } }
+.line-flash { animation: line-flash 1.4s ease-out; }
+@keyframes tile-press { 0% { transform: scale(.94); box-shadow: 0 0 0 3px var(--primary); } 100% { transform: scale(1); box-shadow: 0 0 0 0 transparent; } }
+.tile-press { animation: tile-press .32s ease-out; }
+@keyframes undo-in { from { transform: translateY(10px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
+.undo-in { animation: undo-in .18s ease-out; }
+@media (prefers-reduced-motion: reduce) { .line-flash, .tile-press, .undo-in { animation: none; } }

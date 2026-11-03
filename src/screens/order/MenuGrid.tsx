@@ -94,7 +94,7 @@ function useClockTick(onTick: () => void) {
  * `onOptions` (long-press on a tile, or its visible ⋯ button) opens quantity / options / note for that item.
  * `toolbarStart` / `toolbarEnd` add controls to the search row (the sale screen's mode switch and typed quantity).
  */
-export function MenuGrid({ channel, onPick, disabled, salesChannelId, onOptions, toolbarStart, toolbarEnd, size = 'md' }: { channel: string; onPick: (p: any) => void; disabled?: boolean; salesChannelId?: string | null; onOptions?: (p: any) => void; toolbarStart?: React.ReactNode; toolbarEnd?: React.ReactNode; size?: 'md' | 'lg' }) {
+export function MenuGrid({ channel, onPick, disabled, salesChannelId, onOptions, toolbarStart, toolbarEnd, size = 'md', inCart, above }: { channel: string; onPick: (p: any) => void; disabled?: boolean; salesChannelId?: string | null; onOptions?: (p: any) => void; toolbarStart?: React.ReactNode; toolbarEnd?: React.ReactNode; size?: 'md' | 'lg'; inCart?: Record<string, string>; above?: React.ReactNode }) {
   const { auth, can } = useDev();
   const cats = useQuery<any>('Category.List', { query: { active: true } });
   const products = useQuery<any>('Catalog.Search', { query: { active: true, limit: 500, channel } });
@@ -106,6 +106,8 @@ export function MenuGrid({ channel, onPick, disabled, salesChannelId, onOptions,
   useClockTick(() => { const m = Math.floor(clock.now() / 60_000); if (m !== minuteRef.current) { minuteRef.current = m; setMinute(m); products.refetch(); overview.refetch(); } });
   const [cat, setCat] = useState<string | null>(null);
   const [q, setQ] = useState('');
+  const [hi, setHi] = useState(-1); // search result moved to with the arrow keys
+  useEffect(() => setHi(-1), [q]);
   const [showAll, setShowAll] = useState(false);
   const [board, setBoard] = useState(false);
   const items: any[] = products.data?.items ?? [];
@@ -136,6 +138,16 @@ export function MenuGrid({ channel, onPick, disabled, salesChannelId, onOptions,
     onPick(p);
     return true;
   };
+  const usable = (p: any) => onMenu(p) && p.availability?.state !== 'SOLD_OUT' && !quoteOf(p.id)?.error;
+  /** Enter in the search box: the exact code, the result chosen with the arrows, or the single result. */
+  const searchEnter = () => {
+    if (!q.trim()) return;
+    if (byCode(q)) { if (pickCode(q)) setQ(''); return; }
+    const hits = visible.filter(usable);
+    const p = hi >= 0 ? visible[hi] : hits.length === 1 ? hits[0] : null;
+    if (p && usable(p)) { onPick(p); setQ(''); }
+    else if (!hits.length) toast('warning', t('لا يوجد صنف بهذا الاسم'), q);
+  };
   const pickRef = React.useRef(pickCode);
   pickRef.current = pickCode;
   useEffect(() => {
@@ -165,7 +177,14 @@ export function MenuGrid({ channel, onPick, disabled, salesChannelId, onOptions,
     <div className="@container/menu flex flex-col gap-3 min-h-0 h-full">
       <div className="flex items-center gap-2 shrink-0">
         {toolbarStart}
-        <div className="relative flex-1 min-w-0"><Search className="w-4 h-4 absolute top-1/2 -translate-y-1/2 start-3 text-dim" /><Input data-fb="menu-search" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && byCode(q) && pickCode(q)) setQ(''); if (e.key === 'Escape' && q) { e.stopPropagation(); setQ(''); } }} placeholder={t('ابحث بالاسم أو الكود')} className={cn('ps-9', size === 'lg' ? '!h-12' : '!h-11')} /></div>
+        <div className="relative flex-1 min-w-0"><Search className="w-4 h-4 absolute top-1/2 -translate-y-1/2 start-3 text-dim" /><Input data-fb="menu-search" value={q} onChange={(e) => setQ(e.target.value)} aria-activedescendant={hi >= 0 && visible[hi] ? `tile-${visible[hi].id}` : undefined}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { e.preventDefault(); searchEnter(); }
+            else if (e.key === 'ArrowDown' && q) { e.preventDefault(); setHi((h) => Math.min(visible.length - 1, h + 1)); }
+            else if (e.key === 'ArrowUp' && q) { e.preventDefault(); setHi((h) => Math.max(0, h - 1)); }
+            else if (e.key === 'Escape' && q) { e.stopPropagation(); setQ(''); }
+            else if (e.key === 'Escape') (e.target as HTMLInputElement).blur();
+          }} placeholder={t('ابحث بالاسم أو الكود')} className={cn('ps-9', size === 'lg' ? '!h-12' : '!h-11')} /></div>
         {toolbarEnd}
         <button data-fb="menu:soldout-board" onClick={() => setBoard(true)} title={t('خلص النهارده')} className={cn('shrink-0 px-3 rounded-xl border text-sm inline-flex items-center gap-1.5', size === 'lg' ? 'h-12' : 'h-11', soldOutCount ? 'border-[color-mix(in_srgb,var(--error)_45%,transparent)] text-[var(--error)] bg-[color-mix(in_srgb,var(--error)_10%,transparent)]' : 'border-[var(--glass-border)] text-soft surface-1')}>
           <PackageX className="w-4 h-4" /><span className="hidden @[460px]/menu:inline">{t('خلص النهارده')}</span>{soldOutCount > 0 && <span className="num text-xs font-bold">{soldOutCount}</span>}
@@ -185,6 +204,7 @@ export function MenuGrid({ channel, onPick, disabled, salesChannelId, onOptions,
           )}
         </div>
       )}
+      {above}
       <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide shrink-0" data-fb="category-rail" role="tablist">
         <CatPill on={!cat} onClick={() => setCat(null)} label={t('الكل')} count={listed.length} />
         {catsShown.map((c: any) => <CatPill key={c.id} on={cat === c.id} onClick={() => setCat(c.id)} label={L(c.name)} count={listed.filter((p) => p.categoryId === c.id).length} proposed={c.id === 'cat_direction'} />)}
@@ -193,7 +213,7 @@ export function MenuGrid({ channel, onPick, disabled, salesChannelId, onOptions,
         <EmptyState compact icon={<Search />} title={q ? t('لا يوجد صنف بهذا الاسم') : t('لا توجد أصناف متاحة الآن')} action={q ? <Button size="sm" onClick={() => setQ('')}>{t('مسح البحث')}</Button> : undefined} />
       ) : (
         <div className="grid gap-2.5 overflow-y-auto pe-1 pb-2" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${size === 'lg' ? 148 : 132}px, 1fr))`, gridAutoRows: 'max-content', alignContent: 'start' }} data-fb="menu-tiles">
-          {visible.map((p) => <Tile key={p.id} p={p} quote={quoteOf(p.id)} onPick={() => onPick(p)} onOptions={onOptions ? () => onOptions(p) : undefined} disabled={disabled} />)}
+          {visible.map((p, i) => <Tile key={p.id} p={p} quote={quoteOf(p.id)} onPick={() => onPick(p)} onOptions={onOptions ? () => onOptions(p) : undefined} disabled={disabled} inCart={inCart?.[p.id]} active={i === hi} />)}
         </div>
       )}
       <Modal open={board} onClose={() => setBoard(false)} xwide title={<span className="inline-flex items-center gap-2"><PackageX className="w-5 h-5 text-[var(--error)]" />{t('خلص النهارده')}</span>} badge={<StateBadge ops={['SoldOut.Board', 'Product.SetAvailability', 'ModifierOption.SetAvailability']} />}
@@ -215,7 +235,10 @@ function CatPill({ on, onClick, label, count, proposed }: { on: boolean; onClick
   );
 }
 
-function Tile({ p, quote, onPick, onOptions, disabled }: { p: any; quote?: QuoteState; onPick: () => void; onOptions?: () => void; disabled?: boolean }) {
+function Tile({ p, quote, onPick, onOptions, disabled, inCart, active }: { p: any; quote?: QuoteState; onPick: () => void; onOptions?: () => void; disabled?: boolean; inCart?: string; active?: boolean }) {
+  const [press, setPress] = useState(0); // a short press feedback on every tap (even a fast repeat)
+  const ref = React.useRef<HTMLButtonElement>(null);
+  useEffect(() => { if (active) ref.current?.scrollIntoView({ block: 'nearest' }); }, [active]);
   // long-press (touch or mouse) opens quantity / options / note; the visible ⋯ button does the same
   const lp = React.useRef<{ t: ReturnType<typeof setTimeout> | null; fired: boolean }>({ t: null, fired: false });
   const stop = () => { if (lp.current.t) clearTimeout(lp.current.t); lp.current.t = null; };
@@ -230,12 +253,12 @@ function Tile({ p, quote, onPick, onOptions, disabled }: { p: any; quote?: Quote
   const reason = off ? L({ ar: p.menuNow.reasonAr, en: p.menuNow.reasonEn }) : soldOut ? (tv(p.availability?.reason) ?? t('خلص النهارده')) : tv(err?.details?.reasonAr) ?? tv(p.availability?.reason) ?? '';
   return (
     <div className="relative min-w-0">
-    <button data-fb={`tile:${p.sku}`} disabled={disabled || blocked} title={reason}
-      onClick={() => { if (lp.current.fired) { lp.current.fired = false; return; } onPick(); }}
+    <button ref={ref} id={`tile-${p.id}`} key={press} data-fb={`tile:${p.sku}`} data-active={active || undefined} disabled={disabled || blocked} title={reason}
+      onClick={() => { if (lp.current.fired) { lp.current.fired = false; return; } setPress((x) => x + 1); onPick(); }}
       onPointerDown={onOptions ? () => { lp.current.fired = false; stop(); lp.current.t = setTimeout(() => { lp.current.fired = true; onOptions(); }, 480); } : undefined}
       onPointerUp={stop} onPointerLeave={stop} onPointerCancel={stop}
       onContextMenu={onOptions ? (e) => e.preventDefault() : undefined}
-      className={cn('relative w-full overflow-hidden rounded-xl bg-[var(--card-raised)] border border-[var(--glass-border)] flex flex-col text-start transition-all hover:border-[color-mix(in_srgb,var(--primary)_55%,transparent)] hover:shadow-[0_6px_24px_-10px_var(--primary-glow)] active:scale-[.96] select-none [-webkit-touch-callout:none]', blocked && 'opacity-55 cursor-not-allowed hover:border-[var(--glass-border)] hover:shadow-none')}>
+      className={cn('relative w-full overflow-hidden rounded-xl bg-[var(--card-raised)] border border-[var(--glass-border)] flex flex-col text-start transition-all hover:border-[color-mix(in_srgb,var(--primary)_55%,transparent)] hover:shadow-[0_6px_24px_-10px_var(--primary-glow)] active:scale-[.96] select-none [-webkit-touch-callout:none]', press > 0 && 'tile-press', active && 'ring-2 ring-[var(--primary)] border-[var(--primary)]', blocked && 'opacity-55 cursor-not-allowed hover:border-[var(--glass-border)] hover:shadow-none')}>
       <div className="relative aspect-[4/3] w-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${p.colorCode ?? '#64748b'}40, var(--surface-2))` }}>
         {p.imageUrl ? <img src={p.imageUrl} alt="" className={cn('w-full h-full object-cover', (soldOut || off) && 'grayscale')} /> : <Package className="w-10 h-10 text-dim opacity-60" />}
         <div className="absolute top-2 end-2 flex flex-col gap-1 items-end">
@@ -245,6 +268,7 @@ function Tile({ p, quote, onPick, onOptions, disabled }: { p: any; quote?: Quote
           {noPrice && <Pill tone="warning">{err?.code === 'PRICE_NOT_FOUND' ? t('السعر مش متاح') : err?.network ? t('السعر ما اتحملش') : t('مش متاح')}</Pill>}
           {p.direction && <Tech><Pill tone="violet">{t('مقترح')}</Pill></Tech>}
         </div>
+        {inCart && <span className="absolute bottom-1.5 end-1.5 min-w-7 h-7 px-1.5 rounded-full bg-[var(--primary)] text-[var(--primary-foreground)] text-xs font-bold num inline-flex items-center justify-center shadow" data-fb={`tile-incart:${p.sku}`} title={t('في السلة')}>× {inCart}</span>}
         <div className="absolute top-2 start-2 flex flex-col gap-1 items-start">
           {p.combo?.length > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-500/80 text-white font-bold inline-flex items-center gap-0.5"><Layers className="w-3 h-3" />{t('وجبة')}</span>}
           {p.halfAndHalf && <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-500/80 text-white font-bold inline-flex items-center gap-0.5"><Pizza className="w-3 h-3" />{t('نص ونص')}</span>}
