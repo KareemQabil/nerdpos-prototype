@@ -8,10 +8,12 @@
 export type SaleAction =
   | 'new' | 'held' | 'customer' | 'discount' | 'orders'
   | 'note' | 'prebill' | 'comp' | 'move' | 'split' | 'merge' | 'channel' | 'cancel' | 'history'
-  | 'delivery' | 'staffMeal' | 'staffMeals' | 'soldOut' | 'drawer' | 'mode' | 'search' | 'shortcuts' | 'more';
+  | 'delivery' | 'staffMeal' | 'staffMeals' | 'soldOut' | 'drawer' | 'mode' | 'search' | 'shortcuts' | 'more'
+  | 'guests' | 'label' | 'undo' | 'viewTables' | 'viewChecks' | 'viewClosed';
 
 /** What the big primary button does; 'auto' follows the check state (send → pay → finish paying). */
 export type PrimaryAction = 'auto' | 'send' | 'pay' | 'seat' | 'ready' | 'delivered' | 'dispatch' | 'confirm';
+// waiter: 'send' = إرسال للمطبخ (unsent lines) → then الشيك المبدئي; the waiter never takes payment (no drawer).
 
 export type QuantityMethod = 'typedPrefix' | 'repeatTap' | 'stepper' | 'swipe' | 'longPress';
 
@@ -34,16 +36,16 @@ const ALL_QTY: Record<QuantityMethod, boolean> = { typedPrefix: true, repeatTap:
 const TOUCH_QTY: Record<QuantityMethod, boolean> = { typedPrefix: false, repeatTap: true, stepper: true, swipe: true, longPress: true };
 const NO_QTY: Record<QuantityMethod, boolean> = { typedPrefix: false, repeatTap: false, stepper: false, swipe: false, longPress: false };
 const g = (ar: string, en: string) => ({ ar, en });
-const SALE_OVERFLOW: SaleAction[] = ['delivery', 'staffMeal', 'staffMeals', 'prebill', 'comp', 'channel', 'cancel', 'history', 'soldOut', 'drawer', 'shortcuts'];
+const SALE_OVERFLOW: SaleAction[] = ['label', 'delivery', 'staffMeal', 'staffMeals', 'prebill', 'comp', 'channel', 'cancel', 'history', 'soldOut', 'drawer', 'shortcuts'];
 
 export const PROFILES: Profile[] = [
   // ── floor & counter
   { id: 'cashier', group: g('الصالة والكاونتر', 'Floor & counter'), role: g('كاشير', 'Cashier'), workspaces: ['counter', 'checks', 'shift', 'receipt', 'refunds'], start: 'counter',
     actionBar: { secondary: ['new', 'held', 'customer', 'discount', 'orders'], overflow: SALE_OVERFLOW, primary: 'auto' }, quantity: ALL_QTY, input: 'mixed', hidden: ['expectedCash', 'reports'] },
   { id: 'waiter', group: g('الصالة والكاونتر', 'Floor & counter'), role: g('ويتر', 'Waiter'), workspaces: ['floor', 'order'], start: 'floor',
-    actionBar: { secondary: ['customer', 'prebill', 'move', 'note'], overflow: ['split', 'merge', 'history'], primary: 'send' }, quantity: TOUCH_QTY, input: 'touch', hidden: ['collection', 'drawer', 'reports'] },
+    actionBar: { secondary: ['guests', 'prebill', 'move', 'note'], overflow: ['customer', 'split', 'merge', 'history', 'cancel'], primary: 'send' }, quantity: TOUCH_QTY, input: 'touch', hidden: ['collection', 'drawer', 'reports'] },
   { id: 'captain', group: g('الصالة والكاونتر', 'Floor & counter'), role: g('كابتن صالة', 'Floor captain'), workspaces: ['floor', 'order', 'reservations'], start: 'floor',
-    actionBar: { secondary: ['move', 'merge', 'split', 'prebill'], overflow: ['history', 'note'], primary: 'send' }, quantity: TOUCH_QTY, input: 'touch', hidden: ['drawer', 'financialReports'] },
+    actionBar: { secondary: ['guests', 'prebill', 'move', 'merge', 'split'], overflow: ['note', 'customer', 'history', 'cancel'], primary: 'send' }, quantity: TOUCH_QTY, input: 'touch', hidden: ['drawer', 'financialReports'] },
   { id: 'host', group: g('الصالة والكاونتر', 'Floor & counter'), role: g('مستقبل وحجوزات', 'Host & reservations'), workspaces: ['reservations', 'floor'], start: 'reservations',
     actionBar: { secondary: [], overflow: [], primary: 'seat' }, quantity: NO_QTY, input: 'touch', hidden: ['orders', 'payment'] },
   { id: 'runner', group: g('الصالة والكاونتر', 'Floor & counter'), role: g('رانر', 'Runner'), workspaces: ['kitchen'], start: 'kitchen',
@@ -94,6 +96,7 @@ export const profileById = (id: string) => PROFILES.find((p) => p.id === id) ?? 
 /** Default keys of the sale screen (per device they can be remapped without conflicts — see keymap.ts). */
 export const SALE_KEYS: Partial<Record<SaleAction | 'primary', string>> = {
   shortcuts: 'F1', new: 'F2', held: 'F3', customer: 'F4', discount: 'F6', orders: 'F7', more: 'F8', mode: 'F9', search: 'F10', primary: 'Enter',
+  viewTables: 'PageUp', viewChecks: 'PageDown', viewClosed: 'End',
 };
 
 /**

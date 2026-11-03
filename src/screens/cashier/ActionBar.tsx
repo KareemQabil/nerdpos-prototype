@@ -25,7 +25,7 @@ export interface BarAction {
   fb?: string;
   hotkey?: string;
 }
-export interface PrimaryState { kind: 'send' | 'pay' | 'resume' | 'new'; label: string; icon: React.ReactElement; amount?: string | null; count?: number; disabled?: boolean; run: () => void; fb: string; hotkey?: string }
+export interface PrimaryState { kind: 'send' | 'pay' | 'resume' | 'new' | 'prebill' | 'back'; label: string; icon: React.ReactElement; amount?: string | null; count?: number; disabled?: boolean; run: () => void; fb: string; hotkey?: string }
 
 export function ActionBar({ secondary, overflow, primary, moreKey, showKeys, start, moreRef }: { secondary: BarAction[]; overflow: BarAction[]; primary: PrimaryState; moreKey?: string; showKeys: boolean; start?: React.ReactNode; moreRef?: React.MutableRefObject<(() => void) | null> }) {
   const moreBtn = useRef<HTMLButtonElement>(null);
@@ -87,10 +87,10 @@ function BarButton({ a, showKeys, btnRef, pressed }: { a: BarAction; showKeys: b
 }
 
 function PrimaryButton({ p, showKeys }: { p: PrimaryState; showKeys: boolean }) {
-  const tone = p.kind === 'send' ? 'btn-primary-grad' : 'bg-[var(--success)] text-white shadow-[0_8px_24px_-10px_var(--success)] hover:brightness-110';
+  const tone = p.kind === 'send' ? 'btn-primary-grad' : p.kind === 'prebill' || p.kind === 'back' ? 'bg-[var(--violet)] text-white shadow-[0_8px_24px_-10px_var(--violet)] hover:brightness-110' : 'bg-[var(--success)] text-white shadow-[0_8px_24px_-10px_var(--success)] hover:brightness-110';
   return (
     <button type="button" onClick={p.run} disabled={p.disabled} data-fb={p.fb} data-kind={p.kind}
-      className={cn('shrink-0 h-14 min-w-[240px] px-5 rounded-2xl flex items-center justify-center gap-3 font-bold text-lg transition-[filter,transform,opacity] active:scale-[.98] disabled:opacity-40 disabled:saturate-50 disabled:active:scale-100 [&>svg]:w-6 [&>svg]:h-6', tone)}>
+      className={cn('shrink-0 h-14 min-w-[188px] xl:min-w-[240px] px-5 rounded-2xl flex items-center justify-center gap-3 font-bold text-lg transition-[filter,transform,opacity] active:scale-[.98] disabled:opacity-40 disabled:saturate-50 disabled:active:scale-100 [&>svg]:w-6 [&>svg]:h-6', tone)}>
       {p.icon}
       <span className="whitespace-nowrap">{p.label}</span>
       {p.count ? <span className="num text-base opacity-90">({p.count})</span> : null}

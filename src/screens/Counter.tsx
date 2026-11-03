@@ -11,5 +11,5 @@ export default function Counter() {
   if (!terminal?.drawer) return <div data-screen="C2"><NoDrawer /></div>;
   if (session.loading && !session.data) return <Skeleton className="h-64 rounded-2xl" />;
   if (!session.data) return <div data-screen="C2" className="h-full flex items-center justify-center"><NoShift onOpen={() => nav('shift')} /></div>;
-  return <CashierScreen sessionId={session.data.id} staffMealOnOpen={screen === 'staffmeal'} />;
+  return <CashierScreen sessionId={session.data.id} businessDate={session.data.businessDate ?? null} staffMealOnOpen={screen === 'staffmeal'} />;
 }

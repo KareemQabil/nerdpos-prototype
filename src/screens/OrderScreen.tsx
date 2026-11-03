@@ -9,6 +9,7 @@ import { ProductDialog, type LineDraft } from './order/ProductDialog';
 import { CheckPanel } from './order/CheckPanel';
 import { Button, Banner, StateBadge, Skeleton, EmptyState } from '../ui';
 import { t } from '../i18n';
+import { WaiterCheck } from './waiter/WaiterCheck';
 
 export function needsDialog(p: any) {
   return p.modifierGroupIds?.length || p.variants?.length || p.combo?.length || p.halfAndHalf;
@@ -61,7 +62,9 @@ export function OrderWorkspace({ orderId, mode, back }: { orderId: string; mode:
 }
 
 export default function OrderScreen() {
-  const { params, nav } = useDev();
+  const { params, nav, kind } = useDev();
+  // on the waiter's tablet a check always opens in the waiter layout (products | check | waiter action bar)
+  if (kind === 'FLOOR' && params.orderId) return <WaiterCheck orderId={params.orderId} onBack={() => nav(params.back ?? 'floor', {})} onSwitch={(id) => nav('order', { ...params, orderId: id })} />;
   if (!params.orderId) return <EmptyState icon={<Receipt />} title={t('مفيش شيك مفتوح')} text={t('افتح شيك من الصالة أو من شاشة الشيكات.')} action={<><Button variant="primary" onClick={() => nav('floor')}>{t('الصالة')}</Button><Button onClick={() => nav('checks')}>{t('الشيكات')}</Button></>} />;
   return <OrderWorkspace orderId={params.orderId} mode={params.mode ?? 'FLOOR'} back={() => nav(params.back ?? 'floor')} />;
 }

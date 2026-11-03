@@ -67,7 +67,7 @@ function StageBanner({ stage, paidOn, bookedOn }: { stage: 'S2' | 'S3'; paidOn: 
     : <Banner tone="info" title={t('مرتجع في نفس اليوم')}><span data-fb="refund-stage:S2">{t('الفلوس هتطلع من درج الكاشير اللي على الجهاز ده، والمدير يوافق هنا على نفس الجهاز.')}</span></Banner>;
 }
 
-function RefundForm({ orderId, onDone }: { orderId: string; onDone: () => void }) {
+export function RefundForm({ orderId, onDone }: { orderId: string; onDone: () => void }) {
   const rf = useQuery<any>('Refund.Refundable', { params: { orderId } });
   const reasons = useReasons('REFUND');
   const { terminal } = useDev();
