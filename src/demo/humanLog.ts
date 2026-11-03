@@ -29,7 +29,7 @@ export const actorById = (id: string): Actor => { const u = store.db.users.find(
 export function egp(v: unknown): string {
   const n = Number(v);
   if (v === undefined || v === null || v === '' || !Number.isFinite(n)) return String(v ?? '');
-  return `${Number.isInteger(n) ? n : n.toFixed(2)} ${isEn() ? 'EGP' : 'جنيه'}`;
+  return `${Number.isInteger(n) ? n : n.toFixed(2)} ${isEn() ? 'EGP' : 'ج.م'}`;
 }
 const tableName = (id: string | undefined) => store.db.tables.find((x) => x.id === id)?.name ?? id ?? '';
 const productName = (id: string | undefined) => { const p = store.db.products.find((x) => x.id === id); return p ? L(p.name as any) || String(p.name) : id ?? ''; };

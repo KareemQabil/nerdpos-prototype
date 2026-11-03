@@ -2,7 +2,8 @@
 import React, { useState } from 'react';
 import { CalendarPlus, UserCheck, UserX, PiggyBank, CalendarClock, Phone, Users } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../app/hooks';
-import { PageHeader, Button, Field, Input, Select, Money, Table, Pill, Banner, Tabs, Drawer, FilterChips, Toolbar, EmptyState, confirmDialog } from '../ui';
+import { PageHeader, Button, Field, Input, Select, Money, Table, Pill, Banner, Tabs, Popup, Kbd, FilterChips, Toolbar, EmptyState, confirmDialog } from '../ui';
+import { sign } from '../lib/cash';
 import { Tech } from '../app/tech';
 import { t } from '../i18n';
 import { dateTime, time, money } from '../lib/format';
@@ -69,7 +70,7 @@ function NewReservation({ drawer, onClose }: { drawer: boolean; onClose: () => v
   const [f, setF] = useState({ customer: '', phone: '', partySize: '4', at: new Date(clock.now() + 2 * 3600_000).toISOString().slice(0, 16), tableId: '', noShowFee: '100', deposit: drawer ? '200' : '0', method: 'CASH', reference: '' });
   const create = async () => {
     let depositId: string | undefined;
-    if (Number(f.deposit) > 0) {
+    if (sign(f.deposit) > 0) {
       const d = await run<any>('Deposit.Create', { body: { customer: f.customer, phone: f.phone, amount: f.deposit, method: f.method, reference: f.reference || undefined, purpose: 'BOOKING' } });
       if (!d) return;
       depositId = d.id;
@@ -78,9 +79,9 @@ function NewReservation({ drawer, onClose }: { drawer: boolean; onClose: () => v
     if (r) onClose();
   };
   return (
-    <Drawer open onClose={onClose} title={t('حجز جديد')} badge={<Tech><Pill tone="violet" size="sm">{t('مقترح')}</Pill></Tech>} width="md" icon={<CalendarPlus />}
-      footer={<><Button variant="ghost" onClick={onClose}>{t('رجوع')}</Button><Button variant="primary" size="lg" loading={busy} disabled={!f.customer || !f.phone} onClick={create} data-fb="reservation-create">{t('احجز')}</Button></>}>
-      <div className="space-y-4">
+    <Popup open onClose={onClose} size="md" fb="reservation-popup" title={<span className="flex items-center gap-2"><CalendarPlus className="w-5 h-5 text-[var(--primary)]" />{t('حجز جديد')}<Tech><Pill tone="violet" size="sm">{t('مقترح')}</Pill></Tech></span>}
+      footer={<><Button variant="ghost" size="lg" onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" size="lg" loading={busy} disabled={!f.customer || !f.phone} onClick={create} data-fb="reservation-create">{t('حفظ الحجز')}<Kbd className="!bg-black/10 !border-black/10 !text-current">Enter</Kbd></Button></>}>
+      <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); if (f.customer && f.phone && !busy) create(); }} onKeyDown={(e) => { if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') { e.preventDefault(); if (f.customer && f.phone && !busy) create(); } }}>
         <div className="grid grid-cols-2 gap-3">
           <Field label={t('الاسم')} required><Input value={f.customer} onChange={(e) => setF({ ...f, customer: e.target.value })} /></Field>
           <Field icon={<Phone />} label={t('الموبايل')} required><Input value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} className="num" dir="ltr" inputMode="tel" /></Field>
@@ -95,13 +96,13 @@ function NewReservation({ drawer, onClose }: { drawer: boolean; onClose: () => v
         <div className="rounded-2xl surface-1 border line p-3 space-y-3">
           <div className="text-sm font-bold flex items-center gap-1.5"><PiggyBank className="w-4 h-4 text-[var(--primary)]" />{t('العربون والغرامة')}</div>
           <div className="grid grid-cols-2 gap-3">
-            <Field label={t('العربون (جنيه)')} hint={drawer ? undefined : t('العربون محتاج جهاز فيه درج مفتوح')}><Input value={f.deposit} onChange={(e) => setF({ ...f, deposit: e.target.value.replace(/[^0-9.]/g, '') })} inputMode="decimal" /></Field>
-            <Field label={t('غرامة عدم الحضور')}><Input value={f.noShowFee} onChange={(e) => setF({ ...f, noShowFee: e.target.value.replace(/[^0-9.]/g, '') })} inputMode="decimal" /></Field>
+            <Field label={t('العربون (ج.م)')} hint={drawer ? undefined : t('العربون محتاج جهاز فيه درج مفتوح')}><Input value={f.deposit} onChange={(e) => setF({ ...f, deposit: e.target.value.replace(/[^0-9.]/g, '') })} inputMode="decimal" /></Field>
+            <Field label={t('غرامة عدم الحضور (ج.م)')}><Input value={f.noShowFee} onChange={(e) => setF({ ...f, noShowFee: e.target.value.replace(/[^0-9.]/g, '') })} inputMode="decimal" /></Field>
           </div>
-          {Number(f.deposit) > 0 && <Field label={t('العربون اتدفع إزاي')}><Select value={f.method} onChange={(e) => setF({ ...f, method: e.target.value })} options={['CASH', 'CARD', 'DIGITAL_WALLET'].map((m) => ({ value: m, label: methodText(m) }))} /></Field>}
-          {Number(f.deposit) > 0 && f.method !== 'CASH' && <Field label={t('رقم العملية')}><Input value={f.reference} onChange={(e) => setF({ ...f, reference: e.target.value })} className="num" /></Field>}
+          {sign(f.deposit) > 0 && <Field label={t('العربون اتدفع إزاي')}><Select value={f.method} onChange={(e) => setF({ ...f, method: e.target.value })} options={['CASH', 'CARD', 'DIGITAL_WALLET'].map((m) => ({ value: m, label: methodText(m) }))} /></Field>}
+          {sign(f.deposit) > 0 && f.method !== 'CASH' && <Field label={t('رقم العملية')}><Input value={f.reference} onChange={(e) => setF({ ...f, reference: e.target.value })} className="num" /></Field>}
         </div>
-      </div>
-    </Drawer>
+      </form>
+    </Popup>
   );
 }

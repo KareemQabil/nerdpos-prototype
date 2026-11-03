@@ -117,7 +117,7 @@ export function Sidebar({ paneWidth, compact }: { paneWidth: number; compact?: b
   const role = personRole(me?.user?.username, me?.user?.displayName) || me?.user?.roleAssignments?.map((r: any) => roleLabel(r.roleName)).join(t('، '));
   const activeGroup = sections.find((s) => s.items.some((i) => isActiveItem(i.id, screen)))?.group;
   const toggleMode = () => setPrefs({ mode: wide ? 'rail' : 'wide' });
-  const title = (s: ScreenDef) => (lang === 'ar' ? s.title : s.titleEn);
+  const title = (s: ScreenDef) => (lang === 'ar' ? t(s.title) : s.titleEn);
   const bizName = (lang === 'ar' ? store.db.business.nameAr || store.db.business.name : store.db.business.name || store.db.business.nameAr) || 'NerdPOS';
   const navRef = React.useRef<HTMLElement>(null);
   useEffect(() => { navRef.current?.querySelector('[data-active="true"]')?.scrollIntoView({ block: 'nearest' }); }, [screen, wide]);
@@ -311,7 +311,7 @@ function CommandPalette({ sections, onClose, initial }: { sections: NavSection[]
                   {header}
                   <button data-idx={i} data-fb={`palette:${e.s.id}`} onMouseMove={() => setSel(i)} onClick={() => open(e)} className={cn('w-full flex items-center gap-3 px-2.5 h-11 rounded-xl text-start transition-colors', on ? 'bg-[var(--primary-container)]' : 'hover:bg-[var(--surface-2)]')}>
                     <span className={cn('w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br text-slate-950 shrink-0', e.s.gradient)}><Icon className="w-4 h-4" /></span>
-                    <span className="flex-1 min-w-0"><span className="block text-sm font-bold truncate">{lang === 'ar' ? e.s.title : e.s.titleEn}</span><span className="block text-[11px] text-dim truncate">{t('شاشة')} · {e.sec.title}</span></span>
+                    <span className="flex-1 min-w-0"><span className="block text-sm font-bold truncate">{lang === 'ar' ? t(e.s.title) : e.s.titleEn}</span><span className="block text-[11px] text-dim truncate">{t('شاشة')} · {e.sec.title}</span></span>
                     {isActiveItem(e.s.id, screen) && <span className="text-[10px] text-dim">{t('مفتوحة دلوقتي')}</span>}
                     {on && <CornerDownLeft className="w-4 h-4 text-[var(--primary)] rtl:-scale-x-100" />}
                   </button>

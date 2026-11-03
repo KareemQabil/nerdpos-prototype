@@ -4,7 +4,7 @@
 import React, { useMemo, useState } from 'react';
 import { ClipboardCheck, PackageSearch, Flag, CheckCircle2, XCircle, ListTree, ShieldCheck } from 'lucide-react';
 import { useQuery, useCommand, useDev } from '../../app/hooks';
-import { PageHeader, Card, Table, Pill, Button, Tabs, StatGrid, StatCard, FilterChips, Toolbar, EmptyState, Modal, Field, Textarea, Money, Banner, Drawer, KV } from '../../ui';
+import { PageHeader, Card, Table, Pill, Button, Tabs, StatGrid, StatCard, FilterChips, Toolbar, EmptyState, Modal, Field, Textarea, Money, Banner, Popup, KV } from '../../ui';
 import { t, L } from '../../i18n';
 import { dateTime, money, qty } from '../../lib/format';
 import { Tech } from '../../app/tech';
@@ -122,7 +122,7 @@ export function ReversalTrace({ orderId }: { orderId?: string }) {
         ])}
         empty={<EmptyState compact icon={<ListTree />} title={t('مفيش إلغاءات أو مرتجعات لسه')} text={t('أي شيل أو إلغاء أو مرتجع — في أي مرحلة — بيتسجل هنا.')} />} />
       {sel && (
-        <Drawer open onClose={() => setSel(null)} title={t(KIND_AR[sel.kind] ?? sel.kind)} badge={<StagePill s={sel.stage} />} description={t(STAGE_TEXT[sel.stage as StageId]?.long ?? '')}>
+        <Popup open onClose={() => setSel(null)} size="md" fb="void-review-popup" title={<span className="flex items-center gap-2 flex-wrap">{t(KIND_AR[sel.kind] ?? sel.kind)}<StagePill s={sel.stage} /></span>}>
           <KV rows={[
             [t('الشيك'), `#${sel.orderNumber}`], [t('الصنف'), `${L(sel.name)} ×${qty(sel.quantity)}`], [t('القيمة'), money(sel.value)],
             [t('مين عمل'), first(sel.actorName)], [t('مين وافق'), sel.approverName ? `${first(sel.approverName)} (${t(CRED_AR[sel.credentialKind] ?? '')})` : t('من غير موافقة')], [t('الجهاز'), deviceName(sel.terminalId)],
@@ -132,7 +132,7 @@ export function ReversalTrace({ orderId }: { orderId?: string }) {
             ...(sel.review ? [[t('مراجعة المحاسب'), sel.review.state === 'PENDING' ? t('مستني') : sel.review.state === 'VERIFIED' ? t('اتشاف') : t('مش موجود')] as [string, string]] : []),
           ]} />
           <Tech><div className="num text-[10px] mt-3" dir="ltr">{JSON.stringify({ id: sel.id, grantId: sel.grantId, kind: sel.kind, stage: sel.stage, refundId: sel.refundId })}</div></Tech>
-        </Drawer>
+        </Popup>
       )}
     </Card>
   );

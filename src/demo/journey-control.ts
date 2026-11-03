@@ -78,23 +78,23 @@ const P1: StepDef[] = [
     try {
       await call(c, 'Order.UpdateLine', { params: { orderId: id, lineId: sh.id }, body: { expectedVersion: order(id).version, expectedLineVersion: sh.version, quantity: '1' } });
       const h = order(id).history.at(-1);
-      log({ ok: order(id).lines.find((l) => l.id === sh.id)!.quantity.startsWith('1') && order(id).history.length > histBefore && h?.kind === 'LINE_UPDATED', text: `qty 2 → 1 → 200 without approval; history: ${typeof h?.text === 'string' ? h?.text : h?.text.ar}`, plain: t('تقليل الكمية قبل الإرسال اتنفذ من غير موافقة واتسجل في سجل الشيك') });
-    } catch (e) { log({ ok: false, text: `qty 2 → 1 → ${(e as ApiFailure).code}`, plain: t('تقليل الكمية طلب موافقة — غلط') }); }
+      log({ ok: order(id).lines.find((l) => l.id === sh.id)!.quantity.startsWith('1') && order(id).history.length > histBefore && h?.kind === 'LINE_UPDATED', text: `qty 2 → 1 → 200 without approval; history: ${typeof h?.text === 'string' ? h?.text : h?.text.ar}`, plain: t('نُفِّذ تقليل الكمية قبل الإرسال بلا موافقة وسُجِّل في سجل الشيك') });
+    } catch (e) { log({ ok: false, text: `qty 2 → 1 → ${(e as ApiFailure).code}`, plain: t('طلب تقليل الكمية موافقة — خطأ') }); }
     const rev = lastRev();
-    log({ ok: !!rev && rev.kind === 'QTY_DECREASE' && !rev.approverId, text: `trace ${rev?.kind} ${rev?.stage} approver ${rev?.approverId ?? '—'}`, plain: t('التقليل باين في سجل الإلغاءات من غير موافق') });
+    log({ ok: !!rev && rev.kind === 'QTY_DECREASE' && !rev.approverId, text: `trace ${rev?.kind} ${rev?.stage} approver ${rev?.approverId ?? '—'}`, plain: t('يظهر التقليل في سجل الإلغاءات بلا موافِق') });
     // the guest asks for one more can, then changes their mind: removing the whole line is a void
     const added = await api<any>(c, 'Order.AddLines', { params: { orderId: id }, body: { expectedVersion: order(id).version, lines: [{ productId: 'p_pepsi', quantity: '1', modifierOptionIds: [] }] } }, log, 'one more Pepsi');
     const water = added.lines.filter((l: any) => l.productId === 'p_pepsi' && l.status === 'ACTIVE').at(-1);
     const body = { expectedVersion: order(id).version, expectedLineVersion: water.version, reasonCode: 'CUSTOMER_CHANGED_MIND', reason: 'الزبون غيّر رأيه' };
     let d: any;
-    try { await call(c, 'Order.RemoveLine', { params: { orderId: id, lineId: water.id }, body }); } catch (e) { d = (e as ApiFailure).details; log({ ok: (e as ApiFailure).code === 'APPROVAL_REQUIRED', text: `remove extra Pepsi → ${(e as ApiFailure).code}`, plain: t('شيل الصنف كله طلب موافقة مدير') }); }
+    try { await call(c, 'Order.RemoveLine', { params: { orderId: id, lineId: water.id }, body }); } catch (e) { d = (e as ApiFailure).details; log({ ok: (e as ApiFailure).code === 'APPROVAL_REQUIRED', text: `remove extra Pepsi → ${(e as ApiFailure).code}`, plain: t('حذف الصنف كاملًا طلب موافقة المدير') }); }
     if (d) {
       const g0 = { action: d.action, targetType: d.targetType, targetId: d.targetId, context: d.context };
       await expectRefusal(api(c, 'Approval.Grant', { body: { ...g0, approverUserId: userIdOf('demo-manager-2'), approverCredentialKind: 'CARD', approverSecret: 'CARD-UNKNOWN-0000' } }), 'APPROVER_CREDENTIAL_UNKNOWN', log, 'unknown card', t('تمرير كارت مش متسجل'));
       await expectRefusal(api(c, 'Approval.Grant', { body: { ...g0, approverUserId: userIdOf('demo-cashier-a'), approverCredentialKind: 'CARD', approverSecret: DEMO_CARDS.u_cashier_a.card } }), 'APPROVER_NOT_AUTHORIZED', log, 'cashier card', t('سارة مرّرت الكارت بتاعها'));
     }
     await approveInPlace(c, 'Order.RemoveLine', { params: { orderId: id, lineId: water.id }, body }, { approver: 'demo-manager-2', kind: 'CARD' }, log, 'remove extra Pepsi');
-    traceLine(log, t('شيل البيبسي الزيادة'));
+    traceLine(log, t('حذف البيبسي الإضافي'));
   } },
   { id: 'J-P1-3', device: 't_cash', user: 'demo-cashier-a', screen: 'refunds', text: { who: 'سارة على جهاز الكاشير، وهبة بالبصمة؛ أحمد من كمبيوتر المدير', do_ar: 'الزبون يدفع الشيك كاش ويمشي. بعدها يرجع بالشاورما (باظت). سارة تطلب المرتجع وتضغط «اصرف» من جهازها؛ سارة مالهاش صلاحية الصرف، فهبة توافق بالبصمة على جهاز الكاشير. أحمد يحاول يصرف مرتجع من كمبيوتر المدير.', do_en: 'The guest pays cash and leaves, then returns the (spoiled) shawarma. Sara requests the refund and taps "Pay out" on her device; she lacks the payout permission, so Heba approves with her fingerprint on the cashier device. Ahmed tries to pay a refund from the manager PC.', expect_ar: 'الفلوس بتطلع من درج سارة (مش من المدير)، والسجل فيه سارة اللي صرفت وهبة اللي وافقت بالبصمة. من كمبيوتر المدير الصرف الكاش يترفض: لازم من جهاز الكاشير. الموافقة متتستخدمش مرتين.', expect_en: 'The cash leaves Sara\'s drawer (not the manager\'s); the record has Sara who paid and Heba who approved by fingerprint. From the manager PC the cash payout is refused. A grant is never used twice.', operations: [{ op: 'Refund.Approve', http: 'POST /refund-requests/{id}/approve', actor: 'cashier + manager fingerprint', expected: 'REFUND_OUT on the cashier session' }] }, run: async (log) => {
     const c = await cashier(log);
