@@ -4,9 +4,12 @@
 //   (unsent: a free decrease; 0 or a sent line: a void with its approval).
 // - LineEditorPopover: tap the line → note, options, seat (dine-in) and remove — for an unsent line; a sent line
 //   offers a kitchen note, the seat and the void (approval), never a silent change.
-import React, { useMemo, useRef, useState } from 'react';
+//   ux-04: the size of an UNSENT line can change here (Order.UpdateLine variantId, re-priced by the server, written to the
+//   check history); the new price is the server's quote. A sent line shows its size read-only (void + add instead).
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Trash2, Ban, Armchair, StickyNote, Lock, Check, Ruler, ChefHat, Send } from 'lucide-react';
-import { useQuery, useCommand } from '../../app/hooks';
+import { useQuery, useCommand, useDev } from '../../app/hooks';
+import { call } from '../../api/client';
 import { Popover, Numpad, applyNumpadKey, useNumpadKeys, Button, Input, Kbd, Money } from '../../ui';
 import { t, L } from '../../i18n';
 import { cn, qty as fmtQty } from '../../lib/format';
@@ -66,13 +69,27 @@ export function LineEditorPopover({ anchor, order, line, onClose, seats, onRemov
   const product = (products.data?.items ?? []).find((p: any) => p.id === line.productId);
   const groups: any[] = useMemo(() => (product?.modifierGroupIds ?? []).map((id: string) => (groupsQ.data?.items ?? []).find((g: any) => g.id === id)).filter((g: any) => g && g.active && g.kind !== 'INGREDIENTS'), [product, groupsQ.data]);
   const startMods: string[] = (line.modifiers ?? []).map((m: any) => m.optionId);
+  const { auth } = useDev();
+  const sizes: any[] = useMemo(() => (product?.variants ?? []).filter((v: any) => v.active).sort((a: any, b: any) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)), [product]);
+  const canSize = editable && sizes.length > 1 && !(line.children ?? []).length;
+  const [variantId, setVariantId] = useState<string | null>(line.variant?.id ?? null);
+  const sizeChanged = canSize && !!variantId && variantId !== (line.variant?.id ?? null);
+  // the new price of the line in the chosen size: a server quote (never computed here)
+  const [quote, setQuote] = useState<string | null>(null);
+  useEffect(() => {
+    if (!sizeChanged) { setQuote(null); return; }
+    let alive = true;
+    call<any>(auth, 'Pricing.QuoteItem', { params: { productId: line.productId }, body: { branchId: order.branchId, channel: order.channel, quantity: line.quantity, modifierOptionIds: startMods, variantId, ...(order.salesChannelId ? { salesChannelId: order.salesChannelId } : {}) } })
+      .then((r) => alive && setQuote(r.data?.lineTotal ?? null)).catch(() => alive && setQuote(null));
+    return () => { alive = false; };
+  }, [variantId]); // eslint-disable-line react-hooks/exhaustive-deps
   const [mods, setMods] = useState<string[]>(startMods);
   const [note, setNote] = useState<string>(sent ? '' : line.note ?? '');
   const ref = useRef<HTMLDivElement>(null);
   const modsChanged = mods.slice().sort().join() !== startMods.slice().sort().join();
   const noteChanged = !sent && (note.trim() || '') !== (line.note ?? '');
   const groupOk = groups.every((g) => { const n = mods.filter((m) => g.options.some((o: any) => o.id === m)).length; return n >= g.min && n <= g.max; });
-  const canSave = sent ? !!note.trim() : (modsChanged || noteChanged) && groupOk;
+  const canSave = sent ? !!note.trim() : (modsChanged || noteChanged || sizeChanged) && groupOk;
   const toggle = (g: any, id: string) => setMods((cur) => {
     const inG = cur.filter((m) => g.options.some((o: any) => o.id === m));
     if (g.selectionRule === 'SINGLE' || g.max === 1) return [...cur.filter((m) => !inG.includes(m)), ...(inG.includes(id) && g.min === 0 ? [] : [id])];
@@ -84,7 +101,7 @@ export function LineEditorPopover({ anchor, order, line, onClose, seats, onRemov
     if (!canSave || busy) return;
     const r = sent
       ? await run('Order.ModifyFiredLine', { params: { orderId: order.id, lineId: line.id }, body: { text: note.trim() } }, { success: t('تم إرسال الملاحظة للمطبخ') })
-      : await run('Order.UpdateLine', { params: { orderId: order.id, lineId: line.id }, body: { expectedVersion: order.version, expectedLineVersion: line.version, quantity: line.quantity, ...(noteChanged ? { note: note.trim() } : {}), ...(modsChanged ? { modifiers: mods.map((optionId) => ({ optionId })) } : {}) } });
+      : await run('Order.UpdateLine', { params: { orderId: order.id, lineId: line.id }, body: { expectedVersion: order.version, expectedLineVersion: line.version, quantity: line.quantity, ...(noteChanged ? { note: note.trim() } : {}), ...(modsChanged ? { modifiers: mods.map((optionId) => ({ optionId })) } : {}), ...(sizeChanged ? { variantId } : {}) } }, sizeChanged ? { success: t('تم تغيير المقاس') } : {});
     if (r) { onSaved?.(r); onClose(); }
   };
   const seat = async (s: number | null) => { const r = await run('Order.AssignSeat', { params: { orderId: order.id, lineId: line.id }, body: { seat: s } }); if (r) onSaved?.(r); };
@@ -99,7 +116,16 @@ export function LineEditorPopover({ anchor, order, line, onClose, seats, onRemov
           </div>
           <Money v={line.lineTotal} className="font-bold" />
         </div>
-        {line.variant && <div className="text-xs flex items-center gap-1.5 text-soft" data-fb="line-editor:variant"><Ruler className="w-3.5 h-3.5 text-dim" />{t('الحجم')}: <b>{L(line.variant.name)}</b></div>}
+        {canSize ? (
+          <div className="space-y-1.5" data-fb="line-editor:sizes">
+            <div className="text-xs font-bold text-soft flex items-center gap-1"><Ruler className="w-3.5 h-3.5" />{t('المقاس')}</div>
+            <div className="flex flex-wrap gap-1.5">{sizes.map((v: any) => {
+              const on = variantId === v.id;
+              return <button key={v.id} type="button" onClick={() => setVariantId(v.id)} data-fb={`line-editor:size:${v.id}`} aria-pressed={on} className={cn('min-h-[44px] px-3.5 rounded-xl border text-sm inline-flex items-center gap-1.5', on ? 'border-[var(--primary)] bg-[var(--primary-container)] font-bold' : 'border-[var(--glass-border)] surface-1 hover:bg-[var(--surface-2)]')}>{on && <Check className="w-3.5 h-3.5 text-[var(--primary)]" />}{L(v.name)}</button>;
+            })}</div>
+            {sizeChanged && <div className="text-xs flex items-center justify-between gap-2 rounded-lg surface-1 px-2.5 h-9" data-fb="line-editor:size-quote"><span className="text-soft">{t('السعر الجديد')}</span>{quote ? <Money v={quote} className="font-bold" /> : <span className="text-dim">…</span>}</div>}
+          </div>
+        ) : line.variant && <div className="text-xs flex items-center gap-1.5 text-soft" data-fb="line-editor:variant"><Ruler className="w-3.5 h-3.5 text-dim" />{t('المقاس')}: <b>{L(line.variant.name)}</b></div>}
 
         {editable && groups.map((g) => (
           <div key={g.id} className="space-y-1.5" data-fb={`line-editor:group:${g.id}`}>

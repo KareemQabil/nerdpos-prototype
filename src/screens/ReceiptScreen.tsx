@@ -14,6 +14,7 @@ import { ReprintDialog, ReprintRuleNote } from './admin/output/ReprintDialog';
 import { methodLabel, channelLabel, fiscalStateLabel } from './admin/output/labels';
 import { DocHeader, DocFooter, ReceiptPaper, A4Page, SecondName, ShortNumber } from '../ui/doc';
 import { SegmentedControl } from '../ui';
+import { Barcode128 } from '../ui/Barcode';
 
 /** Server issue text without codes in brackets or tax-type codes (shown with technical details on). */
 const plainDetail = (x: string) => String(x ?? '').replace(/\s*\([A-Za-z0-9_.\-:=, ]+\)/g, '').replace(/\bT\d+(\s*أو\s*T\d+)?/g, t('نوع الضريبة')).replace(/\s{2,}/g, ' ');
@@ -158,6 +159,9 @@ export default function ReceiptScreen() {
                 </div>
               </>
             )}
+            {/* ux-04: the check number as a plain 1D barcode (Code 128) — scanned in collect mode to open the check. Not a QR,
+                so it is never mistaken for the e-receipt QR. */}
+            {isPrebill && <><Rule /><div className="flex flex-col items-center gap-1" data-fb="prebill:barcode-box"><Barcode128 value={r.number} fb="prebill-barcode" /><div className="num text-[11px] tracking-[.3em]">{r.number}</div></div></>}
             <Rule />
             {r.template?.footerLines?.length ? <DocFooter lines={r.template.footerLines} /> : <div className="text-center text-[11px]">{t('شكرًا لزيارتكم')}</div>}
           </ReceiptPaper>
@@ -218,6 +222,7 @@ function A4Receipt({ r, isPrebill, copy }: { r: any; isPrebill: boolean; copy: b
         <div className="border-t-2 border-black pt-1"><Row k={t('الإجمالي')} v={money(tt.payable)} bold big /></div>
         {(r.payments ?? []).map((p: any, i: number) => <Row key={i} k={methodLabel(p.method + (p.walletProvider ? ':' + p.walletProvider : ''))} v={money(p.amount, false)} />)}
       </div>
+      {isPrebill && <div className="mt-6 flex flex-col items-start gap-1" data-fb="a4:prebill-barcode"><Barcode128 value={r.number} module={1.8} height={48} /><div className="num text-[11px] tracking-[.3em]">{r.number}</div></div>}
     </A4Page>
   );
 }
