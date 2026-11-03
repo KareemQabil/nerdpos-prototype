@@ -73,13 +73,19 @@ function ScreenCard({ sc, stations, perm }: { sc: any; stations: any[]; perm: { 
   const [ids, setIds] = useState<string[]>(sc.stationIds);
   const [dispatch, setDispatch] = useState<boolean>(sc.dispatch);
   const [start, setStart] = useState<string>(sc.start);
-  const dirty = ids.join(',') !== sc.stationIds.join(',') || dispatch !== sc.dispatch || start !== sc.start;
-  const save = () => run('KdsScreen.Configure', { params: { terminalId: sc.terminalId }, body: { stationIds: ids, dispatch, start, expectedVersion: sc.configured ? sc.version : undefined } }, { success: t('إعداد الشاشة اتحفظ — الشاشة بتتحدث على طول') });
+  // ux-04: the screen's own timer colours (empty = the kitchen timing policy) and per-item bump
+  const [warn, setWarn] = useState<string>(sc.warnMinutes ? String(sc.warnMinutes) : '');
+  const [late, setLate] = useState<string>(sc.lateMinutes ? String(sc.lateMinutes) : '');
+  const [itemBump, setItemBump] = useState<boolean>(sc.itemBump !== false);
+  const timerDirty = warn !== (sc.warnMinutes ? String(sc.warnMinutes) : '') || late !== (sc.lateMinutes ? String(sc.lateMinutes) : '');
+  const timerOk = (!warn && !late) || (/^\d+$/.test(warn) && /^\d+$/.test(late) && Number(warn) >= 1 && Number(late) > Number(warn) && Number(late) <= 180);
+  const dirty = ids.join(',') !== sc.stationIds.join(',') || dispatch !== sc.dispatch || start !== sc.start || timerDirty || itemBump !== (sc.itemBump !== false);
+  const save = () => run('KdsScreen.Configure', { params: { terminalId: sc.terminalId }, body: { stationIds: ids, dispatch, start, itemBump, ...(timerDirty ? { warnMinutes: warn ? Number(warn) : null, lateMinutes: late ? Number(late) : null } : {}), expectedVersion: sc.configured ? sc.version : undefined } }, { success: t('إعداد الشاشة اتحفظ — الشاشة بتتحدث على طول') });
   const toggle = (id: string) => setIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
   return (
     <Card data-fb={`kds-screen:${sc.terminalId}`} title={<span className="flex items-center gap-2"><MonitorPlay className="w-4 h-4 text-[var(--primary)]" />{tv(sc.terminalName)}{dispatch && <Pill tone="success"><ConciergeBell className="w-3 h-3" />{t('شاشة التسليم')}</Pill>}</span>}
       description={ids.length ? t('بتعرض: {s}', { s: ids.map((id) => stationName(stations.find((x) => x.id === id)?.name)).join(t('، ')) }) : t('بتعرض كل المحطات')}
-      footer={<div className="flex items-center justify-end gap-2"><Tech><span className="num text-[10px] text-dim me-auto">{sc.terminalCode} · v{sc.version}</span></Tech><Button size="sm" variant="primary" disabled={!perm.ok || !dirty || busy} title={perm.title} onClick={save} data-fb={`kds-screen-save:${sc.terminalId}`}><Save className="w-3.5 h-3.5" />{t('احفظ')}</Button></div>}>
+      footer={<div className="flex items-center justify-end gap-2"><Tech><span className="num text-[10px] text-dim me-auto">{sc.terminalCode} · v{sc.version}</span></Tech><Button size="sm" variant="primary" disabled={!perm.ok || !dirty || !timerOk || busy} title={perm.title} onClick={save} data-fb={`kds-screen-save:${sc.terminalId}`}><Save className="w-3.5 h-3.5" />{t('احفظ')}</Button></div>}>
       <div className="space-y-4">
         <Field label={t('المحطات اللي بتظهر على الشاشة دي')} hint={t('مفيش اختيار = كل المحطات.')}>
           <div className="flex flex-wrap gap-1.5">
@@ -93,6 +99,19 @@ function ScreenCard({ sc, stations, perm }: { sc: any; stations: any[]; perm: { 
         <Field label={t('زرار «ابدأ»')} hint={START_OPTS.find((o) => o.id === start)?.help ? t(START_OPTS.find((o) => o.id === start)!.help) : undefined}>
           <SegmentedControl value={start} onChange={setStart} options={START_OPTS.map((o) => ({ id: o.id, label: t(o.label), fb: `kds-screen-start:${sc.terminalId}:${o.id}`, disabled: !perm.ok }))} />
         </Field>
+        <Field label={t('ألوان المؤقت (بالدقائق)')} error={timerOk ? null : t('الأحمر بعد الأصفر، والقيمتان معًا أو فارغتان.')}>
+          <div className="flex items-center gap-2 flex-wrap" data-fb={`kds-screen-timer:${sc.terminalId}`}>
+            <span className="inline-flex items-center gap-1.5 text-sm"><span className="w-3 h-3 rounded-full bg-[var(--warning)]" />{t('أصفر من')}</span>
+            <Input value={warn} onChange={(e) => setWarn(e.target.value.replace(/[^0-9]/g, '').slice(0, 3))} disabled={!perm.ok} inputMode="numeric" className="!w-20 num text-center" data-fb={`kds-screen-warn:${sc.terminalId}`} aria-label={t('أصفر من')} />
+            <span className="inline-flex items-center gap-1.5 text-sm"><span className="w-3 h-3 rounded-full bg-[var(--error)]" />{t('أحمر من')}</span>
+            <Input value={late} onChange={(e) => setLate(e.target.value.replace(/[^0-9]/g, '').slice(0, 3))} disabled={!perm.ok} inputMode="numeric" className="!w-20 num text-center" data-fb={`kds-screen-late:${sc.terminalId}`} aria-label={t('أحمر من')} />
+            {!warn && !late && <span className="text-xs text-dim">{t('حسب سياسة توقيت المطبخ')}</span>}
+          </div>
+        </Field>
+        <div className="flex items-center justify-between gap-3 rounded-xl surface-1 px-3 py-2.5">
+          <div className="font-bold text-sm">{t('تجهيز كل صنف بلمسة')}</div>
+          <span data-fb={`kds-screen-itembump:${sc.terminalId}`}><Switch checked={itemBump} onChange={setItemBump} disabled={!perm.ok} /></span>
+        </div>
       </div>
     </Card>
   );

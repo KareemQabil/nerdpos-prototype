@@ -5,39 +5,40 @@ import { Keyboard, RotateCcw } from 'lucide-react';
 import { Popup, Kbd, Button } from '../../ui';
 import { t } from '../../i18n';
 import { cn } from '../../lib/format';
-import { keymap, useKeymap, keyLabel, ASSIGNABLE, type KeyAction } from '../../app/keymap';
+import { keymap, useKeymap, keyLabel, assignableOf, type KeyAction, type KeyScope } from '../../app/keymap';
 
-export function ShortcutsOverlay({ deviceId, labels, profileName, onClose }: { deviceId: string; labels: Partial<Record<KeyAction, string>>; profileName: string; onClose: () => void }) {
-  const map = useKeymap(deviceId);
+/** Fixed rows of the sale screen (not remappable). Other scopes pass their own. */
+const SALE_FIXED = (primary?: string): [string, string][] => [['Enter', primary ?? t('الزر الرئيسي')], ['0–9', t('الكمية قبل الصنف')], ['?', t('عرض الاختصارات')], ['Esc', t('إغلاق النافذة')], ['Ctrl K', t('البحث في الشاشات')]];
+
+export function ShortcutsOverlay({ deviceId, labels, profileName, onClose, scope = 'sale', fixed, title, fb = 'shortcuts-overlay' }: { deviceId: string; labels: Partial<Record<KeyAction, string>>; profileName: string; onClose: () => void; scope?: KeyScope; fixed?: [string, string][]; title?: string; fb?: string }) {
+  const map = useKeymap(deviceId, scope);
   const [capture, setCapture] = useState<KeyAction | null>(null);
   useEffect(() => {
     if (!capture) return;
     const h = (e: KeyboardEvent) => {
       e.preventDefault(); e.stopPropagation();
       if (e.key === 'Escape') { setCapture(null); return; }
-      if (ASSIGNABLE.includes(e.key)) { keymap.assign(deviceId, capture, e.key); setCapture(null); }
+      const k = scope === 'kds' && e.key.length === 1 ? e.key.toLowerCase() : e.key;
+      if (assignableOf(scope).includes(k)) { keymap.assign(deviceId, capture, k, scope); setCapture(null); }
     };
     window.addEventListener('keydown', h, true);
     return () => window.removeEventListener('keydown', h, true);
-  }, [capture, deviceId]);
-  const rows = (Object.keys(labels) as KeyAction[]).filter((a) => a !== 'primary');
+  }, [capture, deviceId, scope]);
+  const rows = (Object.keys(labels) as KeyAction[]).filter((a) => scope !== 'sale' || a !== 'primary');
+  const fixedRows = fixed ?? SALE_FIXED(labels.primary);
   return (
-    <Popup open onClose={() => (capture ? setCapture(null) : onClose())} size="md" fb="shortcuts-overlay"
-      title={<span className="flex items-center gap-2"><Keyboard className="w-5 h-5 text-[var(--primary)]" />{t('اختصارات لوحة المفاتيح')}</span>}
-      footer={<><span className="me-auto text-xs text-dim">{t('ملف العمل')}: {profileName}</span><Button variant="ghost" onClick={() => keymap.reset(deviceId)} data-fb="shortcuts-reset"><RotateCcw className="w-4 h-4" />{t('استعادة الافتراضي')}</Button><Button variant="primary" onClick={onClose}>{t('تم')}</Button></>}>
+    <Popup open onClose={() => (capture ? setCapture(null) : onClose())} size={scope === 'kds' ? 'lg' : 'md'} fb={fb}
+      title={<span className="flex items-center gap-2"><Keyboard className="w-5 h-5 text-[var(--primary)]" />{title ?? t('اختصارات لوحة المفاتيح')}</span>}
+      footer={<><span className="me-auto text-xs text-dim">{t('ملف العمل')}: {profileName}</span><Button variant="ghost" onClick={() => keymap.reset(deviceId, scope)} data-fb="shortcuts-reset"><RotateCcw className="w-4 h-4" />{t('استعادة الافتراضي')}</Button><Button variant="primary" onClick={onClose}>{t('تم')}</Button></>}>
       <div className="grid sm:grid-cols-2 gap-x-6 gap-y-0.5">
         {rows.map((a) => (
-          <div key={a} className={cn('flex items-center gap-2 h-12 border-b line', capture === a && 'bg-[var(--primary-container)] -mx-2 px-2 rounded-lg')}>
+          <div key={a} className={cn('flex items-center gap-2 h-12 border-b line', capture === a && 'bg-[var(--primary-container)] -mx-2 px-2 rounded-lg')} data-fb={`shortcut-row:${a}`} data-key={map[a] ?? ''}>
             <span className="flex-1 min-w-0 truncate text-sm">{labels[a]}</span>
             {capture === a ? <span className="text-xs text-[var(--primary)] font-semibold">{t('اضغط مفتاحًا')}</span> : <Kbd className="min-w-[36px] h-7 text-xs">{keyLabel(map[a]) || '—'}</Kbd>}
             <button onClick={() => setCapture(capture === a ? null : a)} className="h-9 w-14 rounded-lg text-xs text-soft hover:bg-[var(--surface-2)]" data-fb={`shortcut-change:${a}`}>{t('تغيير')}</button>
           </div>
         ))}
-        <Fixed k="Enter" label={labels.primary ?? t('الزر الرئيسي')} />
-        <Fixed k="0–9" label={t('الكمية قبل الصنف')} />
-        <Fixed k="?" label={t('عرض الاختصارات')} />
-        <Fixed k="Esc" label={t('إغلاق النافذة')} />
-        <Fixed k="Ctrl K" label={t('البحث في الشاشات')} />
+        {fixedRows.map(([k, label]) => <Fixed key={k} k={k} label={label} />)}
       </div>
     </Popup>
   );

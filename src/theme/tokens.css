@@ -298,3 +298,29 @@ input, select, textarea { font: inherit; color: inherit; }
 @keyframes undo-in { from { transform: translateY(10px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
 .undo-in { animation: undo-in .18s ease-out; }
 @media (prefers-reduced-motion: reduce) { .line-flash, .tile-press, .undo-in { animation: none; } }
+/* ux-04: kitchen screen — the bump-bar selection and a new ticket arriving */
+@keyframes kds-arrive { 0% { transform: translateY(-8px) scale(.98); box-shadow: 0 0 0 4px var(--primary); } 100% { transform: none; box-shadow: none; } }
+.kds-arrive { animation: kds-arrive .6s ease-out; }
+.kds-selected { outline: 4px solid var(--primary); outline-offset: 3px; }
+/* ux-04: display screens (call board, customer display). "display" style = forced high contrast, readable from afar,
+   whatever the app theme. Tokens are redefined on the display root only. */
+[data-display-style="display"] {
+  --background: #000000; --foreground: #ffffff; --card: #0d0d0d; --card-raised: #141414; --muted: #1c1c1c;
+  --primary: #ffd400; --primary-foreground: #000000; --primary-container: rgba(255, 212, 0, .16); --primary-glow: rgba(255, 212, 0, .45); --primary-glow-dim: rgba(255, 212, 0, .2);
+  --success: #2ef08a; --warning: #ffd400; --warning-text: #ffd400; --error: #ff6b6b; --info: #7cc4ff; --violet: #d6a8ff;
+  --glass-border: rgba(255, 255, 255, .4); --line: rgba(255, 255, 255, .28); --text-dim: rgba(255, 255, 255, .78); --text-soft: rgba(255, 255, 255, .92);
+  --surface-1: #121212; --surface-2: #1b1b1b; --surface-3: #262626; --overlay-bg: #0d0d0d; --glass-bg-strong: #0d0d0d;
+}
+.display-root { background: var(--background); color: var(--foreground); container-type: size; container-name: display; }
+[data-display-style="theme"].display-root { background: var(--app-bg); }
+@keyframes cb-in { 0% { transform: scale(.6); opacity: 0; } 60% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); } }
+.cb-in { animation: cb-in .7s cubic-bezier(.2,.9,.3,1.3); }
+@keyframes cb-glow { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 0%, transparent); } 50% { box-shadow: 0 0 0 .6cqmin color-mix(in srgb, var(--success) 45%, transparent); } }
+.cb-new { animation: cb-glow 1.6s ease-in-out 4; }
+@keyframes cd-pop { 0% { transform: translateY(12px) scale(.96); opacity: .3; } 100% { transform: none; opacity: 1; } }
+.cd-pop { animation: cd-pop .45s cubic-bezier(.2,.9,.3,1.2); }
+@keyframes cd-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.2cqmin); } }
+.cd-float { animation: cd-float 5s ease-in-out infinite; }
+@keyframes cd-fade { from { opacity: 0; transform: translateX(2cqw); } to { opacity: 1; transform: none; } }
+.cd-fade { animation: cd-fade .6s ease-out; }
+@media (prefers-reduced-motion: reduce) { .kds-arrive, .cb-in, .cb-new, .cd-pop, .cd-float, .cd-fade { animation: none; } }

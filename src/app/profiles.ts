@@ -99,6 +99,13 @@ export const SALE_KEYS: Partial<Record<SaleAction | 'primary', string>> = {
   viewTables: 'PageUp', viewChecks: 'PageDown', viewClosed: 'End',
 };
 
+/** Kitchen screen actions a bump bar (or a keyboard) drives. ←/→ move between tickets and 1–9 pick one (fixed). */
+export type KdsAction = 'kdsNext' | 'kdsPrev' | 'kdsBump' | 'kdsBumpItem' | 'kdsStart' | 'kdsPriority' | 'kdsUndo' | 'kdsRecall' | 'kdsCall' | 'kdsView' | 'kdsHelp';
+/** Default bump-bar map: the keys a 10-key bump bar sends (each can be remapped per screen, swap on conflict). */
+export const KDS_KEYS: Partial<Record<KdsAction, string>> = {
+  kdsNext: 'ArrowDown', kdsPrev: 'ArrowUp', kdsBump: 'Enter', kdsBumpItem: ' ', kdsStart: '+', kdsPriority: '*', kdsUndo: 'Backspace', kdsRecall: '0', kdsCall: '-', kdsView: '/', kdsHelp: 'F1',
+};
+
 /**
  * The profile of the signed-in person on this device. Role names come from Access.Me; the device kind breaks ties
  * (a manager on a cashier terminal works the sale screen like a cashier, with the manager's bar).

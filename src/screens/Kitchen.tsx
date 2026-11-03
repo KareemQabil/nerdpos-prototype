@@ -1,107 +1,253 @@
-// F1 Kitchen display (KDS): tickets per station by round with timers coloured by the kitchen timing policy,
-// rush, per-item bump, refire with a reason, move to another station, all-day counts, recall of delivered
-// tickets and an expo view (all stations; a round is ready to serve when every station has it ready).
-// Round 3: each kitchen screen shows only the stations it subscribes to; only the dispatch screen shows
-// «جاهز للتسليم», the expo and the hand-off; «ابدأ» follows the screen policy (hidden / optional / required) and never
-// resets the timer (it runs from arrival); the all-day box is a fixed side panel. Configured in «المطبخ والمحطات».
-import React, { useMemo, useState } from 'react';
-import { ChefHat, Clock, Play, Check, Truck, Undo2, AlertTriangle, Flame, RotateCcw, ArrowRightLeft, History, MoreVertical, LayoutList, ConciergeBell, Layers, CheckCircle2, Users } from 'lucide-react';
-import { useQuery, useCommand } from '../app/hooks';
-import { StateBadge, Tabs, Pill, Button, Empty, EmptyState, Skeleton, SegmentedControl, useNow, Modal, Field, Select, Input, Banner } from '../ui';
+// F1 Kitchen display (KDS), touch or bump bar. Designed for 22" (1920×1080) and 15" (1366×768) landscape screens.
+// - Station screen (شيف محطة): large tickets of its stations; tap the header = the ticket is ready (sent to dispatch),
+//   tap an item = that item is ready (when the screen allows per-item bump); «بدء» per the screen policy; the timer runs
+//   from arrival with the screen's colour thresholds; voided items struck through and flagged; priority, recalled and
+//   re-fired tickets marked. The all-day panel is fixed on the side (never scrolls away).
+// - Dispatch screen (منسق التسليم): orders grouped with every station's readiness; «جاهز للتسليم», «تسليم» and «نداء»
+//   (to the call board) only here — the server enforces KDS_DISPATCH_ONLY.
+// - Undo the last bump for a few seconds; recall recently bumped tickets; sound on a new ticket and when one turns late
+//   (mute per screen; browsers allow sound only after the first touch).
+// - Bump bar: a keyboard map per screen (↑/↓ or ←/→ move, 1–9 pick, Enter bump, Space item, + start, * priority,
+//   ⌫ undo, 0 recall, − call, / view), remappable in the «?» overlay with swap-on-conflict (app/keymap.ts, scope kds).
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ChefHat, Undo2, AlertTriangle, Flame, History, LayoutGrid, Layers, ConciergeBell, Volume2, VolumeX, Keyboard, X, Truck, RotateCcw, ArrowRightLeft, Trash2, PackageX, CheckCircle2, Clock } from 'lucide-react';
+import { useDev, useQuery, useCommand } from '../app/hooks';
+import { StateBadge, Tabs, Pill, Button, Empty, EmptyState, Skeleton, SegmentedControl, useNow, Modal, Popup, Field, Select, Input, Banner, Kbd, toast } from '../ui';
 import { t, L } from '../i18n';
 import { cn, qty, time } from '../lib/format';
-import { ALLERGEN_AR } from './order/MenuGrid';
 import { Tech } from '../app/tech';
-
 import { stationName } from '../demo/humanLog';
-import { personName } from '../demo/people';
-export const stationLabel = (n?: string | null) => stationName(n);
-const OPS = ['Kitchen.Board', 'Kitchen.AdvanceTicket', 'TicketItem.Bump', 'Ticket.SetPriority', 'Ticket.Refire', 'Ticket.TransferStation', 'Ticket.Recall'];
+import { profileFor, profileById } from '../app/profiles';
+import { useHotkeys, useKeymap, keyLabel, type KeyAction } from '../app/keymap';
+import { cue, useSound } from '../app/sound';
+import { ShortcutsOverlay } from './cashier/ShortcutsOverlay';
+import { TicketCard, toneOf, headline } from './kitchen/TicketCard';
+import { DispatchBoard, groupOrders, type OrderGroup } from './kitchen/DispatchBoard';
 
-type Tone = 'ok' | 'warn' | 'late';
-const toneOf = (tk: any): Tone => (tk.late ? 'late' : tk.warn ? 'warn' : 'ok');
-const TONE: Record<Tone, { color: string; pill: 'success' | 'warning' | 'error' }> = {
-  ok: { color: 'var(--success)', pill: 'success' },
-  warn: { color: 'var(--warning)', pill: 'warning' },
-  late: { color: 'var(--error)', pill: 'error' },
-};
+export const stationLabel = (n?: string | null) => stationName(n);
+const OPS = ['Kitchen.Board', 'Kitchen.AdvanceTicket', 'TicketItem.Bump', 'Ticket.SetPriority', 'Ticket.Refire', 'Ticket.TransferStation', 'Ticket.Recall', 'Kitchen.CallOrder'];
+type View = 'orders' | 'tickets';
+type UndoAction = { id: number; text: string; run: () => Promise<any> };
 
 export default function Kitchen() {
-  useNow(10000);
+  useNow(1000);
+  const { id: deviceId, me, can, nav } = useDev();
   const stations = useQuery<any>('KitchenStation.List', { query: {} });
-  const [station, setStation] = useState<string>('ALL');
-  const [view, setView] = useState<'board' | 'expo' | 'callout'>('board');
-  const [recall, setRecall] = useState(false);
   const board = useQuery<any>('Kitchen.Board', { query: { lifecycle: 'NEW,IN_PROGRESS,READY' } });
+  const { run, busy } = useCommand();
   const all: any[] = board.data?.items ?? [];
-  // round 3 (F3-02): this screen's configuration — its stations, whether it is the dispatch screen, the Start policy
-  const screen = board.data?.screen ?? { stationIds: [], canHandOff: true, dispatch: true, start: 'HIDDEN', isKds: false };
+  const screen = board.data?.screen ?? { stationIds: [], canHandOff: true, dispatch: true, start: 'HIDDEN', isKds: false, itemBump: true };
   const dispatch: boolean = !!screen.canHandOff;
   const startPolicy: 'HIDDEN' | 'OPTIONAL' | 'REQUIRED' = screen.start ?? 'HIDDEN';
+  const itemBump = screen.itemBump !== false;
+  const roles = (me?.user?.roleAssignments ?? []).map((r: any) => String(r.roleName ?? ''));
+  const base = profileFor(roles, 'KDS');
+  const profile = base.id === 'stationChef' && dispatch && screen.isKds ? profileById('expediter') : base;
   const active = (stations.data?.items ?? []).filter((s: any) => s.active);
   const mine = screen.stationIds?.length ? active.filter((s: any) => screen.stationIds.includes(s.id)) : active;
-  // a dispatch screen subscribed to some stations still receives every station's tickets for the consolidated hand-off;
-  // its cooking columns and all-day box show only its own stations
   const own = all.filter((x) => x.onMyScreen !== false);
+  const [station, setStation] = useState<string>('ALL');
+  const [view, setView] = useState<View>('tickets');
+  // the first board says which screen this is: the expediter (and the kitchen manager) start on the grouped orders
+  const viewSet = useRef(false);
+  useEffect(() => { if (!board.data || !me || viewSet.current) return; viewSet.current = true; setView(dispatch && profile.id !== 'stationChef' ? 'orders' : 'tickets'); }, [board.data, me]); // eslint-disable-line react-hooks/exhaustive-deps
+  const v: View = dispatch ? view : 'tickets';
   const tickets = station === 'ALL' || !mine.some((s: any) => s.id === station) ? own : own.filter((x) => x.stationId === station);
-  const timing = board.data?.timing;
-  const reasons = board.data?.refireReasons ?? {};
-  // cooking queue: rush first, then the oldest
-  const cooking = tickets.filter((x) => x.state !== 'READY').sort((a, b) => Number(b.priority === 'RUSH') - Number(a.priority === 'RUSH') || b.ageMinutes - a.ageMinutes);
-  const ready = (dispatch && station === 'ALL' ? all : tickets).filter((x) => x.state === 'READY').sort((a, b) => (b.readyMinutes ?? 0) - (a.readyMinutes ?? 0));
-  const late = cooking.filter((x) => x.late).length;
+  // cooking queue: priority first, then the oldest
+  const cooking = useMemo(() => tickets.filter((x) => x.state !== 'READY').sort((a, b) => Number(b.priority === 'RUSH') - Number(a.priority === 'RUSH') || Number(a.createdAtMs) - Number(b.createdAtMs)), [tickets]);
+  const ready = (dispatch && station === 'ALL' ? all : tickets).filter((x) => x.state === 'READY').sort((a, b) => String(a.readyAt).localeCompare(String(b.readyAt)));
+  const groups = useMemo(() => groupOrders(all), [all]);
+  const late = cooking.filter((x) => toneOf(x) === 'late').length;
   const rush = cooking.filter((x) => x.priority === 'RUSH').length;
   const loading = board.loading && !board.data;
   const single = mine.length === 1 ? mine[0] : null;
   const showStation = mine.length > 1 && station === 'ALL';
-  const v = dispatch ? view : 'board';
+  const timing = board.data?.timing;
+  const reasons = board.data?.refireReasons ?? {};
+  const keys = useKeymap(deviceId, 'kds');
+  const snd = useSound(deviceId);
+
+  // ── selection (bump bar) over the visible list
+  const list: any[] = v === 'orders' ? groups : cooking;
+  const [sel, setSel] = useState(0);
+  const selIdx = list.length ? Math.min(sel, list.length - 1) : -1;
+  // ── undo the last bump (a few seconds)
+  const [undo, setUndo] = useState<UndoAction | null>(null);
+  const undoSeq = useRef(0);
+  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const offerUndo = (u: Omit<UndoAction, 'id'>) => {
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    const id = ++undoSeq.current;
+    setUndo({ ...u, id });
+    undoTimer.current = setTimeout(() => setUndo((x) => (x?.id === id ? null : x)), 8000);
+  };
+  useEffect(() => () => { if (undoTimer.current) clearTimeout(undoTimer.current); }, []);
+  const latest = useRef(all);
+  latest.current = all;
+  const fresh = (id: string) => latest.current.find((x) => x.id === id);
+  const runUndo = async () => { const u = undo; if (!u) return; setUndo(null); await u.run(); };
+
+  // ── actions
+  const bumpTicket = async (tk: any) => {
+    if (startPolicy === 'REQUIRED' && tk.state === 'NEW') { toast('warning', t('اضغط «بدء» أولًا')); return; }
+    const r = await run('Kitchen.AdvanceTicket', { params: { ticketId: tk.id }, body: { expectedVersion: tk.version, toState: 'READY' } });
+    if (r) offerUndo({ text: t('جاهز: {w}', { w: headline(tk) }), run: async () => { const cur = fresh(tk.id); if (!cur || cur.state !== 'READY') { toast('warning', t('تعذر التراجع: تغيرت التذكرة')); return null; } return run('Kitchen.AdvanceTicket', { params: { ticketId: tk.id }, body: { expectedVersion: cur.version, toState: 'IN_PROGRESS' } }, { success: t('تم التراجع') }); } });
+  };
+  const bumpItem = async (tk: any, it: any) => {
+    const r = await run('TicketItem.Bump', { params: { ticketId: tk.id, itemId: it.lineId }, body: {} });
+    if (r) offerUndo({ text: `${it.bumped ? t('إلغاء التجهيز') : t('جاهز')}: ${L(it.name)}`, run: () => run('TicketItem.Bump', { params: { ticketId: tk.id, itemId: it.lineId }, body: {} }, { success: t('تم التراجع') }) });
+  };
+  const bumpNextItem = (tk: any) => { const it = tk.items.find((i: any) => i.status !== 'CANCELLED' && !i.bumped); if (it && itemBump) bumpItem(tk, it); };
+  const start = (tk: any) => tk.state === 'NEW' && startPolicy !== 'HIDDEN' && run('Kitchen.AdvanceTicket', { params: { ticketId: tk.id }, body: { expectedVersion: tk.version, toState: 'IN_PROGRESS' } });
+  const priority = async (tks: any[]) => {
+    const on = !tks.some((x) => x.priority === 'RUSH');
+    for (const tk of tks) { const cur = fresh(tk.id) ?? tk; await run('Ticket.SetPriority', { params: { ticketId: tk.id }, body: { expectedVersion: cur.version, priority: on ? 'RUSH' : 'NORMAL' } }, { success: on ? t('أصبحت التذكرة أولوية — في أول الطابور') : t('أُلغيت الأولوية') }); }
+  };
+  const serve = async (g: OrderGroup) => {
+    if (!g.ready) { toast('warning', t('بانتظار: {s}', { s: g.list.filter((x) => x.state !== 'READY').map((x) => stationName(x.stationName)).join(t('، ')) })); return; }
+    const done: string[] = [];
+    for (const tk of g.list) { const cur = fresh(tk.id) ?? tk; if (await run('Kitchen.AdvanceTicket', { params: { ticketId: tk.id }, body: { expectedVersion: cur.version, toState: 'DONE' } })) done.push(tk.id); }
+    if (done.length) offerUndo({ text: t('سُلِّم: {w}', { w: headline(g.first) }), run: async () => { for (const id of done) await run('Ticket.Recall', { params: { ticketId: id }, body: { undo: true } }); toast('success', t('تم التراجع')); return true; } });
+  };
+  const call = (g: OrderGroup) => g.byNumber && run('Kitchen.CallOrder', { params: { orderId: g.first.orderId }, body: {} }, { success: g.calledAt ? t('أُعيد النداء على الرقم {n}', { n: g.first.shortNo ?? g.first.orderNumber }) : t('نودي على الرقم {n}', { n: g.first.shortNo ?? g.first.orderNumber }) });
+
+  // ── dialogs
+  const [dlg, setDlg] = useState<null | { k: 'move' | 'history' | 'refire'; tk: any }>(null);
+  const [recall, setRecall] = useState(false);
+  const [help, setHelp] = useState(false);
+  const onMenu = (tk: any) => (a: 'priority' | 'move' | 'history') => (a === 'priority' ? priority([tk]) : setDlg({ k: a, tk }));
+
+  // ── bump bar / keyboard
+  const selected = selIdx >= 0 ? list[selIdx] : null;
+  const move = (d: number) => list.length && setSel((i) => (Math.min(i, list.length - 1) + d + list.length) % list.length);
+  useHotkeys(deviceId, !help && !recall && !dlg, {
+    kdsNext: () => move(1), kdsPrev: () => move(-1),
+    kdsBump: () => selected && (v === 'orders' ? serve(selected) : bumpTicket(selected)),
+    kdsBumpItem: () => selected && v === 'tickets' && bumpNextItem(selected),
+    kdsStart: () => selected && v === 'tickets' && start(selected),
+    kdsPriority: () => selected && priority(v === 'orders' ? (selected as OrderGroup).list : [selected]),
+    kdsUndo: () => runUndo(),
+    kdsRecall: () => setRecall(true),
+    kdsCall: () => selected && v === 'orders' && (selected as OrderGroup).ready && call(selected),
+    kdsView: () => dispatch && setView((x) => (x === 'orders' ? 'tickets' : 'orders')),
+    kdsHelp: () => setHelp(true), shortcuts: () => setHelp(true),
+  }, 'kds');
+  // fixed keys: ←/→ move visually (reading direction aware), 1–9 pick a ticket
+  const fixedRef = useRef({ move, list, setSel });
+  fixedRef.current = { move, list, setSel };
+  useEffect(() => {
+    if (help || recall || dlg) return;
+    const h = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')) return;
+      if (document.querySelector('[role="dialog"], [role="menu"]') || !document.querySelector(`[data-device="${deviceId}"] [data-screen="F1"]`)) return;
+      const rtl = document.documentElement.dir !== 'ltr';
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); fixedRef.current.move((e.key === 'ArrowLeft') === rtl ? 1 : -1); return; }
+      if (/^[1-9]$/.test(e.key) && Number(e.key) <= fixedRef.current.list.length) { e.preventDefault(); fixedRef.current.setSel(Number(e.key) - 1); }
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [help, recall, dlg, deviceId]);
+
+  // ── sound: a new ticket on this screen, a ticket turning late
+  const known = useRef<Set<string> | null>(null);
+  const lateSeen = useRef<Set<string>>(new Set());
+  const [arrived, setArrived] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!board.data) return;
+    const ids = new Set(own.filter((x) => x.state !== 'READY').map((x) => x.id));
+    if (known.current) {
+      const added = [...ids].filter((id) => !known.current!.has(id));
+      if (added.length) { cue('new', deviceId); setArrived(new Set(added)); setTimeout(() => setArrived(new Set()), 1500); }
+    } else for (const x of own) if (toneOf(x) === 'late') lateSeen.current.add(x.id); // already late when the screen opened: no alarm
+    known.current = new Set([...(known.current ?? []), ...ids]);
+  }, [board.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  const lateIds = cooking.filter((x) => toneOf(x) === 'late').map((x) => x.id).join(',');
+  useEffect(() => {
+    if (!known.current) return;
+    const turned = cooking.filter((x) => toneOf(x) === 'late' && !lateSeen.current.has(x.id));
+    turned.forEach((x) => lateSeen.current.add(x.id));
+    if (turned.length) cue('late', deviceId);
+  }, [lateIds]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const kLabel = (a: KeyAction) => keyLabel(keys[a]);
+  const labels: Partial<Record<KeyAction, string>> = {
+    kdsNext: t('التذكرة التالية'), kdsPrev: t('التذكرة السابقة'), kdsBump: dispatch ? t('جاهز / تسليم المحددة') : t('جاهز للتذكرة المحددة'), kdsBumpItem: t('تجهيز الصنف التالي'), kdsStart: t('بدء التحضير'),
+    kdsPriority: t('أولوية'), kdsUndo: t('تراجع عن آخر خطوة'), kdsRecall: t('استعادة تذكرة'), kdsCall: t('نداء الرقم'), kdsView: t('تبديل العرض'), kdsHelp: t('عرض الاختصارات'),
+  };
+  const title = single && !dispatch ? t('شاشة {s}', { s: stationLabel(single.name) }) : dispatch && screen.isKds ? t('شاشة التسليم') : t('شاشة المطبخ');
   return (
-    <div data-screen="F1" data-kds-dispatch={dispatch ? '1' : '0'} data-kds-start={startPolicy} className="h-full flex flex-col gap-3 min-h-0">
-      <div className="flex items-center gap-3 flex-wrap shrink-0">
-        <h1 className="text-[22px] font-extrabold tracking-tight flex items-center gap-2"><ChefHat className="w-6 h-6 text-[var(--primary)]" />{single ? `${t('شاشة')} ${stationLabel(single.name)}` : t('شاشة المطبخ')}</h1>
+    <div data-screen="F1" data-kds-dispatch={dispatch ? '1' : '0'} data-kds-start={startPolicy} data-kds-view={v} data-profile={profile.id} className="relative -m-5 h-[calc(100%+2.5rem)] flex flex-col min-h-0 p-3 gap-3">
+      <div className="flex items-center gap-2.5 flex-wrap shrink-0">
+        <h1 className="text-[22px] font-extrabold tracking-tight flex items-center gap-2"><ChefHat className="w-6 h-6 text-[var(--primary)]" />{title}</h1>
         <StateBadge ops={OPS} />
-        <Pill tone={dispatch ? 'success' : 'neutral'} data-fb="kds-role">{dispatch ? <><ConciergeBell className="w-3 h-3" />{t('شاشة التسليم')}</> : <><LayoutList className="w-3 h-3" />{t('شاشة محطة — «جاهز» بيبعت للتسليم')}</>}</Pill>
-        {timing && <span className="text-xs text-dim">{t('العداد بيبدأ أول ما الطلب يوصل · المستهدف {a} دقيقة · بتحمّر بعد {b} دقيقة', { a: timing.targetMinutes, b: timing.alertMinutes })}</span>}
+        <Pill tone={dispatch ? 'success' : 'neutral'} data-fb="kds-role">{L(profile.role)}</Pill>
+        <span className="h-9 px-3 rounded-xl surface-1 border border-[var(--glass-border)] inline-flex items-center gap-1.5 text-sm font-bold" data-fb="kds-count"><Layers className="w-4 h-4 text-soft" /><span className="num">{v === 'orders' ? groups.length : cooking.length}</span></span>
+        {rush > 0 && <span className="h-9 px-3 rounded-xl bg-[var(--error)] text-white inline-flex items-center gap-1.5 text-sm font-extrabold"><Flame className="w-4 h-4" /><span className="num">{rush}</span>{t('أولوية')}</span>}
+        {late > 0 && <span className="h-9 px-3 rounded-xl border-2 border-[var(--error)] text-[var(--error)] inline-flex items-center gap-1.5 text-sm font-extrabold"><AlertTriangle className="w-4 h-4" /><span className="num">{late}</span>{t('متأخرة')}</span>}
+        {timing && <Legend warn={timing.targetMinutes} late={timing.alertMinutes} />}
         <div className="flex-1" />
-        {dispatch && <SegmentedControl value={view} onChange={setView} options={[{ id: 'board', label: t('الطلبات'), icon: <LayoutList />, fb: 'kds-view:board' }, { id: 'expo', label: t('التسليم (الإكسبو)'), icon: <ConciergeBell />, fb: 'kds-view:expo' }, { id: 'callout', label: t('شاشة النداء'), icon: <Users />, fb: 'kds-view:callout' }]} />}
-        <Button size="sm" variant="ghost" onClick={() => setRecall(true)} data-fb="kds-recall-open"><History className="w-4 h-4" />{t('اتسلّم مؤخرًا')}</Button>
+        {dispatch && <SegmentedControl size="lg" value={view} onChange={setView} options={[{ id: 'orders', label: t('تجميع الطلبات'), icon: <ConciergeBell />, fb: 'kds-view:expo' }, { id: 'tickets', label: t('التذاكر'), icon: <LayoutGrid />, fb: 'kds-view:board' }]} />}
+        {profile.id === 'kitchenManager' && <>
+          {can('stock:recordwaste') && <Button size="lg" variant="ghost" onClick={() => nav('inv-waste')} data-fb="kds-waste"><Trash2 className="w-4 h-4" />{t('الهالك')}</Button>}
+          <Button size="lg" variant="ghost" onClick={() => nav('soldout')} data-fb="kds-soldout"><PackageX className="w-4 h-4" />{t('نفد اليوم')}</Button>
+        </>}
+        <Button size="lg" variant="secondary" onClick={() => setRecall(true)} data-fb="kds-recall-open"><History className="w-5 h-5" />{t('استعادة')}<Kbd>{kLabel('kdsRecall')}</Kbd></Button>
+        <button onClick={() => snd.setMuted(!snd.muted)} data-fb="kds-mute" aria-pressed={snd.muted} title={snd.muted ? t('تشغيل الصوت') : t('كتم الصوت')} aria-label={snd.muted ? t('تشغيل الصوت') : t('كتم الصوت')} className={cn('h-12 w-12 rounded-xl border flex items-center justify-center', snd.muted ? 'border-[var(--error)] text-[var(--error)]' : 'border-[var(--glass-border)] surface-1 text-soft')}>{snd.muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}</button>
+        <button onClick={() => setHelp(true)} data-fb="kds-help" title={t('اختصارات شاشة المطبخ')} aria-label={t('اختصارات شاشة المطبخ')} className="h-12 w-12 rounded-xl border border-[var(--glass-border)] surface-1 text-soft text-lg font-black flex items-center justify-center">?</button>
       </div>
-      {v === 'board' && (
-        <div className="flex items-center gap-2 flex-wrap shrink-0">
-          {mine.length > 1 && <Tabs value={station} onChange={setStation} tabs={[{ id: 'ALL', label: <span>{screen.stationIds?.length ? t('محطاتي') : t('كل المحطات')} <span className="num text-xs opacity-70">{own.length}</span></span> }, ...mine.map((s: any) => ({ id: s.id, label: <span data-fb={`kds-station:${s.name}`}>{stationLabel(s.name)} <span className="num text-xs opacity-70">{own.filter((x) => x.stationId === s.id).length}</span></span> }))]} />}
-          <div className="flex-1" />
-          {rush > 0 && <Pill tone="error"><Flame className="w-3 h-3" /><span className="num">{rush}</span> {t('مستعجلة')}</Pill>}
-          {late > 0 && <Pill tone="error"><AlertTriangle className="w-3 h-3" /><span className="num">{late}</span> {t('متأخرة')}</Pill>}
-          <span className="flex items-center gap-3 text-[11px] text-soft"><span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full" style={{ background: TONE.ok.color }} />{t('في الوقت')}</span><span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full" style={{ background: TONE.warn.color }} />{t('قربت')}</span><span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full" style={{ background: TONE.late.color }} />{t('متأخرة')}</span></span>
+      {v === 'tickets' && mine.length > 1 && (
+        <div className="shrink-0">
+          <Tabs value={station} onChange={setStation} tabs={[{ id: 'ALL', label: <span>{screen.stationIds?.length ? t('محطاتي') : t('كل المحطات')} <span className="num text-xs opacity-70">{own.filter((x) => x.state !== 'READY').length}</span></span> }, ...mine.map((s: any) => ({ id: s.id, label: <span data-fb={`kds-station:${s.name}`}>{stationLabel(s.name)} <span className="num text-xs opacity-70">{own.filter((x) => x.stationId === s.id && x.state !== 'READY').length}</span></span> }))]} />
         </div>
       )}
-      {v === 'board' ? (
-        <div className="flex-1 min-h-0 flex gap-3">
-          {/* the all-day box: a fixed panel, always in view (never scrolls away with the tickets) — E06 */}
-          <AllDay tickets={tickets} sentToDispatch={dispatch ? null : ready} />
-          <div className="flex-1 min-w-0 overflow-y-auto pe-1" data-fb="kds-col:ACTIVE">
-            {loading ? <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>{Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-64 rounded-2xl" />)}</div>
+      <div className="flex-1 min-h-0 flex gap-3">
+        {/* the all-day box: a fixed panel, always in view (never scrolls away with the tickets) — E06 */}
+        <AllDay tickets={tickets} sentToDispatch={dispatch ? null : ready} />
+        <div className="flex-1 min-w-0 overflow-y-auto p-1.5 pb-24" data-fb="kds-col:ACTIVE">
+          {loading ? <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))' }}>{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-72 rounded-2xl" />)}</div>
+            : v === 'orders' ? <DispatchBoard groups={groups} sel={selIdx} onSelect={setSel} onServe={serve} onCall={call} busy={busy} keys={{ bump: kLabel('kdsBump'), call: kLabel('kdsCall') }} />
               : cooking.length ? (
-                <div className="grid gap-3 items-start" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
-                  {cooking.map((tk) => <Ticket key={tk.id} tk={tk} stations={active} reasons={reasons} showStation={showStation} startPolicy={startPolicy} dispatch={dispatch} />)}
+                <div className="grid gap-3 items-start" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))' }}>
+                  {cooking.map((tk, i) => <TicketCard key={tk.id} tk={tk} index={i} selected={i === selIdx} onSelect={() => setSel(i)} onBump={() => bumpTicket(tk)} onBumpItem={(it) => bumpItem(tk, it)} onStart={() => start(tk)} onMenu={onMenu(tk)} startPolicy={startPolicy} itemBump={itemBump} dispatch={dispatch} showStation={showStation} busy={busy} fresh={arrived.has(tk.id)} keys={{ bump: kLabel('kdsBump') }} />)}
                 </div>
-              ) : <EmptyState icon={<ChefHat />} title={t('مفيش طلبات بتتعمل دلوقتي')} text={single ? t('أول ما يتبعت صنف لـ {s} هيظهر هنا على طول.', { s: stationLabel(single.name) }) : t('أول ما الويتر أو الكاشير يبعت طلب هيظهر هنا على طول.')} />}
-          </div>
-          {/* "ready for hand-off" exists only on the dispatch screen (F3-02) */}
-          {dispatch && (
-            <div className="w-[min(300px,30%)] shrink-0 rounded-2xl border-t-4 surface-1 flex flex-col min-h-0" style={{ borderTopColor: TONE.ok.color }} data-fb="kds-col:READY">
-              <div className="px-3 py-2.5 font-bold flex items-center justify-between"><span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-[var(--success)]" />{t('جاهز للتسليم')}</span><Pill tone={ready.length ? 'success' : 'neutral'}><span className="num">{ready.length}</span></Pill></div>
-              <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                {ready.map((tk) => <ReadyCard key={tk.id} tk={tk} stations={active} reasons={reasons} showStation={mine.length > 1} />)}
-                {!ready.length && <EmptyState compact icon={<ConciergeBell />} text={t('اللي يجهز هيستنى هنا لحد ما يتسلّم.')} />}
-              </div>
-            </div>
-          )}
+              ) : <EmptyState icon={<ChefHat />} title={t('لا توجد طلبات قيد التحضير')} />}
         </div>
-      ) : v === 'callout' ? <CallOut tickets={all} /> : <Expo tickets={all} />}
-      {recall && <RecallDrawer onClose={() => setRecall(false)} stations={active} reasons={reasons} />}
+        {/* "ready for hand-off" exists only on the dispatch screen (F3-02) */}
+        {dispatch && v === 'tickets' && (
+          <div className="w-[min(300px,28%)] shrink-0 rounded-2xl border-t-4 border-[var(--success)] surface-1 flex flex-col min-h-0" data-fb="kds-col:READY">
+            <div className="px-3 py-2.5 font-bold flex items-center justify-between"><span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-[var(--success)]" />{t('جاهز للتسليم')}</span><Pill tone={ready.length ? 'success' : 'neutral'}><span className="num">{ready.length}</span></Pill></div>
+            <div className="flex-1 overflow-y-auto p-2 space-y-2">
+              {ready.map((tk) => <ReadyCard key={tk.id} tk={tk} showStation={mine.length > 1} onServe={() => { const g = groups.find((x) => x.list.some((y) => y.id === tk.id)); if (g) serve(g); }} onBack={() => run('Kitchen.AdvanceTicket', { params: { ticketId: tk.id }, body: { expectedVersion: tk.version, toState: 'IN_PROGRESS' } })} onRefire={() => setDlg({ k: 'refire', tk })} busy={busy} />)}
+              {!ready.length && <div className="text-sm text-dim text-center py-8">—</div>}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {undo && (
+        <div className="absolute z-[60] bottom-4 end-4 w-[min(440px,calc(100%-2rem))] undo-in" data-fb="undo-toast" role="status" aria-live="polite">
+          <div className="toast-card rounded-2xl ps-4 pe-1.5 py-1.5 flex items-center gap-2 shadow-lg">
+            <span className="flex-1 min-w-0 text-base font-bold truncate">{undo.text}</span>
+            <button onClick={runUndo} data-fb="kds-undo" className="h-12 px-4 rounded-xl font-extrabold text-[var(--primary)] hover:bg-[var(--surface-2)] inline-flex items-center gap-1.5 shrink-0"><Undo2 className="w-5 h-5" />{t('تراجع')}<Kbd>{kLabel('kdsUndo')}</Kbd></button>
+            <button onClick={() => setUndo(null)} className="w-10 h-10 rounded-lg flex items-center justify-center text-dim hover:bg-[var(--surface-2)] shrink-0" aria-label={t('إغلاق')}><X className="w-4 h-4" /></button>
+          </div>
+        </div>
+      )}
+      {recall && <RecallPopup onClose={() => setRecall(false)} stations={active} reasons={reasons} dispatch={dispatch} />}
+      {help && <ShortcutsOverlay deviceId={deviceId} scope="kds" labels={labels} profileName={L(profile.role)} onClose={() => setHelp(false)} title={t('اختصارات شاشة المطبخ')} fb="kds-keys"
+        fixed={[['← →', t('التنقل بين التذاكر')], ['1–9', t('اختيار تذكرة برقمها')], ['?', t('عرض الاختصارات')], ['Esc', t('إغلاق النافذة')]]} />}
+      {dlg?.k === 'refire' && <RefireDialog tk={dlg.tk} reasons={reasons} stations={active} onClose={() => setDlg(null)} />}
+      {dlg?.k === 'move' && <MoveDialog tk={dlg.tk} stations={active} onClose={() => setDlg(null)} />}
+      {dlg?.k === 'history' && <HistoryDialog tk={dlg.tk} onClose={() => setDlg(null)} />}
     </div>
   );
+}
+
+function Legend({ warn, late }: { warn: number; late: number }) {
+  const Dot = ({ c, children }: { c: string; children: React.ReactNode }) => <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded-full" style={{ background: c }} /><span className="num">{children}</span></span>;
+  return <span className="flex items-center gap-3 text-xs font-bold text-soft" data-fb="kds-legend" data-warn={warn} data-late={late}><Dot c="var(--success)">{'<'} {warn}</Dot><Dot c="var(--warning)">{warn}–{late}</Dot><Dot c="var(--error)">≥ {late}</Dot><span>{t('د')}</span></span>;
 }
 
 /** "All day": how many of each item are still to cook on this screen right now, split by size / options (E06).
@@ -120,7 +266,7 @@ function AllDay({ tickets, sentToDispatch }: { tickets: any[]; sentToDispatch: a
         seen.add(once);
         const k = it.name.ar;
         const r = m.get(k) ?? { name: it.name, qty: 0, mods: new Map() };
-        const q = Number(it.quantity);
+        const q = Number(it.quantity); // a count of portions to cook (display only, never money)
         r.qty += q;
         const sig = (it.modifiers ?? []).map((md: any) => L(md)).join(' · ') || t('عادي');
         r.mods.set(sig, (r.mods.get(sig) ?? 0) + q);
@@ -131,15 +277,15 @@ function AllDay({ tickets, sentToDispatch }: { tickets: any[]; sentToDispatch: a
   }, [tickets]);
   const total = rows.reduce((a, r) => a + r.qty, 0);
   return (
-    <aside className="w-[min(230px,26%)] shrink-0 rounded-2xl surface-1 border line flex flex-col min-h-0" data-fb="kds-allday" aria-label={t('المطلوب دلوقتي')}>
-      <div className="px-3 py-2.5 font-bold flex items-center justify-between border-b line"><span className="flex items-center gap-1.5"><Layers className="w-4 h-4 text-[var(--primary)]" />{t('المطلوب دلوقتي')}</span><span className="num text-sm text-soft">{total || ''}</span></div>
+    <aside className="w-[min(250px,24%)] shrink-0 rounded-2xl surface-1 border line flex flex-col min-h-0" data-fb="kds-allday" aria-label={t('المطلوب دلوقتي')}>
+      <div className="px-3 py-3 font-bold flex items-center justify-between border-b line"><span className="flex items-center gap-1.5 text-base"><Layers className="w-5 h-5 text-[var(--primary)]" />{t('المطلوب دلوقتي')}</span><span className="num text-lg font-black text-soft">{total || ''}</span></div>
       <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1.5">
-        {!rows.length && <div className="text-xs text-dim text-center py-6">{t('مفيش حاجة مستنية')}</div>}
+        {!rows.length && <div className="text-sm text-dim text-center py-6">—</div>}
         {rows.map((r) => (
           <div key={r.name.ar} className="rounded-xl bg-[var(--card-raised)] border border-[var(--glass-border)] px-2.5 py-2" data-fb={`allday:${r.name.ar}`}>
-            <div className="flex items-baseline gap-2"><span className="num font-extrabold text-[var(--primary)] text-2xl leading-none" data-allday-qty>{qtyN(r.qty)}</span><span className="font-bold leading-tight min-w-0">{L(r.name)}</span></div>
+            <div className="flex items-baseline gap-2"><span className="num font-black text-[var(--primary)] text-[28px] leading-none" data-allday-qty>{qtyN(r.qty)}</span><span className="font-bold text-[17px] leading-tight min-w-0">{L(r.name)}</span></div>
             {(r.mods.size > 1 || ![...r.mods.keys()].includes(t('عادي'))) && (
-              <div className="mt-1 space-y-0.5">{[...r.mods.entries()].map(([k, v]) => <div key={k} className="text-[11px] text-[var(--warning-text)] flex gap-1.5"><span className="num font-bold">{qtyN(v)}</span><span className="min-w-0">{k}</span></div>)}</div>
+              <div className="mt-1 space-y-0.5">{[...r.mods.entries()].map(([k, v]) => <div key={k} className="text-[13px] text-[var(--warning-text)] flex gap-1.5"><span className="num font-bold">{qtyN(v)}</span><span className="min-w-0">{k}</span></div>)}</div>
             )}
           </div>
         ))}
@@ -147,11 +293,10 @@ function AllDay({ tickets, sentToDispatch }: { tickets: any[]; sentToDispatch: a
       {sentToDispatch && (
         <div className="border-t line p-2 space-y-1.5 max-h-[40%] overflow-y-auto" data-fb="kds-sent">
           <div className="text-xs font-bold text-soft flex items-center gap-1"><ConciergeBell className="w-3.5 h-3.5" />{t('اتبعت لشاشة التسليم')} <span className="num">{sentToDispatch.length}</span></div>
-          {!sentToDispatch.length && <div className="text-[11px] text-dim">{t('اللي تدوس عليه «جاهز» بيروح لشاشة التسليم وهي اللي بتسلّمه.')}</div>}
           {sentToDispatch.slice(0, 6).map((tk) => (
-            <div key={tk.id} className="flex items-center gap-1.5 text-xs rounded-lg surface-2 px-2 py-1">
-              <span className="min-w-0 flex-1 truncate">{tk.shortNo ? <b className="num">{tk.shortNo} · </b> : null}{whereOf(tk)}</span>
-              <button disabled={busy} onClick={() => run('Kitchen.AdvanceTicket', { params: { ticketId: tk.id }, body: { expectedVersion: tk.version, toState: 'IN_PROGRESS' } })} title={t('رجّعها للشغل')} aria-label={t('رجّعها للشغل')} className="w-7 h-7 rounded-md hover:bg-[var(--surface-3)] flex items-center justify-center"><Undo2 className="w-3.5 h-3.5" /></button>
+            <div key={tk.id} className="flex items-center gap-1.5 text-sm rounded-lg surface-2 px-2 py-1">
+              <span className="min-w-0 flex-1 truncate">{tk.shortNo ? <b className="num">{tk.shortNo} · </b> : null}{headline(tk)}</span>
+              <button disabled={busy} onClick={() => run('Kitchen.AdvanceTicket', { params: { ticketId: tk.id }, body: { expectedVersion: tk.version, toState: 'IN_PROGRESS' } })} title={t('إعادة إلى التحضير')} aria-label={t('إعادة إلى التحضير')} className="w-9 h-9 rounded-md hover:bg-[var(--surface-3)] flex items-center justify-center"><Undo2 className="w-4 h-4" /></button>
             </div>
           ))}
         </div>
@@ -161,107 +306,21 @@ function AllDay({ tickets, sentToDispatch }: { tickets: any[]; sentToDispatch: a
 }
 const qtyN = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0+$/, '').replace(/\.$/, ''));
 
-const whereOf = (tk: any) => (tk.tableName ? `${t('ترابيزة')} ${tk.tableName}` : tk.channel === 'TAKEAWAY' ? t('تيك أواي') : tk.channel === 'DELIVERY' ? t('دليفري') : t('كاونتر'));
-
-function Ticket({ tk, stations, reasons, showStation, startPolicy = 'HIDDEN', dispatch = true }: { tk: any; stations: any[]; reasons: Record<string, any>; showStation?: boolean; startPolicy?: 'HIDDEN' | 'OPTIONAL' | 'REQUIRED'; dispatch?: boolean }) {
-  const { run, busy } = useCommand();
-  const [menu, setMenu] = useState(false);
-  const [dlg, setDlg] = useState<null | 'refire' | 'move' | 'history'>(null);
-  const adv = (toState: string) => run('Kitchen.AdvanceTicket', { params: { ticketId: tk.id }, body: { expectedVersion: tk.version, toState } });
-  const bump = (it: any) => run('TicketItem.Bump', { params: { ticketId: tk.id, itemId: it.lineId }, body: {} });
-  const rush = () => run('Ticket.SetPriority', { params: { ticketId: tk.id }, body: { expectedVersion: tk.version, priority: tk.priority === 'RUSH' ? 'NORMAL' : 'RUSH' } }, { success: tk.priority === 'RUSH' ? t('رجعت عادية') : t('الطلب بقى مستعجل — طلع أول الطابور') });
-  const tone = TONE[toneOf(tk)];
-  const isRush = tk.priority === 'RUSH';
-  return (
-    <div data-fb={`ticket:${tk.orderNumber}:r${tk.round}`} data-ticket-state={tk.state} data-priority={tk.priority} className={cn('relative rounded-2xl overflow-hidden border-2 bg-[var(--card-raised)] shadow-[0_8px_24px_-14px_rgba(0,0,0,.5)]', toneOf(tk) === 'late' && 'animate-pulse-glow')} style={{ borderColor: isRush ? 'var(--error)' : tone.color }}>
-      {/* header: where + timer, coloured by the timing */}
-      <div className="px-3 py-2 flex items-center gap-2" style={{ background: `color-mix(in srgb, ${tone.color} 22%, transparent)` }}>
-        <div className="min-w-0 flex-1">
-          <div className="font-extrabold text-xl leading-tight flex items-center gap-1.5 flex-wrap">
-            {isRush && <span className="inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-md bg-[var(--error)] text-white"><Flame className="w-3 h-3" />{t('مستعجل')}</span>}
-            {tk.shortNo && <span className="num inline-flex items-center justify-center min-w-[2.2rem] h-9 px-1.5 rounded-lg bg-[var(--foreground)] text-[var(--background)] text-2xl" title={t('رقم النداء')} data-fb="ticket-short-no">{tk.shortNo}</span>}
-            {whereOf(tk)}
-            {tk.guestCount ? <span className="text-xs text-soft font-bold inline-flex items-center gap-0.5"><Users className="w-3.5 h-3.5" /><span className="num">{tk.guestCount}</span></span> : null}
-          </div>
-          <div className="text-[11px] text-soft"><span title={t('رقم العملية (ثابت)')}>{tk.shortNo ? `${t('عملية')} ` : ''}<span className="num">#{tk.orderNumber}</span></span> · {t('الدفعة')} <span className="num">{tk.round}</span>{showStation ? ` · ${stationLabel(tk.stationName)}` : ''}{tk.serverName ? ` · ${personName(null, tk.serverName)}` : ''}</div>
-        </div>
-        <div className="text-center shrink-0 leading-none" title={t('من {a} دقيقة — المستهدف {b}', { a: tk.ageMinutes, b: tk.targetMinutes })}>
-          <div className="num font-extrabold text-2xl" style={{ color: tone.color }}>{tk.ageMinutes} <span className="text-xs">{t('د')}</span></div>
-          <div className="text-[10px] text-dim num">/ {tk.targetMinutes}</div>
-        </div>
-        <button className="w-9 h-9 rounded-lg hover:bg-[var(--surface-3)] flex items-center justify-center shrink-0" onClick={() => setMenu(!menu)} data-fb={`ticket-menu:${tk.orderNumber}:r${tk.round}`} aria-label={t('خيارات')}><MoreVertical className="w-5 h-5" /></button>
-      </div>
-      <div className="p-3 space-y-2">
-        {(tk.refireOf || tk.transferredFromName || tk.recalledAt) && (
-          <div className="flex flex-wrap gap-1">
-            {tk.refireOf && <Pill tone="violet"><RotateCcw className="w-3 h-3" />{t('إعادة')}: {L(tk.refireReasonText)}{tk.refireNote ? ` — ${tk.refireNote}` : ''}</Pill>}
-            {tk.transferredFromName && <Pill tone="info"><ArrowRightLeft className="w-3 h-3" />{t('جاية من')} {stationLabel(tk.transferredFromName)}</Pill>}
-            {tk.recalledAt && <Pill tone="warning"><Undo2 className="w-3 h-3" />{t('اترجعت')} <span className="num">{time(tk.recalledAt)}</span></Pill>}
-          </div>
-        )}
-        {menu && (
-          <div className="rounded-xl surface-2 border line p-1.5 grid grid-cols-2 gap-1" data-fb="ticket-menu">
-            <Button size="sm" variant={isRush ? 'ghost' : 'danger'} disabled={busy} onClick={() => { setMenu(false); rush(); }} data-fb="ticket-rush"><Flame className="w-3.5 h-3.5" />{isRush ? t('خليها عادية') : t('مستعجل')}</Button>
-            <Button size="sm" disabled={busy} onClick={() => { setMenu(false); setDlg('move'); }} data-fb="ticket-move"><ArrowRightLeft className="w-3.5 h-3.5" />{t('انقل لمحطة')}</Button>
-            <Button size="sm" variant="ghost" onClick={() => { setMenu(false); setDlg('history'); }}><History className="w-3.5 h-3.5" />{t('اللي حصل')}</Button>
-          </div>
-        )}
-        <div className="space-y-1">
-          {tk.items.map((it: any) => {
-            const cancelled = it.status === 'CANCELLED';
-            return (
-              <button key={it.lineId} disabled={cancelled || busy} onClick={() => bump(it)} data-fb={`ticket-item-bump:${it.name.ar}`} title={it.bumped ? t('رجّع الصنف') : t('الصنف ده خلص')}
-                className={cn('w-full text-start rounded-xl px-2 py-1.5 transition-colors hover:bg-[var(--surface-2)] disabled:hover:bg-transparent', cancelled && 'opacity-50', it.bumped && 'opacity-45')}>
-                <div className="flex gap-2 items-start">
-                  <span className={cn('w-6 h-6 mt-0.5 rounded-md border-2 flex items-center justify-center shrink-0', it.bumped ? 'bg-[var(--success)] border-[var(--success)] text-white' : 'border-[var(--glass-border)]')}>{it.bumped && <Check className="w-4 h-4" />}</span>
-                  <span className="num font-extrabold text-lg text-[var(--primary)] leading-6">{qty(it.quantity)}×</span>
-                  <span className={cn('font-bold text-lg leading-6 flex-1 min-w-0', (it.bumped || cancelled) && 'line-through')}>{L(it.name)}{it.name2 && <span className="block text-xs font-semibold text-soft leading-4" data-fb="ticket-name2"><bdi>{it.name2}</bdi></span>}</span>
-                  {it.seat ? <span className="text-[11px] px-1.5 py-0.5 rounded-md surface-3 font-bold">{t('كرسي')} <span className="num">{it.seat}</span></span> : null}{cancelled && <Pill tone="error">{t('اتلغى')}</Pill>}
-                </div>
-                {it.modifiers?.length > 0 && <div className="ps-14 text-sm font-bold text-[var(--warning-text)]">{it.modifiers.map((m: any) => L(m)).join(' · ')}</div>}
-                {it.children?.length > 0 && <div className="ps-14 text-sm text-[var(--info)]">{it.children.map((c: string, i: number) => <div key={i}>↳ {c}</div>)}</div>}
-                {it.note && <div className="ps-14 text-sm font-bold text-[var(--warning-text)] flex items-center gap-1">✎ {it.note}</div>}
-                {it.allergens?.length > 0 && <div className="ps-14 text-sm font-extrabold text-[var(--error)] flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" />{it.allergens.map((a: string) => t(ALLERGEN_AR[a] ?? a)).join(t('، '))}</div>}
-                {it.mods?.map((m: any, i: number) => <div key={i} className="ms-14 mt-0.5 text-sm font-bold text-[var(--info)] bg-[color-mix(in_srgb,var(--info)_12%,transparent)] rounded-md px-1.5">{t('تعديل')}: {m.text} · <span className="num">{time(m.at)}</span></div>)}
-              </button>
-            );
-          })}
-        </div>
-        {tk.siblings?.length > 0 && <div className="flex flex-wrap gap-1 text-[11px]">{tk.siblings.map((s: any) => { const ok = s.state === 'READY' || s.state === 'DONE'; return <span key={s.id} className={cn('px-1.5 py-0.5 rounded-md border font-bold', ok ? 'border-[color-mix(in_srgb,var(--success)_45%,transparent)] text-[var(--success)]' : 'border-[var(--glass-border)] text-dim')}>{stationLabel(s.stationName)}: {ok ? t('جاهز') : t('لسه')}</span>; })}</div>}
-        <div className="flex gap-1.5 pt-1">
-          {/* round 3 (F2-06): "ابدأ" follows the screen's policy; the timer already runs from arrival — start only records startedAt */}
-          {tk.state === 'NEW' && startPolicy !== 'HIDDEN' && <Button size="lg" variant="secondary" disabled={busy} onClick={() => adv('IN_PROGRESS')} data-fb="ticket-start" title={t('بيسجّل إمتى بدأت فعلًا — العداد شغال من ساعة ما الطلب وصل')}><Play className="w-4 h-4" />{t('ابدأ')}</Button>}
-          {tk.state === 'IN_PROGRESS' && <span className="h-12 px-2 rounded-xl text-xs font-bold text-[var(--warning-text)] flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{t('بيتعمل')}</span>}
-          <Button size="lg" variant="success" className="flex-1" disabled={busy || (startPolicy === 'REQUIRED' && tk.state === 'NEW')} title={startPolicy === 'REQUIRED' && tk.state === 'NEW' ? t('دوس «ابدأ» الأول') : dispatch ? undefined : t('بيروح لشاشة التسليم')} onClick={() => adv('READY')} data-fb="ticket-ready"><Check className="w-5 h-5" />{dispatch ? t('جاهز') : t('جاهز — للتسليم')}</Button>
-        </div>
-      </div>
-      {dlg === 'refire' && <RefireDialog tk={tk} reasons={reasons} stations={stations} onClose={() => setDlg(null)} />}
-      {dlg === 'move' && <MoveDialog tk={tk} stations={stations} onClose={() => setDlg(null)} />}
-      {dlg === 'history' && <HistoryDialog tk={tk} onClose={() => setDlg(null)} />}
-    </div>
-  );
-}
-
-/** A ready ticket waiting for pickup: compact, with "handed over", back to cooking and "make it again". */
-function ReadyCard({ tk, stations, reasons, showStation }: { tk: any; stations: any[]; reasons: Record<string, any>; showStation?: boolean }) {
-  const { run, busy } = useCommand();
-  const [dlg, setDlg] = useState<null | 'refire' | 'history'>(null);
-  const adv = (toState: string) => run('Kitchen.AdvanceTicket', { params: { ticketId: tk.id }, body: { expectedVersion: tk.version, toState } });
+/** A ready ticket waiting for pickup (dispatch, tickets view): compact, with hand-off, back to cooking and make again. */
+function ReadyCard({ tk, showStation, onServe, onBack, onRefire, busy }: { tk: any; showStation?: boolean; onServe: () => void; onBack: () => void; onRefire: () => void; busy: boolean }) {
   const waiting = tk.readyMinutes ?? 0;
   return (
     <div data-fb={`ticket:${tk.orderNumber}:r${tk.round}`} data-ticket-state={tk.state} className="rounded-xl bg-[var(--card-raised)] border border-[color-mix(in_srgb,var(--success)_40%,transparent)] p-2.5 space-y-1.5">
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0"><div className="font-extrabold leading-tight flex items-center gap-1.5">{tk.shortNo && <span className="num px-1.5 rounded-md bg-[var(--foreground)] text-[var(--background)] text-lg" title={t('رقم النداء')}>{tk.shortNo}</span>}{whereOf(tk)}</div><div className="text-[11px] text-dim"><span className="num">#{tk.orderNumber}</span> · {t('الدفعة')} <span className="num">{tk.round}</span>{showStation ? ` · ${stationLabel(tk.stationName)}` : ''}</div></div>
-        <Pill tone={waiting >= 5 ? 'warning' : 'success'}><Clock className="w-3 h-3" />{t('مستني')} <span className="num">{waiting}</span>{t('د')}</Pill>
+        <div className="min-w-0"><div className="font-extrabold leading-tight flex items-center gap-1.5">{tk.shortNo && !tk.tableName && <span className="num px-1.5 rounded-md bg-[var(--foreground)] text-[var(--background)] text-lg">{tk.shortNo}</span>}{headline(tk)}</div><div className="text-[11px] text-dim"><span className="num">#{tk.orderNumber}</span> · {t('الدفعة')} <span className="num">{tk.round}</span>{showStation ? ` · ${stationLabel(tk.stationName)}` : ''}</div></div>
+        <Pill tone={waiting >= 5 ? 'warning' : 'success'}><Clock className="w-3 h-3" /><span className="num">{waiting}</span>{t('د')}</Pill>
       </div>
       <div className="text-sm text-soft leading-snug">{tk.items.filter((i: any) => i.status === 'ACTIVE').map((i: any) => `${qty(i.quantity)}× ${L(i.name)}`).join(' · ')}</div>
       <div className="flex gap-1">
-        <Button size="sm" variant="ghost" disabled={busy} onClick={() => adv('IN_PROGRESS')} title={t('رجّعها للشغل')} aria-label={t('رجّعها للشغل')}><Undo2 className="w-3.5 h-3.5" /></Button>
-        <Button size="sm" variant="ghost" disabled={busy} onClick={() => setDlg('refire')} data-fb="ticket-refire" title={t('اعمله تاني')}><RotateCcw className="w-3.5 h-3.5" /></Button>
-        <Button size="sm" variant="primary" className="flex-1" disabled={busy} onClick={() => adv('DONE')} data-fb="ticket-done"><Truck className="w-3.5 h-3.5" />{t('اتسلّم')}</Button>
+        <Button size="lg" variant="ghost" disabled={busy} onClick={onBack} title={t('إعادة إلى التحضير')} aria-label={t('إعادة إلى التحضير')}><Undo2 className="w-4 h-4" /></Button>
+        <Button size="lg" variant="ghost" disabled={busy} onClick={onRefire} data-fb="ticket-refire" title={t('إعادة التحضير')}><RotateCcw className="w-4 h-4" /></Button>
+        <Button size="lg" variant="primary" className="flex-1" disabled={busy} onClick={onServe} data-fb="ticket-done"><Truck className="w-4 h-4 rtl:-scale-x-100" />{t('تسليم')}</Button>
       </div>
-      {dlg === 'refire' && <RefireDialog tk={tk} reasons={reasons} stations={stations} onClose={() => setDlg(null)} />}
-      {dlg === 'history' && <HistoryDialog tk={tk} onClose={() => setDlg(null)} />}
     </div>
   );
 }
@@ -279,7 +338,7 @@ export function RefireDialog({ tk, reasons, stations, onClose }: { tk: any; reas
       footer={<><Button variant="ghost" onClick={onClose}>{t('رجوع')}</Button><Button variant="primary" loading={busy} disabled={!reason || !ids.length || (reason === 'OTHER' && !note.trim())} onClick={submit} data-fb="refire-submit">{t('ابعت للمطبخ تاني')}</Button></>}>
       <div className="space-y-4">
         <Field label={t('ليه هيتعمل تاني؟')}>
-          <div className="grid grid-cols-2 gap-1.5">{Object.entries(reasons).map(([k, v]: any) => <button key={k} onClick={() => setReason(k)} data-fb={`refire-reason:${k}`} className={cn('h-10 rounded-xl border text-sm px-2', reason === k ? 'border-[var(--primary)] bg-[var(--primary-container)] font-bold' : 'border-[var(--glass-border)] surface-1')}>{L(v)}</button>)}</div>
+          <div className="grid grid-cols-2 gap-1.5">{Object.entries(reasons).map(([k, v]: any) => <button key={k} onClick={() => setReason(k)} data-fb={`refire-reason:${k}`} className={cn('h-12 rounded-xl border text-sm px-2', reason === k ? 'border-[var(--primary)] bg-[var(--primary-container)] font-bold' : 'border-[var(--glass-border)] surface-1')}>{L(v)}</button>)}</div>
         </Field>
         {reason === 'OTHER' && <Field label={t('اكتب السبب')}><Input value={note} onChange={(e) => setNote(e.target.value)} /></Field>}
         {reason && reason !== 'OTHER' && <Field label={t('ملاحظة للمطبخ (اختياري)')}><Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('مثلاً: ويل دن المرة دي')} /></Field>}
@@ -310,7 +369,6 @@ function MoveDialog({ tk, stations, onClose }: { tk: any; stations: any[]; onClo
         <div className="text-sm">#{tk.orderNumber} · {t('الدفعة')} {tk.round} · {t('دلوقتي على')} <b>{stationLabel(tk.stationName)}</b></div>
         <div className="grid grid-cols-2 gap-2">{stations.filter((s) => s.id !== tk.stationId).map((s) => <button key={s.id} onClick={() => setTo(s.id)} data-fb={`move-to:${s.name}`} className={cn('h-14 rounded-xl border font-bold', to === s.id ? 'border-[var(--primary)] bg-[var(--primary-container)]' : 'border-[var(--glass-border)] surface-1')}>{stationLabel(s.name)}</button>)}</div>
         <Field label={t('السبب (اختياري)')}><Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t('مثلاً: الشوّاية زحمة')} /></Field>
-        <div className="text-[11px] text-dim">{t('لو المحطة التانية عندها تذكرة لنفس الطلب ونفس الجولة، الأصناف بتنضم لها بدل ما تطلع تذكرتين.')}</div>
       </div>
     </Modal>
   );
@@ -331,85 +389,47 @@ function HistoryDialog({ tk, onClose }: { tk: any; onClose: () => void }) {
   );
 }
 
-/** Expo: every open round across stations. A round is ready to serve when all its stations have it ready. */
-function Expo({ tickets }: { tickets: any[] }) {
-  const { run, busy } = useCommand();
-  const groups = useMemo(() => {
-    const m = new Map<string, any[]>();
-    for (const tk of tickets) { const k = `${tk.orderId}:${tk.round}`; m.set(k, [...(m.get(k) ?? []), tk]); }
-    return [...m.values()].map((list) => ({ list, ready: list.every((x) => x.state === 'READY'), first: list[0], oldest: Math.max(...list.map((x) => x.ageMinutes)), rush: list.some((x) => x.priority === 'RUSH'), late: list.some((x) => x.late && x.state !== 'READY') }))
-      .sort((a, b) => Number(b.ready) - Number(a.ready) || Number(b.rush) - Number(a.rush) || b.oldest - a.oldest);
-  }, [tickets]);
-  const serve = async (list: any[]) => { for (const tk of list) await run('Kitchen.AdvanceTicket', { params: { ticketId: tk.id }, body: { expectedVersion: tk.version, toState: 'DONE' } }); };
-  if (!groups.length) return <Empty icon={<ChefHat className="w-10 h-10 opacity-40" />} text={t('مفيش طلبات في المطبخ دلوقتي')} />;
-  return (
-    <div className="flex-1 min-h-0 overflow-y-auto grid gap-3 content-start" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }} data-fb="kds-expo">
-      {groups.map(({ list, ready, first, oldest, rush, late }) => (
-        <div key={`${first.orderId}:${first.round}`} className={cn('rounded-2xl bg-[var(--card-raised)] p-3 space-y-2 border-2', ready ? 'border-[var(--success)]' : late ? 'border-[var(--error)]' : 'border-[var(--glass-border)]')} data-fb={`expo:${first.orderNumber}:r${first.round}`}>
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <div className="font-extrabold text-xl flex items-center gap-1.5">{rush && <Flame className="w-4 h-4 text-[var(--error)]" />}{first.shortNo && <span className="num px-1.5 rounded-md bg-[var(--foreground)] text-[var(--background)]" title={t('رقم النداء')}>{first.shortNo}</span>}{first.tableName ? `${t('ترابيزة')} ${first.tableName}` : first.channel === 'TAKEAWAY' ? t('تيك أواي') : first.channel === 'DELIVERY' ? t('دليفري') : t('كاونتر')}</div>
-              <div className="text-[11px] text-dim"><span className="num">#{first.orderNumber}</span> · {t('الدفعة')} {first.round} · {first.serverName ? personName(null, first.serverName) : ''}</div>
-            </div>
-            <Pill tone={ready ? 'success' : late ? 'error' : 'neutral'}><Clock className="w-3 h-3" /><span className="num">{oldest}</span>{t('د')}</Pill>
-          </div>
-          <div className="space-y-1.5">
-            {list.map((tk) => (
-              <div key={tk.id} className="rounded-lg surface-1 px-2 py-1.5">
-                <div className="flex items-center justify-between text-xs mb-0.5"><b>{stationLabel(tk.stationName)}</b>{tk.state === 'READY' ? <Pill tone="success">{t('جاهز')}</Pill> : <Pill tone={tk.late ? 'error' : tk.warn ? 'warning' : 'neutral'}>{tk.state === 'NEW' ? t('لسه ما بدأش') : t('بيتعمل')}</Pill>}</div>
-                <div className="text-sm text-soft">{tk.items.filter((i: any) => i.status === 'ACTIVE').map((i: any) => `${qty(i.quantity)}× ${L(i.name)}`).join(' · ')}</div>
-              </div>
-            ))}
-          </div>
-          {ready ? <Button variant="success" size="lg" className="w-full" disabled={busy} onClick={() => serve(list)} data-fb="expo-serve"><Truck className="w-4 h-4" />{t('كله جاهز — سلّم للويتر')}</Button>
-            : <div className="text-xs text-dim text-center">{t('مستني')}: {list.filter((x) => x.state !== 'READY').map((x) => stationLabel(x.stationName)).join(t('، '))}</div>}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function RecallDrawer({ onClose, stations, reasons }: { onClose: () => void; stations: any[]; reasons: Record<string, any> }) {
-  const q = useQuery<any>('Kitchen.Board', { query: { lifecycle: 'DONE', doneWithinMinutes: 120 } });
+/** Recall: the tickets bumped in the last two hours (ready and handed off), newest first. ↑/↓ choose, Enter recalls. */
+function RecallPopup({ onClose, stations, reasons, dispatch }: { onClose: () => void; stations: any[]; reasons: Record<string, any>; dispatch: boolean }) {
+  const q = useQuery<any>('Kitchen.Board', { query: { lifecycle: 'READY,DONE', doneWithinMinutes: 120 } });
   const { run, busy } = useCommand();
   const [refire, setRefire] = useState<any>(null);
-  const items = [...(q.data?.items ?? [])].sort((a, b) => (b.doneAt ?? '').localeCompare(a.doneAt ?? ''));
+  const [sel, setSel] = useState(0);
+  const items = [...(q.data?.items ?? [])].filter((x) => x.onMyScreen !== false || dispatch).sort((a, b) => String(b.doneAt ?? b.readyAt ?? '').localeCompare(String(a.doneAt ?? a.readyAt ?? ''))).slice(0, 12);
+  const doRecall = async (tk: any) => { if (await run('Ticket.Recall', { params: { ticketId: tk.id }, body: { expectedVersion: tk.version } }, { success: t('أُعيدت التذكرة إلى الشاشة') })) onClose(); };
+  const ref = useRef({ items, sel, doRecall });
+  ref.current = { items, sel, doRecall };
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (refire) return;
+      const { items: list, sel: s } = ref.current;
+      if (e.key === 'ArrowDown') { e.preventDefault(); setSel((i) => Math.min(list.length - 1, i + 1)); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); setSel((i) => Math.max(0, i - 1)); }
+      else if (e.key === 'Enter' && list[s]) { e.preventDefault(); ref.current.doRecall(list[s]); }
+      else if (/^[1-9]$/.test(e.key) && list[Number(e.key) - 1]) { e.preventDefault(); setSel(Number(e.key) - 1); }
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [refire]);
   return (
-    <Modal open onClose={onClose} wide title={<span className="flex items-center gap-2"><History className="w-5 h-5" />{t('اتسلّم في آخر ساعتين')}</span>} badge={<StateBadge ops={['Ticket.Recall', 'Ticket.Refire']} />}>
-      <div className="space-y-2" data-fb="kds-recall">
-        {!items.length && <Empty text={t('مفيش تذاكر اتسلمت قريب')} />}
-        {items.map((tk) => (
-          <div key={tk.id} className="flex items-center gap-3 px-3 py-2 rounded-xl surface-1 border line">
+    <Popup open onClose={onClose} size="lg" fb="kds-recall-popup" title={<span className="flex items-center gap-2"><History className="w-5 h-5" />{t('استعادة تذكرة')}<StateBadge ops={['Ticket.Recall', 'Ticket.Refire']} /></span>}>
+      <div className="space-y-1.5" data-fb="kds-recall">
+        {q.loading && !q.data && <Skeleton className="h-40 rounded-xl" />}
+        {q.data && !items.length && <Empty text={t('لا توجد تذاكر منجزة مؤخرًا')} />}
+        {items.map((tk, i) => (
+          <div key={tk.id} onPointerDown={() => setSel(i)} data-selected={i === sel || undefined} className={cn('flex items-center gap-3 px-3 py-2 rounded-xl border', i === sel ? 'border-[var(--primary)] bg-[var(--primary-container)]' : 'surface-1 border-[var(--glass-border)]')}>
+            <span className="num w-7 h-7 rounded-md surface-3 text-sm font-black flex items-center justify-center shrink-0">{i + 1}</span>
             <div className="flex-1 min-w-0">
-              <div className="font-bold text-sm">{tk.tableName ? `${t('ترابيزة')} ${tk.tableName}` : t('تيك أواي / كاونتر')} · <span className="num">#{tk.orderNumber}</span> · {t('الدفعة')} {tk.round} · {stationLabel(tk.stationName)}</div>
-              <div className="text-xs text-dim truncate">{tk.items.filter((i: any) => i.status === 'ACTIVE').map((i: any) => `${qty(i.quantity)}× ${L(i.name)}`).join(' · ')}</div>
+              <div className="font-bold">{headline(tk)} · <span className="num">#{tk.orderNumber}</span> · {t('الدفعة')} <span className="num">{tk.round}</span> · {stationLabel(tk.stationName)}</div>
+              <div className="text-xs text-dim truncate">{tk.items.filter((x: any) => x.status === 'ACTIVE').map((x: any) => `${qty(x.quantity)}× ${L(x.name)}`).join(' · ')}</div>
             </div>
-            <span className="num text-xs text-dim">{time(tk.doneAt)}</span>
-            <Button size="sm" disabled={busy} onClick={() => run('Ticket.Recall', { params: { ticketId: tk.id }, body: { expectedVersion: tk.version } }, { success: t('التذكرة رجعت للشاشة') })} data-fb={`recall:${tk.orderNumber}:r${tk.round}`}><Undo2 className="w-3.5 h-3.5" />{t('رجّعها')}</Button>
-            <Button size="sm" variant="outline" onClick={() => setRefire(tk)} data-fb={`recall-refire:${tk.orderNumber}:r${tk.round}`}><RotateCcw className="w-3.5 h-3.5" />{t('اعمله تاني')}</Button>
+            <Pill tone={tk.state === 'DONE' ? 'neutral' : 'success'}>{tk.state === 'DONE' ? t('سُلِّمت') : t('جاهز')} <span className="num">{time(tk.doneAt ?? tk.readyAt)}</span></Pill>
+            <Button size="lg" disabled={busy} onClick={() => doRecall(tk)} data-fb={`recall:${tk.orderNumber}:r${tk.round}`}><Undo2 className="w-4 h-4" />{t('استعادة')}{i === sel && <Kbd>Enter</Kbd>}</Button>
+            {(tk.state === 'DONE' || tk.state === 'READY') && <Button size="lg" variant="outline" onClick={() => setRefire(tk)} data-fb={`recall-refire:${tk.orderNumber}:r${tk.round}`}><RotateCcw className="w-4 h-4" />{t('إعادة التحضير')}</Button>}
           </div>
         ))}
       </div>
       {refire && <RefireDialog tk={refire} reasons={reasons} stations={stations} onClose={() => setRefire(null)} />}
-    </Modal>
-  );
-}
-
-/** Customer-facing call-out (round 3, E08): the short display numbers — "بيتجهز" and "جاهز، اتفضل استلم". The
- *  transaction number stays on the receipt; only the short number is called out. */
-function CallOut({ tickets }: { tickets: any[] }) {
-  const byOrder = useMemo(() => {
-    const m = new Map<string, any[]>();
-    for (const tk of tickets) m.set(tk.orderId, [...(m.get(tk.orderId) ?? []), tk]);
-    return [...m.values()].map((list) => ({ no: list[0].shortNo ?? list[0].orderNumber, short: !!list[0].shortNo, ready: list.every((x) => x.state === 'READY'), at: Math.max(...list.map((x) => x.ageMinutes)) }));
-  }, [tickets]);
-  const ready = byOrder.filter((x) => x.ready);
-  const prep = byOrder.filter((x) => !x.ready).sort((a, b) => b.at - a.at);
-  const Num = ({ x, tone }: { x: any; tone: 'ready' | 'prep' }) => <div className={cn('num font-black rounded-2xl flex items-center justify-center border-2', tone === 'ready' ? 'text-[var(--success)] border-[var(--success)] bg-[color-mix(in_srgb,var(--success)_12%,transparent)]' : 'text-soft border-[var(--glass-border)] surface-1')} style={{ fontSize: x.short ? 64 : 34, minHeight: 120 }}>{x.no}</div>;
-  return (
-    <div className="flex-1 min-h-0 grid grid-cols-2 gap-4" data-fb="kds-callout">
-      <div className="rounded-2xl surface-1 border line p-4 flex flex-col min-h-0"><div className="text-xl font-extrabold mb-3">{t('بيتجهز')}</div><div className="grid gap-3 overflow-y-auto" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>{prep.map((x) => <Num key={x.no} x={x} tone="prep" />)}</div>{!prep.length && <div className="text-dim">{t('مفيش')}</div>}</div>
-      <div className="rounded-2xl surface-1 border line p-4 flex flex-col min-h-0"><div className="text-xl font-extrabold mb-3 text-[var(--success)]">{t('جاهز — اتفضل استلم')}</div><div className="grid gap-3 overflow-y-auto" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>{ready.map((x) => <Num key={x.no} x={x} tone="ready" />)}</div>{!ready.length && <div className="text-dim">{t('مفيش')}</div>}</div>
-    </div>
+    </Popup>
   );
 }
