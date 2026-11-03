@@ -2,6 +2,7 @@
 // the English UI comes from the single file ./en.ts. Missing English falls back to Arabic.
 import { useSyncExternalStore } from 'react';
 import { en } from './en';
+import { arMsa } from './ar-msa';
 import { techMode } from '../app/tech';
 
 export type Lang = 'ar' | 'en';
@@ -24,7 +25,7 @@ export function useLang(): Lang {
 
 /** Translate an Arabic UI string. `{x}` placeholders are filled from vars. */
 export function t(ar: string, vars?: Record<string, string | number>): string {
-  let s = lang === 'en' ? en[ar] ?? miss(ar) : ar;
+  let s = lang === 'en' ? en[ar] ?? miss(ar) : arMsa[ar] ?? ar;
   if (vars) for (const [k, v] of Object.entries(vars)) s = s.split(`{${k}}`).join(String(v));
   return techMode.get() ? s : stripTech(s);
 }
@@ -49,7 +50,7 @@ function miss(ar: string): string {
 /** Translate a seeded data value (branch, device, supplier, unit, reason… stored in Arabic) when English exists in en.ts. */
 export function tv(v: string | null | undefined): string {
   if (!v) return v as unknown as string; // keep null/undefined so `tv(x) ?? '—'` still falls back
-  return lang === 'en' ? en[v] ?? miss(v) : v;
+  return lang === 'en' ? en[v] ?? miss(v) : arMsa[v] ?? v;
 }
 
 // Server-made one-line labels ("إيصال #1042", "#1042 · جولة 2", "إقفال يوم 2026-10-25") → English fragments.
