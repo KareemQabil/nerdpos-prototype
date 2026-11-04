@@ -7517,6 +7517,7 @@ export const en: Record<string, string> = {
   "انتهاء صلاحية": "Expiry",
   "تصحيح خطأ في الطلب": "Correcting an order mistake",
   // ux-14: devices, printers, display screens and their content
+  "يُعرض على": "Shown on",
   "الأجهزة الطرفية": "Peripherals",
   "الإعدادات الافتراضية: شاشة العميل تعرض المحتوى المخصص لها فقط، ولا طابعة بديلة، والمفاتيح يغيّرها المدير": "The defaults: the customer display shows only its own content, no backup printer, and a manager changes the keys",
   "الأجهزة كلها في مكان واحد: الطابعات والأدراج والماسح وشاشات العرض": "All devices in one place: printers, drawers, the scanner and the display screens",

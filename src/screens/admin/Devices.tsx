@@ -30,7 +30,7 @@ export function StatusPill({ status }: { status: string }) {
 }
 const roleLabel = (r: string) => ({ RECEIPT: t('الإيصالات والشيك المبدئي'), KITCHEN: t('تذاكر المطبخ'), REPORT: t('تقارير الوردية') } as Record<string, string>)[r] ?? r;
 const connLabel = (c: string) => ({ USB: 'USB', NETWORK: t('شبكة'), BLUETOOTH: t('بلوتوث') } as Record<string, string>)[c] ?? c;
-const contentKindLabel = (k: string) => ({ MESSAGE: t('رسالة'), IMAGE: t('صورة'), PROMOTION: t('عرض'), DISH: t('صنف من القائمة') } as Record<string, string>)[k] ?? k;
+const contentKindLabel = (k: string) => ({ MESSAGE: t('رسالة'), IMAGE: t('صورة'), PROMOTION: t('العرض'), DISH: t('صنف من القائمة') } as Record<string, string>)[k] ?? k;
 const CONTENT_ICON: Record<string, React.ComponentType<{ className?: string }>> = { MESSAGE: Megaphone, IMAGE: ImageIcon, PROMOTION: Tag, DISH: UtensilsCrossed };
 const DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
 const needsAttention = (s: string) => s === 'OFFLINE' || s === 'PAPER_OUT' || s === 'ERROR';
@@ -356,7 +356,7 @@ function ContentCard({ c, perm, onEdit, onRetire }: { c: any; perm: { ok: boolea
           <div className="flex flex-wrap gap-1"><Pill tone="neutral" size="sm">{contentKindLabel(c.kind)}</Pill>{c.activeNow ? <Pill tone="success" size="sm">{t('يُعرض الآن')}</Pill> : <Pill tone="neutral" size="sm">{t('خارج وقته')}</Pill>}{c.kind === 'PROMOTION' && c.promotion && !c.promotion.active && <Pill tone="warning" size="sm">{t('العرض متوقف')}</Pill>}</div>
           <div className="text-[11px] text-dim">{scheduleText(c.schedule)}</div>
           {c.kind === 'PROMOTION' && c.promotion && <div className="text-[11px] text-dim">{t('العرض')}: {L(c.promotion.name)}</div>}
-          <div className="text-[11px] text-dim" data-fb={`content-used:${c.id}`}>{c.usedBy?.length ? <>{t('على')}: {c.usedBy.map((d: any) => tv(d.name)).join(t('، '))}</> : t('غير مضاف لأي شاشة')}</div>
+          <div className="text-[11px] text-dim" data-fb={`content-used:${c.id}`}>{c.usedBy?.length ? <>{t('يُعرض على')}: {c.usedBy.map((d: any) => tv(d.name)).join(t('، '))}</> : t('غير مضاف لأي شاشة')}</div>
         </div>
       </div>
       <div className="flex gap-1.5 justify-end mt-2">
