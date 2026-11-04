@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useSyncExternalStore } from 'react';
-import { Columns2, SlidersHorizontal, MessageSquarePlus, ScrollText, PlayCircle, FlaskConical, Languages, Box, Library, HelpCircle, Code2, Armchair, ShoppingCart, ChefHat, Briefcase, Building2, Monitor, MoreHorizontal, WifiOff, Sun, Moon, Gem, X, Tv, MonitorSmartphone } from 'lucide-react';
+import { Columns2, SlidersHorizontal, MessageSquarePlus, ScrollText, PlayCircle, FlaskConical, Languages, Box, Library, HelpCircle, Code2, Armchair, ShoppingCart, ChefHat, Briefcase, Building2, Monitor, MoreHorizontal, WifiOff, Sun, Moon, Gem, X, Tv, MonitorSmartphone, Smartphone } from 'lucide-react';
 import { DevicePane } from './app/DevicePane';
 import { devices, deviceIds, deviceLabel, useDevicesState, isDisplay, DISPLAY_DEVICES } from './app/devices';
 import { useStoreVersion } from './app/hooks';
@@ -22,7 +22,7 @@ import { Popover } from './demo/Popover';
 import { sim } from './mock/sim';
 
 type Panel = null | 'policy' | 'feedback' | 'log' | 'walk' | 'scenarios';
-const KIND_ICON: Record<string, React.ElementType> = { CASH: ShoppingCart, FLOOR: Armchair, KDS: ChefHat, ADMIN: Briefcase, BO: Building2, CALLBOARD: Tv, CUSTOMER: MonitorSmartphone };
+const KIND_ICON: Record<string, React.ElementType> = { CASH: ShoppingCart, FLOOR: Armchair, KDS: ChefHat, ADMIN: Briefcase, BO: Building2, CALLBOARD: Tv, CUSTOMER: MonitorSmartphone, MOBILE: Smartphone };
 
 export default function App() {
   useStoreVersion();

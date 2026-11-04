@@ -2,7 +2,7 @@
 // manager approval popup (C5) and the "result unknown" dialog.
 import { hasPermission } from '../mock/types-channels'; // r3C
 import React, { Suspense, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { LogOut, Lock, KeyRound, Delete, ShieldAlert, WifiOff, RefreshCw, Monitor, CalendarDays, Clock3, Wallet, ShoppingCart, Armchair, ChefHat, Briefcase, Building2, Check, Zap, Inbox } from 'lucide-react';
+import { LogOut, Lock, KeyRound, Delete, ShieldAlert, WifiOff, RefreshCw, Monitor, CalendarDays, Clock3, Wallet, ShoppingCart, Armchair, ChefHat, Briefcase, Building2, Check, Zap, Inbox, Smartphone } from 'lucide-react';
 import { DeviceProvider, useQuery, useApprovals, useUnknowns, retryUnknown, errorText, type DevCtx, useDev } from './hooks';
 import { devices, deviceLabel, useDevicesState, isDisplay, routeFor } from './devices';
 import { screenById, type Kind } from './registry';
@@ -27,7 +27,7 @@ import { profileShows } from './profiles';
 import { drawerBus } from './drawerBus';
 export { visibleScreens } from './DeviceNav';
 
-const KIND_ICON: Record<string, React.ComponentType<{ className?: string }>> = { CASH: ShoppingCart, FLOOR: Armchair, KDS: ChefHat, ADMIN: Briefcase, BO: Building2 };
+const KIND_ICON: Record<string, React.ComponentType<{ className?: string }>> = { CASH: ShoppingCart, FLOOR: Armchair, KDS: ChefHat, ADMIN: Briefcase, BO: Building2, MOBILE: Smartphone };
 
 /** Width of an element, kept up to date (drives wide sidebar vs compact rail). */
 function useWidth<T extends HTMLElement>() {

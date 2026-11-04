@@ -26,8 +26,8 @@ import { RemoteApproval } from '../ops/RemoteApproval';
 interface Req { id: number; deviceId: string; auth: DeviceAuth; details: any; resolve: (grantId: string | null) => void }
 type Kind = 'PIN' | 'CARD' | 'FINGERPRINT';
 
-const CTX_KIND: Record<string, string> = { PERCENTAGE: 'نسبة', FIXED_AMOUNT: 'مبلغ ثابت', CASH: 'كاش', CARD: 'كارت', DIGITAL_WALLET: 'محفظة', PAY_IN: 'إدخال فلوس للدرج', PAY_OUT: 'صرف من الدرج', SAFE_DROP: 'إيداع في الخزنة', SALE_PRICE: 'بسعر البيع', COST: 'بالتكلفة', NONE: '—' };
-const HIDDEN = /Id$|Version$|Hash$|^payableBasis$|^captureCount$|^currentEffectivePaid$|^fireRound$/;
+const CTX_KIND: Record<string, string> = { PERCENTAGE: 'نسبة', FIXED_AMOUNT: 'مبلغ ثابت', CASH: 'كاش', CARD: 'كارت', DIGITAL_WALLET: 'محفظة', PAY_IN: 'إدخال فلوس للدرج', PAY_OUT: 'صرف من الدرج', SAFE_DROP: 'إيداع في الخزنة', SALE_PRICE: 'بسعر البيع', COST: 'بالتكلفة', NONE: '—', COLLECT_CASH: 'تحصيل نقدي', DEDUCT_PAYOUT: 'خصم من المستحقات', WAIVE: 'إعفاء' };
+const HIDDEN = /Id$|Version$|Hash$|^payableBasis$|^captureCount$|^currentEffectivePaid$|^fireRound$|^periodTo$/;
 function plainValue(k: string, v: unknown): string {
   if (k === 'reasonCode') return L(store.db.reasonCodes.find((r) => r.code === v)?.label) || t('سبب من القايمة');
   if (k === 'stage' && typeof v === 'string' && (STAGE_TEXT as any)[v]) return t((STAGE_TEXT as any)[v].short);
@@ -55,6 +55,7 @@ const SHORT: Record<string, string> = {
   LINE_REMOVE_UNSENT: 'حذف صنف', LINE_VOID: 'إلغاء صنف مُرسل', ORDER_VOID: 'إلغاء الشيك', ORDER_DISCOUNT: 'خصم', ORDER_COMP: 'ضيافة',
   REFUND_APPROVE: 'اعتماد مرتجع', RETURN_AFTER_CLOSE: 'مرتجع بعد الإغلاق', SESSION_VARIANCE: 'فرق الدرج', CASH_MOVE: 'حركة نقدية', DRAWER_NO_SALE: 'فتح الدرج',
   TENDER_CORRECTION: 'تصحيح وسيلة الدفع', PRICE_OVERRIDE: 'تعديل سعر', RECEIPT_REPRINT: 'إعادة طباعة إيصال', STAFF_MEAL: 'وجبة موظف', DELIVERY_CANCEL: 'إلغاء طلب دليفري',
+  DRIVER_CASH_VARIANCE: 'فرق نقدية الطيار', DRIVER_CASH_LIMIT_OVERRIDE: 'طيار فوق حد النقد', DRIVER_OWED_SETTLE: 'تسوية عجز طيار', DRIVER_PAYOUT: 'صرف مستحقات طيار', // ux-11
 };
 /** The item a line action is about: «حمص ×1». */
 function lineText(ctx: any): string | null {
@@ -66,7 +67,7 @@ function lineText(ctx: any): string | null {
   return `${L(l.name)} ×${qty(String(q))}`;
 }
 /** Money-like context fields shown in the one-line summary (the value being approved). */
-const VALUE_KEYS = ['lineAmount', 'amount', 'payable', 'discountPercent', 'absVariance'];
+const VALUE_KEYS = ['lineAmount', 'amount', 'payable', 'discountPercent', 'absVariance', 'exposure', 'net'];
 
 export function ControlApprovalDialog({ req }: { req: Req }) {
   const d = req.details;

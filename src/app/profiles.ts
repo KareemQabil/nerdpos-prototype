@@ -102,7 +102,8 @@ export const PROFILES: Profile[] = [
   { id: 'purchasing', group: g('المكتب', 'Back office'), role: g('مسؤول مشتريات', 'Purchasing officer'), workspaces: ['inv-po', 'inv-purchasing', 'inv-suppliers'], start: 'inv-po', boards: { purchasing: 'board' },
     actionBar: { secondary: [], overflow: [], primary: 'confirm' }, quantity: NO_QTY, input: 'keyboard', hidden: ['sale'] },
   // ── delivery
-  { id: 'driver', group: g('الدليفري', 'Delivery'), role: g('طيار', 'Driver'), workspaces: ['delivery-board'], start: 'delivery-board', boards: { delivery: 'list' },
+  // ux-11: the rider works from his phone («طلباتي»); on a cashier terminal he falls back to the board, limited to his orders by the server
+  { id: 'driver', group: g('الدليفري', 'Delivery'), role: g('طيار', 'Driver'), workspaces: ['rider', 'delivery-board'], start: 'rider', boards: { delivery: 'list' },
     actionBar: { secondary: [], overflow: [], primary: 'delivered' }, quantity: NO_QTY, input: 'touch', hidden: ['everythingButOwnOrders'] },
   { id: 'dispatcher', group: g('الدليفري', 'Delivery'), role: g('موزع الدليفري', 'Delivery dispatcher'), workspaces: ['delivery-board', 'counter', 'drivers'], start: 'delivery-board', boards: { delivery: 'board' }, saleModes: ['delivery'], defaultMode: 'delivery', /* ux-07: new deliveries from the sale screen's «دليفري» mode */
     actionBar: { secondary: [], overflow: [], primary: 'dispatch' }, quantity: NO_QTY, input: 'mixed', hidden: ['financialReports'] },

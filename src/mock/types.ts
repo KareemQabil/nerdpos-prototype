@@ -9,7 +9,7 @@ export type TenderMethod = 'CASH' | 'CARD' | 'DIGITAL_WALLET' | 'DEPOSIT' | 'LOY
 
 export interface Business { id: string; name: string; legalName: string | null; currency: 'EGP'; nameAr?: string; version: number }
 export interface Branch { id: string; code: string; name: string; timezone: string; businessDayCutoff: string; active: boolean; version: number }
-export interface Terminal { id: string; code: string; name: string; branchId: string; drawer: boolean; lifecycle: 'ACTIVE' | 'DECOMMISSIONED'; purpose: string; kind: 'FLOOR' | 'CASH' | 'KDS' | 'ADMIN'; version: number }
+export interface Terminal { id: string; code: string; name: string; branchId: string; drawer: boolean; lifecycle: 'ACTIVE' | 'DECOMMISSIONED'; purpose: string; kind: 'FLOOR' | 'CASH' | 'KDS' | 'ADMIN' | 'MOBILE'; version: number } // ux-11: MOBILE = the rider's phone
 export interface Role { id: string; name: string; permissionIds: string[]; active: boolean; version: number }
 export interface RoleAssignment { roleId: string; branchIds: string[] }
 export interface User {

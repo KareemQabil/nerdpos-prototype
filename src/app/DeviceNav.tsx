@@ -36,11 +36,11 @@ export function startScreenFor(user: any, kind: Kind, can: (p: string) => boolea
   const profile = profileOfUser(user, kind);
   const start = SCREENS.find((s) => s.id === profile.start);
   if (start && start.kinds.includes(kind) && permits(start, can) && !capabilityHiding(start, branchId)) return start.id;
-  return (visibleScreens(kind, can, branchId, profile)[0] ?? visibleScreens(kind, can, branchId)[0])?.id ?? (kind === 'KDS' ? 'kitchen' : kind === 'FLOOR' ? 'floor' : kind === 'CASH' ? 'counter' : 'home');
+  return (visibleScreens(kind, can, branchId, profile)[0] ?? visibleScreens(kind, can, branchId)[0])?.id ?? (kind === 'KDS' ? 'kitchen' : kind === 'FLOOR' ? 'floor' : kind === 'CASH' ? 'counter' : kind === 'MOBILE' ? 'rider' : 'home');
 }
 /** ux-09 owner rule «the cashier never needs the sidenav»: a profile that works from one screen (sale, floor, kitchen,
  *  delivery board) gets the compact rail by default; a person can still widen it. */
-const ONE_SCREEN_START = new Set(['counter', 'floor', 'kitchen', 'delivery-board']);
+const ONE_SCREEN_START = new Set(['counter', 'floor', 'kitchen', 'delivery-board', 'rider']);
 export const prefersRail = (p: Profile) => p.workspaces.length > 0 && ONE_SCREEN_START.has(p.start);
 
 const GROUP_ICON: Record<ScreenGroup, React.ComponentType<{ className?: string }>> = {

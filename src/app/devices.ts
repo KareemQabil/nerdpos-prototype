@@ -36,7 +36,7 @@ function emit() {
  *  DEVICE_NAMES in demo/people.ts, which is also what the seed writes into terminal.name (ux-07). */
 export const SEEDED_LABELS: Record<string, { short: string }> = {
   t_cash: { short: 'T1' }, t_floor: { short: 'T2' }, t_kds: { short: 'K1' }, t_admin: { short: 'ADM' }, t_second_floor: { short: 'B2' },
-  t_cash2: { short: 'T3' }, t_kds2: { short: 'K2' }, BO: { short: 'BO' }, d_callboard: { short: 'CB' }, d_customer: { short: 'CD' },
+  t_cash2: { short: 'T3' }, t_kds2: { short: 'K2' }, t_rider: { short: 'R1' }, BO: { short: 'BO' }, d_callboard: { short: 'CB' }, d_customer: { short: 'CD' },
 };
 
 /** ux-04: display screens are attached to a terminal (HDMI / second screen) and use its session — no sign-in of their
@@ -62,7 +62,7 @@ export function getDevice(id: string): DeviceState {
   }
   const t = store.db.terminals.find((x) => x.id === id);
   const kind = t?.kind;
-  const screen = isDisplay(id) ? 'display' : kind === 'KDS' ? 'kitchen' : kind === 'FLOOR' ? 'floor' : kind === 'CASH' ? 'counter' : 'home';
+  const screen = isDisplay(id) ? 'display' : kind === 'KDS' ? 'kitchen' : kind === 'FLOOR' ? 'floor' : kind === 'CASH' ? 'counter' : kind === 'MOBILE' ? 'rider' : 'home';
   const d: DeviceState = { id, terminalId: t ? t.id : null, branchId: t?.branchId ?? store.db.branches[0]?.id ?? null, token: null, userName: null, screen, params: {} };
   st.devices[id] = d;
   return d;

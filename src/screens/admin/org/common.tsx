@@ -83,4 +83,4 @@ export const reasonKindLabel = (k: string) => ({
   CASH_MOVE: t('حركة نقدية'), NO_SALE: t('فتح الدرج بدون بيع'), TENDER_CORRECTION: t('تصحيح وسيلة دفع'), VARIANCE: t('فرق الدرج'), REPRINT: t('إعادة طباعة'),
 } as Record<string, string>)[k] ?? k;
 
-export const terminalKindLabel = (k: string) => ({ CASH: t('كاشير'), FLOOR: t('تابلت صالة'), KDS: t('شاشة مطبخ'), ADMIN: t('إدارة') } as Record<string, string>)[k] ?? k;
+export const terminalKindLabel = (k: string) => ({ CASH: t('كاشير'), FLOOR: t('تابلت صالة'), KDS: t('شاشة مطبخ'), ADMIN: t('إدارة'), MOBILE: t('موبايل طيار') } as Record<string, string>)[k] ?? k;

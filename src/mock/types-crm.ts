@@ -39,8 +39,12 @@ export interface Driver {
   onShift: boolean; active: boolean; location: { x: number; y: number; at: string } | null; version: number; createdAt: string;
   /** Running shortage the driver still owes from past settlements. */
   owed: Money; userId?: string | null;
+  /** ux-11: the open shift (DriverShift) while onShift; deactivation is a fact kept on the record (reactivation clears it). */
+  shiftId?: string | null; deactivatedAt?: string | null; deactivatedBy?: string | null; deactivationReason?: string | null;
 }
-export type DeliveryState = 'PENDING' | 'ASSIGNED' | 'PICKED_UP' | 'DELIVERED' | 'FAILED' | 'CANCELLED';
+/** ux-11: RETURNED = after a failed attempt the food came back to the restaurant (received by staff); it can be
+ *  dispatched again (Assign / Dispatch) or cancelled (the existing cancel / void flow). */
+export type DeliveryState = 'PENDING' | 'ASSIGNED' | 'PICKED_UP' | 'DELIVERED' | 'FAILED' | 'RETURNED' | 'CANCELLED';
 export type DeliveryPaymentMode = 'CASH_ON_DELIVERY' | 'PAID_ONLINE' | 'CARD_ON_DELIVERY';
 export interface Delivery {
   id: string; branchId: string; number: string; orderId: string | null; orderNumber: string; customerId: string | null; customerName: string; phone: string;
@@ -49,6 +53,7 @@ export interface Delivery {
   sourceLabel?: string | null; externalOrderId?: string | null; note?: string | null;
   createdAt: string; createdAtMs: number; promisedAt: string; promisedAtMs: number;
   assignedAt?: string | null; pickedUpAt?: string | null; deliveredAt?: string | null; failedAt?: string | null; cancelledAt?: string | null;
+  returnedAt?: string | null; returned?: { at: string; by: string; note: string | null }[];
   attempts: { at: string; by: string; reasonCode: string; reason?: string | null; driverId: string | null }[];
   cancel?: { at: string; by: string; reason: string; approvalGrantId?: string | null; orderOutcome: string } | null;
   /** Cash the driver collected on delivery (cash on delivery) and still has to hand over. */
@@ -59,6 +64,26 @@ export interface Delivery {
 export interface DriverSettlement {
   id: string; driverId: string; branchId: string; sessionId: string; terminalId: string; at: string; by: string;
   deliveryIds: string[]; expected: Money; counted: Money; variance: Money; approvalGrantId?: string | null; reason?: string | null;
+}
+/** ux-11: one rider shift (start → end); minutes are recorded when it ends. Ended shifts are never changed. */
+export interface DriverShift {
+  id: string; driverId: string; branchId: string; startedAt: string; startedAtMs: number; startedBy: string;
+  endedAt: string | null; endedAtMs: number | null; endedBy: string | null; minutes: number | null; terminalId: string | null; version: number;
+}
+/** ux-11: the rider's owed ledger (append-only). SHORTAGE adds (cash settlement); COLLECT_CASH (drawer PAY_IN),
+ *  DEDUCT_PAYOUT (netted by the next payout) and WAIVE reduce. `amount` is always positive. */
+export type DriverOwedKind = 'SHORTAGE' | 'COLLECT_CASH' | 'DEDUCT_PAYOUT' | 'WAIVE';
+export interface DriverOwedEntry {
+  id: string; driverId: string; branchId: string; kind: DriverOwedKind; amount: Money; owedBefore: Money; owedAfter: Money;
+  at: string; by: string; reason: string | null; approvalGrantId: string | null; sessionId: string | null; settlementId: string | null; terminalId: string | null;
+}
+export type DriverPayMode = 'PER_TRIP' | 'FIXED_SHIFT' | 'PERCENT_OF_FEE';
+/** ux-11: a payout covers a period and is immutable: the trips / shifts it paid, the pay rule it used, the owed
+ *  deductions it netted, and the drawer PAY_OUT. */
+export interface DriverPayout {
+  id: string; number: string; driverId: string; branchId: string; periodFrom: string; periodTo: string;
+  mode: DriverPayMode; rate: string; tripIds: string[]; shiftIds: string[]; gross: Money; deductions: Money; deductionIds: string[]; net: Money;
+  sessionId: string | null; terminalId: string | null; at: string; by: string; approvalGrantId: string | null; note: string | null;
 }
 
 export type ExternalSource = 'APP_1' | 'APP_2' | 'WEBSITE' | 'WHATSAPP';
@@ -88,6 +113,7 @@ export interface CrmCollections {
   drivers?: Driver[];
   deliveries?: Delivery[];
   driverSettlements?: DriverSettlement[];
+  driverShifts?: DriverShift[]; driverOwedEntries?: DriverOwedEntry[]; driverPayouts?: DriverPayout[]; // ux-11
   externalOrders?: ExternalOrder[];
   channelItemMap?: ChannelItemMap[];
   paymentAuthorizations?: PaymentAuthorization[];

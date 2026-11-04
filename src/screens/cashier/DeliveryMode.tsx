@@ -240,9 +240,9 @@ export function CashierDeliveryBoard({ list, loading, onNew, onOpenCheck, toolba
     <div className="h-full min-h-0 flex flex-col" data-fb="cashier-delivery-board">
       <Board id="cashier-delivery" embedded userId={me?.user?.id} items={loading ? null : list} itemKey={(d: any) => d.id} columns={defs.columns} columnOf={deliveryStage} aging={(d) => deliveryAging(d, now)}
         search={(d: any) => `${d.number} ${d.orderNumber} ${d.customerName ?? ''} ${d.phone ?? ''}`} searchPlaceholder={t('الرقم أو الهاتف أو الاسم')}
-        filters={[{ id: 'late', label: t('متأخر'), test: (d: any) => !!d.late }, { id: 'norider', label: t('بلا طيار'), test: (d: any) => !d.driverId && (d.state === 'PENDING' || d.state === 'FAILED') }]}
+        filters={[{ id: 'late', label: t('متأخر'), test: (d: any) => !!d.late }, { id: 'norider', label: t('بلا طيار'), test: (d: any) => !d.driverId && (d.state === 'PENDING' || d.state === 'FAILED' || d.state === 'RETURNED') }, { id: 'returned', label: t('مرتجع للمطعم'), test: (d: any) => d.state === 'RETURNED' || d.state === 'FAILED' }]}
         sort={(a: any, b: any) => a.promisedAtMs - b.promisedAtMs} canMove={defs.canMove} onMove={defs.onMove}
-        cardActions={(d) => deliveryCardActions(d, { can, dispatch: defs.dispatch, openCheck: onOpenCheck })}
+        cardActions={(d) => deliveryCardActions(d, { can, dispatch: defs.dispatch, openCheck: onOpenCheck, received: defs.received })}
         renderCard={(d: any, c) => <div className="space-y-1.5"><DeliveryCardBody d={d} compact a={c.aging} /><DeliveryInlineActions d={d} onOpenCheck={onOpenCheck} /></div>}
         toolbarStart={<>{toolbarStart}{can('delivery:create') && <Button size="lg" variant="primary" onClick={onNew} data-fb="delivery-new-start"><PhoneCall className="w-5 h-5" />{t('طلب دليفري جديد')}</Button>}</>}
         toolbarEnd={<RiderCashButton />} />

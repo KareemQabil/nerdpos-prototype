@@ -17,6 +17,7 @@ export const STATE: Record<string, { ar: string; tone: 'primary' | 'warning' | '
   PICKED_UP: { ar: 'في الطريق', tone: 'violet' },
   DELIVERED: { ar: 'اتسلّم', tone: 'success' },
   FAILED: { ar: 'محاولة فشلت', tone: 'error' },
+  RETURNED: { ar: 'مرتجع للمطعم', tone: 'warning' }, // ux-11: the food came back after a failed attempt
   CANCELLED: { ar: 'ملغي', tone: 'neutral' },
 };
 export const KITCHEN: Record<string, { ar: string; tone: 'neutral' | 'warning' | 'success' | 'info' | 'primary' }> = {
@@ -101,36 +102,12 @@ export function MiniMap({ zones, drivers = [], deliveries = [], restaurant, heig
 }
 
 // ───────── action dialogs
-export function AssignDialog({ d, onClose, dispatch }: { d: any; onClose: () => void; dispatch?: boolean }) {
-  const drivers = useQuery<any>('Driver.List', { query: {} });
-  const { run, busy } = useCommand();
-  const list: any[] = (drivers.data?.items ?? []).filter((x: any) => x.onShift);
-  const max = drivers.data?.rules?.maxActivePerDriver ?? 3;
-  const pick = async (drv: any) => {
-    const r = dispatch
-      ? await run('Delivery.Dispatch', { params: { deliveryId: d.id }, body: { expectedVersion: d.version, toState: 'PICKED_UP', driverId: drv.id } }, { success: t('الطلب خرج مع {n}', { n: drv.name }) })
-      : await run('Delivery.Assign', { params: { deliveryId: d.id }, body: { expectedVersion: d.version, driverId: drv.id } }, { success: t('الطلب اتسلّم لـ {n}', { n: drv.name }) });
-    if (r) onClose();
-  };
+/** ux-11: picking a rider from the delivery details — the same list (with the suggestion) as the board's picker. */
+export function AssignDialog({ d, onClose }: { d: any; onClose: () => void }) {
   return (
-    <Modal open onClose={onClose} title={dispatch ? t('اختار الطيار وطلّع الطلب') : t('اختار الطيار')} badge={<StateBadge ops={[dispatch ? 'Delivery.Dispatch' : 'Delivery.Assign', 'Driver.List']} />}>
-      <div className="text-sm text-dim mb-3">{d.number} · {d.customerName} · {d.zoneName}</div>
-      {drivers.loading && <Spinner />}
-      <div className="space-y-1.5">
-        {list.map((drv) => {
-          const full = drv.activeCount >= max;
-          const sameZone = drv.active.some((a: any) => a.zoneId === d.zoneId);
-          return (
-            <button key={drv.id} disabled={busy || full || drv.id === d.driverId} onClick={() => pick(drv)} data-fb={`pick-driver:${drv.id}`} className="w-full flex items-center gap-3 rounded-xl surface-1 border border-[var(--glass-border)] px-3 py-2.5 text-start hover:border-[var(--primary)] disabled:opacity-40">
-              <VehicleIcon v={drv.vehicle} className="w-5 h-5 text-[var(--primary)]" />
-              <span className="flex-1 min-w-0"><span className="font-bold block">{drv.name}</span><span className="text-xs text-dim">{t(DRIVER_STATUS[drv.status]?.ar)} · {drv.activeCount}/{max} {t('طلبات')}{sameZone ? ` · ${t('رايح نفس المنطقة')}` : ''}</span></span>
-              <span className="text-end text-xs"><span className="block text-dim">{t('معاه كاش')}</span><Money v={drv.cashInHand} tone={drv.overCashLimit ? 'error' : undefined} /></span>
-            </button>
-          );
-        })}
-        {!drivers.loading && !list.length && <Banner tone="warning">{t('مفيش طيارين في الوردية دلوقتي — شغّل طيار من شاشة الطيارين.')}</Banner>}
-      </div>
-    </Modal>
+    <Popup open onClose={onClose} size="sm" fb="rider-popup" title={<span>{t('اختيار الطيار')} · <span className="num">{d.number}</span></span>}>
+      <RiderList d={d} onDone={(ok) => ok && onClose()} />
+    </Popup>
   );
 }
 
@@ -206,6 +183,7 @@ export function DeliveryActions({ d, size = 'sm', onOpen }: { d: any; size?: 'sm
   const { can } = useDev();
   const { run, busy } = useCommand();
   const [dlg, setDlg] = useState<null | 'assign' | 'dispatch' | 'complete' | 'fail' | 'cancel'>(null);
+  const received = () => run('Delivery.Return', { params: { deliveryId: d.id }, body: { expectedVersion: d.version } }, { success: t('استُلم الطلب في المطعم'), refId: d.id });
   const kitchenReady = d.kitchen?.state === 'READY' || d.kitchen?.state === 'HANDED';
   const dispatch = async () => {
     if (!kitchenReady && !(await confirmDialog(t('المطبخ لسه ما خلّصش الطلب ده. تطلّعه برضه؟')))) return;
@@ -214,12 +192,13 @@ export function DeliveryActions({ d, size = 'sm', onOpen }: { d: any; size?: 'sm
   const notSent = d.order?.status === 'DRAFT';
   return (
     <div className="flex gap-1.5 flex-wrap">
-      {(d.state === 'PENDING' || d.state === 'FAILED') && can('delivery:assign') && <Button size={size} variant={d.state === 'FAILED' ? 'warning' : 'primary'} disabled={busy || notSent} onClick={() => setDlg('assign')} data-fb={`assign:${d.number}`}><UserCheck className="w-3.5 h-3.5" />{d.state === 'FAILED' ? t('إعادة المحاولة') : t('سلّم لطيار')}</Button>}
+      {d.state === 'FAILED' && can('delivery:assign') && <Button size={size} variant="warning" disabled={busy} onClick={received} data-fb={`returned:${d.number}`}><Store className="w-3.5 h-3.5" />{t('استلام المرتجع')}</Button>}
+      {(d.state === 'PENDING' || d.state === 'FAILED' || d.state === 'RETURNED') && can('delivery:assign') && <Button size={size} variant={d.state === 'PENDING' ? 'primary' : 'secondary'} disabled={busy || notSent} onClick={() => setDlg('assign')} data-fb={`assign:${d.number}`}><UserCheck className="w-3.5 h-3.5" />{d.state === 'FAILED' ? t('إعادة المحاولة') : d.state === 'RETURNED' ? t('إعادة الإرسال') : t('سلّم لطيار')}</Button>}
       {d.state === 'ASSIGNED' && can('delivery:dispatch') && <Button size={size} variant="primary" disabled={busy} onClick={dispatch} data-fb={`dispatch:${d.number}`}><Send className="w-3.5 h-3.5" />{t('خرج')}</Button>}
       {d.state === 'ASSIGNED' && can('delivery:assign') && <Button size={size} variant="ghost" disabled={busy} onClick={() => setDlg('assign')}>{t('غيّر الطيار')}</Button>}
       {d.state === 'PICKED_UP' && can('delivery:complete') && <Button size={size} variant="success" disabled={busy} onClick={() => setDlg('complete')} data-fb={`deliver:${d.number}`}><CheckCircle2 className="w-3.5 h-3.5" />{t('اتسلّم')}</Button>}
       {(d.state === 'ASSIGNED' || d.state === 'PICKED_UP') && can('delivery:failattempt') && <Button size={size} variant="ghost" disabled={busy} onClick={() => setDlg('fail')} data-fb={`fail:${d.number}`}><XCircle className="w-3.5 h-3.5" />{t('ما اتسلّمش')}</Button>}
-      {['PENDING', 'ASSIGNED', 'PICKED_UP', 'FAILED'].includes(d.state) && can('delivery:cancel') && <Button size={size} variant="ghost" className="text-[var(--error)]" disabled={busy} onClick={() => setDlg('cancel')} data-fb={`cancel:${d.number}`}><Ban className="w-3.5 h-3.5" /></Button>}
+      {['PENDING', 'ASSIGNED', 'PICKED_UP', 'FAILED', 'RETURNED'].includes(d.state) && can('delivery:cancel') && <Button size={size} variant="ghost" className="text-[var(--error)]" disabled={busy} onClick={() => setDlg('cancel')} data-fb={`cancel:${d.number}`}><Ban className="w-3.5 h-3.5" /></Button>}
       {onOpen && <Button size={size} variant="ghost" onClick={onOpen} title={t('التفاصيل')}><History className="w-3.5 h-3.5" /></Button>}
       {dlg === 'assign' && <AssignDialog d={d} onClose={() => setDlg(null)} />}
       {dlg === 'complete' && <CompleteDialog d={d} onClose={() => setDlg(null)} />}
@@ -299,29 +278,46 @@ export { MapPin, Store, AlertTriangle };
 
 // ───────── ux-05: pick the رider from the card (popover) or after a drop (centered popup) — Delivery.Assign
 /** The riders on shift with their load and cash; picking one assigns (or changes) the rider of the delivery. */
-export function RiderList({ d, onDone }: { d: any; onDone: (ok: boolean) => void }) {
+export function RiderList({ d, onDone, onPick }: { d: any; onDone: (ok: boolean) => void; onPick?: () => void }) {
   const drivers = useQuery<any>('Driver.List', { query: {} });
+  const sug = useQuery<any>('Delivery.SuggestRider', { params: { deliveryId: d.id } });
   const { run, busy } = useCommand();
-  const list: any[] = (drivers.data?.items ?? []).filter((x: any) => x.onShift);
   const max = drivers.data?.rules?.maxActivePerDriver ?? 3;
+  // ux-11: ranked by the server (same zone → least load → free the longest; over the cash limit last)
+  const rank: any[] = sug.data?.ranked ?? [];
+  const byId = new Map(rank.map((r, i) => [r.driverId, { ...r, i }]));
+  const list: any[] = (drivers.data?.items ?? []).filter((x: any) => x.onShift).sort((a: any, b: any) => (byId.get(a.id)?.i ?? 99) - (byId.get(b.id)?.i ?? 99));
+  const top = sug.data?.suggested ? list.find((x) => x.id === sug.data.suggested) : null;
+  const topInfo = top ? byId.get(top.id) : null;
   const pick = async (drv: any) => {
+    onPick?.(); // a popover closes first, so an approval popup (over the cash limit) is never under it
     const r = await run('Delivery.Assign', { params: { deliveryId: d.id }, body: { expectedVersion: d.version, driverId: drv.id } }, { success: t('تم تسليم الطلب إلى {n}', { n: drv.name }), refId: d.id });
     onDone(!!r);
   };
+  const why = (r: any) => [r.sameZone ? t('نفس المنطقة') : null, r.load ? t('معه {n}', { n: r.load }) : t('بلا طلبات'), r.overLimit ? t('فوق حد النقد') : null].filter(Boolean).join(' · ');
   if (drivers.loading && !drivers.data) return <div className="p-3"><Spinner /></div>;
   if (!list.length) return <div className="p-3 text-sm text-dim">{t('لا يوجد طيارون في الوردية')}</div>;
   return (
     <div className="flex flex-col gap-1" data-fb="rider-list">
+      {top && topInfo && (
+        <button type="button" disabled={busy} onClick={() => pick(top)} data-fb="rider-suggest" data-driver={top.id}
+          className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-start border border-[color-mix(in_srgb,var(--primary)_55%,transparent)] bg-[var(--primary-container)] hover:brightness-110 outline-none disabled:opacity-45 mb-1">
+          <VehicleIcon v={top.vehicle} className="w-5 h-5 text-[var(--primary)] shrink-0" />
+          <span className="flex-1 min-w-0"><span className="text-[11px] font-bold text-[var(--primary)] block">{t('المقترح')}</span><span className="font-bold block truncate">{top.name}</span><span className="text-[11px] text-dim">{why(topInfo)}</span></span>
+          <span className="shrink-0 inline-flex items-center gap-1 h-8 px-3 rounded-lg bg-[var(--primary)] text-[var(--primary-foreground)] text-xs font-bold"><UserCheck className="w-3.5 h-3.5" />{t('تعيين')}</span>
+        </button>
+      )}
       {list.map((drv) => {
         const full = drv.activeCount >= max && drv.id !== d.driverId;
         const same = drv.id === d.driverId;
-        const sameZone = drv.active.some((a: any) => a.zoneId === d.zoneId && a.id !== d.id);
+        const info = byId.get(drv.id);
+        const sameZone = info ? info.sameZone : drv.active.some((a: any) => a.zoneId === d.zoneId && a.id !== d.id);
         return (
           <button key={drv.id} type="button" disabled={busy || full || same} onClick={() => pick(drv)} data-fb={`rider:${drv.id}`}
             className="w-full flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-start hover:bg-[var(--surface-2)] focus-visible:bg-[var(--surface-2)] outline-none disabled:opacity-45">
             <VehicleIcon v={drv.vehicle} className="w-4 h-4 text-[var(--primary)] shrink-0" />
-            <span className="flex-1 min-w-0"><span className="font-bold text-sm block truncate">{drv.name}</span><span className="text-[11px] text-dim">{t(DRIVER_STATUS[drv.status]?.ar)} · <span className="num">{drv.activeCount}/{max}</span>{sameZone ? ` · ${t('نفس المنطقة')}` : ''}{same ? ` · ${t('الطيار الحالي')}` : ''}</span></span>
-            <Money v={drv.cashInHand} tone={drv.overCashLimit ? 'error' : 'dim'} className="text-[11px]" />
+            <span className="flex-1 min-w-0"><span className="font-bold text-sm block truncate">{drv.name}</span><span className="text-[11px] text-dim">{t(DRIVER_STATUS[drv.status]?.ar)} · <span className="num">{drv.activeCount}/{max}</span>{sameZone ? ` · ${t('نفس المنطقة')}` : ''}{same ? ` · ${t('الطيار الحالي')}` : ''}{info?.overLimit ? ` · ${t('فوق حد النقد')}` : ''}</span></span>
+            <Money v={info?.exposure ?? drv.cashInHand} tone={info?.overLimit || drv.overCashLimit ? 'error' : 'dim'} className="text-[11px]" />
           </button>
         );
       })}
@@ -333,7 +329,7 @@ export function RiderList({ d, onDone }: { d: any; onDone: (ok: boolean) => void
 export function RiderButton({ d, size = 'sm' }: { d: any; size?: 'sm' | 'md' }) {
   const { can } = useDev();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
-  const may = can('delivery:assign') && ['PENDING', 'FAILED', 'ASSIGNED'].includes(d.state) && d.order?.status !== 'DRAFT';
+  const may = can('delivery:assign') && ['PENDING', 'FAILED', 'RETURNED', 'ASSIGNED'].includes(d.state) && d.order?.status !== 'DRAFT';
   const label = d.driver ? d.driver.name : t('بلا طيار');
   if (!may) return d.driver ? <span className="text-xs inline-flex items-center gap-1 text-[var(--info)] min-w-0 truncate"><VehicleIcon v={d.driver.vehicle} className="w-3.5 h-3.5 shrink-0" />{d.driver.name}</span> : null;
   return (
@@ -344,7 +340,7 @@ export function RiderButton({ d, size = 'sm' }: { d: any; size?: 'sm' | 'md' }) 
       </button>
       <Popover anchor={anchor} open={!!anchor} onClose={() => setAnchor(null)} side="auto" width={300} label={t('اختيار الطيار')} fb="rider-popover">
         <div className="px-2.5 pt-1.5 pb-1 text-[11px] font-bold text-dim">{d.driver ? t('تغيير الطيار') : t('اختيار الطيار')} · <span className="num">{d.number}</span></div>
-        <RiderList d={d} onDone={(ok) => { if (ok) setAnchor(null); }} />
+        <RiderList d={d} onPick={() => setAnchor(null)} onDone={(ok) => { if (ok) setAnchor(null); }} />
       </Popover>
     </>
   );

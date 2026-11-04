@@ -191,6 +191,8 @@ const OPTIONS: Record<string, Record<string, OptText>> = {
   'StackedTaxPolicy.order': { BEFORE_VAT: O('قبل القيمة المضافة (تدخل فيها)'), AFTER_VAT: O('بعد القيمة المضافة') },
   'WalletProvidersPolicy.providers': { INSTAPAY: O('إنستاباي'), VODAFONE_CASH: O('فودافون كاش'), ORANGE_CASH: O('أورنج كاش'), ETISALAT_CASH: O('اتصالات كاش') },
   'ApprovalCredentialPolicy.methods': { PIN: O('الرقم السري'), CARD: O('تمرير كارت المدير'), FINGERPRINT: O('البصمة'), REMOTE: O('طلب على جهاز المدير') },
+  'DriverPayPolicy.mode': { PER_TRIP: O('مبلغ لكل مشوار مُسلَّم'), FIXED_SHIFT: O('مبلغ ثابت لكل وردية'), PERCENT_OF_FEE: O('نسبة من رسوم التوصيل') }, // ux-11
+  'DeliveryPolicy.cashLimitMode': { APPROVAL: O('بموافقة المدير'), BLOCK: O('ممنوع'), WARN: O('تنبيه فقط') }, // ux-11
   'StaffMealAllowancePolicy.basis': { SALE_PRICE: O('بسعر البيع', 'الوجبة بتتحسب من الحد بسعرها في المنيو.'), COST: O('بالتكلفة', 'الوجبة بتتحسب بتكلفة خاماتها من الوصفة.') },
 };
 // Generic fallbacks for policies added later by other screens.
@@ -391,6 +393,7 @@ const CONTEXT_FIELD: Record<string, [string, Unit]> = {
   firstPrice: ['ده أول سعر للصنف', 'none'], decrease: ['السعر بيقل', 'none'], active: ['الحساب هيفضل شغال', 'none'],
   points: ['عدد النقاط', 'none'], absPoints: ['عدد النقاط', 'none'], expected: ['المبلغ المتوقع', 'egp'], counted: ['المبلغ المعدود', 'egp'],
   warehouseId: ['المخزن', 'none'], quantityDelta: ['الكمية (زيادة أو نقص)', 'none'], reasonCode: ['السبب', 'none'], absVarianceValue: ['قيمة الفروقات', 'egp'], lineCount: ['عدد الأصناف', 'none'], value: ['القيمة بالتكلفة', 'egp'], // inventory area
+  exposure: ['النقد الذي سيحمله الطيار', 'egp'], limit: ['حد النقد', 'egp'], owedBefore: ['العجز قبل التسوية', 'egp'], mode: ['طريقة التسوية', 'none'], gross: ['المستحقات', 'egp'], deductions: ['خصم العجز', 'egp'], net: ['الصافي من الدرج', 'egp'], // ux-11 riders
   foodFired: ['الأكل كان اتبعت للمطبخ', 'none'], variance: ['الفرق', 'egp'], quantity: ['الكمية', 'none'], percent: ['النسبة', 'pct'],
   orderId: ['الشيك', 'none'], fromSessionId: ['من وردية', 'none'], toSessionId: ['لوردية', 'none'], date: ['اليوم', 'none'], deliveryId: ['العملية', 'none'], consumerId: ['رايحة لـ', 'none'],
   attempts: ['عدد المحاولات', 'none'], warnings: ['عدد التحذيرات', 'none'], deadLetter: ['العملية وقفت بعد محاولات كتير', 'none'],

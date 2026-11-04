@@ -104,10 +104,12 @@ export const DEVICE_NAMES: Record<string, DeviceName> = {
   // ux-04: display screens (attached to a terminal; no sign-in of their own)
   d_callboard: { name: 'شاشة النداء', short: 'شاشة النداء', en: 'Call board', shortEn: 'Call board', hint: 'شاشة أرقام الطلبات للعملاء: قيد التحضير وجاهز، تعمل مع شاشة التسليم' },
   d_customer: { name: 'شاشة العميل', short: 'شاشة العميل', en: 'Customer display', shortEn: 'Customer display', hint: 'الشاشة المواجهة للعميل عند الكاشير: الأصناف والإجمالي والدفع' },
+  // ux-11: the rider's own phone (signed in by the rider; his orders only)
+  t_rider: { name: 'موبايل الطيار', short: 'الطيار', en: 'Rider phone', shortEn: 'Rider', hint: 'موبايل الطيار: طلباته فقط، و«استلمت» و«سلّمت» و«فشل التسليم»، والمبلغ المطلوب تحصيله، ووردية الطيار' },
 };
-const SHORT_TO_ID: Record<string, string> = { T1: 't_cash', T2: 't_floor', K1: 't_kds', K2: 't_kds2', ADM: 't_admin', B2: 't_second_floor', T3: 't_cash2', BO: 'BO' };
-const KIND_NAME: Record<string, string> = { CASH: 'جهاز الكاشير', FLOOR: 'تابلت الويتر', KDS: 'شاشة المطبخ', ADMIN: 'كمبيوتر المكتب' };
-const KIND_NAME_EN: Record<string, string> = { CASH: 'Cashier station', FLOOR: 'Waiter tablet', KDS: 'Kitchen screen', ADMIN: 'Office PC' };
+const SHORT_TO_ID: Record<string, string> = { T1: 't_cash', T2: 't_floor', K1: 't_kds', K2: 't_kds2', ADM: 't_admin', B2: 't_second_floor', T3: 't_cash2', R1: 't_rider', BO: 'BO' };
+const KIND_NAME: Record<string, string> = { CASH: 'جهاز الكاشير', FLOOR: 'تابلت الويتر', KDS: 'شاشة المطبخ', ADMIN: 'كمبيوتر المكتب', MOBILE: 'موبايل الطيار' };
+const KIND_NAME_EN: Record<string, string> = { CASH: 'Cashier station', FLOOR: 'Waiter tablet', KDS: 'Kitchen screen', ADMIN: 'Office PC', MOBILE: 'Rider phone' };
 const kindName = (k: string) => (isEn() ? KIND_NAME_EN[k] : KIND_NAME[k]);
 export const terminalKindName = (kind: string) => kindName(kind) ?? kind;
 const devName = (id: string) => (isEn() ? DEVICE_NAMES[id].en : DEVICE_NAMES[id].name);
@@ -124,6 +126,7 @@ const DEVICE_HINT_EN: Record<string, string> = {
   BO: 'Management from any computer outside the restaurant (no registered device): menu, settings and reports',
   d_callboard: 'The order-number board for guests: preparing and ready, driven by the dispatch screen',
   d_customer: 'The guest-facing screen at the cashier: items, total and payment',
+  t_rider: 'The rider\'s phone: his orders only, «picked up», «delivered» and «delivery failed», the amount to collect, and his shift',
 };
 
 /** A device id, a top-bar code (T1…) or a terminal code (DEMO-CASH-1, CASH-1…) → a plain device name. */
@@ -140,6 +143,7 @@ export function deviceName(idOrCode: string | null | undefined, kind?: string | 
   if (code === 'DEMO-ADMIN-1') return devName('t_admin');
   if (code === 'DEMO-SECOND-FLOOR-1') return devName('t_second_floor');
   if (code === 'DEMO-CASH-2') return devName('t_cash2');
+  if (code === 'DEMO-RIDER-1') return devName('t_rider');
   if (kind && KIND_NAME[kind]) return kindName(kind);
   if (code.includes('CASH')) return kindName('CASH');
   if (code.includes('FLOOR')) return kindName('FLOOR');

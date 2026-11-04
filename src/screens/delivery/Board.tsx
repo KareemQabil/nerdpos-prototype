@@ -2,7 +2,7 @@
 // and a simple map with the zones, the drivers and the open orders (simulated GPS).
 import { useTech } from '../../app/tech';
 import React, { useEffect, useRef, useState } from 'react';
-import { Bike, PhoneCall, ChefHat, Clock, Map as MapIcon, LayoutGrid, Navigation, Globe, Banknote, List as ListIcon, ClipboardList, Send } from 'lucide-react';
+import { Bike, PhoneCall, ChefHat, Clock, Map as MapIcon, LayoutGrid, Navigation, Globe, Banknote, List as ListIcon, ClipboardList, Send, Store } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';
 import { call } from '../../api/client';
 import { PageHeader, StateBadge, Button, Pill, EmptyState, SegmentedControl, Money, Card, Switch, useNow, Table, Popup, confirmDialog } from '../../ui';
@@ -27,7 +27,7 @@ export default function DeliveryBoardScreen() {
 const DL_STAGE = (d: any): string | null => {
   if (d.state === 'DELIVERED' || d.state === 'CANCELLED') return 'done';
   if (d.state === 'ASSIGNED' || d.state === 'PICKED_UP') return 'rider';
-  if (d.state === 'FAILED') return 'ready';
+  if (d.state === 'FAILED' || d.state === 'RETURNED') return 'ready'; // ux-11: back at the restaurant, ready to go again
   if (d.state !== 'PENDING') return null;
   const k = d.kitchen?.state;
   return k === 'READY' || k === 'HANDED' ? 'ready' : k === 'COOKING' ? 'cooking' : 'new';
@@ -85,6 +85,7 @@ export function useDeliveryBoardDefs() {
     if (!(d.kitchen?.state === 'READY' || d.kitchen?.state === 'HANDED') && !(await confirmDialog(t('لم ينتهِ المطبخ من هذا الطلب. إخراجه الآن؟')))) return;
     await run('Delivery.Dispatch', { params: { deliveryId: d.id }, body: { expectedVersion: d.version, toState: 'PICKED_UP' } }, { success: t('خرج الطلب مع الطيار'), refId: d.id });
   };
+  const received = async (d: any) => { await run('Delivery.Return', { params: { deliveryId: d.id }, body: { expectedVersion: d.version } }, { success: t('استُلم الطلب في المطعم'), refId: d.id }); };
   const popups = (
     <>
       {rider.open && (
@@ -95,7 +96,7 @@ export function useDeliveryBoardDefs() {
       {complete.open && <CompleteDialog d={complete.open} onClose={() => complete.done(false)} onSuccess={() => complete.done(true)} />}
     </>
   );
-  return { columns, canMove, onMove, dispatch, popups };
+  return { columns, canMove, onMove, dispatch, received, popups };
 }
 
 export function DeliveryCardBody({ d, compact, a }: { d: any; compact: boolean; a: Aging }) {
@@ -116,6 +117,7 @@ export function DeliveryCardBody({ d, compact, a }: { d: any; compact: boolean; 
         {d.state === 'CANCELLED' && <Pill size="sm" tone="neutral">{t('ملغى')}</Pill>}
         {d.readyWaiting && <Pill size="sm" tone="warning"><Clock className="w-3 h-3" />{t('جاهز بلا طيار')}</Pill>}
         {d.attempts?.length > 0 && d.state === 'FAILED' && <Pill size="sm" tone="error">{t('محاولة فاشلة')} {d.attempts.length}</Pill>}
+        {d.state === 'RETURNED' && <span data-fb={`returned-pill:${d.number}`}><Pill size="sm" tone="warning"><Store className="w-3 h-3" />{t('مرتجع للمطعم')}</Pill></span>}
         {d.sourceLabel && <Pill size="sm" tone="info">{d.sourceLabel}</Pill>}
       </div>
       <div className="flex items-center justify-between gap-2 text-xs">
@@ -127,8 +129,10 @@ export function DeliveryCardBody({ d, compact, a }: { d: any; compact: boolean; 
   );
 }
 
-export function deliveryCardActions(d: any, ctx: { can: (p: string) => boolean; dispatch: (d: any) => void; openCheck?: (d: any) => void }): CardAction[] {
+export function deliveryCardActions(d: any, ctx: { can: (p: string) => boolean; dispatch: (d: any) => void; openCheck?: (d: any) => void; received?: (d: any) => void }): CardAction[] {
   const out: CardAction[] = [];
+  // ux-11: after a failed attempt the food is received back at the restaurant (FAILED → RETURNED)
+  if (d.state === 'FAILED' && ctx.received) out.push({ id: 'returned', label: t('استلام المرتجع'), icon: <Store className="w-4 h-4" />, onSelect: () => ctx.received!(d), disabled: !ctx.can('delivery:assign'), reason: t('لا تملك صلاحية تعيين الطيار'), tone: 'primary' });
   if (ctx.openCheck && d.orderId) out.push({ id: 'open-check', label: t('فتح الشيك'), icon: <ClipboardList className="w-4 h-4" />, onSelect: () => ctx.openCheck!(d) });
   if (d.state === 'ASSIGNED') out.push({ id: 'dispatch', label: t('خروج الطلب'), icon: <Send className="w-4 h-4" />, onSelect: () => ctx.dispatch(d), disabled: !ctx.can('delivery:dispatch'), reason: t('لا تملك صلاحية إخراج الطلب'), tone: 'primary' });
   return out;
@@ -162,14 +166,15 @@ function DeliveryBoard({ mode, onMode }: { mode: 'board' | 'list' | 'map'; onMod
           search={(d: any) => `${d.number} ${d.orderNumber} ${d.customerName ?? ''} ${d.phone ?? ''} ${d.zoneName ?? ''} ${d.driver?.name ?? ''}`} searchPlaceholder={t('رقم الطلب أو الهاتف أو الاسم')}
           filters={[
             { id: 'late', label: t('متأخر'), test: (d: any) => !!d.late },
-            { id: 'norider', label: t('بلا طيار'), test: (d: any) => !d.driverId && (d.state === 'PENDING' || d.state === 'FAILED') },
+            { id: 'norider', label: t('بلا طيار'), test: (d: any) => !d.driverId && (d.state === 'PENDING' || d.state === 'FAILED' || d.state === 'RETURNED') },
+            { id: 'returned', label: t('مرتجع للمطعم'), test: (d: any) => d.state === 'RETURNED' || d.state === 'FAILED' },
             { id: 'collect', label: t('للتحصيل'), test: (d: any) => unpaid(d) },
             ...zoneNames.map((z) => ({ id: `zone:${z}`, label: z, group: 'zone', test: (d: any) => d.zoneName === z })),
           ]}
           timeBuckets={{ columns: [{ id: 't:late', title: t('متأخر'), tone: 'error' }, { id: 't:now', title: t('الآن'), tone: 'warning' }, { id: 't:hour', title: t('خلال ساعة'), tone: 'info' }, { id: 't:later', title: t('لاحقًا'), tone: 'neutral' }], of: (d: any) => { if (d.late) return 't:late'; const left = (d.promisedAtMs - now) / 60000; return left <= 10 ? 't:now' : left <= 60 ? 't:hour' : 't:later'; } }}
           sort={(a: any, b: any) => a.promisedAtMs - b.promisedAtMs}
           canMove={defs.canMove} onMove={defs.onMove}
-          cardActions={(d) => deliveryCardActions(d, { can, dispatch: defs.dispatch })}
+          cardActions={(d) => deliveryCardActions(d, { can, dispatch: defs.dispatch, received: defs.received })}
           cardLabel={(d: any) => `${d.number} · ${d.customerName ?? ''}`}
           renderCard={(d: any, c) => <DeliveryCardBody d={d} compact={c.compact} a={c.aging} />}
           renderDetail={(d: any, close) => <DeliveryDetailBody id={d.id} onClose={close} stacked />}
