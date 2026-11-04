@@ -324,7 +324,7 @@ export function DataTable<T>({ columns, rows, rowKey, onRowOpen, rowClassName, r
                   aria-selected={selectedKey !== undefined ? sel : undefined} data-row={row.id}
                   className={cn('table-row transition-colors', onRowOpen && 'cursor-pointer', sel && 'row-selected', rowClassName?.(x.r, x.i))} {...(rowAttrs?.(x.r, x.i) ?? {})}>
                   {columns.map((c) => (
-                    <td key={c.id} className={cn('px-3 align-middle border-b line', py, touch && 'h-12', al(c), c.kind === 'text' && 'max-w-0 w-auto', c.className)} data-kind={c.kind}
+                    <td key={c.id} className={cn('px-3 align-middle border-b line', py, touch && 'h-12', al(c), c.kind === 'text' && !c.cell && 'max-w-0 w-auto', c.className)} data-kind={c.kind}
                       onClick={c.kind === 'actions' ? (e) => e.stopPropagation() : undefined} onKeyDown={c.kind === 'actions' ? (e) => e.stopPropagation() : undefined}>
                       {c.kind === 'actions' ? <div className="inline-flex items-center justify-end gap-1">{c.cell?.(x.r, x.i)}</div> : <DefaultCell c={c} row={x.r} i={x.i} />}
                     </td>
@@ -336,7 +336,7 @@ export function DataTable<T>({ columns, rows, rowKey, onRowOpen, rowClassName, r
           {footer && rows.length > 0 && (
             <tfoot>
               <tr data-fb="table-totals">
-                {columns.map((c, j) => <td key={c.id} className={cn('table-head sticky bottom-0 px-3 py-2 border-t line font-bold', al(c))} data-kind={c.kind}>{footer(c, j)}</td>)}
+                {columns.map((c, j) => <td key={c.id} className={cn('table-head px-3 py-2 border-t line font-bold', !flow && 'sticky bottom-0', al(c))} data-kind={c.kind}>{footer(c, j)}</td>)}
               </tr>
             </tfoot>
           )}
@@ -344,7 +344,7 @@ export function DataTable<T>({ columns, rows, rowKey, onRowOpen, rowClassName, r
             <tfoot>
               <tr data-fb="table-totals">
                 {columns.map((c, j) => (
-                  <td key={c.id} className={cn('table-head sticky bottom-0 px-3 py-2 border-t line font-bold', al(c))} data-kind={c.kind}>
+                  <td key={c.id} className={cn('table-head px-3 py-2 border-t line font-bold', !flow && 'sticky bottom-0', al(c))} data-kind={c.kind}>
                     {totals[j] !== null ? (c.kind === 'money' ? <Money v={totals[j]} /> : <span className="num">{c.kind === 'qty' ? fmtQty(totals[j]!) : totals[j]}</span>) : j === firstText ? <span className="text-soft text-xs">{totalLabel ?? t('الإجمالي')}</span> : null}
                   </td>
                 ))}
@@ -355,9 +355,9 @@ export function DataTable<T>({ columns, rows, rowKey, onRowOpen, rowClassName, r
       </div>
       {paged && (
         <div className="flex items-center gap-2 pt-2 text-xs text-soft" data-fb="table-pager">
-          <span className="num">{t('{a}–{b} من {n}', { a: pagination.pageIndex * pagination.pageSize + 1, b: Math.min(rows.length, (pagination.pageIndex + 1) * pagination.pageSize), n: rows.length })}</span>
+          <span data-fb="table-range"><span className="num">{pagination.pageIndex * pagination.pageSize + 1}–{Math.min(rows.length, (pagination.pageIndex + 1) * pagination.pageSize)}</span> {t('من أصل')} <span className="num">{rows.length}</span></span>
           <span className="flex-1" />
-          <DensityToggle dense={dense} />
+          {!touch && <DensityToggle dense={dense} />}
           <Button size="icon" variant="ghost" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()} aria-label={t('الصفحة السابقة')} data-fb="table-page:prev">{getLang() === 'ar' ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}</Button>
           <Button size="icon" variant="ghost" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()} aria-label={t('الصفحة التالية')} data-fb="table-page:next">{getLang() === 'ar' ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</Button>
         </div>
