@@ -9,6 +9,9 @@ import { Tech } from '../../app/tech';
 import { money, dateTime, cn } from '../../lib/format';
 import { store } from '../../mock/store';
 import { deviceName, personText } from '../../demo/people';
+import { useBoardView } from '../../app/useBoardView';
+import { BoardViewToggle } from '../../ui/board';
+import ApprovalsBoard from '../boards/ApprovalsBoard';
 
 const FIELD: Record<string, string> = {
   amount: 'المبلغ', lineAmount: 'قيمة الصنف', payable: 'إجمالي الشيك', discountPercent: 'نسبة الخصم', absVariance: 'الفرق', countedCash: 'المعدود', expectedCash: 'المتوقع',
@@ -27,7 +30,14 @@ function plainValue(k: string, v: unknown): string {
   return String(v);
 }
 
+// ux-05: the approvals & reviews board or this inbox list (board / list switch, remembered per user).
 export default function ApprovalsInbox() {
+  const { view, setView } = useBoardView('approvals');
+  if (view === 'board') return <ApprovalsBoard onList={() => setView('list')} />;
+  return <ApprovalsList onBoard={() => setView('board')} />;
+}
+
+function ApprovalsList({ onBoard }: { onBoard: () => void }) {
   useNow(5000);
   const [tab, setTab] = useState<'PENDING' | 'DONE'>('PENDING');
   const q = useQuery<any>('ApprovalRequest.Find', { query: { state: tab === 'PENDING' ? 'PENDING' : 'APPROVED,REJECTED,EXPIRED,CANCELLED', limit: 100 } });
@@ -36,7 +46,7 @@ export default function ApprovalsInbox() {
     <div className="space-y-4" data-screen="APR">
       <Section title={t('طلبات الموافقة')} badge={<StateBadge ops={['ApprovalRequest.Find', 'ApprovalRequest.Decide', 'ApprovalRequest.Create']} />}
         sub={t('الكاشير أو الويتر لما يحتاج موافقة يقدر يبعتها هنا بدل ما تروح له. موافقتك بتتستخدم مرة واحدة للعملية دي بالظبط.')}
-        actions={<Tabs value={tab} onChange={setTab} tabs={[{ id: 'PENDING', label: <span className="flex items-center gap-1.5">{t('مستنية')}{tab !== 'PENDING' || !items.length ? '' : <Pill tone="warning">{items.length}</Pill>}</span> }, { id: 'DONE', label: t('اتردّ عليها') }]} />} />
+        actions={<div className="flex items-center gap-2"><BoardViewToggle value="list" onChange={(v) => v === 'board' && onBoard()} /><Tabs value={tab} onChange={setTab} tabs={[{ id: 'PENDING', label: <span className="flex items-center gap-1.5">{t('مستنية')}{tab !== 'PENDING' || !items.length ? '' : <Pill tone="warning">{items.length}</Pill>}</span> }, { id: 'DONE', label: t('اتردّ عليها') }]} /></div>} />
       {tab === 'PENDING' && items.length === 0 && !q.loading && <Card><Empty icon={<Inbox className="w-10 h-10 opacity-40" />} text={t('مفيش طلبات مستنية دلوقتي')}><div className="text-xs">{t('جرّب: على الكاشير اعمل خصم كبير، وفي شاشة الموافقة اضغط "ابعت طلب للمدير".')}</div></Empty></Card>}
       <div className="grid xl:grid-cols-2 gap-3">
         {items.map((r) => <RequestCard key={r.id} r={r} />)}
