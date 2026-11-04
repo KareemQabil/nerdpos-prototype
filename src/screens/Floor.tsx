@@ -167,6 +167,8 @@ function MapTable({ tb, stage, checks, px, onClick, selected, dim }: { tb: any; 
       {stage === 'RESERVED' && <div className={cn('flex items-center gap-0.5 mt-0.5 font-bold', meta)} style={{ color: look.accent }}><CalendarClock className="w-3 h-3" /><DateTime v={tb.reservation.at} time /></div>}
       {stage === 'FREE' && lvl > 0 && <div className={cn('mt-0.5 flex items-center gap-0.5 num', meta)} style={{ color: look.accent }}><Users className="w-3 h-3" />{tb.capacity}</div>}
       {o?.primary && o.checks > 1 && <span className="absolute -top-2 -end-2 min-w-5 h-5 px-1 rounded-full text-[10px] font-bold num flex items-center justify-center bg-[var(--card-raised)] border border-[var(--glass-border)]" title={t('{n} شيكات', { n: o.checks })}>{o.checks}</span>}
+      {occ && tb.reservation && <span className="absolute -bottom-2 -end-2 h-5 px-1.5 rounded-full text-[10px] font-bold num flex items-center gap-0.5 justify-center text-white" style={{ background: 'var(--violet)' }} title={`${tb.reservation.customer} · ${t('حجز قادم')}`} data-fb={`table-res-marker:${tb.name}`}><CalendarClock className="w-2.5 h-2.5" /><DateTime v={tb.reservation.at} time /></span>}
+      {stage === 'RESERVED' && lvl === 2 && <div className={cn('truncate px-1 font-bold', meta)} style={{ color: look.accent }} data-fb={`table-res:${tb.name}`}>{firstName(tb.reservation.customer)} · <span className="num">{tb.reservation.partySize}</span></div>}
       {unsent > 0 && <span className="absolute -top-2 -start-2 h-5 px-1.5 rounded-full text-[10px] font-bold num flex items-center gap-0.5 justify-center bg-[var(--primary)] text-[var(--primary-foreground)]" title={t('لم يُرسل بعد')} data-fb={`table-unsent:${tb.name}`}><Send className="w-2.5 h-2.5 rtl:-scale-x-100" />{unsent}</span>}
     </button>
   );
@@ -231,9 +233,14 @@ function CleanSheet({ tb, onClose, onSeat, title, sub }: { tb: any; onClose: () 
 
 function OpenTable({ tb, onClose, title, sub, openCheck }: { tb: any; onClose: () => void; title: React.ReactNode; sub: React.ReactNode; openCheck: (id: string) => void }) {
   const { run, busy } = useCommand();
-  const [guests, setGuests] = useState(tb.reservation?.partySize ? Number(tb.reservation.partySize) : Math.min(2, tb.capacity));
-  const open = async (andCheck: boolean) => {
-    const v = await run<any>('TableVisit.Open', { params: { tableId: tb.id }, body: { guestCount: guests, reservationId: tb.reservation?.id } }, { success: t('ترابيزة {n} اتفتحت', { n: tb.name }) });
+  const { can } = useDev();
+  const rv = tb.reservation;
+  const [guests, setGuests] = useState(rv?.partySize ? Number(rv.partySize) : Math.min(2, tb.capacity));
+  // ux-12: a reservation is seated through Reservation.Seat (the one seating path); a walk-in opens the table without it
+  const open = async (andCheck: boolean, walkIn = false) => {
+    const v = rv && !walkIn
+      ? await run<any>('Reservation.Seat', { params: { reservationId: rv.id }, body: { tableId: tb.id, guestCount: guests, expectedVersion: rv.version } }, { success: t('جلس {n} على ترابيزة {tb}', { n: rv.customer, tb: tb.name }) })
+      : await run<any>('TableVisit.Open', { params: { tableId: tb.id }, body: { guestCount: guests } }, { success: t('ترابيزة {n} اتفتحت', { n: tb.name }) });
     if (!v) return;
     if (andCheck) {
       const o = await run<any>('Order.Create', { body: { channel: 'DINE_IN', tableId: tb.id } });
@@ -246,9 +253,25 @@ function OpenTable({ tb, onClose, title, sub, openCheck }: { tb: any; onClose: (
   const chips = Array.from({ length: Math.max(6, Math.min(12, tb.capacity + 2)) }, (_, i) => i + 1);
   return (
     <Modal open onClose={onClose} title={title} description={sub} badge={<StateBadge ops={['TableVisit.Open']} />} size="sm"
-      footer={<><Button variant="ghost" loading={busy} onClick={() => open(false)} data-fb="open-table">{t('افتح الترابيزة بس')}</Button><Button variant="primary" size="lg" loading={busy} onClick={() => open(true)} data-fb="open-table-check"><Plus className="w-4 h-4" />{t('افتح + شيك جديد')}</Button></>}>
+      footer={rv ? <>
+        <Button variant="ghost" loading={busy} onClick={() => open(false, true)} data-fb="open-table-walkin">{t('فتح لضيف آخر')}</Button>
+        <div className="flex-1" />
+        {can('order:create') && <Button loading={busy} onClick={() => open(false)} data-fb="seat-reservation">{t('إجلاس الحجز')}</Button>}
+        {can('order:create') && <Button variant="primary" size="lg" loading={busy} onClick={() => open(true)} data-fb="seat-reservation-check"><Plus className="w-4 h-4" />{t('إجلاس + شيك جديد')}</Button>}
+        {!can('order:create') && <Button variant="primary" size="lg" loading={busy} onClick={() => open(false)} data-fb="seat-reservation"><CalendarClock className="w-4 h-4" />{t('إجلاس الحجز')}</Button>}
+      </> : <><Button variant="ghost" loading={busy} onClick={() => open(false)} data-fb="open-table">{t('افتح الترابيزة بس')}</Button><Button variant="primary" size="lg" loading={busy} onClick={() => open(true)} data-fb="open-table-check"><Plus className="w-4 h-4" />{t('افتح + شيك جديد')}</Button></>}>
       <div className="space-y-5">
-        {tb.reservation && <Banner tone="info" title={t('محجوزة')}>{tb.reservation.customer} · <DateTime v={tb.reservation.at} time /> · {tb.reservation.partySize} {t('أفراد')}</Banner>}
+        {rv && (
+          <div className="rounded-2xl border p-3 flex items-center gap-3" style={{ borderColor: 'color-mix(in srgb, var(--violet) 45%, transparent)', background: 'color-mix(in srgb, var(--violet) 8%, transparent)' }} data-fb="table-reservation">
+            <CalendarClock className="w-6 h-6 shrink-0" style={{ color: 'var(--violet)' }} />
+            <div className="flex-1 min-w-0">
+              <div className="font-bold truncate">{rv.customer}</div>
+              <div className="text-xs text-soft flex items-center gap-2 flex-wrap"><DateTime v={rv.at} time /><span className="inline-flex items-center gap-0.5"><Users className="w-3 h-3" /><span className="num">{rv.partySize}</span></span>{rv.late ? <span className="font-bold text-[var(--warning-text)]">{t('متأخر {n} دقيقة', { n: -rv.minutesTo })}</span> : <span>{t('بعد {n} دقيقة', { n: rv.minutesTo })}</span>}</div>
+              {rv.notes && <div className="text-xs text-soft truncate">{rv.notes}</div>}
+            </div>
+            {rv.deposit && rv.depositState === 'HELD' && <div className="text-end shrink-0"><div className="text-[11px] text-dim">{t('العربون')}</div><Money v={rv.deposit} /></div>}
+          </div>
+        )}
         <div>
           <div className="text-sm font-bold mb-2">{t('عدد الضيوف')}</div>
           <div className="flex items-center justify-center gap-4 rounded-2xl surface-1 border line p-3">

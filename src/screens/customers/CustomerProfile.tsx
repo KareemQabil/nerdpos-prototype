@@ -1,7 +1,7 @@
 // Customer profile: contact, tags, allergies and notes; addresses; orders and deliveries; loyalty points and tier;
 // manual points adjustment; merge a duplicate into this customer.
 import React, { useState } from 'react';
-import { ArrowRight, Pencil, PhoneCall, MapPin, Plus, Trash2, Star, Crown, Merge, Gift, History, Bike, ShoppingBag, Phone, Mail, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, Pencil, PhoneCall, MapPin, Plus, Trash2, Star, Crown, Merge, Gift, History, Bike, ShoppingBag, Phone, Mail, CheckCircle2, CalendarClock } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';
 import { Section, StateBadge, Button, Card, Pill, Money, Modal, Field, Input, Textarea, Banner, Tabs, Table, Spinner, Empty, KV, confirmDialog, DateTime } from '../../ui';
 import { Tech } from '../../app/tech';
@@ -12,6 +12,7 @@ import { TAGS, ALLERGENS, TagPills, TierBadge, AllergyWarning, AddressForm, EMPT
 import { STATE, PAYMENT_MODE, DeliveryDetail } from '../delivery/common';
 import { StatusPill } from '../order/CheckPanel';
 import { personText } from '../../demo/people';
+import { RES_STATE, DEP_STATE } from '../reservationLabels'; // ux-12
 
 const ENTRY: Record<string, { ar: string; tone: 'success' | 'error' | 'info' | 'violet' | 'neutral' }> = {
   EARN: { ar: 'كسب', tone: 'success' }, REDEEM: { ar: 'صرف', tone: 'error' }, ADJUST: { ar: 'تعديل يدوي', tone: 'info' }, MERGE_IN: { ar: 'دمج (داخل)', tone: 'violet' }, MERGE_OUT: { ar: 'دمج (خارج)', tone: 'neutral' }, REVERSE: { ar: 'إلغاء', tone: 'neutral' },
@@ -21,7 +22,8 @@ export const entryLabel = ENTRY;
 export default function CustomerProfile() {
   const { params, nav, can } = useDev();
   const q = useQuery<any>(params.customerId ? 'Customer.Get' : null, { params: { customerId: params.customerId } });
-  const [tab, setTab] = useState<'addresses' | 'orders' | 'points' | 'merge'>('addresses');
+  const [tab, setTab] = useState<'addresses' | 'orders' | 'reservations' | 'points' | 'merge'>('addresses');
+  const resv = useQuery<any>(params.customerId && can('table:read') ? 'Reservation.Find' : null, { query: { customerId: params.customerId } }); // ux-12
   const [edit, setEdit] = useState(false);
   const c = q.data;
   if (!params.customerId) return <Banner tone="info">{t('افتح عميل من شاشة العملاء')}</Banner>;
@@ -73,11 +75,13 @@ export default function CustomerProfile() {
           <Tabs value={tab} onChange={setTab} tabs={[
             { id: 'addresses', label: `${t('العناوين')} (${c.addresses.length})` },
             { id: 'orders', label: `${t('الطلبات')} (${c.orders.length + c.deliveries.filter((d: any) => d.historical).length})` },
+            ...(can('table:read') ? [{ id: 'reservations' as const, label: `${t('الحجوزات')} (${resv.data?.items?.length ?? 0})`, fb: 'customer-tab:reservations' }] : []),
             { id: 'points', label: t('النقاط') },
             ...(c.active && can('customer:update') ? [{ id: 'merge' as const, label: <span className="flex items-center gap-1">{t('دمج مكرر')}{c.duplicates.length ? <span className="px-1.5 rounded-full bg-[var(--warning)] text-black text-[10px] font-bold">{c.duplicates.length}</span> : null}</span> }] : []),
           ]} />
           {tab === 'addresses' && <Addresses c={c} />}
           {tab === 'orders' && <Orders c={c} />}
+          {tab === 'reservations' && <CustomerReservations items={resv.data?.items ?? null} />}
           {tab === 'points' && <Points c={c} />}
           {tab === 'merge' && <MergePanel c={c} />}
         </div>
@@ -179,6 +183,19 @@ function Orders({ c }: { c: any }) {
       {c.stats.orders > c.orders.length + hist.length && <div className="text-xs text-dim">{t('العدد الكلي فيه طلبات قديمة من قبل تشغيل السيستم ({n} طلب).', { n: c.stats.orders - c.orders.length - hist.length })}</div>}
       {open && <DeliveryDetail id={open} onClose={() => setOpen(null)} />}
     </div>
+  );
+}
+
+/** ux-12: this customer's reservations (read-only; managed from «الحجوزات»). */
+function CustomerReservations({ items }: { items: any[] | null }) {
+  const rows = (items ?? []).slice().reverse();
+  return (
+    <Card title={<span className="flex items-center gap-2"><CalendarClock className="w-4 h-4" />{t('الحجوزات')}</span>} badge={<StateBadge ops={['Reservation.Find']} />}>
+      <Table loading={items === null} head={[t('الموعد'), t('الأفراد'), t('الترابيزة'), t('العربون'), t('الحالة')]} align={['start', 'center', 'start', 'end', 'start']} empty={t('لا توجد حجوزات')}
+        rows={rows.map((r: any) => [<DateTime v={r.at} className="text-xs" />, <span className="num font-bold">{r.partySize}</span>, r.tableName ? `${t('ترابيزة')} ${r.tableName}` : <span className="text-dim">—</span>,
+          r.deposit ? <span className="inline-flex flex-col items-end"><Money v={r.deposit.amount} /><span className="text-[11px] text-dim">{t(DEP_STATE[r.deposit.state]?.[0] ?? '')}</span></span> : <span className="text-dim">—</span>,
+          <Pill tone={RES_STATE[r.state]?.[1] ?? 'neutral'} dot>{t(RES_STATE[r.state]?.[0] ?? '—')}</Pill>])} />
+    </Card>
   );
 }
 

@@ -392,11 +392,20 @@ export const moneyHandlers: Record<string, Handler> = {
     // ux-12: the customer record when the screen picked one (the name stays as written for legacy readers)
     const cust = ctx.body.customerId ? (ctx.db.customers ?? []).find((c) => c.id === ctx.body.customerId) : null;
     if (ctx.body.customerId && !cust) throw new ApiError('CUSTOMER_NOT_FOUND', { customerId: ctx.body.customerId }, 404);
-    const d = { id: nextId('dep'), branchId: ctx.branchId!, customer: cust?.name ?? ctx.body.customer, phone: cust?.phone ?? ctx.body.phone, customerId: cust?.id ?? null, amount: m4(ctx.body.amount), method: ctx.body.method, reference: ctx.body.reference, purpose: ctx.body.purpose, state: 'HELD' as const, reservationId: ctx.body.reservationId, createdAt: ctx.nowIso, sessionId: s.id, by: ctx.user!.id, version: 1, applications: [], refunds: [], forfeit: null };
+    // ux-12: a deposit taken for a reservation that already exists (the screen books first, then takes the deposit)
+    const resv = ctx.body.reservationId ? ctx.db.reservations.find((x) => x.id === ctx.body.reservationId && x.branchId === ctx.branchId) : null;
+    if (ctx.body.reservationId && !resv) throw new ApiError('RESERVATION_NOT_FOUND', { reservationId: ctx.body.reservationId }, 404);
+    if (resv && resv.state !== 'BOOKED') throw new ApiError('RESERVATION_NOT_BOOKED', { state: resv.state }, 409);
+    if (resv && resv.depositId && ctx.db.deposits.some((x) => x.id === resv.depositId && x.state === 'HELD')) throw new ApiError('VALIDATION_FAILED', { field: 'reservationId', rule: 'the reservation already holds a deposit' });
+    const d = { id: nextId('dep'), branchId: ctx.branchId!, customer: cust?.name ?? ctx.body.customer, phone: cust?.phone ?? ctx.body.phone, customerId: cust?.id ?? null, amount: m4(ctx.body.amount), method: ctx.body.method, reference: ctx.body.reference, purpose: ctx.body.purpose, state: 'HELD' as const, reservationId: resv?.id, createdAt: ctx.nowIso, sessionId: s.id, by: ctx.user!.id, version: 1, applications: [], refunds: [], forfeit: null };
     ctx.db.deposits.push(d);
     if (d.method === 'CASH') cashEntry(ctx, s.id, 'DEPOSIT_IN', d.amount, { ref: d.id });
-    if (ctx.body.reservationId) { const r = ctx.db.reservations.find((x) => x.id === ctx.body.reservationId); if (r) r.depositId = d.id; }
-    ctx.audit(`deposit ${d.amount} ${d.method} from ${d.customer}`, d.id);
+    if (resv) {
+      pushResEvent(resv, { at: ctx.nowIso, by: ctx.user!.id, kind: 'UPDATED', changes: [{ field: 'depositId', from: resv.depositId, to: d.id }], amount: d.amount, ref: d.id });
+      resv.depositId = d.id; resv.version = (resv.version ?? 1) + 1;
+      if (!d.customerId && resv.customerId) d.customerId = resv.customerId;
+    }
+    ctx.audit(`deposit ${d.amount} ${d.method} from ${d.customer}${resv ? ` for reservation ${resv.id}` : ''}`, d.id);
     return { status: 201, body: depositView(ctx.db, d) };
   },
   // ux-12: a deposit is applied up to what remains of it and of the check (amount optional: the smaller of the two).

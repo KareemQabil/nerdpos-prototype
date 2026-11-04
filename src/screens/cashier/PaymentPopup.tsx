@@ -56,7 +56,8 @@ export function PaymentPopup({ orderId, onClose, onNext, nextLabel }: { orderId:
   const remaining: string = draft ? order?.totals?.payable ?? '0' : s?.remaining ?? '0';
   const due: string = method === 'CASH' && !draft && s?.cash?.increment && !s?.settled ? s.cash.due : remaining;
   const enabled: string[] = tm.data?.value?.enabled ?? ['CASH', 'CARD'];
-  const held = (deposits.data?.items ?? []).filter((d: any) => d.state === 'HELD');
+  // ux-12: the deposit of this table's reservation first (found through the seated visit); the remainder is what can be applied
+  const held = (deposits.data?.items ?? []).filter((d: any) => d.state === 'HELD').sort((a: any, b: any) => Number(!!order?.visitId && b.visitId === order.visitId) - Number(!!order?.visitId && a.visitId === order.visitId));
   const prepaidOk = !!(order?.externalOrderId || order?.deliveryId);
   const methods: Method[] = [
     ...(['CASH', 'CARD', 'DIGITAL_WALLET'] as Method[]).filter((m) => enabled.includes(m)),
@@ -212,7 +213,7 @@ export function PaymentPopup({ orderId, onClose, onNext, nextLabel }: { orderId:
 
               {method === 'LOYALTY' && <LoyaltyRedeemBox order={order} />}
               {method === 'DEPOSIT' && (
-                <div className="space-y-1.5">{held.map((d: any) => <div key={d.id} className="flex items-center justify-between rounded-xl surface-1 px-3 min-h-[56px] text-sm"><span>{d.customer} · {d.purpose === 'BOOKING' ? t('عربون حجز') : t('عربون')}</span><span className="flex items-center gap-2"><Money v={d.amount} /><Button size="lg" variant="primary" onClick={() => run('Deposit.Apply', { params: { depositId: d.id }, body: { orderId: order.id } }, { success: t('تم خصم العربون') })}>{t('خصم')}</Button></span></div>)}</div>
+                <div className="space-y-1.5">{held.map((d: any) => { const mine = !!order.visitId && d.visitId === order.visitId; return <div key={d.id} className={cn('flex items-center justify-between rounded-xl px-3 min-h-[56px] text-sm', mine ? 'border border-[var(--primary)] bg-[var(--primary-container)]' : 'surface-1')} data-fb={`deposit-row:${d.id}`} data-mine={mine || undefined}><span>{d.customerName ?? d.customer} · {mine ? t('عربون حجز هذه الترابيزة') : d.purpose === 'BOOKING' ? t('عربون حجز') : t('عربون')}</span><span className="flex items-center gap-2"><Money v={d.remaining ?? d.amount} /><Button size="lg" variant="primary" data-fb="deposit-apply" onClick={() => run('Deposit.Apply', { params: { depositId: d.id }, body: { orderId: order.id, expectedVersion: d.version } }, { success: t('تم خصم العربون') })}>{t('خصم')}</Button></span></div>; })}</div>
               )}
 
               {plain && <>
