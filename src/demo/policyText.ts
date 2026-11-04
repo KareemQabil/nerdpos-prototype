@@ -75,6 +75,7 @@ const PLAIN: Record<string, Plain> = {
   // r3B (round 3)
   TenderReferencePolicy: { title: 'رقم العملية لكل طريقة دفع', explain: 'لكل طريقة دفع: الكاشير يكتب رقم العملية (من مكنة الكارت، رقم التحويل، أو رقم طلب التطبيق) ولا لأ — مقفول، اختياري، أو لازم. نفس الرقم مايتسجلش مرتين على نفس طريقة الدفع في نفس اليوم.', reacts: 'خانة «رقم العملية» في شاشة التحصيل بتظهر أو تختفي أو تبقى لازمة.', question: 'عندكم أنهي طريقة دفع لازم يتكتب لها رقم العملية؟ (مثلًا إنستاباي لازم، والكارت اختياري)' },
   ShortOrderNumberPolicy: { title: 'رقم النداء القصير', explain: 'رقم صغير ينادوا بيه على الزبون ويظهر كبير على الإيصال وتذكرة المطبخ وشاشة التسليم. بيبدأ من 1 مع قفل اليوم، أو بعد عدد طلبات معين. رقم العملية الأصلي ثابت ومستحيل يتغير وبيتطبع دايمًا.', reacts: 'الإيصال، شاشة المطبخ، شاشة التسليم.', question: 'تحبوا رقم النداء يبدأ من 1 كل يوم، ولا كل 100 طلب؟' },
+  CallBoardPolicy: { title: 'شاشة النداء', explain: 'متى يظهر رقم الطلب في «جاهز» على شاشة النداء، وكم دقيقة يبقى، وهل تظهر أرقام الدليفري.', reacts: 'شاشة النداء وزر «نداء» في شاشة التسليم.' }, // ux-12c
   SecondLanguagePolicy: { title: 'اللغة التانية', explain: 'يطبع الاسم الإنجليزي للصنف تحت الاسم العربي على الإيصال أو تذكرة المطبخ أو أزرار المنيو — بس لو الصنف ليه اسم تاني متسجل. مفيش ترجمة أوتوماتيك.', reacts: 'الإيصال، شاشة المطبخ، أزرار الأصناف في شاشة البيع.' },
   WalletProvidersPolicy: { title: 'المحافظ الإلكترونية', explain: 'إنستاباي وفودافون كاش وغيرهم كطرق دفع برقم العملية، وكل واحدة تظهر سطر لوحدها في تقرير قفلة الوردية.' },
   // r3A — who did it vs who allowed it
@@ -169,6 +170,7 @@ const OPTIONS: Record<string, Record<string, OptText>> = {
   'TenderMethodPolicy.enabled': ON_SALE,
   'TenderReferencePolicy.*': { OFF: O('مقفول', 'مفيش خانة لرقم العملية.'), OPTIONAL: O('اختياري', 'الخانة موجودة والكاشير يكتبه لو موجود.'), REQUIRED: O('لازم', 'مفيش دفع من غير رقم العملية.') },
   'ShortOrderNumberPolicy.mode': { OFF: O('مقفول', 'رقم العملية بس.'), DAILY: O('يبدأ من 1 مع قفل اليوم'), EVERY_N: O('يرجع لـ 1 بعد عدد طلبات', 'وبيبدأ من 1 برضه مع كل يوم جديد.') },
+  'CallBoardPolicy.call': { MANUAL: O('من شاشة التسليم بزر «نداء»'), AUTO: O('تلقائيًا عند جاهزية كل المحطات') }, // ux-12c
   'CollectionScopePolicy.DINE_IN': {
     BRANCH_COLLECTING_DRAWER: O('أي كاشير مفتوح في الفرع يحصّل', 'والشيك يفضل محسوب على الويتر اللي فتحه.'),
     ORIGIN_SESSION: O('الوردية اللي فتحت الشيك بس', 'الشيك لازم يتحصّل على نفس الدرج اللي اتفتح عليه.'),
@@ -251,6 +253,7 @@ const FIELD_LABEL: Record<string, string> = {
   'WalletProvidersPolicy.providers': 'المحافظ',
   'TenderReferencePolicy.CARD': 'كارت (مكنة الكارت)', 'TenderReferencePolicy.DIGITAL_WALLET': 'محفظة / تحويل', 'TenderReferencePolicy.ONLINE': 'مدفوع قبل كده (تطبيق / لينك)',
   'ShortOrderNumberPolicy.mode': 'رقم النداء', 'ShortOrderNumberPolicy.every': 'يرجع لـ 1 بعد',
+  'CallBoardPolicy.call': 'النداء', 'CallBoardPolicy.readyMinutes': 'مدة بقاء الرقم في «جاهز» (دقيقة)', 'CallBoardPolicy.delivery': 'أرقام الدليفري على شاشة النداء', // ux-12c
   'SecondLanguagePolicy.receipt': 'على إيصال الزبون', 'SecondLanguagePolicy.kitchen': 'على تذكرة المطبخ', 'SecondLanguagePolicy.menu': 'في أزرار المنيو',
   'TableTurnPolicy.markDirty': 'تتعلم «محتاجة تنضيف» بعد القعدة', 'TableTurnPolicy.blockSeating': 'ممنوع حد يقعد عليها قبل التنضيف', 'TableTurnPolicy.alertMinutes': 'ينبّه لو فضلت مش نضيفة بعد',
   'OfflineModePolicy.maxQueued': 'أقصى عمليات مستنية على الجهاز', 'OfflineModePolicy.cashOnly': 'التحصيل من غير نت كاش بس',

@@ -23,7 +23,7 @@ import { useHotkeys, useKeymap, keyLabel, type KeyAction } from '../app/keymap';
 import { cue, useSound } from '../app/sound';
 import { ShortcutsOverlay } from './cashier/ShortcutsOverlay';
 import { TicketCard, toneOf, headline } from './kitchen/TicketCard';
-import { DispatchBoard, groupOrders, type OrderGroup } from './kitchen/DispatchBoard';
+import { DispatchBoard, groupOrders, liveTicket, type OrderGroup } from './kitchen/DispatchBoard';
 
 export const stationLabel = (n?: string | null) => stationName(n);
 const OPS = ['Kitchen.Board', 'Kitchen.AdvanceTicket', 'TicketItem.Bump', 'Ticket.SetPriority', 'Ticket.Refire', 'Ticket.TransferStation', 'Ticket.Recall', 'Kitchen.CallOrder'];
@@ -104,9 +104,14 @@ export default function Kitchen() {
     for (const tk of tks) { const cur = fresh(tk.id) ?? tk; await run('Ticket.SetPriority', { params: { ticketId: tk.id }, body: { expectedVersion: cur.version, priority: on ? 'RUSH' : 'NORMAL' } }, { success: on ? t('أصبحت التذكرة أولوية — في أول الطابور') : t('أُلغيت الأولوية') }); }
   };
   const serve = async (g: OrderGroup) => {
-    if (!g.ready) { toast('warning', t('بانتظار: {s}', { s: g.list.filter((x) => x.state !== 'READY').map((x) => stationName(x.stationName)).join(t('، ')) })); return; }
+    if (!g.ready) { toast('warning', t('بانتظار: {s}', { s: g.list.filter((x) => liveTicket(x) && x.state !== 'READY').map((x) => stationName(x.stationName)).join(t('، ')) })); return; }
     const done: string[] = [];
-    for (const tk of g.list) { const cur = fresh(tk.id) ?? tk; if (await run('Kitchen.AdvanceTicket', { params: { ticketId: tk.id }, body: { expectedVersion: cur.version, toState: 'DONE' } })) done.push(tk.id); }
+    for (const tk of g.list) {
+      // ux-12c: a ticket whose items were all voided leaves with the order (marked ready first, then handed off)
+      if ((fresh(tk.id) ?? tk).state !== 'READY' && !(await run('Kitchen.AdvanceTicket', { params: { ticketId: tk.id }, body: { expectedVersion: (fresh(tk.id) ?? tk).version, toState: 'READY' } }))) continue;
+      const cur = fresh(tk.id) ?? tk;
+      if (await run('Kitchen.AdvanceTicket', { params: { ticketId: tk.id }, body: { expectedVersion: cur.version, toState: 'DONE' } })) done.push(tk.id);
+    }
     if (done.length) offerUndo({ text: t('سُلِّم: {w}', { w: headline(g.first) }), run: async () => { for (const id of done) await run('Ticket.Recall', { params: { ticketId: id }, body: { undo: true } }); toast('success', t('تم التراجع')); return true; } });
   };
   const call = (g: OrderGroup) => g.byNumber && run('Kitchen.CallOrder', { params: { orderId: g.first.orderId }, body: {} }, { success: g.calledAt ? t('أُعيد النداء على الرقم {n}', { n: g.first.shortNo ?? g.first.orderNumber }) : t('نودي على الرقم {n}', { n: g.first.shortNo ?? g.first.orderNumber }) });

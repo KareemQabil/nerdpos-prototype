@@ -1,6 +1,7 @@
 // The dispatch (expediter) view: one card per order round with every station's readiness. «جاهز للتسليم» and the
-// hand-off exist only here (KDS_DISPATCH_ONLY is enforced by the server). An order collected by number is called to
-// the call board with «نداء» once every station is ready; calling again re-announces it.
+// hand-off exist only here (KDS_DISPATCH_ONLY is enforced by the server). An order collected by number (the server's
+// `callable`, CallBoardPolicy) is called to the call board with «نداء» once every station of every open round is ready;
+// calling again re-announces it. A ticket whose items were all voided is not waited for (ux-12c).
 import React from 'react';
 import { Check, Clock, Flame, Megaphone, Truck, ConciergeBell, ChefHat, Ban } from 'lucide-react';
 import { Kbd } from '../../ui';
@@ -11,15 +12,26 @@ import { personName } from '../../demo/people';
 import { clock } from '../../mock/clock';
 import { TONE, toneOf, ageSeconds, mmss, orderType, headline } from './TicketCard';
 
-export interface OrderGroup { key: string; list: any[]; first: any; ready: boolean; rush: boolean; oldest: any; calledAt: string | null; byNumber: boolean }
+export interface OrderGroup { key: string; list: any[]; first: any; ready: boolean; rush: boolean; oldest: any; calledAt: string | null; byNumber: boolean; orderReady: boolean; waitingRounds: number[] }
+
+/** A ticket the guest still waits for: at least one item not voided. */
+export const liveTicket = (tk: any) => (tk.items ?? []).some((i: any) => i.status !== 'CANCELLED');
 
 export function groupOrders(tickets: any[]): OrderGroup[] {
   const m = new Map<string, any[]>();
-  for (const tk of tickets) { const k = `${tk.orderId}:${tk.round}`; m.set(k, [...(m.get(k) ?? []), tk]); }
+  const byOrder = new Map<string, any[]>();
+  for (const tk of tickets) { const k = `${tk.orderId}:${tk.round}`; m.set(k, [...(m.get(k) ?? []), tk]); byOrder.set(tk.orderId, [...(byOrder.get(tk.orderId) ?? []), tk]); }
   return [...m.entries()].map(([key, list]) => {
     const oldest = list.reduce((a, b) => (Number(a.createdAtMs) <= Number(b.createdAtMs) ? a : b));
-    const calledAt = list.map((x) => x.calledAt).filter(Boolean).sort().pop() ?? null;
-    return { key, list, first: list[0], ready: list.every((x) => x.state === 'READY'), rush: list.some((x) => x.priority === 'RUSH'), oldest, calledAt, byNumber: !list[0].tableName };
+    const live = list.filter(liveTicket);
+    const ready = live.length ? live.every((x) => x.state === 'READY') : list.every((x) => x.state === 'READY');
+    // the number is on «جاهز» only while every ticket of the order the guest waits for carries the call (as on the
+    // call board: a recall, a refire or a new round clears it)
+    const orderLive = (byOrder.get(list[0].orderId) ?? []).filter(liveTicket);
+    const calledAt = orderLive.length && orderLive.every((x) => x.calledAt) ? orderLive.map((x) => x.calledAt).sort().pop() : null;
+    // the guest collects the whole order: another round still cooking holds the call
+    const waitingRounds = [...new Set((byOrder.get(list[0].orderId) ?? []).filter((x) => x.round !== list[0].round && liveTicket(x) && x.state !== 'READY').map((x) => Number(x.round)))].sort((a, b) => a - b);
+    return { key, list, first: list[0], ready, rush: list.some((x) => x.priority === 'RUSH'), oldest, calledAt, byNumber: list[0].callable === true, orderReady: ready && !waitingRounds.length, waitingRounds };
   }).sort((a, b) => Number(b.ready) - Number(a.ready) || Number(b.rush) - Number(a.rush) || Number(a.oldest.createdAtMs) - Number(b.oldest.createdAtMs));
 }
 
@@ -70,12 +82,13 @@ export function DispatchBoard({ groups, sel, onSelect, onServe, onCall, busy, ke
               {i < 9 && <Kbd className={cn('!h-8 !min-w-8 !text-sm shrink-0', sel === i && '!border-[var(--primary)] !text-[var(--primary)]')}>{i + 1}</Kbd>}
               {g.ready ? (
                 <>
-                  {g.byNumber && <button type="button" disabled={busy} onClick={() => onCall(g)} data-fb="expo-call" className={cn('h-14 px-3 rounded-xl font-extrabold inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 disabled:opacity-50', g.calledAt ? 'btn-secondary' : 'bg-[var(--primary)] text-[var(--primary-foreground)]')}>
+                  {g.byNumber && !g.orderReady && <span className="h-14 px-2 rounded-xl surface-1 border border-dashed border-[var(--glass-border)] inline-flex items-center gap-1 text-xs text-soft font-bold shrink-0" data-fb="expo-call-wait"><Megaphone className="w-4 h-4 rtl:-scale-x-100" />{t('بانتظار الدفعة {n}', { n: g.waitingRounds.join(t('، ')) })}</span>}
+                  {g.byNumber && g.orderReady && <button type="button" disabled={busy} onClick={() => onCall(g)} data-fb="expo-call" className={cn('h-14 px-3 rounded-xl font-extrabold inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 disabled:opacity-50', g.calledAt ? 'btn-secondary' : 'bg-[var(--primary)] text-[var(--primary-foreground)]')}>
                     <Megaphone className="w-5 h-5 rtl:-scale-x-100" />{g.calledAt ? t('إعادة النداء') : t('نداء')}{keys.call && sel === i && <Kbd className="!bg-black/10 !border-black/10 !text-current">{keys.call}</Kbd>}
                   </button>}
                   <button type="button" disabled={busy} onClick={() => onServe(g)} data-fb="expo-serve" className="flex-1 h-14 rounded-xl bg-[var(--success)] text-white text-lg font-extrabold inline-flex items-center justify-center gap-2 disabled:opacity-50"><Truck className="w-5 h-5 rtl:-scale-x-100" />{t('تسليم')}{keys.bump && sel === i && <Kbd className="!bg-black/15 !border-black/10 !text-current">{keys.bump}</Kbd>}</button>
                 </>
-              ) : <div className="h-14 flex-1 rounded-xl surface-1 border border-dashed border-[var(--glass-border)] flex items-center justify-center gap-1.5 text-sm text-soft font-bold"><ConciergeBell className="w-4 h-4" />{t('بانتظار: {s}', { s: g.list.filter((x) => x.state !== 'READY').map((x) => stationName(x.stationName)).join(t('، ')) })}</div>}
+              ) : <div className="h-14 flex-1 rounded-xl surface-1 border border-dashed border-[var(--glass-border)] flex items-center justify-center gap-1.5 text-sm text-soft font-bold"><ConciergeBell className="w-4 h-4" />{t('بانتظار: {s}', { s: g.list.filter((x) => liveTicket(x) && x.state !== 'READY').map((x) => stationName(x.stationName)).join(t('، ')) })}</div>}
             </footer>
             {calledMin !== null && <div className="px-3 pb-2 -mt-1 text-xs font-bold text-[var(--primary)] flex items-center gap-1" data-fb="expo-called"><Megaphone className="w-3.5 h-3.5 rtl:-scale-x-100" />{t('على شاشة النداء منذ {m} د', { m: calledMin })}</div>}
           </article>

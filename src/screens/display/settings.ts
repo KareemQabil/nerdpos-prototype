@@ -1,10 +1,11 @@
 // Settings of a display screen, kept on the display device itself (like a TV's own menu): which terminal it follows,
-// its look (the app theme or the high-contrast display style), and for the call board how long a number stays ready.
+// its look (the app theme or the high-contrast display style) and the branding strip. ux-12c: when a number is called and
+// how long it stays «جاهز» are the venue rule CallBoardPolicy (restaurant settings), not a setting of one screen.
 import { useSyncExternalStore } from 'react';
 import { DISPLAY_DEVICES } from '../../app/devices';
 
 export type DisplayStyle = 'theme' | 'display';
-export interface DisplaySettings { host: string; style: DisplayStyle; readyMinutes: number; autoCall: boolean; branding: boolean }
+export interface DisplaySettings { host: string; style: DisplayStyle; branding: boolean }
 const KEY = 'nerdpos.display.v1';
 let all: Record<string, Partial<DisplaySettings>> = (() => { try { return JSON.parse(localStorage.getItem(KEY) ?? '{}') ?? {}; } catch { return {}; } })();
 const ls = new Set<() => void>();
@@ -14,7 +15,8 @@ export function displaySettings(id: string): DisplaySettings {
   const hit = cache.get(id);
   if (hit) return hit;
   const d = DISPLAY_DEVICES[id];
-  const v: DisplaySettings = { host: d?.host ?? 't_cash', style: 'theme', readyMinutes: 10, autoCall: false, branding: true, ...(all[id] ?? {}) };
+  const { readyMinutes: _r, autoCall: _a, ...saved } = (all[id] ?? {}) as Partial<DisplaySettings> & { readyMinutes?: unknown; autoCall?: unknown }; // older builds kept these per screen
+  const v: DisplaySettings = { host: d?.host ?? 't_cash', style: 'theme', branding: true, ...saved };
   cache.set(id, v);
   return v;
 }

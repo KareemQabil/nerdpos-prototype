@@ -1,7 +1,7 @@
 // شاشة النداء — the call board guests watch: two columns, «جارٍ التحضير» and «جاهز», short order numbers in very
 // large type. The newest ready number grows in at the top of «جاهز» with a gentle chime. A number leaves «جاهز» when
-// the order is handed off or after the minutes set on the display. Only orders collected by number are shown (a
-// table is served at the table). Reads CallBoard.View through the dispatch kitchen screen it is attached to.
+// the order is handed off or after CallBoardPolicy.readyMinutes. Only orders collected by number are shown (a table is
+// served at the table; delivery per CallBoardPolicy). Reads CallBoard.View through the dispatch screen it follows.
 import React, { useEffect, useRef, useState } from 'react';
 import { ChefHat, BellRing, WifiOff } from 'lucide-react';
 import { useQuery, useStoreVersion } from '../../app/hooks';
@@ -17,7 +17,7 @@ const MAX_PREP = 15, MAX_READY = 8;
 export function CallBoard({ displayId, cfg, online }: { displayId: string; cfg: DisplaySettings; online: boolean }) {
   useNow(15000);
   useStoreVersion();
-  const q = useQuery<any>('CallBoard.View', { query: { readyMinutes: cfg.readyMinutes, auto: cfg.autoCall ? 'true' : 'false' } });
+  const q = useQuery<any>('CallBoard.View'); // ux-12c: timing, call mode and delivery numbers are the venue rule CallBoardPolicy
   const tpl = useQuery<any>(cfg.branding ? 'DocTemplate.Get' : null);
   // a number also leaves «جاهز» when its minutes run out with nothing else changing
   useEffect(() => { const iv = setInterval(() => q.refetch(), 15000); return () => clearInterval(iv); }, []); // eslint-disable-line react-hooks/exhaustive-deps
