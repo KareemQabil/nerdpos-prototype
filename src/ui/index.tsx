@@ -10,7 +10,7 @@
 //   Page                 page wrapper (vertical rhythm)
 //   PageHeader           title + one plain sentence + small state badge (ops/badge) + actions at the end
 //   StatGrid / StatCard  KPI tiles (label, value, hint, tone, icon, delta, onClick)
-//   Drawer               side sheet sliding from the inline-end edge (RTL aware), portaled like Modal
+//   Drawer               DEPRECATED (ux-06): no side sheets — use Popup, Popover, MasterDetail/DetailPane (./layout)
 //   Skeleton / SkeletonCard / SkeletonRows   loading placeholders
 //   EmptyState           icon, title, text and the next action
 //   Toolbar (+ Toolbar.Spacer), SearchInput, FilterChips   list filter bar
@@ -20,7 +20,8 @@
 //   InputGroup, Kbd, Avatar, Divider
 //   Popup                smart centered popup (replaces side sheets for actions), Popover (anchored, 1–2 fields)
 //   Numpad               the one keypad: quantity, payment, PIN, drawer counting (./Numpad)
-import React, { useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
+//   MasterDetail, DetailPane, FillPage, useEnterSave, useScrollLock   page layouts without side drawers (./layout)
+import React, { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Loader2, AlertTriangle, CheckCircle2, Info, XCircle, Search, Check, Inbox } from 'lucide-react';
 import { cn, money } from '../lib/format';
@@ -29,6 +30,7 @@ import type { BadgeState } from '../mock/contracts';
 import { badgeOfOps, opsById } from '../mock/contracts';
 import { useTech } from '../app/tech';
 import { deviceName } from '../demo/people';
+import { useScrollLock } from './layout';
 
 // ───────── buttons
 type BtnVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success' | 'warning' | 'outline' | 'subtle';
@@ -96,6 +98,7 @@ function useFocusIn(open: boolean) {
 
 export function Modal({ open, onClose, title, children, footer, wide, xwide, badge, description, size }: { open: boolean; onClose: () => void; title: React.ReactNode; children: React.ReactNode; footer?: React.ReactNode; wide?: boolean; xwide?: boolean; badge?: React.ReactNode; description?: React.ReactNode; size?: 'sm' | 'md' | 'lg' | 'xl' }) {
   useEscape(open, onClose);
+  useScrollLock(open);
   const { ctx, anchor } = useOverlayCtx();
   const panel = useFocusIn(open);
   const titleId = useId();
@@ -113,7 +116,7 @@ export function Modal({ open, onClose, title, children, footer, wide, xwide, bad
           </div>
           <IconButton onClick={onClose} title={t('إغلاق')} className="-me-2 -mt-0.5 shrink-0"><X className="w-4 h-4" /></IconButton>
         </div>
-        <div className="px-5 pb-5 pt-1 overflow-y-auto flex-1 min-h-0">{children}</div>
+        <div className="px-5 pb-5 pt-1 overflow-y-auto overscroll-contain flex-1 min-h-0">{children}</div>
         {footer && <div className="px-5 py-3.5 border-t line flex flex-wrap gap-2 justify-end items-center overlay-footer rounded-b-2xl">{footer}</div>}
       </div>
     </div>,
@@ -127,6 +130,7 @@ export function Modal({ open, onClose, title, children, footer, wide, xwide, bad
  */
 export function Popup({ open, onClose, title, children, footer, size = 'md', bare, className, fb, labelledBy, closeOnBackdrop = true }: { open: boolean; onClose: () => void; title?: React.ReactNode; children: React.ReactNode; footer?: React.ReactNode; size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl'; bare?: boolean; className?: string; fb?: string; labelledBy?: string; closeOnBackdrop?: boolean }) {
   useEscape(open, onClose);
+  useScrollLock(open);
   const { ctx, anchor } = useOverlayCtx();
   const panel = useFocusIn(open);
   const titleId = useId();
@@ -142,7 +146,7 @@ export function Popup({ open, onClose, title, children, footer, size = 'md', bar
             <IconButton onClick={onClose} title={t('إغلاق')} className="-me-2 shrink-0"><X className="w-4 h-4" /></IconButton>
           </div>
         )}
-        {bare ? children : <div className="px-5 pb-5 pt-1 overflow-y-auto flex-1 min-h-0">{children}</div>}
+        {bare ? children : <div className="px-5 pb-5 pt-1 overflow-y-auto overscroll-contain flex-1 min-h-0">{children}</div>}
         {footer && <div className="px-5 py-3.5 border-t line flex flex-wrap gap-2 justify-end items-center overlay-footer rounded-b-3xl">{footer}</div>}
       </div>
     </div>,
@@ -185,7 +189,10 @@ export function Popover({ anchor, open, onClose, children, side = 'top', align =
   );
 }
 
-/** Side sheet for details/edit of one row. Slides in from the inline-end edge (left in Arabic). */
+/**
+ * @deprecated ux-06: no side sheets (UX brief §3). Use Popup / Popover, or MasterDetail + DetailPane from './layout'.
+ * Kept exported only while the purchasing screens (ux-05) still use it; remove once they are converted.
+ */
 export function Drawer({ open, onClose, title, children, footer, badge, description, width = 'md', icon }: { open: boolean; onClose: () => void; title: React.ReactNode; children: React.ReactNode; footer?: React.ReactNode; badge?: React.ReactNode; description?: React.ReactNode; width?: 'sm' | 'md' | 'lg' | 'xl'; icon?: React.ReactNode }) {
   useEscape(open, onClose);
   const { ctx, anchor } = useOverlayCtx();
@@ -220,7 +227,7 @@ type Tone = 'neutral' | 'primary' | 'success' | 'warning' | 'error' | 'info';
 const TONE_TEXT: Record<Tone, string> = { neutral: '', primary: 'text-[var(--primary)]', success: 'text-[var(--success)]', warning: 'text-[var(--warning)]', error: 'text-[var(--error)]', info: 'text-[var(--info)]' };
 const TONE_VAR: Record<Tone, string> = { neutral: 'var(--text-soft)', primary: 'var(--primary)', success: 'var(--success)', warning: 'var(--warning)', error: 'var(--error)', info: 'var(--info)' };
 
-export function Card({ className, children, title, actions, badge, description, footer, padding = 'md', tone, interactive, onClick, ...rest }: { className?: string; children: React.ReactNode; title?: React.ReactNode; actions?: React.ReactNode; badge?: React.ReactNode; description?: React.ReactNode; footer?: React.ReactNode; padding?: 'none' | 'sm' | 'md' | 'lg'; tone?: Exclude<Tone, 'neutral'>; interactive?: boolean; onClick?: () => void } & Omit<React.HTMLAttributes<HTMLDivElement>, 'title' | 'onClick'>) {
+export function Card({ className, bodyClassName, children, title, actions, badge, description, footer, padding = 'md', tone, interactive, onClick, ...rest }: { className?: string; bodyClassName?: string; children: React.ReactNode; title?: React.ReactNode; actions?: React.ReactNode; badge?: React.ReactNode; description?: React.ReactNode; footer?: React.ReactNode; padding?: 'none' | 'sm' | 'md' | 'lg'; tone?: Exclude<Tone, 'neutral'>; interactive?: boolean; onClick?: () => void } & Omit<React.HTMLAttributes<HTMLDivElement>, 'title' | 'onClick'>) {
   const p = { none: '', sm: 'p-3', md: 'p-4', lg: 'p-5' }[padding];
   const head = title || actions;
   return (
@@ -234,7 +241,7 @@ export function Card({ className, children, title, actions, badge, description, 
           {actions && <div className="flex items-center gap-2 flex-wrap justify-end shrink-0">{actions}</div>}
         </div>
       )}
-      <div className={p}>{children}</div>
+      <div className={cn(p, bodyClassName)}>{children}</div>
       {footer && <div className="px-4 py-3 border-t line flex flex-wrap items-center gap-2 justify-end">{footer}</div>}
     </div>
   );
@@ -657,12 +664,29 @@ export function Timeline({ items, className, empty }: { items: { id?: string | n
   );
 }
 
-export function Table({ head, rows, empty, className, align, loading, onRowClick, maxHeight, dense, rowKey, rowClassName }: { head: React.ReactNode[]; rows: React.ReactNode[][]; empty?: React.ReactNode; className?: string; align?: ('start' | 'end' | 'center' | undefined)[]; loading?: boolean; onRowClick?: (i: number) => void; maxHeight?: number | string; dense?: boolean; rowKey?: (i: number) => React.Key; rowClassName?: (i: number) => string | undefined }) {
+/**
+ * One table. `fill`: the table fills its flex parent and is the region's only scroller (sticky head, horizontal scroll
+ * inside). Without fill/maxHeight the table flows with the page; while it fits the width it is not a scroll box, so its
+ * head sticks to the page scroller (ux-06: no nested scrollers, sticky heads, horizontal overflow only in tables).
+ */
+export function Table({ head, rows, empty, className, align, loading, onRowClick, maxHeight, dense, rowKey, rowClassName, fill }: { head: React.ReactNode[]; rows: React.ReactNode[][]; empty?: React.ReactNode; className?: string; align?: ('start' | 'end' | 'center' | undefined)[]; loading?: boolean; onRowClick?: (i: number) => void; maxHeight?: number | string; dense?: boolean; rowKey?: (i: number) => React.Key; rowClassName?: (i: number) => string | undefined; fill?: boolean }) {
   const al = (j: number) => (align?.[j] === 'end' ? 'text-end' : align?.[j] === 'center' ? 'text-center' : 'text-start');
   const py = dense ? 'py-1.5' : 'py-2.5';
+  const wrap = useRef<HTMLDivElement>(null);
+  const tbl = useRef<HTMLTableElement>(null);
+  const [flow, setFlow] = useState(false);
+  useLayoutEffect(() => {
+    const w = wrap.current, tb = tbl.current;
+    if (maxHeight || fill || !w || !tb) { setFlow(false); return; }
+    const check = () => setFlow(tb.offsetWidth <= w.clientWidth + 1);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(w); ro.observe(tb);
+    return () => ro.disconnect();
+  }, [maxHeight, fill]);
   return (
-    <div className={cn('overflow-auto rounded-xl border line table-wrap', className)} style={maxHeight ? { maxHeight } : undefined}>
-      <table className="w-full text-sm border-separate border-spacing-0">
+    <div ref={wrap} className={cn('rounded-xl border line table-wrap', flow ? 'overflow-visible' : 'overflow-auto', fill && 'flex-1 min-h-0', className)} style={maxHeight ? { maxHeight } : undefined} data-table-fill={fill || undefined}>
+      <table ref={tbl} className="w-full text-sm border-separate border-spacing-0">
         <thead><tr>{head.map((h, i) => <th key={i} className={cn('table-head sticky top-0 z-[1] font-bold text-[11px] text-soft px-3 py-2.5 whitespace-nowrap border-b line', al(i))}>{h}</th>)}</tr></thead>
         <tbody>
           {loading && rows.length === 0 && Array.from({ length: 4 }, (_, i) => <tr key={`sk${i}`}>{head.map((_, j) => <td key={j} className={cn('px-3 border-b line', py)}><Skeleton className={cn('h-4', j === 0 ? 'w-3/4' : 'w-1/2', align?.[j] === 'end' && 'ms-auto')} /></td>)}</tr>)}
@@ -703,4 +727,5 @@ export function ConfirmHost() {
 }
 
 export { Numpad, applyNumpadKey, useNumpadKeys } from './Numpad';
+export { MasterDetail, DetailPane, FillPage, FILL_CARD, FILL_BODY, useEnterSave, useScrollLock, useDetailMode, useListCompact, SPLIT_MIN } from './layout';
 export type { NumpadKey, NumpadMode } from './Numpad';

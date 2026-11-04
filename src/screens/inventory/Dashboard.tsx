@@ -8,7 +8,6 @@ import { t, L, tv } from '../../i18n';
 import { money, dayShort } from '../../lib/format';
 import { BandPill, BranchScope, ItemPicker, KIND_TEXT, LevelPill, MovementTable, Pct, Qty, Stat, WarehouseSelect, fmtQty, useBranchScope, useItemsCatalog, useList, useWarehouses } from './common';
 import { WasteDialog } from './WasteDialog';
-import { ItemDrawer } from './ItemDrawer';
 
 const OPS = ['Inventory.Dashboard', 'Inventory.LowStock', 'Inventory.Expiring', 'Movement.Find', 'Movement.Get'];
 
@@ -31,7 +30,7 @@ function Overview({ branchId }: { branchId?: string }) {
   const low = useList<any>('Inventory.LowStock', { branchId });
   const exp = useList<any>('Inventory.Expiring', { branchId, days: 3 });
   const [waste, setWaste] = useState<{ itemId?: string; wh?: string } | null>(null);
-  const [item, setItem] = useState<string | null>(null);
+  const setItem = (id: string) => nav('inv-items', { open: id, back: { screen: 'inv-dashboard' } });
   const d = q.data;
   if (!d) return <div className="py-10 flex justify-center"><Spinner /></div>;
   if (!d.byWarehouse.length) {
@@ -129,7 +128,6 @@ function Overview({ branchId }: { branchId?: string }) {
         <MovementTable items={d.recent} compact />
       </Card>
       {waste && <WasteDialog open onClose={() => setWaste(null)} presetItemId={waste.itemId} presetWarehouseId={waste.wh} />}
-      <ItemDrawer itemId={item} onClose={() => setItem(null)} />
     </div>
   );
 }

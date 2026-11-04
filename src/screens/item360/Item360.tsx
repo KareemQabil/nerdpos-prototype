@@ -16,7 +16,7 @@ import { follow, useFollowList } from '../search/refs';
 import { BandPill, LevelPill, MovementTable, Pct, Qty, StatePill, PO_STATE, fmtQty, unitLabel } from '../inventory/common';
 import { PackCards } from '../inventory/PackCards';
 import { SR_STATE } from '../inventory/Chain';
-import { ItemDrawer } from '../inventory/ItemDrawer';
+import { ItemActionsPopup } from '../inventory/ItemDetail';
 import { ReceiveDialog } from '../inventory/Receipts';
 import { StoreRequestEditor } from '../inventory/Purchasing';
 
@@ -33,7 +33,7 @@ export default function Item360() {
   const q = useQuery<any>(id ? 'Item.Lifecycle' : null, { params: { kind, itemId: id } });
   const userId: string | undefined = me?.user?.id;
   const followed = useFollowList(userId);
-  const [drawer, setDrawer] = useState<null | 'stock' | 'setup' | 'levels'>(null);
+  const [drawer, setDrawer] = useState<null | 'stock' | 'levels'>(null);
   const [receive, setReceive] = useState(false);
   const [request, setRequest] = useState(false);
   const [price, setPrice] = useState(false);
@@ -235,7 +235,7 @@ export default function Item360() {
         </div>
       </div>
 
-      {stockItemId && <ItemDrawer itemId={drawer ? stockItemId : null} initialTab={drawer ?? 'stock'} onClose={() => setDrawer(null)} />}
+      {stockItemId && drawer && <ItemActionsPopup itemId={stockItemId} kind={drawer} onClose={() => setDrawer(null)} />}
       {receive && stockItemId && <ReceiveDialog presetItemId={stockItemId} presetSupplierId={d.item.defaultSupplierId ?? undefined} onClose={() => setReceive(false)} />}
       {request && stockItemId && <StoreRequestEditor presetItemId={stockItemId} onClose={() => setRequest(false)} onSaved={(sid) => { setRequest(false); nav('inv-purchasing', { tab: 'requests', open: sid }); }} />}
       {price && isDish && <PriceDialog d={d} onClose={() => setPrice(false)} />}

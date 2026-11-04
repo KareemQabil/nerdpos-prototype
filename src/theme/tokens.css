@@ -235,6 +235,10 @@ input, select, textarea { font: inherit; color: inherit; }
   .table-row:hover > td { background: var(--row-hover); }
   .table-row:last-child > td { border-bottom-width: 0; }
   .overlay-panel { background: var(--overlay-bg); border: 1px solid var(--glass-border); box-shadow: var(--shadow-pop); }
+  /* ux-06: in-page detail beside its list (no side sheets) */
+  .detail-side { background: color-mix(in srgb, var(--card) 55%, transparent); }
+  .detail-page { background: transparent; }
+  .table-row.row-selected > td { background: var(--primary-container); }
   .overlay-footer { background: var(--overlay-footer); }
   .toast-card { background: var(--overlay-bg); border: 1px solid var(--glass-border); box-shadow: var(--shadow-pop); }
   .skeleton { background: linear-gradient(90deg, var(--skeleton-a) 0%, var(--skeleton-b) 50%, var(--skeleton-a) 100%); background-size: 200% 100%; animation: shimmer 1.4s ease-in-out infinite; }
@@ -324,3 +328,5 @@ input, select, textarea { font: inherit; color: inherit; }
 @keyframes cd-fade { from { opacity: 0; transform: translateX(2cqw); } to { opacity: 1; transform: none; } }
 .cd-fade { animation: cd-fade .6s ease-out; }
 @media (prefers-reduced-motion: reduce) { .kds-arrive, .cb-in, .cb-new, .cd-pop, .cd-float, .cd-fade { animation: none; } }
+/* ux-06: no page scroll behind an open popup (the popup body scrolls on its own) */
+html.overlay-open, html.overlay-open body { overflow: hidden; overscroll-behavior: none; }

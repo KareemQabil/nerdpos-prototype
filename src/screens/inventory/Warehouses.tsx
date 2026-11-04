@@ -8,7 +8,6 @@ import { Banner, Button, Card, Empty, Field, Input, KV, Modal, Money, Pill, Sect
 import { t, L, tv } from '../../i18n';
 import { dateTime } from '../../lib/format';
 import { LevelPill, Qty, WH_KIND, fmtQty, newKey, useList } from './common';
-import { ItemDrawer } from './ItemDrawer';
 
 const OPS = ['Warehouse.List', 'Warehouse.Get', 'Warehouse.Configure', 'Warehouse.SetSalesDefault'];
 
@@ -98,7 +97,8 @@ const historyText = (s: string) => s.replace('created — sales warehouse of the
 
 function WarehouseView({ id, onClose }: { id: string | null; onClose: () => void }) {
   const q = useQuery<any>(id ? 'Warehouse.Get' : null, { params: { warehouseId: id } });
-  const [item, setItem] = useState<string | null>(null);
+  const { nav } = useDev();
+  const setItem = (itemId: string) => nav('inv-items', { open: itemId, back: { screen: 'inv-warehouses', params: { open: id } } });
   const w = q.data;
   return (
     <Modal open={!!id} onClose={onClose} xwide title={w ? `${tv(w.name)} — ${tv(w.branchName)}` : t('المخزن')} badge={<StateBadge ops={['Warehouse.Get']} />}>
@@ -110,7 +110,6 @@ function WarehouseView({ id, onClose }: { id: string | null; onClose: () => void
           ])} />
         </div>
       )}
-      <ItemDrawer itemId={item} onClose={() => setItem(null)} />
     </Modal>
   );
 }

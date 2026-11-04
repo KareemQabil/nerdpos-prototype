@@ -1,58 +1,66 @@
-// Stock item drawer: balances per warehouse, units & packs, min/target levels, lots & expiry, cost history,
-// where the item is used in recipes, and its movements. Adjustment and waste start from here.
+// Stock item details (in the page, never a side sheet): balances per warehouse, units & packs, min/target levels,
+// lots & expiry, cost history, where the item is used in recipes, and its movements. Adjustment and waste start here.
+// Shown beside the items list on a wide screen and as a full page with a back button on a narrow one (ux-06).
 import React, { useEffect, useState } from 'react';
 import { Save, Plus, Trash2, SlidersHorizontal, Scale, PackagePlus, ScanSearch } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
-import { Banner, Button, Field, Input, KV, Modal, Drawer, Money, Pill, Select, Spinner, StateBadge, Switch, Table, Tabs, Textarea } from '../../ui';
+import { Banner, Button, DetailPane, Field, Input, KV, Modal, Money, Pill, Popup, Select, Spinner, StateBadge, Switch, Table, Tabs, Textarea, useEnterSave } from '../../ui';
 import { t, L, tv } from '../../i18n';
 import { dateTime, money } from '../../lib/format';
+import { D } from '../../mock/money';
 import { ADJUST_REASONS, ADJUST_REASON_TEXT, LevelPill, MovementTable, Qty, WH_KIND, fmtQty, unitLabel, useList, Inp } from './common';
 import { WasteDialog } from './WasteDialog';
 
-type Tab = 'stock' | 'setup' | 'levels' | 'lots' | 'cost' | 'recipes' | 'moves';
+export type ItemTab = 'stock' | 'setup' | 'levels' | 'lots' | 'cost' | 'recipes' | 'moves';
 const OPS = ['InventoryItem.Get', 'InventoryItem.Configure', 'InventoryItem.SetLevels', 'Inventory.OnHand', 'Inventory.Adjust'];
 
-export function ItemDrawer({ itemId, onClose, initialTab = 'stock' }: { itemId: string | null; onClose: () => void; initialTab?: Tab }) {
-  const q = useQuery<any>(itemId ? 'InventoryItem.Get' : null, { params: { inventoryItemId: itemId } });
-  const [tab, setTab] = useState<Tab>(initialTab);
+/** Balances per warehouse with adjust / waste (also the item page's "adjust / waste" popup). */
+export function StockTable({ it, onAdjust, onWaste }: { it: any; onAdjust: (b: any) => void; onWaste: (warehouseId: string) => void }) {
+  return (
+    <Table head={[t('المخزن'), t('الرصيد'), t('الحد الأدنى / المستهدف'), t('الحالة'), '']} align={['start', 'end', 'end', 'start', 'end']} rows={it.balances.filter((b: any) => b.active || Number(b.quantity) !== 0).map((b: any) => [
+      <div className="min-w-[120px]"><div className="font-bold whitespace-nowrap">{tv(b.warehouse.name)}</div><div className="text-[11px] text-dim flex items-center gap-1 flex-wrap">{tv(b.warehouse.branchName)}{b.salesDefault && <Pill size="sm" tone="primary">{t('مخزن البيع')}</Pill>}</div></div>,
+      <div className="whitespace-nowrap"><Qty v={b.quantity} unit={it.unit} /><div className="text-[11px] text-dim"><Money v={b.value} /></div></div>,
+      b.level ? <span className="num text-xs whitespace-nowrap">{fmtQty(b.level.min)} / {fmtQty(b.level.par)}</span> : <span className="text-dim text-xs">—</span>,
+      <LevelPill state={b.state} />,
+      <div className="flex gap-1 justify-end">
+        <Button size="sm" data-fb={`item:adjust:${b.warehouse.id}`} title={t('تسوية')} onClick={() => onAdjust(b)}><SlidersHorizontal className="w-3.5 h-3.5" /><span className="hidden @lg/detail:inline">{t('تسوية')}</span></Button>
+        <Button size="sm" variant="warning" data-fb={`item:waste:${b.warehouse.id}`} title={t('هالك')} onClick={() => onWaste(b.warehouse.id)}><Trash2 className="w-3.5 h-3.5" /><span className="hidden @lg/detail:inline">{t('هالك')}</span></Button>
+      </div>,
+    ])} />
+  );
+}
+
+export function ItemDetail({ itemId, onClose, backLabel }: { itemId: string; onClose: () => void; backLabel?: React.ReactNode }) {
+  const q = useQuery<any>('InventoryItem.Get', { params: { inventoryItemId: itemId } });
+  const [tab, setTab] = useState<ItemTab>('stock');
   const [adjust, setAdjust] = useState<any | null>(null);
   const [waste, setWaste] = useState<string | null>(null);
-  useEffect(() => setTab(initialTab), [itemId, initialTab]);
-  const it = q.data;
-  const { nav, screen } = useDev();
+  useEffect(() => setTab('stock'), [itemId]);
+  const it = q.data?.id === itemId ? q.data : null;
+  const { nav } = useDev();
   return (
-    <Drawer width="xl" open={!!itemId} onClose={onClose} title={it ? <span className="flex items-center gap-2">{L(it.name)} <span className="text-sm text-dim">{tv(it.category)}</span></span> : t('صنف مخزن')}
-      badge={<>{it && !it.active && <Pill tone="neutral">{t('موقوف')}</Pill>}{it?.kind === 'PREP' && <Pill tone="violet">{t('تجهيزة مطبخ')}</Pill>}{it?.kind === 'RESALE' && <Pill tone="info">{t('بيتباع زي ما هو')}</Pill>}<StateBadge ops={OPS} />{it && screen !== 'item360' && <Button size="sm" variant="subtle" data-fb="item:open-360" onClick={() => { onClose(); nav('item360', { kind: 'item', id: it.id }); }}><ScanSearch className="w-3.5 h-3.5" />{t('صفحة الصنف كاملة')}</Button>}</>}>
+    <DetailPane fb="item-detail" onClose={onClose} backLabel={backLabel}
+      title={it ? L(it.name) : t('صنف مخزن')} meta={it ? <span>{tv(it.category)}</span> : undefined}
+      badge={<>{it && !it.active && <Pill tone="neutral">{t('موقوف')}</Pill>}{it?.kind === 'PREP' && <Pill tone="violet">{t('تجهيزة مطبخ')}</Pill>}{it?.kind === 'RESALE' && <Pill tone="info">{t('بيتباع زي ما هو')}</Pill>}<StateBadge ops={OPS} /></>}
+      actions={it && <Button size="sm" variant="subtle" data-fb="item:open-360" onClick={() => nav('item360', { kind: 'item', id: it.id })}><ScanSearch className="w-3.5 h-3.5" />{t('صفحة الصنف')}</Button>}>
       {!it ? <Spinner /> : (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="grid gap-2 grid-cols-[repeat(auto-fit,minmax(120px,1fr))]">
             <Box label={t('الرصيد في كل المخازن')} value={<Qty v={it.totalQuantity} unit={it.unit} />} />
             <Box label={t('متوسط التكلفة')} value={<span className="num">{money(it.avgCost)}</span>} sub={t('لكل {u}', { u: unitLabel(it.unit) })} />
             <Box label={t('آخر سعر شراء')} value={<span className="num">{money(it.lastCost)}</span>} />
-            <Box label={t('قيمة المخزون')} value={<Money v={String(Number(it.totalQuantity) * Number(it.avgCost))} />} />
+            <Box label={t('قيمة المخزون')} value={<Money v={D(it.totalQuantity).times(D(it.avgCost)).toFixed(4)} />} />
           </div>
-          <Tabs<Tab> value={tab} onChange={setTab} tabs={[
-            { id: 'stock', label: t('الرصيد') }, { id: 'setup', label: t('البيانات والعبوات') }, { id: 'levels', label: t('الحد الأدنى') },
-            { id: 'lots', label: t('الصلاحية ({n})', { n: it.lots.length }) }, { id: 'cost', label: t('التكلفة') }, { id: 'recipes', label: t('الوصفات ({n})', { n: it.whereUsed.length }) }, { id: 'moves', label: t('الحركات') },
+          <Tabs<ItemTab> value={tab} onChange={setTab} tabs={[
+            { id: 'stock', label: t('الرصيد'), fb: 'item-tab:stock' }, { id: 'setup', label: t('البيانات والعبوات'), fb: 'item-tab:setup' }, { id: 'levels', label: t('الحد الأدنى'), fb: 'item-tab:levels' },
+            { id: 'lots', label: t('الصلاحية ({n})', { n: it.lots.length }), fb: 'item-tab:lots' }, { id: 'cost', label: t('التكلفة'), fb: 'item-tab:cost' }, { id: 'recipes', label: t('الوصفات ({n})', { n: it.whereUsed.length }), fb: 'item-tab:recipes' }, { id: 'moves', label: t('الحركات'), fb: 'item-tab:moves' },
           ]} />
-          {tab === 'stock' && (
-            <Table head={[t('المخزن'), t('الرصيد'), t('الحد الأدنى / المستهدف'), t('الحالة'), t('القيمة'), '']} rows={it.balances.filter((b: any) => b.active || Number(b.quantity) !== 0).map((b: any) => [
-              <span><span className="font-bold">{tv(b.warehouse.name)}</span> <span className="text-xs text-dim">{tv(b.warehouse.branchName)}</span>{b.salesDefault && <Pill tone="primary" className="ms-1">{t('مخزن البيع')}</Pill>}</span>,
-              <Qty v={b.quantity} unit={it.unit} />,
-              b.level ? <span className="num text-xs">{fmtQty(b.level.min)} / {fmtQty(b.level.par)}</span> : <span className="text-dim text-xs">—</span>,
-              <LevelPill state={b.state} />,
-              <Money v={b.value} className="text-xs" />,
-              <div className="flex gap-1 justify-end">
-                <Button size="sm" data-fb={`item:adjust:${b.warehouse.id}`} onClick={() => setAdjust(b)}><SlidersHorizontal className="w-3.5 h-3.5" />{t('تسوية')}</Button>
-                <Button size="sm" variant="warning" data-fb={`item:waste:${b.warehouse.id}`} onClick={() => setWaste(b.warehouse.id)}><Trash2 className="w-3.5 h-3.5" />{t('هالك')}</Button>
-              </div>,
-            ])} />
-          )}
-          {tab === 'setup' && <SetupTab it={it} />}
-          {tab === 'levels' && <LevelsTab it={it} />}
+          {tab === 'stock' && <StockTable it={it} onAdjust={setAdjust} onWaste={setWaste} />}
+          {tab === 'setup' && <SetupTab key={it.version} it={it} />}
+          {tab === 'levels' && <LevelsTab key={it.version} it={it} />}
           {tab === 'lots' && (
-            <Table empty={it.trackLots ? t('مفيش دفعات فيها رصيد') : t('الصنف ده مش متتبع بالصلاحية — فعّلها من "البيانات والعبوات"')} head={[t('الدفعة'), t('المخزن'), t('اتستلمت'), t('تاريخ الصلاحية'), t('الباقي')]} rows={it.lots.map((l: any) => {
+            <Table empty={it.trackLots ? t('لا توجد دفعات بها رصيد.') : t('الصنف غير متتبع بالصلاحية.')} head={[t('الدفعة'), t('المخزن'), t('اتستلمت'), t('تاريخ الصلاحية'), t('الباقي')]} rows={it.lots.map((l: any) => {
               const days = l.expiryDate ? Math.round((Date.parse(l.expiryDate) - Date.parse(new Date().toISOString().slice(0, 10))) / 86_400_000) : null;
               return [<span className="num text-xs">{l.lotCode}</span>, tv(l.warehouse.name), <span className="text-xs">{dateTime(l.receivedAt)}</span>,
                 l.expiryDate ? <span className="inline-flex items-center gap-1.5"><span className="num">{l.expiryDate}</span>{days !== null && days < 0 ? <Pill tone="error">{t('انتهت')}</Pill> : days !== null && days <= 2 ? <Pill tone="warning">{days === 0 ? t('النهارده') : t('فاضل {n} يوم', { n: days })}</Pill> : null}</span> : '—',
@@ -61,16 +69,12 @@ export function ItemDrawer({ itemId, onClose, initialTab = 'stock' }: { itemId: 
           )}
           {tab === 'cost' && (
             <div className="space-y-3">
-              <Banner tone="info">{t('التكلفة بمتوسط مرجّح: كل استلام بسعر جديد بيغيّر المتوسط حسب الكمية. الحركات الخارجة (بيع، هالك، تحويل) بتتسعّر بالمتوسط وقتها.')}</Banner>
               {it.kind === 'PREP' && <KV rows={[[t('تكلفة الوصفة دلوقتي (نظري)'), money(it.theoreticalCost)]]} />}
-              <Table empty={t('لسه مفيش تغيير في التكلفة')} head={[t('إمتى'), t('السبب'), t('سعر الحركة'), t('المتوسط بعدها')]} rows={it.costHistory.map((h: any) => [<span className="text-xs">{dateTime(h.at)}</span>, <span className="text-xs">{({ RECEIPT: t('استلام'), OPENING: t('رصيد أول المدة'), PRODUCTION_IN: t('تحضير'), ADJUSTMENT: t('تسوية بسعر'), RECEIPT_REVERSAL: t('إلغاء استلام'), SUPPLIER_RETURN: t('مرتجع مورد') } as Record<string, string>)[h.source] ?? h.source} <span className="num text-dim">{h.ref}</span></span>, <span className="num">{money(h.unitCost)}</span>, <span className="num font-bold">{money(h.avgCost)}</span>])} />
+              <Table empty={t('لسه مفيش تغيير في التكلفة')} head={[t('إمتى'), t('السبب'), t('سعر الحركة'), t('المتوسط بعدها')]} align={['start', 'start', 'end', 'end']} rows={it.costHistory.map((h: any) => [<span className="text-xs">{dateTime(h.at)}</span>, <span className="text-xs">{({ RECEIPT: t('استلام'), OPENING: t('رصيد أول المدة'), PRODUCTION_IN: t('تحضير'), ADJUSTMENT: t('تسوية بسعر'), RECEIPT_REVERSAL: t('إلغاء استلام'), SUPPLIER_RETURN: t('مرتجع مورد') } as Record<string, string>)[h.source] ?? h.source} <span className="num text-dim">{h.ref}</span></span>, <span className="num">{money(h.unitCost)}</span>, <span className="num font-bold">{money(h.avgCost)}</span>])} />
             </div>
           )}
           {tab === 'recipes' && (
-            <div className="space-y-3">
-              {it.producedBy && <Banner tone="info">{t('الصنف ده بيتعمل في المطبخ بوصفة تحضير — شوفه في شاشة "التحضير".')}</Banner>}
-              <Table empty={t('الصنف ده مش داخل في أي وصفة')} head={[t('الوصفة'), t('النوع'), t('الكمية')]} rows={it.whereUsed.map((w: any) => [<span className="font-bold">{L(w.name)}</span>, <Pill tone={w.kind === 'MENU' ? 'primary' : w.kind === 'PREP' ? 'violet' : 'neutral'}>{w.kind === 'MENU' ? t('صنف منيو') : w.kind === 'PREP' ? t('تحضير') : t('إضافة')}</Pill>, <span className="num">{fmtQty(w.enteredQuantity)} {w.enteredUnit === 'unit_g' ? t('جم') : w.enteredUnit === 'unit_ml' ? t('مل') : unitLabel(it.unit)}{w.kind === 'PREP' ? ` / ${fmtQty(w.perBatch)}` : ''}</span>])} />
-            </div>
+            <Table empty={t('الصنف ده مش داخل في أي وصفة')} head={[t('الوصفة'), t('النوع'), t('الكمية')]} rows={it.whereUsed.map((w: any) => [<span className="font-bold">{L(w.name)}</span>, <Pill tone={w.kind === 'MENU' ? 'primary' : w.kind === 'PREP' ? 'violet' : 'neutral'}>{w.kind === 'MENU' ? t('صنف منيو') : w.kind === 'PREP' ? t('تحضير') : t('إضافة')}</Pill>, <span className="num">{fmtQty(w.enteredQuantity)} {w.enteredUnit === 'unit_g' ? t('جم') : w.enteredUnit === 'unit_ml' ? t('مل') : unitLabel(it.unit)}{w.kind === 'PREP' ? ` / ${fmtQty(w.perBatch)}` : ''}</span>])} />
           )}
           {tab === 'moves' && <MovementTable items={it.movements} showItem={false} compact />}
           <Tech><div className="text-[11px] num text-dim">{it.id} · productId {it.productId} · v{it.version}</div></Tech>
@@ -78,7 +82,25 @@ export function ItemDrawer({ itemId, onClose, initialTab = 'stock' }: { itemId: 
       )}
       {it && adjust && <AdjustDialog item={it} balance={adjust} onClose={() => setAdjust(null)} />}
       {it && waste && <WasteDialog open onClose={() => setWaste(null)} presetItemId={it.id} presetWarehouseId={waste} />}
-    </Drawer>
+    </DetailPane>
+  );
+}
+
+/** The item page's quick actions (adjust / waste per warehouse, min & target levels) as a centered popup. */
+export function ItemActionsPopup({ itemId, kind, onClose }: { itemId: string; kind: 'stock' | 'levels'; onClose: () => void }) {
+  const q = useQuery<any>('InventoryItem.Get', { params: { inventoryItemId: itemId } });
+  const [adjust, setAdjust] = useState<any | null>(null);
+  const [waste, setWaste] = useState<string | null>(null);
+  const it = q.data?.id === itemId ? q.data : null;
+  const child = !!(adjust || waste);
+  return (
+    <>
+      <Popup open={!child} onClose={onClose} size="lg" fb={`item-actions:${kind}`} title={<span className="flex items-center gap-2 flex-wrap">{kind === 'stock' ? t('تسوية / هالك') : t('الحد الأدنى والمستهدف')}{it && <span className="text-sm text-dim font-normal">{L(it.name)}</span>}</span>}>
+        <div className="@container/detail">{!it ? <Spinner /> : kind === 'stock' ? <StockTable it={it} onAdjust={setAdjust} onWaste={setWaste} /> : <LevelsTab key={it.version} it={it} onSaved={onClose} />}</div>
+      </Popup>
+      {it && adjust && <AdjustDialog item={it} balance={adjust} onClose={() => setAdjust(null)} />}
+      {it && waste && <WasteDialog open onClose={() => setWaste(null)} presetItemId={it.id} presetWarehouseId={waste} />}
+    </>
   );
 }
 
@@ -93,35 +115,37 @@ export function AdjustDialog({ item, balance, onClose }: { item: any; balance: a
   const [reason, setReason] = useState<string>('DAMAGED');
   const [cost, setCost] = useState('');
   const [note, setNote] = useState('');
-  const n = Number(qty);
-  const after = Number(balance.quantity) + (dir === 'IN' ? n : -n);
+  const valid = /^\d+(\.\d+)?$/.test(qty) && D(qty).gt(0) && (reason !== 'OTHER' || !!note.trim());
+  const delta = valid ? (dir === 'IN' ? D(qty) : D(qty).neg()) : null;
+  const after = delta ? D(balance.quantity).plus(delta) : null;
   const submit = async () => {
+    if (!valid || busy) return;
     const r = await run('Inventory.Adjust', { body: { inventoryItemId: item.id, warehouseId: balance.warehouse.id, quantityDelta: dir === 'IN' ? qty : `-${qty}`, reason, stockUnitId: item.stockUnitId, expectedItemVersion: item.version, expectedVersion: balance.version, unitCost: dir === 'IN' && cost ? cost : undefined, note: note || undefined } }, { success: t('التسوية اتسجلت') });
     if (r) onClose();
   };
+  const onKey = useEnterSave(submit, valid && !busy);
   return (
-    <Modal open onClose={onClose} title={t('تسوية رصيد — {n}', { n: L(item.name) })} badge={<StateBadge ops={['Inventory.Adjust']} />}
-      footer={<><Button onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" data-fb="adjust:save" loading={busy} disabled={!(n > 0)} onClick={submit}><Save className="w-4 h-4" />{t('سجّل التسوية')}</Button></>}>
-      <div className="space-y-3">
-        <KV rows={[[t('المخزن'), balance.warehouse.name], [t('الرصيد دلوقتي'), <Qty v={balance.quantity} unit={item.unit} />]]} />
+    <Popup open onClose={onClose} size="md" fb="adjust-popup" title={<span className="flex items-center gap-2 flex-wrap">{t('تسوية رصيد — {n}', { n: L(item.name) })}<StateBadge ops={['Inventory.Adjust']} /></span>}
+      footer={<><Button variant="ghost" onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" data-fb="adjust:save" loading={busy} disabled={!valid} onClick={submit}><Save className="w-4 h-4" />{t('تسجيل التسوية')}</Button></>}>
+      <div className="space-y-3" onKeyDown={onKey}>
+        <KV rows={[[t('المخزن'), tv(balance.warehouse.name)], [t('الرصيد دلوقتي'), <Qty v={balance.quantity} unit={item.unit} />]]} />
         <div className="grid grid-cols-2 gap-2">
           <Button data-fb="adjust:out" variant={dir === 'OUT' ? 'danger' : 'secondary'} onClick={() => { setDir('OUT'); setReason('DAMAGED'); }}>{t('نقص من الرصيد')}</Button>
           <Button data-fb="adjust:in" variant={dir === 'IN' ? 'success' : 'secondary'} onClick={() => { setDir('IN'); setReason('FOUND'); }}>{t('زيادة على الرصيد')}</Button>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Field label={t('الكمية ({u})', { u: unitLabel(item.unit) })}><Input data-fb="adjust:qty" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value.replace(/[^\d.]/g, ''))} /></Field>
+          <Field label={t('الكمية ({u})', { u: unitLabel(item.unit) })} required><Input data-fb="adjust:qty" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value.replace(/[^\d.]/g, ''))} data-autofocus /></Field>
           <Field label={t('السبب')}><Select data-fb="adjust:reason" value={reason} onChange={(e) => setReason(e.target.value)} options={ADJUST_REASONS.map((r) => ({ value: r, label: t(ADJUST_REASON_TEXT[r]) }))} /></Field>
-          {dir === 'IN' && <Field label={t('سعر الوحدة (اختياري)')} hint={t('لو فاضي بتتسعر بمتوسط التكلفة')}><Input data-fb="adjust:cost" inputMode="decimal" value={cost} onChange={(e) => setCost(e.target.value)} placeholder={money(item.avgCost, false)} /></Field>}
+          {dir === 'IN' && <Field label={t('سعر الوحدة (اختياري)')} className="col-span-2"><Input data-fb="adjust:cost" inputMode="decimal" value={cost} onChange={(e) => setCost(e.target.value)} placeholder={money(item.avgCost, false)} /></Field>}
         </div>
-        <Field label={t('ملاحظة')} hint={reason === 'OTHER' ? t('لازم تكتب السبب') : undefined}><Textarea data-fb="adjust:note" value={note} onChange={(e) => setNote(e.target.value)} /></Field>
-        {n > 0 && <Banner tone={after < 0 ? 'error' : 'info'}>{t('الرصيد هيبقى')} <b className="num">{fmtQty(after)} {unitLabel(item.unit)}</b> · {t('القيمة')} <b className="num">{money(String((dir === 'IN' ? 1 : -1) * n * Number(cost || item.avgCost)))}</b></Banner>}
-        <Banner tone="warning">{t('أي تسوية بتحتاج موافقة مدير تاني (مش اللي بيسجل)، وبتتسجل في السجل باسمكم الاتنين.')}</Banner>
+        <Field label={t('ملاحظة')} required={reason === 'OTHER'}><Textarea data-fb="adjust:note" value={note} onChange={(e) => setNote(e.target.value)} /></Field>
+        {after && <Banner tone={after.lt(0) ? 'error' : 'info'}>{t('الرصيد هيبقى')} <b className="num">{fmtQty(after.toFixed(6))} {unitLabel(item.unit)}</b> · {t('القيمة')} <b className="num">{money(delta!.times(D(cost || item.avgCost)).toFixed(4))}</b></Banner>}
       </div>
-    </Modal>
+    </Popup>
   );
 }
 
-function SetupTab({ it }: { it: any }) {
+export function SetupTab({ it }: { it: any }) {
   const { run, busy } = useCommand();
   const suppliers = useList<any>('Supplier.List', { active: 'true' });
   const [d, setD] = useState(() => ({ nameAr: it.name.ar, nameEn: it.name.en, sku: it.sku, category: it.category, kind: it.kind, packs: it.packs.map((p: any) => ({ ...p, nameAr: p.name.ar })), purchasePackId: it.purchasePackId ?? '', defaultSupplierId: it.defaultSupplierId ?? '', trackLots: it.trackLots, shelfLifeDays: it.shelfLifeDays ? String(it.shelfLifeDays) : '', allowNegative: it.allowNegative === null ? '' : String(it.allowNegative), active: it.active }));
@@ -145,7 +169,6 @@ function SetupTab({ it }: { it: any }) {
       </div>
       <div className="rounded-xl surface-1 p-3 space-y-2">
         <div className="flex items-center justify-between"><div className="font-bold text-sm">{t('عبوات الشراء')}</div><Button size="sm" data-fb="item:add-pack" onClick={() => setD({ ...d, packs: [...d.packs, { id: `pk_${it.id}_${d.packs.length + 1}_${Date.now().toString(36)}`, nameAr: '', factor: '1', name: { en: '' } }] })}><PackagePlus className="w-3.5 h-3.5" />{t('عبوة')}</Button></div>
-        <div className="text-xs text-dim">{t('مثال: شيكارة دقيق 25 كجم — بتشتري بالشيكارة والمخزن بيعد بالكيلو.')}</div>
         {d.packs.map((p: any, i: number) => (
           <div key={p.id} className="grid grid-cols-[1fr_140px_auto_auto] gap-2 items-center">
             <Input value={p.nameAr} placeholder={t('اسم العبوة')} onChange={(e) => setD({ ...d, packs: d.packs.map((x: any, j: number) => (j === i ? { ...x, nameAr: e.target.value } : x)) })} />
@@ -164,13 +187,13 @@ function SetupTab({ it }: { it: any }) {
   );
 }
 
-function LevelsTab({ it }: { it: any }) {
+export function LevelsTab({ it, onSaved }: { it: any; onSaved?: () => void }) {
   const { run, busy } = useCommand();
   const [rows, setRows] = useState(() => it.balances.filter((b: any) => b.active).map((b: any) => ({ warehouseId: b.warehouse.id, name: b.warehouse.name, branch: b.warehouse.branchName, kind: b.warehouse.kind, min: b.level?.min ?? '', par: b.level?.par ?? '', qty: b.quantity })));
-  const save = () => run('InventoryItem.SetLevels', { params: { inventoryItemId: it.id }, body: { expectedVersion: it.version, levels: rows.map((r: any) => ({ warehouseId: r.warehouseId, minQuantity: r.min === '' ? null : r.min, parQuantity: r.par === '' ? undefined : r.par })) } }, { success: t('الحدود اتحفظت') });
+  const save = async () => { const r = await run('InventoryItem.SetLevels', { params: { inventoryItemId: it.id }, body: { expectedVersion: it.version, levels: rows.map((r: any) => ({ warehouseId: r.warehouseId, minQuantity: r.min === '' ? null : r.min, parQuantity: r.par === '' ? undefined : r.par })) } }, { success: t('الحدود اتحفظت') }); if (r) onSaved?.(); };
+  const onKey = useEnterSave(save, !busy);
   return (
-    <div className="space-y-3">
-      <Banner tone="info">{t('الحد الأدنى: لو الرصيد وصله أو قل عنه، الصنف بيظهر في "النواقص". المستهدف: الكمية اللي بنكمّل لها لما نطلب من المورد.')}</Banner>
+    <div className="space-y-3" onKeyDown={onKey}>
       <Table head={[t('المخزن'), t('الرصيد'), t('الحد الأدنى'), t('المستهدف')]} rows={rows.map((r: any, i: number) => [
         <span><span className="font-bold">{tv(r.name)}</span> <span className="text-xs text-dim">{t(WH_KIND[r.kind] ?? r.kind)} · {tv(r.branch)}</span></span>,
         <Qty v={r.qty} unit={it.unit} />,

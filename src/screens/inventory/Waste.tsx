@@ -8,7 +8,7 @@ import { t, L, tv } from '../../i18n';
 import { dateTime } from '../../lib/format';
 import { BranchScope, ItemPicker, MovementTable, Qty, WASTE_REASONS, WASTE_REASON_TEXT, WarehouseSelect, reasonText, useBranchScope, useItemsCatalog, useList, useWarehouses } from './common';
 import { WasteDialog } from './WasteDialog';
-import { AdjustDialog } from './ItemDrawer';
+import { AdjustDialog } from './ItemDetail';
 import { personText } from '../../demo/people';
 
 const OPS = ['Stock.RecordWaste', 'Waste.Find', 'Inventory.Adjust', 'Stock.RecordReturn', 'Movement.Find'];
