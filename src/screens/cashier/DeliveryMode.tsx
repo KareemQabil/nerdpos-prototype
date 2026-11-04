@@ -13,7 +13,7 @@ import { t, L } from '../../i18n';
 import { cn, money } from '../../lib/format';
 import { sign } from '../../lib/cash';
 import { clock } from '../../mock/clock';
-import { CustomerRow, QuickCreate, AddressForm, EMPTY_ADDRESS, cleanAddress, addressText, useZones } from '../customers/common';
+import { CustomerRow, QuickCreate, AddressForm, EMPTY_ADDRESS, cleanAddress, addressText, useZones, PhoneText } from '../customers/common';
 import { PAYMENT_MODE, RiderButton, RiderCashPopup, CompleteDialog, VehicleIcon } from '../delivery/common';
 import { deliveryStage, deliveryAging, DeliveryCardBody, useDeliveryBoardDefs, deliveryCardActions } from '../delivery/Board';
 import { AgeChip } from '../boards/common';
@@ -88,7 +88,7 @@ export function DeliveryStartPopup({ onClose, onStarted, edit, customerId }: { o
             <div className="relative"><Phone className="w-4 h-4 absolute top-1/2 -translate-y-1/2 start-3 text-dim" /><Input autoFocus data-autofocus data-fb="delivery-phone" value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" dir="ltr" placeholder={t('رقم الهاتف أو الاسم')} className="ps-9 !h-12 text-lg num" onKeyDown={(e) => { if (e.key === 'Enter' && res.data?.items?.length === 1) pickCustomer(res.data.items[0]); }} /></div>
             {res.loading && <Spinner />}
             <div className="space-y-1.5 max-h-72 overflow-y-auto">{(res.data?.items ?? []).map((x: any) => <CustomerRow key={x.id} c={x} onClick={() => pickCustomer(x)} />)}</div>
-            {q.length >= 3 && !res.loading && !(res.data?.items ?? []).length && <div className="text-sm text-dim text-center py-2">{t('لا يوجد عميل بهذه البيانات')}</div>}
+            {q.length >= 3 && !res.loading && !(res.data?.items ?? []).length && <div className="text-sm text-dim text-center py-2">{res.data?.phoneSearch === 'FULL_NUMBER_REQUIRED' ? t('اكتب الرقم كاملًا') : t('لا يوجد عميل بهذه البيانات')}</div>}
             <Button variant="outline" className="w-full" onClick={() => setCreating(true)} data-fb="delivery-new-customer"><UserPlus className="w-4 h-4" />{t('عميل جديد')}{isPhone && q ? ` · ${q}` : ''}</Button>
           </div>
         )
@@ -100,7 +100,7 @@ export function DeliveryStartPopup({ onClose, onStarted, edit, customerId }: { o
       ) : (
         <div className="space-y-3">
           <div className="rounded-xl surface-1 border line px-3 py-2 flex items-center gap-2">
-            <span className="flex-1 min-w-0"><span className="font-bold block truncate">{c.name}</span><span className="text-xs text-dim num" dir="ltr">{c.phone}</span></span>
+            <span className="flex-1 min-w-0"><span className="font-bold block truncate">{c.name}</span><PhoneText v={c.phone} className="text-xs text-dim block" /></span>
             {!edit && <Button size="sm" variant="ghost" onClick={() => setCust(null)} data-fb="delivery-change-customer">{t('تغيير')}</Button>}
           </div>
           <div className="space-y-1.5" role="radiogroup" aria-label={t('العنوان')}>

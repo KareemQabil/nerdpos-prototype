@@ -389,7 +389,7 @@ function ReservationPopup({ r, onClose, onAct }: { r: any; onClose: () => void; 
             {r.customerRef?.allergies?.length > 0 && <div className="text-xs font-bold text-[var(--warning-text)] flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" />{t('حساسية')}: {r.customerRef.allergies.length}</div>}
             {!r.legacy && can('customer:pii:read') && <Button size="sm" variant="ghost" onClick={() => nav('customer', { customerId: r.customerId })} data-fb="res-customer-open"><ExternalLink className="w-3.5 h-3.5" />{t('ملف العميل')}</Button>}
             {r.legacy && booked && manage && !linking && <Button size="sm" onClick={() => setLinking(true)} data-fb="res-customer-link"><UserPlus className="w-3.5 h-3.5" />{t('ربط بعميل')}</Button>}
-            {linking && <GuestPicker value={null} onChange={(c) => c && link(c)} initial={r.phone} />}
+            {linking && <GuestPicker value={null} onChange={(c) => c && link(c)} initial={r.phone?.includes("•") ? "" : r.phone /* ux-13: a masked number cannot be searched */} />}
           </div>
           <div className="grid grid-cols-3 gap-2">
             <Fact label={t('الموعد')} value={<DateTime v={r.at} time />} hint={<DateTime v={r.at} />} />
@@ -470,7 +470,7 @@ function GuestPicker({ value, onChange, initial }: { value: any | null; onChange
       <div className="relative"><Search className="w-4 h-4 absolute top-3 start-3 text-dim" /><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('رقم الموبايل أو الاسم')} className="ps-9" data-fb="guest-search" /></div>
       {res.loading && <Spinner />}
       <div className="space-y-1.5">{items.map((c) => <CustomerRow key={c.id} c={c} onClick={() => onChange(c)} />)}</div>
-      {q.trim().length >= 3 && !res.loading && !items.length && <div className="text-xs text-dim">{t('لا يوجد عميل بهذه البيانات')}</div>}
+      {q.trim().length >= 3 && !res.loading && !items.length && <div className="text-xs text-dim">{res.data?.phoneSearch === 'FULL_NUMBER_REQUIRED' ? t('اكتب الرقم كاملًا') : t('لا يوجد عميل بهذه البيانات')}</div>}
       <Button variant="outline" size="sm" className="w-full" onClick={() => setCreating(true)} data-fb="guest-new"><UserPlus className="w-4 h-4" />{t('عميل جديد')}{isPhone && q.trim() ? ` · ${q.trim()}` : ''}</Button>
     </div>
   );

@@ -1,14 +1,16 @@
 // Customer profile: contact, tags, allergies and notes; addresses; orders and deliveries; loyalty points and tier;
 // manual points adjustment; merge a duplicate into this customer.
 import React, { useState } from 'react';
-import { ArrowRight, Pencil, PhoneCall, MapPin, Plus, Trash2, Star, Crown, Merge, Gift, History, Bike, ShoppingBag, Phone, Mail, CheckCircle2, CalendarClock } from 'lucide-react';
-import { useDev, useQuery, useCommand } from '../../app/hooks';
+import { ArrowRight, Pencil, PhoneCall, MapPin, Plus, Trash2, Star, Crown, Merge, Gift, History, Bike, ShoppingBag, Phone, Mail, CheckCircle2, CalendarClock, Eye } from 'lucide-react';
+import { useDev, useQuery, useCommand, useReasonMin } from '../../app/hooks';
 import { Section, StateBadge, Button, Card, Pill, Money, Modal, Field, Input, Textarea, Banner, Tabs, Table, Spinner, Empty, KV, confirmDialog, DateTime } from '../../ui';
 import { Tech } from '../../app/tech';
 import { t, L, tv } from '../../i18n';
 import { cn, money, dateTime } from '../../lib/format';
 import { ALLERGEN_AR } from '../order/MenuGrid';
-import { TAGS, ALLERGENS, TagPills, TierBadge, AllergyWarning, AddressForm, EMPTY_ADDRESS, cleanAddress, addressText, useZones, CustomerPicker, CustomerRow } from './common';
+import { TAGS, ALLERGENS, TagPills, TierBadge, AllergyWarning, AddressForm, EMPTY_ADDRESS, cleanAddress, addressText, useZones, CustomerPicker, CustomerRow, PhoneText, RevealPhonePopup, isMaskedPhone } from './common';
+import { useApprovalRule } from '../admin/org/common';
+import { ruleSentence } from '../../demo/policyText';
 import { STATE, PAYMENT_MODE, DeliveryDetail } from '../delivery/common';
 import { StatusPill } from '../order/CheckPanel';
 import { personText } from '../../demo/people';
@@ -16,6 +18,7 @@ import { RES_STATE, DEP_STATE } from '../reservationLabels'; // ux-12
 
 const ENTRY: Record<string, { ar: string; tone: 'success' | 'error' | 'info' | 'violet' | 'neutral' }> = {
   EARN: { ar: 'كسب', tone: 'success' }, REDEEM: { ar: 'صرف', tone: 'error' }, ADJUST: { ar: 'تعديل يدوي', tone: 'info' }, MERGE_IN: { ar: 'دمج (داخل)', tone: 'violet' }, MERGE_OUT: { ar: 'دمج (خارج)', tone: 'neutral' }, REVERSE: { ar: 'إلغاء', tone: 'neutral' },
+  EXPIRE: { ar: 'انتهاء صلاحية', tone: 'neutral' }, // ux-13
 };
 export const entryLabel = ENTRY;
 
@@ -25,6 +28,7 @@ export default function CustomerProfile() {
   const [tab, setTab] = useState<'addresses' | 'orders' | 'reservations' | 'points' | 'merge'>('addresses');
   const resv = useQuery<any>(params.customerId && can('table:read') ? 'Reservation.Find' : null, { query: { customerId: params.customerId } }); // ux-12
   const [edit, setEdit] = useState(false);
+  const [reveal, setReveal] = useState(false); // ux-13
   const c = q.data;
   if (!params.customerId) return <Banner tone="info">{t('افتح عميل من شاشة العملاء')}</Banner>;
   if (q.error) return <Banner tone="error">{t('العميل ده مش موجود')}</Banner>;
@@ -44,7 +48,8 @@ export default function CustomerProfile() {
         <div className="space-y-3">
           <Card>
             <div className="space-y-2 text-sm">
-              <div className="flex items-center gap-2"><Phone className="w-4 h-4 text-dim" /><a href={`tel:${c.phone}`} className="num font-bold" dir="ltr">{c.phone}</a>{c.altPhone && <span className="num text-dim" dir="ltr">· {c.altPhone}</span>}</div>
+              <div className="flex items-center gap-2 flex-wrap"><Phone className="w-4 h-4 text-dim" /><PhoneText v={c.phone} link className="font-bold" fb="customer-phone" />{c.altPhone && <span className="text-dim">· <PhoneText v={c.altPhone} link /></span>}
+                {c.phoneReveal && isMaskedPhone(c.phone) && <Button size="sm" variant="ghost" className="ms-auto" onClick={() => setReveal(true)} data-fb="phone-reveal"><Eye className="w-3.5 h-3.5" />{t('إظهار الرقم')}</Button>}</div>
               {c.email && <div className="flex items-center gap-2"><Mail className="w-4 h-4 text-dim" />{c.email}</div>}
               <AllergyWarning allergies={c.allergies} />
               {tv(c.notes) && <div className="rounded-lg surface-1 px-3 py-2 text-xs">✎ {tv(c.notes)}</div>}
@@ -87,6 +92,7 @@ export default function CustomerProfile() {
         </div>
       </div>
       {edit && <EditDialog c={c} onClose={() => setEdit(false)} />}
+      {reveal && <RevealPhonePopup c={c} onClose={() => setReveal(false)} />}
     </div>
   );
 }
@@ -97,16 +103,18 @@ function StatTile({ label, v, small }: { label: string; v: React.ReactNode; smal
 
 function EditDialog({ c, onClose }: { c: any; onClose: () => void }) {
   const { run, busy } = useCommand();
-  const [f, setF] = useState({ name: c.name, phone: c.phone, altPhone: c.altPhone ?? '', email: c.email ?? '', notes: c.notes ?? '', tags: [...c.tags] as string[], allergies: [...c.allergies] as string[] });
+  // ux-13: a masked number is not editable as text — the field starts empty (the number stays) and a new one is typed whole
+  const mp = isMaskedPhone(c.phone), ma = isMaskedPhone(c.altPhone);
+  const [f, setF] = useState({ name: c.name, phone: mp ? '' : c.phone, altPhone: ma ? '' : c.altPhone ?? '', email: c.email ?? '', notes: c.notes ?? '', tags: [...c.tags] as string[], allergies: [...c.allergies] as string[] });
   const toggle = (k: 'tags' | 'allergies', v: string) => setF({ ...f, [k]: f[k].includes(v) ? f[k].filter((x) => x !== v) : [...f[k], v] });
-  const save = async () => { const r = await run('Customer.Update', { params: { customerId: c.id }, body: { ...f, altPhone: f.altPhone || null, email: f.email || null, expectedVersion: c.version } }, { success: t('بيانات العميل اتحفظت') }); if (r) onClose(); };
+  const save = async () => { const r = await run('Customer.Update', { params: { customerId: c.id }, body: { ...f, phone: f.phone.trim() || (mp ? c.phone : ''), altPhone: f.altPhone.trim() || (ma ? c.altPhone : null), email: f.email || null, expectedVersion: c.version } }, { success: t('بيانات العميل اتحفظت') }); if (r) onClose(); };
   return (
     <Modal open onClose={onClose} wide title={t('تعديل بيانات العميل')} badge={<StateBadge ops={['Customer.Update']} />} footer={<><Button variant="ghost" onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" loading={busy} disabled={!f.name.trim()} onClick={save} data-fb="customer-save">{t('حفظ')}</Button></>}>
       <div className="space-y-3">
         <div className="grid sm:grid-cols-2 gap-2">
           <Field label={t('الاسم')}><Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
-          <Field label={t('الموبايل')}><Input value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} dir="ltr" className="num" /></Field>
-          <Field label={t('رقم تاني (موبايل أو أرضي)')}><Input value={f.altPhone} onChange={(e) => setF({ ...f, altPhone: e.target.value })} dir="ltr" className="num" /></Field>
+          <Field label={t('الموبايل')}><Input value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} placeholder={mp ? c.phone : undefined} dir="ltr" className="num" data-fb="customer-edit-phone" /></Field>
+          <Field label={t('رقم تاني (موبايل أو أرضي)')}><Input value={f.altPhone} onChange={(e) => setF({ ...f, altPhone: e.target.value })} placeholder={ma ? c.altPhone : undefined} dir="ltr" className="num" /></Field>
           <Field label={t('الإيميل')}><Input value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} dir="ltr" /></Field>
         </div>
         <div><div className="text-xs font-bold text-soft mb-1.5">{t('تصنيف العميل')}</div><div className="flex flex-wrap gap-1.5">{Object.entries(TAGS).map(([k, v]) => <button key={k} type="button" onClick={() => toggle('tags', k)} className={cn('px-2.5 h-8 rounded-lg text-xs border', f.tags.includes(k) ? 'border-[var(--primary)] bg-[var(--primary-container)] font-bold' : 'surface-1 border-[var(--glass-border)]')}>{t(v.ar)}</button>)}</div></div>
@@ -209,9 +217,14 @@ function Points({ c }: { c: any }) {
       actions={c.active && can('loyalty:adjust') && <Button size="sm" onClick={() => setAdj(true)} data-fb="points-adjust"><Gift className="w-4 h-4" />{t('تعديل يدوي')}</Button>}>
       {!d ? <Spinner /> : (
         <>
-          <div className="text-xs text-dim mb-3">{t('كل {e} ج.م من قيمة الأصناف = نقطة، والنقطة بـ {v} ج.م عند الصرف. المستوى بيتحدد بالنقاط اللي اتكسبت كلها ({l} نقطة).', { e: money(d.program.egpPerPoint, false), v: money(d.program.pointValue, false), l: d.lifetime })}</div>
+          <div className="flex flex-wrap gap-1.5 mb-3 text-xs" data-fb="points-rules">
+            <Pill tone="neutral">{t('نقطة لكل')} <Money v={d.program.egpPerPoint} /></Pill>
+            <Pill tone="neutral">{t('قيمة النقطة')} <Money v={d.program.pointValue} /></Pill>
+            <Pill tone="neutral">{t('النقاط المكتسبة')} <span className="num">{d.lifetime}</span></Pill>
+            {d.program.expiryMonths > 0 && <Pill tone="warning">{t('تنتهي بعد {n} شهر', { n: d.program.expiryMonths })}</Pill>}
+          </div>
           <Table head={[t('الوقت'), t('الحركة'), t('النقاط'), t('الرصيد بعدها'), t('الطلب'), t('التفاصيل')]} empty={t('مفيش حركة نقاط')}
-            rows={d.entries.map((e: any) => [<DateTime v={e.at} className="text-xs" />, <Pill tone={ENTRY[e.kind]?.tone}>{t(ENTRY[e.kind]?.ar ?? e.kind)}</Pill>, <b className={cn('num', e.points > 0 ? 'text-[var(--success)]' : 'text-[var(--error)]')}>{e.points > 0 ? '+' : ''}{e.points}</b>, <span className="num">{e.balanceAfter}</span>, e.orderNumber ? <span className="num">#{e.orderNumber}</span> : '—', <span className="text-xs">{tv(e.reason) ?? ''}{personText(e.byName) ? <span className="text-dim"> · {personText(e.byName)}</span> : ''}{e.approvalGrantId ? <span className="text-dim"> · {t('بموافقة')}</span> : ''}</span>])} />
+            rows={d.entries.map((e: any) => [<DateTime v={e.at} className="text-xs" />, <Pill tone={ENTRY[e.kind]?.tone}>{t(ENTRY[e.kind]?.ar ?? e.kind)}</Pill>, <b className={cn('num', e.points > 0 ? 'text-[var(--success)]' : 'text-[var(--error)]')}>{e.points > 0 ? '+' : ''}{e.points}</b>, <span className="num">{e.balanceAfter}</span>, e.orderNumber ? <span className="num">#{e.orderNumber}</span> : '—', <span className="text-xs">{tv(e.reason) ?? ''}{e.multiplier ? <span className="num"> ×{e.multiplier}</span> : ''}{personText(e.byName) ? <span className="text-dim"> · {personText(e.byName)}</span> : ''}{e.approvalGrantId ? <span className="text-dim"> · {t('بموافقة')}</span> : ''}</span>])} />
         </>
       )}
       {adj && <AdjustDialog c={c} balance={d?.balance ?? 0} onClose={() => setAdj(false)} />}
@@ -219,24 +232,27 @@ function Points({ c }: { c: any }) {
   );
 }
 
+// ux-13: reason (ReasonTextPolicy), the balance shown is sent back (CAS), and the approval follows the LOYALTY_ADJUST rule
 function AdjustDialog({ c, balance, onClose }: { c: any; balance: number; onClose: () => void }) {
   const { run, busy } = useCommand();
+  const min = useReasonMin();
+  const { rule } = useApprovalRule('LOYALTY_ADJUST');
   const [sign, setSign] = useState<1 | -1>(1);
   const [pts, setPts] = useState('');
   const [reason, setReason] = useState('');
-  const quick = ['تعويض عن تأخير طلب', 'تعويض عن صنف ناقص', 'هدية عيد ميلاد', 'تصحيح غلط في الطلب'];
-  const save = async () => { const r = await run('Loyalty.Adjust', { params: { customerId: c.id }, body: { points: sign * Number(pts), reason } }, { success: t('النقاط اتعدلت') }); if (r) onClose(); };
+  const quick = ['تعويض عن تأخير طلب', 'تعويض عن صنف ناقص', 'هدية عيد ميلاد', 'تصحيح خطأ في الطلب'];
+  const save = async () => { const r = await run('Loyalty.Adjust', { params: { customerId: c.id }, body: { points: sign * Number(pts), reason: reason.trim(), expectedBalance: balance } }, { success: t('النقاط اتعدلت') }); if (r) onClose(); };
   return (
-    <Modal open onClose={onClose} title={t('تعديل نقاط يدوي')} badge={<StateBadge ops={['Loyalty.Adjust', 'Approval.Grant']} />} footer={<><Button variant="ghost" onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" loading={busy} disabled={!Number(pts) || reason.trim().length < 3} onClick={save} data-fb="adjust-save">{t('حفظ')}</Button></>}>
+    <Modal open onClose={onClose} title={t('تعديل نقاط يدوي')} badge={<StateBadge ops={['Loyalty.Adjust', 'Approval.Grant']} />} footer={<><Button variant="ghost" onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" loading={busy} disabled={!Number(pts) || reason.trim().length < min || (sign === -1 && Number(pts) > balance)} onClick={save} data-fb="adjust-save">{t('حفظ')}</Button></>}>
       <div className="space-y-3">
         <div className="text-sm">{t('الرصيد الحالي')}: <b className="num">{balance}</b> {t('نقطة')}</div>
         <div className="grid grid-cols-2 gap-2">
           <button onClick={() => setSign(1)} className={cn('h-11 rounded-xl border text-sm', sign === 1 ? 'border-[var(--success)] bg-[color-mix(in_srgb,var(--success)_12%,transparent)] font-bold' : 'surface-1 border-[var(--glass-border)]')}>{t('إضافة نقاط')}</button>
           <button onClick={() => setSign(-1)} className={cn('h-11 rounded-xl border text-sm', sign === -1 ? 'border-[var(--error)] bg-red-500/10 font-bold' : 'surface-1 border-[var(--glass-border)]')}>{t('خصم نقاط')}</button>
         </div>
-        <Field label={t('عدد النقاط')} hint={t('أكتر من 200 نقطة محتاج موافقة مدير')}><Input value={pts} onChange={(e) => setPts(e.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" className="num text-xl" data-fb="adjust-points" /></Field>
+        <Field label={t('عدد النقاط')} hint={rule ? ruleSentence('LOYALTY_ADJUST', rule) : undefined}><Input value={pts} onChange={(e) => setPts(e.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" className="num text-xl" data-fb="adjust-points" /></Field>
         <div className="flex flex-wrap gap-1.5">{quick.map((q) => <button key={q} onClick={() => setReason(q)} className={cn('px-2.5 h-8 rounded-lg text-xs border', reason === q ? 'border-[var(--primary)] bg-[var(--primary-container)]' : 'surface-1 border-[var(--glass-border)]')}>{t(q)}</button>)}</div>
-        <Field label={t('السبب (إجباري)')}><Input value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
+        <Field label={t('السبب')} required><Input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} data-fb="adjust-reason" /></Field>
       </div>
     </Modal>
   );
@@ -255,12 +271,11 @@ function MergePanel({ c }: { c: any }) {
   return (
     <Card title={<span className="flex items-center gap-2"><Merge className="w-4 h-4" />{t('دمج عميل مكرر في')} {c.name}</span>} badge={<StateBadge ops={['Customer.Merge']} />}>
       <div className="space-y-3">
-        <div className="text-sm text-dim">{t('لو نفس الشخص متسجل مرتين (برقم تاني مثلاً)، ادمج التاني هنا: العناوين والطلبات والنقاط بتتنقل للعميل ده، ورقمه بيبقى الرقم التاني، والعميل التاني بيتقفل.')}</div>
         {done && <Banner tone="success">{t('اتنقل {o} طلب و{p} نقطة.', { o: done.movedOrders, p: done.movedPoints })}</Banner>}
         {c.duplicates.length > 0 && (
           <div>
             <div className="text-xs font-bold text-[var(--warning)] mb-1.5">{t('ممكن يكونوا نفس العميل')}</div>
-            <div className="space-y-1.5">{c.duplicates.map((d: any) => <button key={d.id} onClick={() => setSrc(d)} data-fb={`dup:${d.phone}`} className={cn('w-full text-start rounded-xl border px-3 py-2 text-sm', src?.id === d.id ? 'border-[var(--primary)] bg-[var(--primary-container)]' : 'surface-1 border-[var(--glass-border)]')}><b>{d.name}</b> <span className="num text-xs text-dim" dir="ltr">{d.phone}</span> <span className="text-xs text-dim">{d.code}</span></button>)}</div>
+            <div className="space-y-1.5">{c.duplicates.map((d: any) => <button key={d.id} onClick={() => setSrc(d)} data-fb={`dup:${d.phone}`} className={cn('w-full text-start rounded-xl border px-3 py-2 text-sm', src?.id === d.id ? 'border-[var(--primary)] bg-[var(--primary-container)]' : 'surface-1 border-[var(--glass-border)]')}><b>{d.name}</b> <PhoneText v={d.phone} className="text-xs text-dim" /> <span className="text-xs text-dim">{d.code}</span></button>)}</div>
           </div>
         )}
         <Button variant="ghost" onClick={() => setPick(true)}>{t('اختار عميل تاني بالبحث')}</Button>
@@ -270,7 +285,7 @@ function MergePanel({ c }: { c: any }) {
             <div className="flex gap-2"><Button variant="ghost" onClick={() => setSrc(null)}>{t('إلغاء')}</Button><Button variant="warning" loading={busy} onClick={merge} data-fb="merge-confirm"><Merge className="w-4 h-4" />{t('ادمج')}</Button></div>
           </div>
         )}
-        {c.mergedFrom.length > 0 && <div className="text-xs text-dim">{t('اتدمج فيه قبل كده')}: {c.mergedFrom.map((m: any) => `${m.name} (${m.phone})`).join(t('، '))}</div>}
+        {c.mergedFrom.length > 0 && <div className="text-xs text-dim">{t('اتدمج فيه قبل كده')}: {c.mergedFrom.map((m: any, i: number) => <span key={m.id}>{i ? t('، ') : ''}{m.name} (<PhoneText v={m.phone} />)</span>)}</div>}
       </div>
       <CustomerPicker open={pick} onClose={() => setPick(false)} title={t('اختار العميل المكرر')} onPick={(x) => { setPick(false); if (x.id !== c.id) setSrc(x); }} />
     </Card>

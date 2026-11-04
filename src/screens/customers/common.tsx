@@ -1,10 +1,10 @@
 // Shared customer UI: tags, tier badge, address text and form, the phone lookup / quick-create picker and the
 // customer chip shown on a check.
 import React, { useEffect, useMemo, useState } from 'react';
-import { Search, UserPlus, Phone, MapPin, AlertTriangle, Star, UserRound, X, Crown, Check } from 'lucide-react';
-import { useDev, useQuery, useCommand, errorText } from '../../app/hooks';
+import { Search, UserPlus, Phone, MapPin, AlertTriangle, Star, UserRound, X, Crown, Check, EyeOff, Eye, Copy } from 'lucide-react';
+import { useDev, useQuery, useCommand, errorText, useReasonMin } from '../../app/hooks';
 import { call, ApiFailure } from '../../api/client';
-import { Modal, Button, Field, Input, Select, Textarea, Pill, Banner, Spinner, Empty, StateBadge, toast } from '../../ui';
+import { Modal, Popup, Button, Field, Input, Select, Textarea, Pill, Banner, Spinner, Empty, StateBadge, toast } from '../../ui';
 import { Tech } from '../../app/tech';
 import { t, L } from '../../i18n';
 import { cn, money, dateTime } from '../../lib/format';
@@ -18,6 +18,51 @@ export const TAGS: Record<string, { ar: string; tone: 'violet' | 'success' | 'in
   CAUTION: { ar: 'خلي بالك', tone: 'warning' },
 };
 export const ALLERGENS = Object.keys(ALLERGEN_AR);
+
+/** ux-13: the server masks a customer number the viewer may not see (010•••••678). */
+export const isMaskedPhone = (p: unknown) => typeof p === 'string' && p.includes('•');
+/** A customer number: a call link only when the full number came from the server; a masked one is plain text. */
+export function PhoneText({ v, link, className, fb }: { v: string | null | undefined; link?: boolean; className?: string; fb?: string }) {
+  if (!v) return null;
+  const num = <span className="num" dir="ltr">{v}</span>;
+  if (isMaskedPhone(v)) return <span className={cn('inline-flex items-center gap-1', className)} title={t('الرقم مخفي')} data-fb={fb} data-masked="1"><EyeOff className="w-3 h-3 text-dim shrink-0" />{num}</span>;
+  if (link) return <a href={`tel:${v}`} className={cn('inline-flex items-center gap-1', className)} data-fb={fb}><Phone className="w-3 h-3 shrink-0" />{num}</a>;
+  return <span className={className} data-fb={fb}>{num}</span>;
+}
+
+const REVEAL_REASONS = ['الاتصال بالعميل لتأكيد طلب', 'تأكيد عنوان التوصيل', 'متابعة شكوى العميل'];
+/** ux-13 «إظهار الرقم»: one customer's number, once, with a written reason (Customer.RevealPhone, audited). The number
+ *  lives only in this popup; closing it forgets it. */
+export function RevealPhonePopup({ c, onClose }: { c: any; onClose: () => void }) {
+  const { run, busy } = useCommand();
+  const min = useReasonMin();
+  const [reason, setReason] = useState('');
+  const [shown, setShown] = useState<{ phone: string; altPhone: string | null } | null>(null);
+  const reveal = async () => { const r = await run<any>('Customer.RevealPhone', { params: { customerId: c.id }, body: { reason: reason.trim(), expectedVersion: c.version } }); if (r) setShown({ phone: r.phone, altPhone: r.altPhone }); };
+  const copy = async (v: string) => { try { await navigator.clipboard.writeText(v); toast('success', t('نُسخ الرقم')); } catch { /* clipboard blocked */ } };
+  return (
+    <Popup open onClose={onClose} size="sm" fb="reveal-popup" title={t('إظهار رقم العميل')} badge={<StateBadge ops={['Customer.RevealPhone']} />}
+      footer={shown ? <Button variant="primary" onClick={onClose} data-fb="reveal-close">{t('إغلاق')}</Button> : <><Button variant="ghost" onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" loading={busy} disabled={reason.trim().length < min} onClick={reveal} data-fb="reveal-confirm"><Eye className="w-4 h-4" />{t('إظهار')}</Button></>}>
+      {shown ? (
+        <div className="space-y-2 text-center py-1" data-fb="reveal-shown">
+          <div className="text-sm text-dim">{c.name}</div>
+          {[shown.phone, shown.altPhone].filter(Boolean).map((p) => (
+            <div key={p!} className="flex items-center justify-center gap-2">
+              <a href={`tel:${p}`} className="num text-2xl font-extrabold text-[var(--primary)]" dir="ltr">{p}</a>
+              <Button size="sm" variant="ghost" onClick={() => copy(p!)} title={t('نسخ')}><Copy className="w-4 h-4" /></Button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="text-sm flex items-center gap-2"><b>{c.name}</b><PhoneText v={c.phone} /></div>
+          <div className="flex flex-wrap gap-1.5">{REVEAL_REASONS.map((q) => <button key={q} type="button" onClick={() => setReason(t(q))} className={cn('px-2.5 h-8 rounded-lg text-xs border', reason === t(q) ? 'border-[var(--primary)] bg-[var(--primary-container)]' : 'surface-1 border-[var(--glass-border)]')}>{t(q)}</button>)}</div>
+          <Field label={t('السبب')} required><Input autoFocus value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} data-fb="reveal-reason" /></Field>
+        </div>
+      )}
+    </Popup>
+  );
+}
 
 export function TagPills({ tags, className }: { tags: string[]; className?: string }) {
   if (!tags?.length) return null;
@@ -113,7 +158,7 @@ export function CustomerPicker({ open, onClose, onPick, initialPhone, title, cre
           <div className="space-y-1.5">
             {items.map((c) => <CustomerRow key={c.id} c={c} onClick={() => onPick(c)} />)}
           </div>
-          {q.trim().length >= 3 && !res.loading && !items.length && <Empty icon={<UserRound className="w-10 h-10" />} text={t('مفيش عميل بالبيانات دي')} />}
+          {q.trim().length >= 3 && !res.loading && !items.length && (res.data?.phoneSearch === 'FULL_NUMBER_REQUIRED' ? <div className="text-xs text-dim" data-fb="phone-whole">{t('اكتب الرقم كاملًا')}</div> : <Empty icon={<UserRound className="w-10 h-10" />} text={t('مفيش عميل بالبيانات دي')} />)}
           <Button variant="outline" className="w-full" onClick={() => setCreating(true)} data-fb="customer-new"><UserPlus className="w-4 h-4" />{t('عميل جديد')}{isPhone && q.trim() ? ` · ${q.trim()}` : ''}</Button>
         </div>
       ) : (
@@ -130,7 +175,7 @@ export function CustomerRow({ c, onClick, active }: { c: any; onClick?: () => vo
       <span className="w-9 h-9 shrink-0 rounded-full surface-3 flex items-center justify-center font-bold">{c.name.slice(0, 1)}</span>
       <span className="flex-1 min-w-0">
         <span className="flex items-center gap-1.5 flex-wrap font-bold">{c.name}<TierBadge tier={c.loyalty?.tier} /><TagPills tags={c.tags} /></span>
-        <span className="block text-xs text-dim truncate"><span className="num" dir="ltr">{c.phone}</span>{def ? ` · ${addressText(def, false)}` : ''}</span>
+        <span className="block text-xs text-dim truncate"><PhoneText v={c.phone} />{def ? ` · ${addressText(def, false)}` : ''}</span>
       </span>
       <span className="text-end text-[11px] text-dim shrink-0"><span className="block num">{c.stats?.orders ?? 0} {t('طلب')}</span><span className="block num text-[var(--primary)] font-bold">{c.loyalty?.balance ?? 0} {t('نقطة')}</span></span>
     </button>
@@ -204,7 +249,7 @@ export function CustomerChip({ order, editable = true, compact }: { order: any; 
         <UserRound className="w-4 h-4 text-[var(--primary)] shrink-0" />
         <div className="flex-1 min-w-0 text-xs">
           <div className="font-bold flex items-center gap-1.5 flex-wrap truncate">{cust?.name ?? order.customerName}{cust && <TierBadge tier={cust.loyalty?.tier} />}{cust?.tags?.includes('VIP') && <Pill tone="violet">VIP</Pill>}</div>
-          <div className="text-dim truncate"><span className="num" dir="ltr">{cust?.phone ?? order.customerPhone ?? ''}</span>{cust ? <> · <Star className="w-3 h-3 inline -mt-0.5" /> <span className="num">{cust.loyalty?.balance ?? 0}</span> {t('نقطة')}</> : null}{!compact && cust?.stats ? ` · ${cust.stats.orders} ${t('طلب')}` : ''}</div>
+          <div className="text-dim truncate"><PhoneText v={cust?.phone ?? order.customerPhone ?? ''} />{cust ? <> · <Star className="w-3 h-3 inline -mt-0.5" /> <span className="num">{cust.loyalty?.balance ?? 0}</span> {t('نقطة')}</> : null}{!compact && cust?.stats ? ` · ${cust.stats.orders} ${t('طلب')}` : ''}</div>
           {cust?.allergies?.length ? <div className="text-amber-300 font-bold truncate">⚠ {cust.allergies.map((a: string) => t(ALLERGEN_AR[a] ?? a)).join(t('، '))}</div> : null}
         </div>
         {canSet && <button onClick={() => setOpen(true)} className="text-[11px] text-[var(--primary)] font-bold shrink-0">{t('تغيير')}</button>}

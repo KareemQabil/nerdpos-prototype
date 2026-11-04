@@ -33,6 +33,7 @@ function Program() {
           <StatCard label={t('نقاط اتصرفت')} value={String(tt.redeemed)} icon={<Award />} />
           <StatCard label={t('رصيد العملاء دلوقتي')} value={String(tt.outstanding)} icon={<Crown />} tone="primary" />
           <StatCard label={t('قيمتها بالجنيه')} value={money(ledger.data.liabilityEgp, false)} unit={currencyText()} hint={t('فلوس ممكن العملاء يصرفوها')} tone="warning" />
+          {tt.expired > 0 && <StatCard label={t('نقاط انتهت صلاحيتها')} value={String(tt.expired)} icon={<Star />} />}
         </StatGrid>
       )}
       <PolicyCard policyId="LoyaltyProgramPolicy" title={t('قواعد النقاط')} />
@@ -101,7 +102,7 @@ function Ledger() {
     <Card title={<span className="flex items-center gap-2"><Star className="w-4 h-4" />{t('كل حركات النقاط')}</span>} actions={<div className="w-44"><Select value={kind} onChange={(e) => setKind(e.target.value)} options={[{ value: '', label: t('كل الحركات') }, ...Object.entries(entryLabel).map(([k, v]) => ({ value: k, label: t(v.ar) }))]} /></div>}>
       {q.loading && !items.length ? <Spinner /> : (
         <Table head={[t('الوقت'), t('العميل'), t('الحركة'), t('النقاط'), t('الرصيد بعدها'), t('الطلب'), t('التفاصيل')]} empty={t('مفيش حركات')}
-          rows={items.map((e) => [<DateTime v={e.at} className="text-xs" />, <button className="text-start font-bold hover:text-[var(--primary)]" onClick={() => nav('customer', { customerId: e.customerId })}>{e.customerName}<span className="block text-[10px] text-dim num font-normal">{e.customerCode}</span></button>, <Pill tone={entryLabel[e.kind]?.tone}>{t(entryLabel[e.kind]?.ar ?? e.kind)}</Pill>, <b className={cn('num', e.points > 0 ? 'text-[var(--success)]' : 'text-[var(--error)]')}>{e.points > 0 ? '+' : ''}{e.points}</b>, <span className="num">{e.balanceAfter}</span>, e.orderNumber ? <span className="num">#{e.orderNumber}</span> : '—', <span className="text-xs">{tv(e.reason) ?? ''}{personText(e.byName) ? <span className="text-dim"> · {personText(e.byName)}</span> : ''}</span>])} />
+          rows={items.map((e) => [<DateTime v={e.at} className="text-xs" />, <button className="text-start font-bold hover:text-[var(--primary)]" onClick={() => nav('customer', { customerId: e.customerId })}>{e.customerName}<span className="block text-[10px] text-dim num font-normal">{e.customerCode}</span></button>, <Pill tone={entryLabel[e.kind]?.tone}>{t(entryLabel[e.kind]?.ar ?? e.kind)}</Pill>, <b className={cn('num', e.points > 0 ? 'text-[var(--success)]' : 'text-[var(--error)]')}>{e.points > 0 ? '+' : ''}{e.points}</b>, <span className="num">{e.balanceAfter}</span>, e.orderNumber ? <span className="num">#{e.orderNumber}</span> : '—', <span className="text-xs">{tv(e.reason) ?? ''}{e.multiplier ? <span className="num"> ×{e.multiplier}</span> : ''}{personText(e.byName) ? <span className="text-dim"> · {personText(e.byName)}</span> : ''}{e.approvalGrantId ? <span className="text-dim"> · {t('بموافقة')}</span> : ''}</span>])} />
       )}
     </Card>
   );

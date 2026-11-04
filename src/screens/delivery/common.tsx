@@ -8,7 +8,7 @@ import { Tech } from '../../app/tech';
 import { t, L, tv, getLang } from '../../i18n';
 import { cn, money, time, qty } from '../../lib/format';
 import { clock } from '../../mock/clock';
-import { addressText, AllergyWarning, TierBadge } from '../customers/common';
+import { addressText, AllergyWarning, TierBadge, PhoneText } from '../customers/common';
 import { personText } from '../../demo/people';
 
 export const STATE: Record<string, { ar: string; tone: 'primary' | 'warning' | 'info' | 'success' | 'error' | 'neutral' | 'violet' }> = {
@@ -151,7 +151,7 @@ export function FailDialog({ d, onClose }: { d: any; onClose: () => void }) {
   return (
     <Modal open onClose={onClose} title={t('التوصيل ما تمّش')} badge={<StateBadge ops={['Delivery.FailAttempt']} />} footer={<><Button variant="ghost" onClick={onClose}>{t('رجوع')}</Button><Button variant="danger" loading={busy} disabled={code === 'OTHER' && !note.trim()} onClick={ok} data-fb="confirm-fail"><XCircle className="w-4 h-4" />{t('سجّل المحاولة')}</Button></>}>
       <div className="space-y-3">
-        <div className="text-sm text-dim">{d.number} · {d.customerName} · <span className="num" dir="ltr">{d.phone}</span></div>
+        <div className="text-sm text-dim">{d.number} · {d.customerName} · <PhoneText v={d.phone} /></div>
         <div className="grid grid-cols-2 gap-1.5">{list.map(([k, v]) => <button key={k} onClick={() => setCode(k)} data-fb={`fail-reason:${k}`} className={cn('h-11 rounded-xl border text-sm px-2', code === k ? 'border-[var(--error)] bg-red-500/10 text-[var(--error)] font-bold' : 'surface-1 border-[var(--glass-border)]')}>{L(v)}</button>)}</div>
         <Field label={t('تفاصيل')} hint={code === 'OTHER' ? t('مطلوبة مع "سبب تاني"') : undefined}><Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('مثلاً: رن 3 مرات ومفيش رد')} /></Field>
         <div className="text-[11px] text-dim">{t('بعد المحاولة الفاشلة الطيار بيرجع، وتقدر تسلّم الطلب لطيار تاني (إعادة المحاولة) أو تلغيه وترجّعه.')}</div>
@@ -231,7 +231,7 @@ export function DeliveryDetailBody({ id, onClose, stacked }: { id: string; onClo
             <div className="flex items-center gap-2 flex-wrap"><StatePill s={d.state} />{d.kitchen && d.state === 'PENDING' && <Pill tone={KITCHEN[d.kitchen.state]?.tone}><ChefHat className="w-3 h-3" />{t(KITCHEN[d.kitchen.state]?.ar ?? d.kitchen.state)}</Pill>}<Eta d={d} />{d.sourceLabel && <Pill tone="info"><Globe className="w-3 h-3" />{d.sourceLabel}</Pill>}</div>
             <KV rows={[
               [t('العميل'), <span className="flex items-center gap-1.5 flex-wrap">{d.customerName}{d.customer?.loyalty?.tier && <TierBadge tier={d.customer.loyalty.tier} />}{d.customerId && <button className="text-xs text-[var(--primary)] font-bold" onClick={() => { onClose(); nav('customer', { customerId: d.customerId }); }}>{t('الملف')}</button>}</span>],
-              [t('الموبايل'), <a href={`tel:${d.phone}`} className="num inline-flex items-center gap-1" dir="ltr"><Phone className="w-3 h-3" />{d.phone}</a>],
+              [t('الموبايل'), <PhoneText v={d.phone} link fb="delivery-phone" />], // ux-13: a call link only when the server sent the full number
               [t('العنوان'), addressText(d.address)],
               [t('المنطقة'), `${d.zoneName} · ${t('رسوم')} ${money(d.fee)}`],
               [t('الدفع'), t(PAYMENT_MODE[d.paymentMode]?.ar ?? d.paymentMode)],

@@ -6,7 +6,7 @@ import { PageHeader, StateBadge, Button, Card, Money, Select, Table, EmptyState,
 import { Tech } from '../../app/tech';
 import { t, L } from '../../i18n';
 import { cn, money } from '../../lib/format';
-import { TAGS, TagPills, TierBadge, CustomerPicker, addressText } from './common';
+import { TAGS, TagPills, TierBadge, CustomerPicker, addressText, PhoneText } from './common';
 
 export default function Customers() {
   const { nav } = useDev();
@@ -25,7 +25,6 @@ export default function Customers() {
   return (
     <div data-screen="CR1" className="space-y-4">
       <PageHeader icon={<Users />} title={t('العملاء')} badge={<StateBadge ops={['Customer.Search', 'Customer.Create', 'Customer.Get']} />}
-        description={t('كل العملاء اللي طلبوا قبل كده: عناوينهم، طلباتهم، نقاطهم وملاحظاتهم. ابحث برقم الموبايل أو الاسم.')}
         actions={<Button variant="primary" onClick={() => setCreating(true)} data-fb="customers-new"><UserPlus className="w-4 h-4" />{t('عميل جديد')}</Button>} />
       <StatGrid>
         <StatCard label={t('عدد العملاء')} value={res.data?.total ?? '—'} icon={<Users />} loading={res.loading && !res.data} />
@@ -42,12 +41,12 @@ export default function Customers() {
         </Toolbar>
         {(
           <Table loading={res.loading && !items.length} maxHeight={640} onRowClick={(i) => nav('customer', { customerId: items[i].id })} align={[undefined, undefined, undefined, undefined, 'end', 'end', 'end', undefined]}
-            head={[t('العميل'), t('الموبايل'), t('المنطقة'), t('المستوى'), t('النقاط'), t('الطلبات'), t('إجمالي الصرف'), t('آخر طلب')]} empty={<EmptyState compact icon={<Users />} title={t('مفيش عملاء بالبحث ده')} text={t('جرّب رقم موبايل تاني، أو ضيف العميل من «عميل جديد».')} />}
+            head={[t('العميل'), t('الموبايل'), t('المنطقة'), t('المستوى'), t('النقاط'), t('الطلبات'), t('إجمالي الصرف'), t('آخر طلب')]} empty={res.data?.phoneSearch === 'FULL_NUMBER_REQUIRED' ? <EmptyState compact icon={<Users />} title={t('اكتب الرقم كاملًا')} /> : <EmptyState compact icon={<Users />} title={t('مفيش عملاء بالبحث ده')} />}
             rows={items.slice(0, n).map((c) => {
               const a = c.addresses.find((x: any) => x.isDefault) ?? c.addresses[0];
               return [
                 <div className="text-start" data-fb={`open-customer:${c.phone}`}><div className="font-bold flex items-center gap-1.5 flex-wrap">{c.name}<TagPills tags={c.tags} /></div><div className="text-[11px] text-dim"><Tech><span className="num">{c.code}</span></Tech>{c.allergies?.length ? <span className="text-[var(--warning)]">⚠ {t('عنده حساسية')}</span> : null}</div></div>,
-                <span className="num text-xs" dir="ltr">{c.phone}</span>,
+                <PhoneText v={c.phone} className="text-xs" />,
                 <span className="text-xs">{a ? a.area : '—'}</span>,
                 <TierBadge tier={c.loyalty.tier} />,
                 <span className="num font-bold text-[var(--primary)]">{c.loyalty.balance}</span>,

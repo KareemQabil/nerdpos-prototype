@@ -107,7 +107,7 @@ const UNIT_SUFFIX: Record<string, string> = {
   'SessionDurationPolicy.maxHours': 'ساعة', 'SessionDurationPolicy.warningHours': 'ساعة', 'ApprovalTtlPolicy.seconds': 'ثانية', 'KitchenTimingPolicy.targetMinutes': 'دقيقة',
   'KitchenTimingPolicy.alertMinutes': 'دقيقة', 'LoginLockoutPolicy.maxFailedAttempts': 'محاولة', 'LoginLockoutPolicy.lockMinutes': 'دقيقة', 'AuthSessionPolicy.maxHours': 'ساعة',
   'AuthSessionPolicy.pinSessionMaxHours': 'ساعة', 'CredentialPolicy.passwordMinLength': 'حرف', 'CredentialPolicy.pinLength': 'رقم', 'OrderNumberPolicy.width': 'رقم',
-  'RoundingPolicy.scale': 'رقم', 'SkuGenerationPolicy.width': 'رقم',
+  'RoundingPolicy.scale': 'رقم', 'SkuGenerationPolicy.width': 'رقم', 'LoyaltyProgramPolicy.expiryMonths': 'شهر', 'LoyaltyProgramPolicy.minRedeemPoints': 'نقطة', // ux-13
 };
 
 export function FieldEditor({ policyId, f, value, onChange }: { policyId: string; f: Field; value: any; onChange: (v: any) => void }) {

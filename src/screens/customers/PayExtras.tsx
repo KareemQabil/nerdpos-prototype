@@ -4,7 +4,7 @@ import { useTech } from '../../app/tech';
 import React, { useState } from 'react';
 import { Star, CreditCard, ShieldCheck, Gift } from 'lucide-react';
 import { useQuery, useCommand } from '../../app/hooks';
-import { Button, Field, Input, Banner, Money, Switch, Spinner, StateBadge } from '../../ui';
+import { Button, Field, Input, Banner, Money, Switch, Spinner, StateBadge, Pill } from '../../ui';
 import { t, L } from '../../i18n';
 import { cn, money } from '../../lib/format';
 import { TierBadge } from './common';
@@ -18,22 +18,28 @@ export function LoyaltyRedeemBox({ order }: { order: any }) {
   if (!d) return <Spinner />;
   const r = d.redeem;
   const redeem = async () => { const x = await run('Loyalty.Redeem', { body: { orderId: order.id, points: Number(pts) } }, { success: t('اتخصم من النقاط') }); if (x) setPts(''); };
+  const over = !!d.redeem && Number(pts) > d.redeem.maxPoints;
   return (
     <div className="space-y-3" data-fb="loyalty-box">
       <div className="flex items-center justify-between rounded-xl surface-1 px-3 py-2">
         <span className="text-sm flex items-center gap-1.5">{d.customerName}<TierBadge tier={d.tier} /></span>
-        <span className="text-end"><b className="num text-lg text-[var(--primary)]">{d.balance}</b> <span className="text-xs text-dim">{t('نقطة')} = {money(d.valueEgp)}</span></span>
+        <span className="text-end"><b className="num text-lg text-[var(--primary)]">{d.balance}</b> <span className="text-xs text-dim">{t('نقطة')} = <Money v={d.valueEgp} /></span></span>
       </div>
       {!d.program.enabled ? <Banner tone="warning">{t('برنامج النقاط مقفول.')}</Banner> : !r?.canRedeem ? (
         <Banner tone="info">{d.balance < d.program.minRedeemPoints ? t('لازم يكون معاه {m} نقطة على الأقل عشان يصرف.', { m: d.program.minRedeemPoints }) : t('مفيش مبلغ متاح يتدفع بالنقاط على الشيك ده.')}</Banner>
       ) : (
         <>
-          <div className="text-xs text-dim">{t('النقطة بـ {v} ج.م · أقصى حاجة على الشيك ده {p} نقطة = {m} (لحد {x}% من الشيك)', { v: money(d.program.pointValue, false), p: r.maxPoints, m: money(r.maxValue), x: r.maxRedeemPercent })}</div>
-          <Field label={t('عدد النقاط')}><Input data-fb="redeem-points" value={pts} onChange={(e) => setPts(e.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" className="text-2xl num" placeholder={String(r.maxPoints)} /></Field>
+          {/* ux-13: the rule as short facts (point value, the cap on this check) — no paragraph */}
+          <div className="flex flex-wrap gap-1.5 text-xs" data-fb="redeem-cap">
+            <Pill tone="neutral">{t('قيمة النقطة')} <Money v={d.program.pointValue} /></Pill>
+            <Pill tone="primary">{t('الحد على هذا الشيك')} <span className="num">{r.maxPoints}</span> {t('نقطة')} = <Money v={r.maxValue} /></Pill>
+            <Pill tone="neutral">{t('حتى {x}% من الشيك', { x: r.maxRedeemPercent })}</Pill>
+          </div>
+          <Field label={t('عدد النقاط')} error={over ? t('أكثر من الحد على هذا الشيك') : null}><Input data-fb="redeem-points" value={pts} onChange={(e) => setPts(e.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" className="text-2xl num" placeholder={String(r.maxPoints)} /></Field>
           <div className="flex gap-1.5 flex-wrap">
             {[r.minRedeemPoints, Math.floor(r.maxPoints / 2), r.maxPoints].filter((v, i, a) => v >= r.minRedeemPoints && a.indexOf(v) === i).map((v) => <Button key={v} size="sm" className="num" onClick={() => setPts(String(v))}>{v}</Button>)}
           </div>
-          <Button variant="primary" size="xl" className="w-full" loading={busy} disabled={!Number(pts)} onClick={redeem} data-fb="redeem"><Star className="w-5 h-5" />{t('ادفع بالنقاط')}</Button>
+          <Button variant="primary" size="xl" className="w-full" loading={busy} disabled={!Number(pts) || over} onClick={redeem} data-fb="redeem"><Star className="w-5 h-5" />{t('ادفع بالنقاط')}</Button>
         </>
       )}
       {d.earnPreview?.points > 0 && <div className="text-[11px] text-dim flex items-center gap-1"><Gift className="w-3.5 h-3.5" />{t('هيكسب حوالي {p} نقطة لما الشيك يتقفل', { p: d.earnPreview.points })}</div>}

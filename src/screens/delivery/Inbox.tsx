@@ -7,7 +7,7 @@ import { Section, StateBadge, Button, Card, Pill, Money, Modal, Field, Input, Se
 import { Tech } from '../../app/tech';
 import { t, L, tv } from '../../i18n';
 import { cn, money, qty, time } from '../../lib/format';
-import { addressText } from '../customers/common';
+import { addressText, PhoneText } from '../customers/common';
 
 export default function Inbox() {
   useNow(20000);
@@ -68,7 +68,7 @@ function ExternalCard({ e }: { e: any }) {
           <div className="text-end"><div className="text-[10px] text-dim">{t('إجمالي التطبيق')}</div><Money v={e.sourceTotal} /></div>
         </div>
         <div className="rounded-xl surface-1 px-3 py-2 text-sm">
-          <div className="font-bold flex items-center gap-2">{e.customer.name}<span className="num text-xs text-dim font-normal" dir="ltr">{e.customer.phone}</span></div>
+          <div className="font-bold flex items-center gap-2">{e.customer.name}<PhoneText v={e.customer.phone} className="text-xs text-dim font-normal" /></div>
           {e.customer.address && <div className="text-xs text-soft mt-0.5 flex items-start gap-1"><MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />{addressText(e.customer.address)}</div>}
           {e.fulfillment === 'DELIVERY' && (e.zone ? <div className="text-[11px] text-dim mt-0.5">{t('منطقة')} {L(e.zone.name)} · {t('حوالي')} {e.zone.etaMinutes} {t('د')}</div> : <div className="text-[11px] text-[var(--error)] mt-0.5">{t('العنوان برة مناطق التوصيل')}</div>)}
           {tv(e.note) && <div className="text-xs text-[var(--warning-text)] mt-1">✎ {tv(e.note)}</div>}

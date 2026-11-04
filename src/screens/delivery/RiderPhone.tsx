@@ -9,7 +9,7 @@ import { Button, DateTime, EmptyState, Field, Input, Money, Pill, Popup, Spinner
 import { t, L } from '../../i18n';
 import { cn } from '../../lib/format';
 import { sign } from '../../lib/cash';
-import { addressText } from '../customers/common';
+import { addressText, PhoneText } from '../customers/common';
 import { STATE, VehicleIcon } from './common';
 import { hoursText } from './Drivers';
 
@@ -61,7 +61,8 @@ export default function RiderPhone() {
               <Pill tone={STATE[d.state]?.tone}>{t(STATE[d.state]?.ar)}</Pill>
             </div>
             <div className="text-sm flex items-start gap-1.5"><MapPin className="w-4 h-4 mt-0.5 shrink-0 text-dim" /><span>{addressText(d.address)}</span></div>
-            <a href={`tel:${d.phone}`} className="text-sm inline-flex items-center gap-1.5 text-[var(--primary)] font-bold"><Phone className="w-4 h-4" /><span className="num" dir="ltr">{d.phone}</span></a>
+            {/* ux-13: the full number (a call link) arrives once he picked the order up (CustomerPrivacyPolicy.riderAccess) */}
+            <PhoneText v={d.phone} link className="text-sm text-[var(--primary)] font-bold" fb={`rider-phone-number:${d.number}`} />
             <div className={cn('rounded-xl px-3 py-2.5 text-center border', sign(due) > 0 ? 'border-[color-mix(in_srgb,var(--warning)_45%,transparent)] bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]' : 'border-[color-mix(in_srgb,var(--success)_40%,transparent)] bg-[color-mix(in_srgb,var(--success)_8%,transparent)]')}>
               <div className="text-xs text-soft font-bold flex items-center justify-center gap-1">{card ? <CreditCard className="w-3.5 h-3.5" /> : <Banknote className="w-3.5 h-3.5" />}{sign(due) > 0 ? (card ? t('المطلوب بالبطاقة') : t('المطلوب تحصيله')) : t('مدفوع')}</div>
               {sign(due) > 0 && <Money v={due} className="text-2xl" fb={`rider-due:${d.number}`} />}
