@@ -5,6 +5,7 @@ import { ShieldCheck, ShieldAlert, Clock, Info, CheckCircle2, AlertTriangle, Boo
 import { Pill, Card, Button, Money, DateTime } from '../../ui';
 import { t, L, getLang } from '../../i18n';
 import { cn, currency } from '../../lib/format';
+import { rangeText } from '../../reports/format';
 import { Tech } from '../../app/tech';
 
 export type Loc = { ar: string; en: string };
@@ -62,8 +63,9 @@ export function ReportHeader({ h, onShowRecon }: { h: any; onShowRecon?: () => v
   return (
     <Card padding="sm" className="space-y-2" data-fb="report-header">
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <Pill tone="neutral"><Clock className="w-3.5 h-3.5 inline me-1" />{t('اليوم التجاري')}: <span className="num ms-1">{h.period.from}{h.period.to !== h.period.from ? ` → ${h.period.to}` : ''}</span></Pill>
-        <Pill tone="neutral">{t('توقيت القاهرة — اليوم بيبدأ {c}', { c: h.cutoff })}<Tech><span className="num ms-1">Africa/Cairo</span></Tech></Pill>
+        <Pill tone="primary" data-fb="report:business-day"><Clock className="w-3.5 h-3.5 inline me-1" />{h.period.to !== h.period.from ? t('الفترة') : t('اليوم التجاري')}: <span className="ms-1">{rangeText(h.period.from, h.period.to, getLang())}</span></Pill>
+        {h.venue?.branches?.length > 0 && <Pill tone="neutral" data-fb="report:scope">{h.venue.branches.map((b: any) => b.name).join('، ')}</Pill>}
+        <Pill tone="neutral">{t('يبدأ اليوم {c}', { c: h.cutoff })}<Tech><span className="num ms-1">Africa/Cairo</span></Tech></Pill>
         <Pill tone="neutral">{t('لحد')} <DateTime v={h.asOf} className="ms-1" /></Pill>
         {h.provisional ? <Pill tone="warning" dot title={h.provisionalReasons.map((x: Loc) => L(x)).join(' ')}>{t('مبدئي')}</Pill> : <Pill tone="success" dot>{t('نهائي — الأيام مقفولة')}</Pill>}
         <button type="button" onClick={onShowRecon} data-fb="report:recon-status" className="inline-flex"><Pill tone={STATUS_TONE[rec.status]} dot>{rec.status === 'UNEXPLAINED' ? <ShieldAlert className="w-3.5 h-3.5 inline me-1" /> : <ShieldCheck className="w-3.5 h-3.5 inline me-1" />}{t('المطابقة')}: {statusText(rec.status)} <span className="num ms-1 opacity-70">({rec.counts.MATCHED}✓ {rec.counts.EXPLAINED ? `${rec.counts.EXPLAINED}≈ ` : ''}{rec.counts.UNEXPLAINED ? `${rec.counts.UNEXPLAINED}✗` : ''})</span></Pill></button>
@@ -72,7 +74,7 @@ export function ReportHeader({ h, onShowRecon }: { h: any; onShowRecon?: () => v
       </div>
       {h.days.length <= 7 && h.days.length > 1 && <div className="flex flex-wrap gap-1 text-[11px]">{h.days.map((d: any) => <span key={d.date} className={cn('px-2 py-0.5 rounded-md surface-1', d.status === 'OPEN' && 'text-[var(--warning-text)]')}><span className="num">{d.date.slice(5)}</span> {dayText(d.status)}</span>)}</div>}
       {h.provisional && <div className="text-xs text-[var(--warning-text)] flex items-start gap-1"><AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />{h.provisionalReasons.map((x: Loc) => L(x)).join(' ')}</div>}
-      {h.preLaunch && <div className="text-xs text-dim flex items-start gap-1"><Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />{t('الأيام قبل {d} عندها إجماليات يومية مستوردة بس (من غير شيكات) — أي رقم محتاج تفاصيل بيطلع «مش متاح» للأيام دي.', { d: h.launchDate })}</div>}
+      {h.preLaunch && <div className="text-xs text-dim flex items-start gap-1"><Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />{t('قبل {d}: إجماليات يومية مستوردة فقط.', { d: h.launchDate })}</div>}
       {defs && (
         <div className="grid @3xl/main:grid-cols-2 gap-2 pt-1" data-fb="report:definitions-list">
           {h.metrics.map((m: any) => (

@@ -28,8 +28,8 @@ export function fmtNumber(v: string | number | null | undefined, format: NumberF
   if (unit === 'minutes') return `${NUM(n, 1, 1)} ${lang === 'ar' ? 'دقيقة' : 'min'}`;
   return NUM(n, 0, 2);
 }
-export const NA_TEXT: Record<Lang, string> = { ar: 'مش متاح', en: 'Not available' };
-export const REFUSED_TEXT: Record<Lang, string> = { ar: 'اترفض', en: 'Refused' };
+export const NA_TEXT: Record<Lang, string> = { ar: 'غير متاح', en: 'Not available' };
+export const REFUSED_TEXT: Record<Lang, string> = { ar: 'مرفوض', en: 'Refused' };
 /** A cell as text (print / CSV): never «0» for something that is not available. */
 export function cellText(v: MetricValue | undefined, format: NumberFormat, lang: Lang, unit?: string): string {
   if (!v) return '—';
@@ -56,9 +56,9 @@ export function dayText(d: string, lang: Lang = 'ar', withYear = false): string 
   if (!y || !m || !dd) return d;
   return lang === 'ar' ? `${dd} ${MONTHS_AR[m - 1]}${withYear ? ' ' + y : ''}` : `${MONTHS_EN[m - 1]} ${dd}${withYear ? ', ' + y : ''}`;
 }
-/** A business-date range in words: «من 26 أكتوبر لـ 1 نوفمبر 2026» — no arrows that flip in right-to-left text. */
+/** A business-date range in words: «من 26 أكتوبر إلى 1 نوفمبر 2026» — no arrows that flip in right-to-left text. */
 export function rangeText(from: string, to: string, lang: Lang = 'ar'): string {
   const y = from.slice(0, 4) !== to.slice(0, 4);
   if (from === to) return dayText(from, lang, true);
-  return lang === 'ar' ? `من ${dayText(from, lang, y)} لـ ${dayText(to, lang, true)}` : `${dayText(from, lang, y)} – ${dayText(to, lang, true)}`;
+  return lang === 'ar' ? `من ${dayText(from, lang, y)} إلى ${dayText(to, lang, true)}` : `${dayText(from, lang, y)} – ${dayText(to, lang, true)}`;
 }

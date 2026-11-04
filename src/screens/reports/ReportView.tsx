@@ -119,7 +119,6 @@ export function Bridge({ run, br }: { run: any; br: any }) {
           ))}
           <div className="flex items-center gap-2 text-sm font-bold"><span className="flex-1">{t('غير مفسَّر')}</span><Amt v={g.unexplained} className={cn(Number(g.unexplained) !== 0 && 'text-[var(--error)]')} /></div>
         </div>
-        <div className="text-[11px] text-dim mt-1">{t('المبيعات والتحصيل مقاييس مختلفة — مش لازم يتساووا، بس كل فرق لازم يتشرح بحركات مربوطة.')}</div>
       </div>
       <div className="grid @3xl/main:grid-cols-2 gap-1.5">
         {br.outside.map((x: any) => (
@@ -210,8 +209,7 @@ export function ReportView({ run, onTemplate, withExpert, hidePurpose }: { run: 
       {!hidePurpose && <div className="text-sm text-soft flex items-start gap-2"><Info className="w-4 h-4 mt-0.5 shrink-0" /><span>{L(run.manifest.purpose)} <span className="text-dim">{t('القرار')}: {L(run.manifest.decision)} · {t('بيتابعه')}: {run.manifest.audience.map((a: string) => t(AUD[a] ?? a)).join('، ')} · {t('التنقل')}: {L(run.manifest.drilldown)}</span></span></div>}
       {run.manifest.notes?.map((n: any, i: number) => <Banner key={i} tone="info">{L(n)}</Banner>)}
       {run.blocks.map((b: any) => (
-        <Card key={b.id} title={L(b.title)} className="min-w-0" data-fb={`block:${b.id}`} actions={<Tech><span className="num text-[10px] text-dim" dir="ltr">{b.kind} · {b.metrics.join(',')}{b.dimensions?.length ? ' × ' + b.dimensions.join(',') : ''}</span></Tech>}>
-          {b.note && <div className="text-xs text-dim mb-2">{L(b.note)}</div>}
+        <Card key={b.id} title={<span className="inline-flex items-center gap-1.5">{L(b.title)}{b.note && <span title={L(b.note)} aria-label={L(b.note)} className="text-dim"><Info className="w-3.5 h-3.5" /></span>}</span>} className="min-w-0" data-fb={`block:${b.id}`} actions={<Tech><span className="num text-[10px] text-dim" dir="ltr">{b.kind} · {b.metrics.join(',')}{b.dimensions?.length ? ' × ' + b.dimensions.join(',') : ''}</span></Tech>}>
           {b.result?.meta.refused.map((x: any, i: number) => <Banner key={i} tone="warning">{L(x.reason)}</Banner>)}
           {b.kind === 'kpis' && <Kpis run={run} b={b} />}
           {b.kind === 'table' && <QTable run={run} b={b} />}

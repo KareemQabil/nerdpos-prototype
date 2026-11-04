@@ -1,8 +1,8 @@
 // «معاينة الطباعة»: pick a ready template and see real pages immediately — page breaks, the table header repeated on
 // every page, carried-forward subtotals, signatures, «مبدئي» watermark — with zoom, page navigation and thumbnails.
-// Editing a template is a handful of switches; the pages update live. «تنزيل PDF» renders these same pages to images
-// (the browser draws the Arabic, so letters join correctly) and puts them in a PDF (jsPDF). Templates are saved and
-// versioned on the server (ReportTemplate.Save).
+// Editing a template is a handful of switches; the pages update live. «تنزيل PDF» writes these same pages as real text
+// (ux-17: jsPDF + jspdf-autotable + the embedded IBM Plex Sans Arabic — src/reports/print/pdf.ts). Templates are saved
+// and versioned on the server (ReportTemplate.Save).
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Printer, FileDown, ZoomIn, ZoomOut, ChevronRight, ChevronLeft, Save, Copy, FileText, ReceiptText, LayoutTemplate, Check } from 'lucide-react';
@@ -11,9 +11,9 @@ import { call } from '../../../api/client';
 import { Button, SegmentedControl, Switch, Field, Input, Textarea, Select, Spinner, toast, Pill } from '../../../ui';
 import { t, L, getLang } from '../../../i18n';
 import { cn, dateTime } from '../../../lib/format';
-import { saveFile } from '../../../lib/files';
+import { exportPdf } from './exports';
 import { useDocTemplate } from '../../../ui/doc';
-import { docFromPivot, docFromCertified, paginate, paperOf, kpisPerRow, H, type DocModel, type Page, type PageItem } from '../../../reports/print/layout';
+import { docFromPivot, docFromCertified, paginate, paperOf, kpisPerRow, receiptColumns, H, type DocModel, type Page, type PageItem } from '../../../reports/print/layout';
 import type { PivotResult } from '../../../reports/pivot';
 import type { ReportTemplate, ColumnView } from '../../../reports/studio';
 import { lang } from './common';
@@ -22,30 +22,19 @@ export type PrintSource =
   | { kind: 'pivot'; result: PivotResult; title: string; view?: ColumnView[]; chart?: 'none' | 'bars' | 'line'; savedId?: string | null; spec?: any; templateId?: string | null; generatedAt?: string }
   | { kind: 'certified'; run: any; templateId?: string | null; generatedAt?: string };
 
-const MM = 96 / 25.4;
-/** The page font (Almarai) as data URLs, fetched once. Offline → '' and the browser's own Arabic font is used — the
- *  letters still join correctly because the browser draws the page. Never reads cross-origin stylesheets. */
-let fontsOnce: Promise<string> | null = null;
-function embeddedFonts(): Promise<string> {
-  fontsOnce ??= (async () => {
-    try {
-      const href = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')).map((l) => l.href).find((h) => h.includes('fonts.googleapis.com'));
-      if (!href) return '';
-      const css = await (await fetch(href)).text();
-      const faces = css.split('@font-face').slice(1).map((b) => '@font-face' + b.split('}')[0] + '}').filter((b) => /Almarai/.test(b) && /font-weight:\s*(400|700|800)/.test(b));
-      const out: string[] = [];
-      for (const f of faces) {
-        const url = f.match(/url\((https:[^)]+)\)/)?.[1]; if (!url) continue;
-        const blob = await (await fetch(url)).blob();
-        const data = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = () => rej(r.error); r.readAsDataURL(blob); });
-        out.push(f.replace(url, data));
-      }
-      return out.join('\n');
-    } catch { return ''; }
-  })();
-  return fontsOnce;
-}
 type Draft = Omit<ReportTemplate, 'versions'> & { versions?: any };
+
+/** The venue block of a printed report (name, logo, header / footer lines from the venue's document template, branches). */
+export function useDocVenue(branchIds: string[]): DocModel['venue'] {
+  const branches = useQuery<any>('Branch.List');
+  const { template: venueTpl } = useDocTemplate();
+  const key = branchIds.join(',');
+  return useMemo(() => ({
+    name: venueTpl?.business?.nameAr || venueTpl?.business?.name || t('المطعم'),
+    branches: branchIds.map((id) => (branches.data?.items ?? []).find((b: any) => b.id === id)?.name ?? id).join('، '),
+    logo: venueTpl?.logoDataUrl ?? null, headerLines: venueTpl?.headerLines ?? [], footerLines: venueTpl?.footerLines ?? [], taxNumber: null,
+  }), [venueTpl, branches.data, key]); // eslint-disable-line react-hooks/exhaustive-deps
+}
 
 export function PrintStudio({ source, onClose }: { source: PrintSource; onClose: () => void }) {
   const { auth, me } = useDev();
@@ -59,8 +48,6 @@ export function PrintStudio({ source, onClose }: { source: PrintSource; onClose:
   const [zoom, setZoom] = useState(0.8);
   const [cur, setCur] = useState(1);
   const [pdfBusy, setPdfBusy] = useState(false);
-  const [exporting, setExporting] = useState<Page[] | null>(null);
-  const exportRoot = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
   const mainRef = useRef<HTMLDivElement>(null);
   useEffect(() => { if (!templates.length) return; const pick = templates.find((x) => x.id === tplId) ?? templates.find((x) => x.id === (source.kind === 'certified' ? 'tpl_accountant_a4' : 'tpl_accountant_a4')) ?? templates[0]; if (!draft || draft.id !== pick.id) { setTplId(pick.id); setDraft(structuredClone(pick)); } }, [templates.length, tplId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -69,19 +56,14 @@ export function PrintStudio({ source, onClose }: { source: PrintSource; onClose:
   const lng = lang();
   const branchName = (id: string) => (branches.data?.items ?? []).find((b: any) => b.id === id)?.name ?? id;
   const generatedAt = source.generatedAt ?? new Date().toISOString();
-  const venue: DocModel['venue'] = useMemo(() => ({
-    name: venueTpl?.business?.nameAr || venueTpl?.business?.name || t('المطعم'),
-    branches: (source.kind === 'pivot' ? source.result.meta.branchIds : source.run.branchIds ?? []).map(branchName).join('، '),
-    logo: venueTpl?.logoDataUrl ?? null, headerLines: venueTpl?.headerLines ?? [], footerLines: venueTpl?.footerLines ?? [], taxNumber: null,
-  }), [venueTpl, branches.data, source]); // eslint-disable-line react-hooks/exhaustive-deps
+  const venue = useDocVenue(source.kind === 'pivot' ? source.result.meta.branchIds : source.run.branchIds ?? []);
   const generatedBy = me?.displayName ?? '';
   const doc: DocModel | null = useMemo(() => {
     if (!draft) return null;
     const d = source.kind === 'pivot'
       ? docFromPivot(source.result, { title: source.title, lang: lng, view: source.view, depth: draft.depth, venue, generatedBy, generatedAt, chart: source.chart ?? 'bars', sandbox: true })
       : docFromCertified(source.run, { lang: lng, venue, generatedBy, generatedAt, sandbox: true });
-    if (draft.paper === 'RECEIPT_80') d.tables = d.tables.map((tb) => { const keep = tb.columns.map((c, i) => ({ c, i })).filter(({ c }) => !c.group || c.group === (lng === 'ar' ? 'الإجمالي' : 'Total')).slice(0, 2).map((x) => x.i); return { ...tb, columns: keep.map((i) => tb.columns[i]), rows: tb.rows.map((r) => ({ ...r, cells: keep.map((i) => r.cells[i]), raw: keep.map((i) => r.raw[i]), tones: keep.map((i) => r.tones[i]) })) }; });
-    return d;
+    return draft.paper === 'RECEIPT_80' ? receiptColumns(d) : d;
   }, [draft, source, venue, lng, generatedBy, generatedAt]);
   const pages = useMemo(() => (doc && draft ? paginate(doc, draft as ReportTemplate) : []), [doc, draft]);
   useEffect(() => { if (cur > pages.length) setCur(Math.max(1, pages.length)); }, [pages.length, cur]);
@@ -99,31 +81,14 @@ export function PrintStudio({ source, onClose }: { source: PrintSource; onClose:
     const r = await runCmd('ReportTemplate.Save', { body }, { success: asNew ? t('القالب الجديد اتحفظ') : t('القالب اتحفظ — نسخة جديدة') });
     if (r) { await tq.refetch(); setTplId(r.id); setDraft(structuredClone(r)); }
   };
+  // ux-17: «تنزيل PDF» writes real text (jsPDF + autotable + the embedded Arabic font) from these same pages
   const pdf = async () => {
-    if (!draft || !pages.length) return;
+    if (!draft || !doc || !pages.length) return;
     setPdfBusy(true);
     try {
-      // audited on the server like every export (the numbers come from the same run as the screen)
-      if (source.kind === 'pivot') await call(auth, 'Report.PivotExport', { body: { savedReportId: source.savedId ?? undefined, spec: source.savedId ? undefined : source.spec ?? source.result.spec, format: 'PDF', name: title } });
-      else await call(auth, 'Report.Export', { body: { reportId: source.run.reportId, fromBusinessDate: source.run.period.from, toBusinessDate: source.run.period.to, branchIds: (source.run.branchIds ?? []).join(','), format: 'PDF' } });
-      setExporting(pages);
-      await new Promise((r) => setTimeout(r, 120));
-      const [{ toCanvas }, { jsPDF }] = await Promise.all([import('html-to-image'), import('jspdf')]);
-      const paper = paperOf(draft);
-      const fonts = await embeddedFonts();
-      const nodes = Array.from(exportRoot.current?.querySelectorAll<HTMLElement>('[data-print-page]') ?? []);
-      let pdfDoc: any = null;
-      for (const node of nodes) {
-        const hMm = draft.paper === 'RECEIPT_80' ? node.offsetHeight / MM : paper.h;
-        const canvas = await toCanvas(node, { pixelRatio: 2, backgroundColor: '#ffffff', width: Math.round(paper.w * MM), height: Math.round(hMm * MM), fontEmbedCSS: fonts });
-        const img = canvas.toDataURL('image/jpeg', 0.92);
-        if (!pdfDoc) pdfDoc = new jsPDF({ orientation: paper.w > (hMm || paper.h) ? 'landscape' : 'portrait', unit: 'mm', format: draft.paper === 'RECEIPT_80' ? [paper.w, hMm] : 'a4', compress: true });
-        else pdfDoc.addPage(draft.paper === 'RECEIPT_80' ? [paper.w, hMm] : 'a4', paper.w > paper.h ? 'landscape' : 'portrait');
-        pdfDoc.addImage(img, 'JPEG', 0, 0, paper.w, hMm);
-      }
-      const name = `nerdpos-${(source.kind === 'pivot' ? source.savedId ?? 'report' : source.run.reportId).replace(/^sr_/, '')}-${source.kind === 'pivot' ? source.result.meta.from : source.run.period.from}.pdf`;
-      if (await saveFile(name, pdfDoc.output('arraybuffer'), 'application/pdf')) toast('success', t('ملف PDF اتنزل'), name, auth.label);
-    } catch (e) { toast('error', errorText(e), (e as any)?.code ?? String(e), auth.label); } finally { setExporting(null); setPdfBusy(false); }
+      const res = await exportPdf(auth, { source, template: draft as ReportTemplate, doc, venue, generatedBy, lang: lng });
+      if (res.saved) toast('success', t('تم تنزيل ملف PDF'), res.filename, auth.label);
+    } catch (e) { toast('error', errorText(e), (e as any)?.code ?? String(e), auth.label); } finally { setPdfBusy(false); }
   };
   const print = () => { document.body.classList.add('printing-report'); setTimeout(() => { window.print(); setTimeout(() => document.body.classList.remove('printing-report'), 500); }, 60); };
 
@@ -197,7 +162,6 @@ export function PrintStudio({ source, onClose }: { source: PrintSource; onClose:
           </aside>
         )}
       </div>
-      {exporting && doc && draft && <div ref={exportRoot} style={{ position: 'fixed', top: 0, left: -20000, zIndex: -1 }} aria-hidden>{exporting.map((p) => <PrintPage key={p.n} doc={doc} tpl={draft as ReportTemplate} page={p} total={exporting.length} flat />)}</div>}
     </div>, document.body);
 }
 
@@ -255,14 +219,14 @@ export function PrintPage({ doc, tpl, page, total, flat }: { doc: DocModel; tpl:
       </div>
       {!receipt && (
         <div className="absolute flex items-end justify-between gap-3" style={{ insetInline: `${paper.margin}mm`, bottom: `${paper.margin - 2}mm`, height: `${H.footer - 2}mm`, fontSize: '6.8pt', color: '#555', borderTop: '0.2mm solid #ccc', paddingTop: '1mm' }}>
-          <div className="min-w-0"><div className="truncate">{tpl.footer.confidentiality}</div><div className="truncate">{T('اتطلع بواسطة', 'Generated by')} {doc.generatedBy || '—'} · {dateTime(doc.generatedAt)} · {T('التعريفات', 'Definitions')}: {doc.definitions}</div></div>
+          <div className="min-w-0"><div className="truncate">{tpl.footer.confidentiality}</div><div className="truncate">{T('أُنشئ بواسطة', 'Generated by')} {doc.generatedBy || '—'} · {dateTime(doc.generatedAt)} · {T('التعريفات', 'Definitions')}: {doc.definitions}</div></div>
           <div className="shrink-0 flex items-center gap-2">
             {tpl.watermark.sandbox && doc.status.sandbox && <span style={{ color: '#b45309', border: '0.3mm solid #f59e0b', borderRadius: '1mm', padding: '0 1.2mm' }}>{T('بيانات تجريبية', 'Demo data')}</span>}
             {tpl.footer.pageNumbers && <span className="font-bold num">{T(`صفحة ${page.n} من ${total}`, `Page ${page.n} of ${total}`)}</span>}
           </div>
         </div>
       )}
-      {receipt && <div style={{ marginTop: '3mm', fontSize: '6.6pt', color: '#444', textAlign: 'center', borderTop: '0.3mm dashed #333', paddingTop: '1.5mm' }}>{tpl.footer.confidentiality && <div>{tpl.footer.confidentiality}</div>}{doc.venue.footerLines.slice(0, 2).map((l, i) => <div key={i}>{l}</div>)}<div>{T('اتطلع بواسطة', 'Generated by')} {doc.generatedBy} · {dateTime(doc.generatedAt)}</div></div>}
+      {receipt && <div style={{ marginTop: '3mm', fontSize: '6.6pt', color: '#444', textAlign: 'center', borderTop: '0.3mm dashed #333', paddingTop: '1.5mm' }}>{tpl.footer.confidentiality && <div>{tpl.footer.confidentiality}</div>}{doc.venue.footerLines.slice(0, 2).map((l, i) => <div key={i}>{l}</div>)}<div>{T('أُنشئ بواسطة', 'Generated by')} {doc.generatedBy} · {dateTime(doc.generatedAt)}</div></div>}
       {isLast && null}
     </div>
   );
@@ -296,7 +260,7 @@ function Item({ it, doc, tpl, T }: { it: PageItem; doc: DocModel; tpl: ReportTem
           <div className="text-end shrink-0" style={{ maxWidth: '55%' }}>
             <div style={{ fontSize: '12pt', fontWeight: 800 }}>{doc.title}</div>
             <div>{doc.params[0]?.value}</div>
-            <div style={{ display: 'inline-block', marginTop: '1mm', padding: '0.3mm 2mm', borderRadius: '1mm', fontSize: '7pt', fontWeight: 700, background: doc.status.provisional ? '#fef3c7' : '#dcfce7', color: doc.status.provisional ? '#92400e' : '#166534' }}>{doc.status.provisional ? T('مبدئي — ممكن يتغير', 'Provisional') : T('نهائي — الأيام مقفولة', 'Final — days closed')}</div>
+            <div style={{ display: 'inline-block', marginTop: '1mm', padding: '0.3mm 2mm', borderRadius: '1mm', fontSize: '7pt', fontWeight: 700, background: doc.status.provisional ? '#fef3c7' : '#dcfce7', color: doc.status.provisional ? '#92400e' : '#166534' }}>{doc.status.provisional ? T('مبدئي — قد يتغير', 'Provisional') : T('نهائي — الأيام مغلقة', 'Final — days closed')}</div>
           </div>
         </div>
       );
@@ -325,7 +289,7 @@ function Item({ it, doc, tpl, T }: { it: PageItem; doc: DocModel; tpl: ReportTem
     }
     case 'bridge': return (
       <div style={{ marginBottom: mm(H.gap) }}>
-        <div style={{ height: mm(H.bridgeHead - 2), fontWeight: 700 }}>{T('جسر الفلوس', 'Money bridge')}</div>
+        <div style={{ height: mm(H.bridgeHead - 2), fontWeight: 700 }}>{T('جسر النقدية', 'Money bridge')}</div>
         {doc.bridge!.map((b, i) => <div key={i} className="flex justify-between" style={{ height: mm(H.bridgeRow), alignItems: 'center', borderBottom: '0.2mm solid #eee', fontWeight: b.strong ? 700 : 400 }}><span className="truncate">{b.label}</span><span className="num">{b.amount}</span></div>)}
       </div>
     );
@@ -355,17 +319,17 @@ function Item({ it, doc, tpl, T }: { it: PageItem; doc: DocModel; tpl: ReportTem
               </tr>
             </thead>
             <tbody>
-              {it.carryIn && <tr data-fb="pp:carry-in"><td style={{ ...cellBase, fontStyle: 'italic', background: '#f3f4f6' }}>{T('منقول من الصفحة اللي قبلها', 'Brought forward')}</td>{it.carryIn.map((v, i) => <td key={i} className="num" style={{ ...cellBase, textAlign: 'end', fontStyle: 'italic', background: '#f3f4f6' }}>{v}</td>)}</tr>}
+              {it.carryIn && <tr data-fb="pp:carry-in"><td style={{ ...cellBase, fontStyle: 'italic', background: '#f3f4f6' }}>{T('منقول من الصفحة السابقة', 'Brought forward')}</td>{it.carryIn.map((v, i) => <td key={i} className="num" style={{ ...cellBase, textAlign: 'end', fontStyle: 'italic', background: '#f3f4f6' }}>{v}</td>)}</tr>}
               {it.rows.map((ri) => {
                 const r = tb.rows[ri]; const total = r.kind === 'total'; const group = r.kind === 'group';
                 return (
                   <tr key={ri}>
-                    <td style={{ ...cellBase, paddingInlineStart: `${1.4 + r.depth * 3.2}mm`, fontWeight: total || group ? 700 : 400, fontStyle: r.kind === 'others' ? 'italic' : undefined, background: total ? '#e5e7eb' : group && r.depth === 0 ? '#f8fafc' : undefined, borderTop: total ? '0.4mm solid #111' : undefined }}>{total ? T('الإجمالي', 'Grand total') : r.label}</td>
+                    <td style={{ ...cellBase, paddingInlineStart: `${1.4 + r.depth * 3.2}mm`, fontWeight: total || group ? 700 : 400, fontStyle: r.kind === 'others' ? 'italic' : undefined, background: total ? '#e5e7eb' : group && r.depth === 0 ? '#f8fafc' : undefined, borderTop: total ? '0.4mm solid #111' : undefined }}>{total ? (r.label || T('الإجمالي', 'Grand total')) : r.label}</td>
                     {r.cells.map((v, i) => <td key={i} className="num" style={{ ...cellBase, textAlign: 'end', fontWeight: total || group ? 700 : 400, background: total ? '#e5e7eb' : r.tones[i] === 'good' ? '#dcfce7' : r.tones[i] === 'bad' ? '#fee2e2' : group && r.depth === 0 ? '#f8fafc' : undefined, color: r.tones[i] === 'bad' ? '#b91c1c' : undefined, borderTop: total ? '0.4mm solid #111' : undefined }}>{v}</td>)}
                   </tr>
                 );
               })}
-              {it.carryOut && <tr data-fb="pp:carry-out"><td style={{ ...cellBase, fontStyle: 'italic', background: '#f3f4f6', borderTop: '0.3mm solid #999' }}>{T('يتنقل للصفحة اللي بعدها', 'Carried forward')}</td>{it.carryOut.map((v, i) => <td key={i} className="num" style={{ ...cellBase, textAlign: 'end', fontStyle: 'italic', background: '#f3f4f6', borderTop: '0.3mm solid #999' }}>{v}</td>)}</tr>}
+              {it.carryOut && <tr data-fb="pp:carry-out"><td style={{ ...cellBase, fontStyle: 'italic', background: '#f3f4f6', borderTop: '0.3mm solid #999' }}>{T('يُرحَّل إلى الصفحة التالية', 'Carried forward')}</td>{it.carryOut.map((v, i) => <td key={i} className="num" style={{ ...cellBase, textAlign: 'end', fontStyle: 'italic', background: '#f3f4f6', borderTop: '0.3mm solid #999' }}>{v}</td>)}</tr>}
             </tbody>
           </table>
         </div>

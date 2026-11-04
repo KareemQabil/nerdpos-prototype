@@ -1,7 +1,7 @@
 // Print layout (pure, no React): a document model built from a pivot result (custom reports) or a certified run, and a
 // deterministic paginator for A4 portrait / landscape and the 80 mm receipt. Every row has a fixed height (labels are
 // cut with «…», never wrapped), so page breaks are known before rendering: the table header repeats on every page and
-// additive columns carry a running subtotal («منقول من الصفحة اللي قبلها» / «يتنقل للصفحة اللي بعدها»). The preview,
+// additive columns carry a running subtotal («منقول من الصفحة السابقة» / «يُرحَّل إلى الصفحة التالية»). The preview,
 // the PDF and the test all use this one layout. Carried-forward sums add the rows printed so far (decimal), and the
 // test proves they meet the engine's grand total.
 import type { Loc } from '../../mock/types';
@@ -14,6 +14,7 @@ import { zonedParts } from '../../mock/clock';
 /** An instant in Cairo local time, in words: «1 نوفمبر 2026، 16:44». */
 export function cairoText(iso: string, lang: Lang): string { const p = zonedParts(Date.parse(iso), 'Africa/Cairo'); const d = `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`; return `${dayText(d, lang, true)}${lang === 'ar' ? '، ' : ', '}${String(p.hour).padStart(2, '0')}:${String(p.minute).padStart(2, '0')}`; }
 import { flatten } from '../pivot';
+import { DIMENSIONS } from '../registry/dimensions';
 
 export interface DocColumn { group: string | null; label: string; format: NumberFormat; unit?: string; carry: boolean }
 export interface DocRow { label: string; depth: number; kind: 'group' | 'leaf' | 'others' | 'total' | 'plain'; terminal: boolean; cells: string[]; raw: (string | null)[]; tones: (string | null)[] }
@@ -41,6 +42,7 @@ export const H = { headerFull: 28, headerCompact: 10, params: 19, kpiRow: 19, ch
 export const kpisPerRow = (t: Pick<ReportTemplate, 'orientation' | 'paper'>) => (t.paper === 'RECEIPT_80' ? 2 : t.orientation === 'landscape' ? 6 : 4);
 
 const L = (lang: Lang, ar: string, en: string) => (lang === 'ar' ? ar : en);
+const DIM_LABEL: Record<string, Loc> = Object.fromEntries(DIMENSIONS.map((d) => [d.id, d.label]));
 
 /** A pivot result → the printable document (columns in the user's order, labels and formats applied). */
 export function docFromPivot(r: PivotResult, o: { title: string; lang: Lang; view?: ColumnView[]; depth: number; venue: DocModel['venue']; generatedBy: string; generatedAt: string; chart?: 'none' | 'bars' | 'line'; sandbox?: boolean; filtersText?: string }): DocModel {
@@ -69,9 +71,9 @@ export function docFromPivot(r: PivotResult, o: { title: string; lang: Lang; vie
 export function paramsOf(r: PivotResult, lang: Lang, filtersText?: string): { label: string; value: string }[] {
   const p = [
     { label: L(lang, 'الفترة', 'Period'), value: rangeText(r.meta.from, r.meta.to, lang) },
-    { label: L(lang, 'اليوم التجاري', 'Business day'), value: L(lang, `من ${r.meta.cutoff} الفجر لـ ${r.meta.cutoff} الفجر بتوقيت القاهرة`, `${r.meta.cutoff} to ${r.meta.cutoff}, Cairo time`) },
-    { label: L(lang, 'لحد', 'As of'), value: cairoText(r.meta.asOf, lang) },
-    { label: L(lang, 'الحالة', 'Status'), value: r.meta.provisional ? L(lang, 'مبدئي — ممكن يتغير', 'Provisional — may change') : L(lang, 'نهائي — الأيام مقفولة', 'Final — days closed') },
+    { label: L(lang, 'اليوم التجاري', 'Business day'), value: L(lang, `من ${r.meta.cutoff} إلى ${r.meta.cutoff} فجرًا بتوقيت القاهرة`, `${r.meta.cutoff} to ${r.meta.cutoff}, Cairo time`) },
+    { label: L(lang, 'حتى', 'As of'), value: cairoText(r.meta.asOf, lang) },
+    { label: L(lang, 'الحالة', 'Status'), value: r.meta.provisional ? L(lang, 'مبدئي — قد يتغير', 'Provisional — may change') : L(lang, 'نهائي — الأيام مغلقة', 'Final — days closed') },
   ];
   if (r.meta.compare) p.push({ label: L(lang, 'المقارنة', 'Compared with'), value: `${pick(r.meta.compare.label, lang)} (${rangeText(r.meta.compare.from, r.meta.compare.to, lang)})` });
   if (filtersText) p.push({ label: L(lang, 'الفلاتر', 'Filters'), value: filtersText });
@@ -82,24 +84,58 @@ export function paramsOf(r: PivotResult, lang: Lang, filtersText?: string): { la
 export function docFromCertified(run: any, o: { lang: Lang; venue: DocModel['venue']; generatedBy: string; generatedAt: string; sandbox?: boolean }): DocModel {
   const lang = o.lang; const h = run.header;
   const MONEY = /^-?\d+\.\d{4}$/;
-  const tables: DocTable[] = (run.sections ?? []).map((s: any) => ({
-    title: pick(s.title, lang), rowHeader: s.columns?.[0] ?? '', columns: (s.columns ?? []).slice(1).map((c: string) => ({ group: null, label: c, format: 'money' as NumberFormat, carry: false })),
-    rows: (s.rows ?? []).map((row: any[]) => { const total = typeof row[0] === 'string' && /الإجمالي|الفرق/.test(row[0]); return { label: String(row[0] ?? ''), depth: 0, kind: total ? 'total' as const : 'plain' as const, terminal: !total, raw: row.slice(1).map((c) => (typeof c === 'string' && MONEY.test(c) ? c : null)), tones: row.slice(1).map(() => null), cells: row.slice(1).map((c) => (c === 'CAPABILITY_NOT_AVAILABLE' ? L(lang, 'مش متاح', 'Not available') : typeof c === 'string' && MONEY.test(c) ? fmtNumber(c, 'money', lang) : String(c ?? ''))) }; }),
-  }));
+  const fromSections = (sec: any): DocTable => ({
+    title: pick(sec.title, lang), rowHeader: sec.columns?.[0] ?? '', columns: (sec.columns ?? []).slice(1).map((c: string) => ({ group: null, label: c, format: 'money' as NumberFormat, carry: false })),
+    rows: (sec.rows ?? []).map((row: any[]) => { const total = typeof row[0] === 'string' && /الإجمالي|الفرق/.test(row[0]); return { label: String(row[0] ?? ''), depth: 0, kind: total ? 'total' as const : 'plain' as const, terminal: !total, raw: row.slice(1).map((c) => (typeof c === 'string' && MONEY.test(c) ? c : null)), tones: row.slice(1).map(() => null), cells: row.slice(1).map((c) => (c === 'CAPABILITY_NOT_AVAILABLE' ? L(lang, 'غير متاح', 'Not available') : typeof c === 'string' && MONEY.test(c) ? fmtNumber(c, 'money', lang) : String(c ?? ''))) }; }),
+  });
+  // ux-17: tables from the run's blocks (labels in the document's language, each metric in its own unit); a block kind
+  // without a table form (matrix, evidence) keeps the export section — the same numbers either way
+  const metaOf = (id: string) => (h.metrics ?? []).find((m: any) => m.id === id);
+  const fmtOf = (id: string): NumberFormat => { const u = metaOf(id)?.unit; return u === '%' ? 'pct' : u === 'count' || u === 'unit' ? 'number0' : u === 'minutes' ? 'number' : 'money'; };
+  const cell = (v: any, id: string) => cellText(v, fmtOf(id), lang, metaOf(id)?.unit);
+  const row = (label: string, vals: { v: any; id: string }[], kind: DocRow['kind'] = 'plain'): DocRow => ({ label, depth: 0, kind, terminal: kind !== 'total', cells: vals.map((x) => cell(x.v, x.id)), raw: vals.map((x) => (x.v?.availability === 'AVAILABLE' && fmtOf(x.id).startsWith('money') ? x.v.value : null)), tones: vals.map(() => null) });
+  const money = (amount: string) => ({ v: { value: amount, availability: 'AVAILABLE' }, id: '__money' });
+  const fromBlock = (b: any, i: number): DocTable | null => {
+    const title = pick(b.title, lang);
+    if (b.result) {
+      const r = b.result; const ms: string[] = r.metrics;
+      if (!r.dimensions.length) return { title, rowHeader: L(lang, 'المقياس', 'Metric'), columns: [{ group: null, label: L(lang, 'القيمة', 'Value'), format: 'money', carry: false }], rows: ms.map((m) => ({ ...row(pick(metaOf(m)?.label, lang) || m, [{ v: r.totals[m], id: m }]), raw: [null] })) };
+      const dimHead = r.dimensions.map((d: string) => pick(DIM_LABEL[d], lang) || d).join(' · ');
+      return { title, rowHeader: dimHead, columns: ms.map((m) => ({ group: null, label: pick(metaOf(m)?.label, lang) || m, format: fmtOf(m), unit: metaOf(m)?.unit, carry: metaOf(m)?.additivity === 'ADD' && fmtOf(m) === 'money' })),
+        rows: [...r.rows.map((x: any) => row(r.dimensions.map((d: string) => pick(x.labels[d], lang)).join(' · '), ms.map((m) => ({ v: x.values[m], id: m })))), row(L(lang, 'الإجمالي', 'Total'), ms.map((m) => ({ v: r.totals[m], id: m })), 'total')] };
+    }
+    if (b.bridge) {
+      const br = b.bridge;
+      return { title, rowHeader: L(lang, 'البند', 'Item'), columns: [{ group: null, label: L(lang, 'المبلغ', 'Amount'), format: 'money', carry: false }],
+        rows: [...br.sales.map((x: any) => ({ ...row(pick(x.label, lang), [money(x.amount)], x.total ? 'group' : 'plain'), raw: [null] })), ...br.money.map((x: any) => ({ ...row(pick(x.label, lang), [money(x.amount)], x.total ? 'group' : 'plain'), raw: [null] })),
+          { ...row(L(lang, 'الفرق (الفواتير − المتحصل)', 'Difference (billed − collected)'), [money(br.gap.difference)], 'total'), raw: [null] }] };
+    }
+    if (b.drawers) return { title, rowHeader: L(lang, 'الوردية', 'Session'), columns: [L(lang, 'المتوقع', 'Expected'), L(lang, 'المعدود', 'Counted'), L(lang, 'الفرق', 'Difference')].map((label) => ({ group: null, label, format: 'money' as NumberFormat, carry: false })),
+      rows: b.drawers.map((d: any) => ({ label: d.label, depth: 0, kind: 'plain' as const, terminal: true, raw: [null, null, null], tones: [null, null, d.variance && Number(d.variance) < 0 ? 'bad' : null], cells: [d.expected, d.counted, d.variance].map((x) => (x === null || x === undefined ? '—' : fmtNumber(x, 'money', lang))) })) };
+    const sec = (run.sections ?? []).find((x: any) => x.id === b.id) ?? run.sections?.[i];
+    return sec ? fromSections(sec) : null;
+  };
+  const tables: DocTable[] = run.blocks?.length ? run.blocks.map(fromBlock).filter((x: DocTable | null): x is DocTable => !!x && x.rows.length > 0) : (run.sections ?? []).map(fromSections);
   const kpis = (run.kpis ?? []).map((k: any) => ({ label: pick(k.label, lang), value: cellText(k.value, k.unit === '%' ? 'pct' : k.unit === 'count' || k.unit === 'unit' ? 'number0' : 'money', lang, k.unit) }));
   const bridge = run.bridge ? [...run.bridge.sales.map((x: any) => ({ label: pick(x.label, lang), amount: fmtNumber(x.amount, 'money', lang), strong: !!x.total })), ...run.bridge.money.map((x: any) => ({ label: pick(x.label, lang), amount: fmtNumber(x.amount, 'money', lang), strong: !!x.total }))] : null;
   return {
     lang, title: pick(run.title, lang), venue: o.venue, generatedBy: o.generatedBy, generatedAt: o.generatedAt,
     params: [
       { label: L(lang, 'الفترة', 'Period'), value: rangeText(h.period.from, h.period.to, lang) },
-      { label: L(lang, 'اليوم التجاري', 'Business day'), value: L(lang, `من ${h.cutoff} الفجر لـ ${h.cutoff} الفجر بتوقيت القاهرة`, `${h.cutoff} to ${h.cutoff}, Cairo time`) },
-      { label: L(lang, 'لحد', 'As of'), value: cairoText(String(h.asOf), lang) },
-      { label: L(lang, 'الحالة', 'Status'), value: h.provisional ? L(lang, 'مبدئي — ممكن يتغير', 'Provisional — may change') : L(lang, 'نهائي — الأيام مقفولة', 'Final — days closed') },
+      { label: L(lang, 'اليوم التجاري', 'Business day'), value: L(lang, `من ${h.cutoff} إلى ${h.cutoff} فجرًا بتوقيت القاهرة`, `${h.cutoff} to ${h.cutoff}, Cairo time`) },
+      { label: L(lang, 'حتى', 'As of'), value: cairoText(String(h.asOf), lang) },
+      { label: L(lang, 'الحالة', 'Status'), value: h.provisional ? L(lang, 'مبدئي — قد يتغير', 'Provisional — may change') : L(lang, 'نهائي — الأيام مغلقة', 'Final — days closed') },
     ],
     status: { provisional: h.provisional, reasons: (h.provisionalReasons ?? []).map((x: Loc) => pick(x, lang)), closed: !!h.closed, sandbox: !!o.sandbox },
     definitions: (h.metrics ?? []).slice(0, 8).map((m: any) => `${pick(m.label, lang)} v${m.version}`).join('، '),
     kpis, tables, chart: null, bridge,
   };
+}
+
+/** The 80 mm roll keeps the label and the first two total columns of each table (the preview and the PDF). */
+export function receiptColumns(d: DocModel): DocModel {
+  const tot = d.lang === 'ar' ? 'الإجمالي' : 'Total';
+  return { ...d, tables: d.tables.map((tb) => { const keep = tb.columns.map((c, i) => ({ c, i })).filter(({ c }) => !c.group || c.group === tot).slice(0, 2).map((x) => x.i); return { ...tb, columns: keep.map((i) => tb.columns[i]), rows: tb.rows.map((r) => ({ ...r, cells: keep.map((i) => r.cells[i]), raw: keep.map((i) => r.raw[i]), tones: keep.map((i) => r.tones[i]) })) }; }) };
 }
 
 /** Deterministic pages. */

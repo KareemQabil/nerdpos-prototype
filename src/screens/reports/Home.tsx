@@ -11,7 +11,7 @@ import { PageHeader, Tabs, Card, Button, Pill, SearchInput, FilterChips, EmptySt
 import { t, L, getLang } from '../../i18n';
 import { cn, dateTime } from '../../lib/format';
 import { Tech } from '../../app/tech';
-import { REPORT_CATEGORIES } from '../../reports/studio';
+import { REPORT_GROUPS, reportGroup } from '../../reports/studio';
 import { EvidenceCtx, type EvidenceSpec } from './parts';
 import { EvidencePopup } from './Evidence';
 import { ReportView } from './ReportView';
@@ -20,10 +20,10 @@ import { AskDock } from './Assistant';
 import { usePivot, designSpec, useRegistry, PERIODS, periodText, lang, today, useClickAway, EMPTY_TEXT } from './studio/common';
 import { PivotGrid, initialExpanded } from './studio/PivotGrid';
 import { Kpis, MiniChart, StatusLine, LeftOut, DefinitionsList } from './studio/Summary';
-import { PrintStudio, type PrintSource } from './studio/PrintStudio';
+import { PrintStudio, useDocVenue, type PrintSource } from './studio/PrintStudio';
 import { SchedulesPanel, ScheduleDialog } from './studio/Schedules';
 import { HistoryPopup, shareText, actionText } from './studio/SaveHistory';
-import { exportPivot, exportCertified } from './studio/exports';
+import { exportPivot, exportCertified, exportPdf } from './studio/exports';
 import { MenuRow } from './Designer';
 import { SalesOverview } from '../ops/ReportExtras';
 import type { PeriodPreset } from '../../reports/pivot';
@@ -49,13 +49,13 @@ export function ReportsHome({ legacy, onLegacy }: { legacy: any[]; onLegacy: (id
   const favs: string[] = sq.data?.favourites ?? [];
   const recent: { id: string; at: string }[] = sq.data?.recent ?? [];
   const cards = useMemo(() => [
-    ...certified.map((r) => ({ kind: 'certified' as const, id: r.id, title: L(r.title), text: L(r.purpose), category: REPORT_CATEGORIES[r.family] ? r.family : 'other', pilot: r.pilot, owner: null as string | null, share: null as string | null })),
-    ...saved.map((r) => ({ kind: 'saved' as const, id: r.id, title: r.name, text: r.description, category: r.category, pilot: false, owner: r.ownerName, share: shareText(r.view) })),
+    ...certified.map((r) => ({ kind: 'certified' as const, id: r.id, title: L(r.title), text: L(r.purpose), category: reportGroup(r.family, r.id), pilot: r.pilot, owner: null as string | null, share: null as string | null })),
+    ...saved.map((r) => ({ kind: 'saved' as const, id: r.id, title: r.name, text: r.description, category: reportGroup(r.category), pilot: false, owner: r.ownerName, share: shareText(r.view) })),
   ], [certified, saved]);
   const lastAt = (id: string) => recent.find((x) => x.id === id)?.at ?? null;
   const match = (c: (typeof cards)[number]) => (!q.trim() || `${c.title} ${c.text}`.includes(q.trim())) && (!cat || c.category === cat) && (f === 'all' || (f === 'fav' && favs.includes(c.id)) || (f === 'recent' && !!lastAt(c.id)) || (f === 'certified' && c.kind === 'certified') || (f === 'mine' && c.kind === 'saved'));
   const shown = cards.filter(match).sort((a, b) => (f === 'recent' ? String(lastAt(b.id)).localeCompare(String(lastAt(a.id))) : 0));
-  const grouped = Object.keys(REPORT_CATEGORIES).map((k) => [k, shown.filter((c) => c.category === k)] as const).filter(([, xs]) => xs.length);
+  const grouped = Object.keys(REPORT_GROUPS).map((k) => [k, shown.filter((c) => c.category === k)] as const).filter(([, xs]) => xs.length);
   const star = async (id: string) => { await run('SavedReport.Favourite', { body: { id } }); sq.refetch(); };
   const open = (c: { kind: 'certified' | 'saved'; id: string }) => nav('reports', c.kind === 'certified' ? { reportId: c.id } : { savedId: c.id });
   const loading = (list.loading && !list.data) || (sq.loading && !sq.data);
@@ -66,7 +66,6 @@ export function ReportsHome({ legacy, onLegacy }: { legacy: any[]; onLegacy: (id
     <AskDock>
     <div className="space-y-4 pb-16" data-screen-id="H1" data-fb="reports-home">
       <PageHeader title={t('التقارير')} icon={<FileBarChart className="w-5 h-5" />} badge={<StateBadge ops={['Report.List', 'SavedReport.Find', 'Report.Pivot', 'Report.Run']} />}
-        description={t('كل أرقام المطعم في مكان واحد. دوس على أي رقم يوريك الشيكات اللي وراه.')}
         actions={<>
           <Button size="sm" variant="outline" onClick={() => nav('report-assistant')} data-fb="reports:ask"><MessageCircleQuestion className="w-4 h-4" />{t('اسأل التقارير')}</Button>
           <Button size="sm" variant="primary" onClick={() => nav('report-designer')} data-fb="reports:new"><Wand2 className="w-4 h-4" />{t('اعمل تقرير')}</Button>
@@ -89,7 +88,7 @@ export function ReportsHome({ legacy, onLegacy }: { legacy: any[]; onLegacy: (id
             { id: 'mine', label: t('تقاريري'), count: saved.length, fb: 'reports-filter:mine' },
           ]} />
           <span className="flex-1" />
-          <div className="w-48"><Select value={cat} onChange={(e) => setCat(e.target.value)} options={[{ value: '', label: t('كل المواضيع') }, ...Object.entries(REPORT_CATEGORIES).filter(([k]) => cards.some((c) => c.category === k)).map(([k, v]) => ({ value: k, label: L(v) }))]} data-fb="reports:category" /></div>
+          <div className="w-48"><Select value={cat} onChange={(e) => setCat(e.target.value)} options={[{ value: '', label: t('كل المجموعات') }, ...Object.entries(REPORT_GROUPS).filter(([k]) => cards.some((c) => c.category === k)).map(([k, v]) => ({ value: k, label: L(v) }))]} data-fb="reports:category" /></div>
         </div>
         {loading ? <div className="grid @3xl/main:grid-cols-2 @6xl/main:grid-cols-3 gap-3">{[0, 1, 2, 3, 4, 5].map((i) => <SkeletonCard key={i} />)}</div> : <>
           {quick && (favCards.length > 0 || recentCards.length > 0) && (
@@ -98,29 +97,27 @@ export function ReportsHome({ legacy, onLegacy }: { legacy: any[]; onLegacy: (id
               {recentCards.length > 0 && <Shelf title={t('فتحتها قريب')} icon={<Clock className="w-4 h-4 text-[var(--primary)]" />}>{recentCards.map((c) => <MiniRow key={c.id} c={c} at={lastAt(c.id)} onOpen={() => open(c)} />)}</Shelf>}
             </div>
           )}
-          {!shown.length ? <EmptyState icon={<Search className="w-6 h-6" />} title={t('مفيش تقرير بالشكل ده')} text={t('جرّب كلمة تانية أو شيل الفلتر — أو اعمل تقرير جديد بنفسك.')} action={<Button variant="primary" onClick={() => nav('report-designer')}><Wand2 className="w-4 h-4" />{t('اعمل تقرير')}</Button>} /> : grouped.map(([k, xs]) => (
-            <section key={k} className="space-y-2">
-              <div className="text-sm font-bold text-soft">{L(REPORT_CATEGORIES[k])} <span className="text-dim font-normal num">({xs.length})</span></div>
-              <div className="grid @3xl/main:grid-cols-2 @6xl/main:grid-cols-3 gap-3">
-                {xs.map((c) => (
-                  <div key={c.kind + c.id} role="button" tabIndex={0} onClick={() => open(c)} onKeyDown={(e) => e.key === 'Enter' && open(c)} data-fb={`report-card:${c.id}`}
-                    className="group text-start rounded-2xl border border-[var(--glass-border)] bg-[var(--card-raised)] p-4 hover:border-[var(--primary)]/50 hover:shadow-[var(--shadow-card)] transition-all cursor-pointer flex flex-col gap-2 min-h-[132px]">
-                    <div className="flex items-start gap-2">
-                      <div className="min-w-0 flex-1 font-bold leading-snug group-hover:text-[var(--primary)]">{c.title}</div>
-                      <button type="button" onClick={(e) => { e.stopPropagation(); star(c.id); }} aria-label={favs.includes(c.id) ? t('شيل من المفضلة') : t('ضيف للمفضلة')} data-fb={`report-star:${c.id}`} className="shrink-0 -m-1 p-1 rounded-lg hover:surface-2"><Star className={cn('w-4 h-4', favs.includes(c.id) ? 'text-amber-400 fill-amber-400' : 'text-dim')} /></button>
-                    </div>
-                    <div className="text-xs text-soft line-clamp-2 flex-1">{c.text || t('من غير وصف')}</div>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      {c.kind === 'certified' ? <Pill size="sm" tone="success"><ShieldCheck className="w-3 h-3 inline me-0.5" />{t('معتمد')}</Pill> : <Pill size="sm" tone="violet"><Sparkles className="w-3 h-3 inline me-0.5" />{t('مخصص')}</Pill>}
-                      {c.owner && <span className="text-[11px] text-dim inline-flex items-center gap-0.5"><User className="w-3 h-3" />{c.owner.split(' — ')[0]}</span>}
-                      {c.share && <span className="text-[11px] text-dim">· {c.share}</span>}
-                      {lastAt(c.id) && <DateTime v={lastAt(c.id)!} className="text-[11px] text-dim ms-auto" />}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          ))}
+          {!shown.length ? <EmptyState icon={<Search className="w-6 h-6" />} title={t('لا يوجد تقرير مطابق')} action={<Button variant="primary" onClick={() => nav('report-designer')}><Wand2 className="w-4 h-4" />{t('اعمل تقرير')}</Button>} /> : (
+            <div className="grid @5xl/main:grid-cols-2 gap-3 items-start" data-fb="reports:groups">
+              {grouped.map(([k, xs]) => (
+                <section key={k} className="rounded-2xl border border-[var(--glass-border)] bg-[var(--card-raised)] overflow-hidden" data-fb={`report-group:${k}`}>
+                  <div className="flex items-center gap-2 px-3 h-10 border-b border-[var(--glass-border)] surface-1"><span className="text-sm font-bold">{L(REPORT_GROUPS[k])}</span><span className="text-dim text-xs num">{xs.length}</span></div>
+                  <ul className="divide-y divide-[var(--glass-border)]">
+                    {xs.map((c) => (
+                      <li key={c.kind + c.id} role="button" tabIndex={0} onClick={() => open(c)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), open(c))} data-fb={`report-card:${c.id}`} data-group={k} title={c.text || undefined}
+                        className="group flex items-center gap-2 px-3 h-11 cursor-pointer hover:surface-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)]">
+                        {c.kind === 'certified' ? <ShieldCheck className="w-4 h-4 shrink-0 text-[var(--success)]" aria-label={t('معتمد')} /> : <Sparkles className="w-4 h-4 shrink-0 text-[var(--violet)]" aria-label={t('مخصص')} />}
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium group-hover:text-[var(--primary)]">{c.title}</span>
+                        {c.owner && <span className="hidden @3xl/main:inline-flex text-[11px] text-dim items-center gap-0.5 shrink-0"><User className="w-3 h-3" />{c.owner.split(' — ')[0]}</span>}
+                        {lastAt(c.id) && <DateTime v={lastAt(c.id)!} className="text-[11px] text-dim shrink-0" />}
+                        <button type="button" onClick={(e) => { e.stopPropagation(); star(c.id); }} aria-label={favs.includes(c.id) ? t('شيل من المفضلة') : t('ضيف للمفضلة')} data-fb={`report-star:${c.id}`} className="shrink-0 p-1 rounded-lg hover:surface-2"><Star className={cn('w-4 h-4', favs.includes(c.id) ? 'text-amber-400 fill-amber-400' : 'text-dim')} /></button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          )}
           {quick && (
             <details className="rounded-2xl border border-[var(--glass-border)] p-3 text-sm" data-fb="reports:overview">
               <summary className="cursor-pointer text-soft">{t('نظرة سريعة على مبيعات آخر الأيام')}</summary>
@@ -195,11 +192,17 @@ function DownloadButton({ busy, onPick }: { busy: string | null; onPick: (f: 'XL
       <Button size="sm" variant="outline" loading={!!busy} onClick={() => setOpen(!open)} data-fb="report:download"><Download className="w-4 h-4" />{t('تنزيل')}</Button>
       {open && <div className="absolute z-40 mt-1 end-0 w-56 overlay-panel rounded-xl border border-[var(--glass-border)] shadow-[var(--shadow-pop)] p-1.5" data-fb="download-menu">
         <MenuRow icon={<FileSpreadsheet className="w-4 h-4 text-[var(--success)]" />} title={t('إكسل')} sub={t('مجمّع ومنسّق + صفحة التعريفات')} onClick={() => { setOpen(false); onPick('XLSX'); }} fb="dl:xlsx" />
-        <MenuRow icon={<FileText className="w-4 h-4 text-[var(--error)]" />} title="PDF" sub={t('من معاينة الطباعة')} onClick={() => { setOpen(false); onPick('PDF'); }} fb="dl:pdf" />
+        <MenuRow icon={<FileText className="w-4 h-4 text-[var(--error)]" />} title="PDF" sub={t('A4، نص قابل للبحث والنسخ')} onClick={() => { setOpen(false); onPick('PDF'); }} fb="dl:pdf" />
         <MenuRow icon={<FileText className="w-4 h-4 text-dim" />} title="CSV" sub={t('جدول بسيط لبرامج تانية')} onClick={() => { setOpen(false); onPick('CSV'); }} fb="dl:csv" />
       </div>}
     </div>
   );
+}
+/** ux-17: the print template a direct PDF download uses (the report's own, else the accountant's A4). */
+function usePdfTemplate(id: string) {
+  const tq = useQuery<any>('ReportTemplate.Find');
+  const items: any[] = tq.data?.items ?? [];
+  return items.find((x) => x.id === id) ?? items.find((x) => x.id === 'tpl_accountant_a4') ?? null;
 }
 function useFavs() {
   const sq = useQuery<any>('SavedReport.Find');
@@ -215,14 +218,20 @@ function useRangeState(initial: PeriodPreset) {
 
 // ─────────────────────────── certified report page
 export function CertifiedPage({ id }: { id: string }) {
-  const { auth, nav } = useDev();
+  const { auth, nav, params, me } = useDev();
   const list = useQuery<any>('Report.List');
   const branches = useQuery<any>('Branch.List');
   const def = (list.data?.items ?? []).find((r: any) => r.id === id);
   const { favs, toggle } = useFavs();
   const { run: runCmd } = useCommand();
   const p = useRangeState(def?.defaultPeriod === 'LAST_7' ? 'LAST_7' : def?.defaultPeriod === 'YESTERDAY' ? 'YESTERDAY' : 'TODAY');
-  useEffect(() => { if (def) p.setPreset(def.defaultPeriod === 'LAST_7' ? 'LAST_7' : def.defaultPeriod === 'YESTERDAY' ? 'YESTERDAY' : 'TODAY'); }, [def?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // ux-17: opened from Home (or a link) with a business day / range → the same period, so the numbers match
+  useEffect(() => {
+    if (!def) return;
+    const pf = /^\d{4}-\d{2}-\d{2}$/.test(params?.from ?? '') ? params.from : null, pt = /^\d{4}-\d{2}-\d{2}$/.test(params?.to ?? '') ? params.to : pf;
+    if (pf) { const preset = (['TODAY', 'YESTERDAY', 'LAST_7'] as PeriodPreset[]).find((x) => { const r = resolvePeriod(x, today()); return r.from === pf && r.to === (def.period === 'DAY' ? r.from : pt); }); if (preset && (def.period !== 'DAY' || preset !== 'LAST_7')) p.setPreset(preset); else p.setRange(pf, def.period === 'DAY' ? pf : pt!); return; }
+    p.setPreset(def.defaultPeriod === 'LAST_7' ? 'LAST_7' : def.defaultPeriod === 'YESTERDAY' ? 'YESTERDAY' : 'TODAY');
+  }, [def?.id, params?.from, params?.to]); // eslint-disable-line react-hooks/exhaustive-deps
   const [branch, setBranch] = useState('');
   const branchIds = branch === '*' ? (branches.data?.items ?? []).map((b: any) => b.id).join(',') : branch || undefined;
   const isRange = def?.period !== 'DAY';
@@ -236,10 +245,16 @@ export function CertifiedPage({ id }: { id: string }) {
   const [sched, setSched] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [expert, setExpert] = useState(false);
+  const pdfTpl = usePdfTemplate('tpl_accountant_a4');
+  const venue = useDocVenue(r?.branchIds ?? []);
   const download = async (fmt: 'XLSX' | 'CSV' | 'PDF') => {
-    if (fmt === 'PDF') { setPrint(true); return; }
+    if (fmt === 'PDF' && (!r || !pdfTpl)) { setPrint(true); return; }
     setBusy(fmt);
-    try { const res = await exportCertified(auth, { reportId: id, from, to, branchIds, format: fmt, lang: lang() }); if (res.saved) toast('success', fmt === 'XLSX' ? t('ملف الإكسل اتنزل') : t('ملف CSV اتنزل'), res.filename, auth.label); } catch (e) { toast('error', errorText(e), (e as any)?.code, auth.label); } finally { setBusy(null); }
+    try {
+      // ux-17: PDF = real text from the accountant's A4 template (the preview stays one click away)
+      const res = fmt === 'PDF' ? await exportPdf(auth, { source: { kind: 'certified', run: { ...r, kpis: kpisOfRun(r) } }, template: pdfTpl!, venue, generatedBy: me?.displayName ?? '', lang: lang() }) : await exportCertified(auth, { reportId: id, from, to, branchIds, format: fmt, lang: lang() });
+      if (res.saved) toast('success', fmt === 'XLSX' ? t('ملف الإكسل اتنزل') : fmt === 'PDF' ? t('تم تنزيل ملف PDF') : t('ملف CSV اتنزل'), res.filename, auth.label);
+    } catch (e) { toast('error', errorText(e), (e as any)?.code, auth.label); } finally { setBusy(null); }
   };
   const saveAs = async () => { const d = await runCmd('SavedReport.FromCertified', { body: { reportId: id } }); if (d) nav('report-designer', { design: d.design, name: d.name, description: d.description, category: d.category, basedOn: d.basedOn }); };
   const certifiedRows = (list.data?.items ?? []).filter((x: any) => x.certified);
@@ -276,7 +291,7 @@ function kpisOfRun(r: any) { const b = r.blocks?.find((x: any) => x.kind === 'kp
 
 // ─────────────────────────── saved (custom) report page
 export function SavedPage({ id }: { id: string }) {
-  const { auth, nav } = useDev();
+  const { auth, nav, me } = useDev();
   const reg = useRegistry();
   const sq = useQuery<any>('SavedReport.Get', { params: { savedReportId: id } });
   const list = useQuery<any>('Report.List');
@@ -308,10 +323,13 @@ export function SavedPage({ id }: { id: string }) {
   const [defs, setDefs] = useState(false);
   const [expert, setExpert] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const savedTpl = usePdfTemplate(rep?.templateId ?? 'tpl_accountant_a4');
+  const venue = useDocVenue(r?.meta.branchIds ?? []);
   const changed = !!rep && (compare !== (rep.design.compare ?? null) || !!extraRow || !!branch || p.preset !== rep.design.period.preset);
   const download = async (fmt: 'XLSX' | 'CSV' | 'PDF') => {
-    if (fmt === 'PDF') { setPrint(true); return; }
+    if (fmt === 'PDF' && (!r || !rep || !savedTpl)) { setPrint(true); return; }
     setBusy(fmt);
+    if (fmt === 'PDF') { try { const res = await exportPdf(auth, { source: { kind: 'pivot', result: r!, title: rep.name, view: rep.design.view.columns, chart: rep.design.view.chart, savedId: changed ? null : id, spec }, template: savedTpl!, venue, generatedBy: me?.displayName ?? '', lang: lang() }); if (res.saved) toast('success', t('تم تنزيل ملف PDF'), res.filename, auth.label); } catch (e) { toast('error', errorText(e), (e as any)?.code, auth.label); } finally { setBusy(null); } return; }
     try { const res = await exportPivot(auth, { format: fmt, savedId: changed ? null : id, spec: spec!, name: rep.name, view: rep.design.view.columns, lang: lang(), venue: t('مطعم الحاج سامي للمشويات'), branchName: (b) => branchItems.find((x) => x.id === b)?.name ?? b, evidence: fmt === 'XLSX' }); if (res.saved) toast('success', fmt === 'XLSX' ? t('ملف الإكسل اتنزل') : t('ملف CSV اتنزل'), res.filename, auth.label); } catch (e) { toast('error', errorText(e), (e as any)?.code, auth.label); } finally { setBusy(null); }
   };
   const duplicate = async () => { const d = await run('SavedReport.Duplicate', { params: { savedReportId: id } }, { success: t('اتعملت نسخة ليك') }); if (d) nav('report-designer', { savedId: d.id }); };

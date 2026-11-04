@@ -11,7 +11,7 @@ import { Tech } from '../../app/tech';
 import { fmt, Amt, type EvidenceSpec } from './parts';
 
 const KIND: Record<string, string> = { CHECK: 'شيك', LINE: 'سطر', PAYMENT: 'دفعة', REFUND: 'مرتجع', CASH_ENTRY: 'حركة درج', SESSION: 'وردية', REMOVAL: 'إلغاء', DISCOUNT: 'خصم', STAFF_MEAL: 'وجبة موظف', TICKET: 'تذكرة مطبخ', FISCAL: 'إيصال', APPROVAL: 'موافقة', STOCK: 'مخزن', WASTE: 'هالك', PO: 'أمر شراء', GRN: 'استلام', VISIT: 'قعدة', DELIVERY: 'دليفري', HISTORY: 'إجمالي يوم', RESERVATION: 'حجز', RECON: 'قاعدة مطابقة' };
-const NOTE: Record<string, string> = { 'stage-derived': 'المرحلة مستنتجة من الأحداث', 'no-recipe': 'من غير وصفة — التكلفة مش متاحة', 'cost-current': 'تكلفة حالية (مفيش تاريخ)', 'aggregate-only': 'إجمالي مستورد — من غير شيكات', 'in-flight': 'لسه في المطبخ', 'same-order (counted once)': 'نفس الأوردر — اتعد مرة واحدة' };
+const NOTE: Record<string, string> = { 'rider-shift-pay': 'أجر الطيار بالوردية — لا تكلفة للمشوار', 'partner-commission': 'طلب من تطبيق — العمولة غير مسجلة', 'stage-derived': 'المرحلة مستنتجة من الأحداث', 'no-recipe': 'من غير وصفة — التكلفة مش متاحة', 'cost-current': 'تكلفة حالية (مفيش تاريخ)', 'aggregate-only': 'إجمالي مستورد — من غير شيكات', 'in-flight': 'لسه في المطبخ', 'same-order (counted once)': 'نفس الأوردر — اتعد مرة واحدة' };
 
 function Rows({ rows, unit, onOpen }: { rows: any[]; unit?: string; onOpen: (orderId: string) => void }) {
   return (
