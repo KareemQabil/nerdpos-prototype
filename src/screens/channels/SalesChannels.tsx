@@ -1,10 +1,11 @@
 // B8 Sales channels (E13): صالة، تيك أواي، دليفري، طلبات… as records. The order type decides how the order runs
 // (kitchen, service, delivery); the channel decides the price (own prices, or follow another channel ± %).
 // Managers and the owner create channels themselves — no code change, no vendor.
+// ux-06: add/edit a channel in a centered popup (Enter saves, Esc closes) instead of a side sheet.
 import React, { useMemo, useState } from 'react';
-import { Store, Plus, Pencil, Tags, Info, History, ArrowLeftRight } from 'lucide-react';
+import { Store, Plus, Pencil, Tags, History, ArrowLeftRight } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../app/hooks';
-import { Banner, Button, Card, Drawer, EmptyState, Field, Input, PageHeader, Pill, SegmentedControl, Select, StateBadge, Switch, Table, Timeline, Money } from '../../ui';
+import { Button, Card, EmptyState, Field, Input, PageHeader, Pill, Popup, SegmentedControl, Select, StateBadge, Switch, Table, Timeline, Money, useEnterSave } from '../../ui';
 import { t, L } from '../../i18n';
 import { Tech } from '../../app/tech';
 import { dateTime } from '../../lib/format';
@@ -23,11 +24,7 @@ export default function SalesChannels() {
   return (
     <div className="space-y-4" data-fb="screen:B8">
       <PageHeader icon={<Store />} title={t('قنوات البيع')} ops={['SalesChannel.List', 'SalesChannel.Upsert']}
-        description={t('كل قناة بيع ليها نوع طلب (صالة، تيك أواي، دليفري) وقايمة أسعار. ضيف قناة زي «طلبات» بأسعارها من غير ما تغيّر أسعار الصالة.')}
         actions={<Button variant="primary" data-fb="channels:new" disabled={!canManage} title={canManage ? undefined : t('الحساب ده مش مسموح له يعمل الحركة دي')} onClick={() => setEdit('new')}><Plus className="w-4 h-4" />{t('قناة جديدة')}</Button>} />
-      <Banner tone="info" title={t('نوع الطلب غير القناة')}>
-        {t('نوع الطلب بيحدد الشغل: يروح المطبخ إزاي، عليه خدمة ولا لأ، وله توصيل ولا لأ. القناة بتحدد السعر بس. الطلب اللي جاي من «طلبات» بيتعامل كدليفري، لكن بأسعار طلبات.')}
-      </Banner>
       <div className="grid grid-cols-1 @4xl/main:grid-cols-3 gap-3">
         {byType.map(({ ot, items }) => (
           <Card key={ot} title={<span className="inline-flex items-center gap-2">{orderTypeLabel(ot)} <Pill size="sm">{t('{n} قناة', { n: String(items.length) })}</Pill></span>} padding="sm">
@@ -52,7 +49,7 @@ export default function SalesChannels() {
         ))}
       </div>
       <PriceCompare channels={list.items.filter((c) => c.active)} />
-      {edit && <ChannelDrawer channel={edit === 'new' ? null : edit} all={list.items} onClose={() => setEdit(null)} />}
+      {edit && <ChannelPopup channel={edit === 'new' ? null : edit} all={list.items} onClose={() => setEdit(null)} />}
     </div>
   );
 }
@@ -72,17 +69,16 @@ function PriceCompare({ channels }: { channels: SalesChannelView[] }) {
   };
   return (
     <Card title={<span className="inline-flex items-center gap-2"><ArrowLeftRight className="w-4 h-4" />{t('مقارنة الأسعار بين القنوات')}</span>} badge={<StateBadge ops={['Catalog.PriceList']} />}
-      description={t('بالأزرق الغامق = سعر خاص بالقناة. بالأزرق الفاتح = محسوب من قناة تانية بنسبة. بالرمادي = مفيش سعر خاص فبيتباع بسعر نوع الطلب.')}>
+      description={<span className="flex flex-wrap gap-3"><span className="font-bold text-[var(--primary)]">{t('سعر خاص')}</span><span className="text-[var(--info)]">{t('نسبة من قناة أخرى')}</span><span className="text-dim">{t('سعر نوع الطلب')}</span></span>}>
       <Table dense loading={q.loading && !q.data} head={[t('الصنف'), ...channels.map((c) => <span className="inline-flex items-center gap-1"><ChannelDot color={c.color} />{L(c.name)}</span>)]}
         align={['start', ...channels.map(() => 'end' as const)]}
         rows={items.map((p) => [<span>{L(p.name)}</span>, ...channels.map((c) => cell(p, c))])}
-        empty={<EmptyState compact icon={<Tags />} title={t('مفيش أسعار')} text={t('حط أسعار من شاشة الأسعار.')} />} />
-      <div className="text-[11px] text-dim mt-2">{t('تغيّر سعر صنف في قناة من شاشة «الأسعار»، أو تزوّد كل أسعار قناة مرة واحدة من «تغيير جماعي».')}</div>
+        empty={<EmptyState compact icon={<Tags />} title={t('مفيش أسعار')} />} />
     </Card>
   );
 }
 
-function ChannelDrawer({ channel, all, onClose }: { channel: SalesChannelView | null; all: SalesChannelView[]; onClose: () => void }) {
+function ChannelPopup({ channel, all, onClose }: { channel: SalesChannelView | null; all: SalesChannelView[]; onClose: () => void }) {
   const { run, busy } = useCommand();
   const [nameAr, setNameAr] = useState(channel?.name.ar ?? '');
   const [nameEn, setNameEn] = useState(channel?.name.en ?? '');
@@ -100,6 +96,7 @@ function ChannelDrawer({ channel, all, onClose }: { channel: SalesChannelView | 
   const pctOk = /^-?\d{1,3}(\.\d{1,2})?$/.test(percent.trim()) && Number(percent) >= -50 && Number(percent) <= 200;
   const valid = nameAr.trim().length >= 2 && (mode === 'OWN' || (followId && pctOk));
   const save = async () => {
+    if (!valid || busy) return;
     const body: any = { name: { ar: nameAr.trim(), en: nameEn.trim() || nameAr.trim() }, orderType, priceMode: mode, color, active, note: note.trim() || null };
     if (mode === 'FOLLOW') body.follow = { channelId: followId, percent: percent.trim(), roundingStep: step };
     if (channel) body.expectedVersion = channel.version;
@@ -107,14 +104,14 @@ function ChannelDrawer({ channel, all, onClose }: { channel: SalesChannelView | 
     if (r) onClose();
   };
   const follow = all.find((c) => c.id === followId);
+  const onKey = useEnterSave(save, !!valid && !busy);
   return (
-    <Drawer open width="lg" onClose={onClose} icon={<Store />} title={channel ? t('تعديل قناة {n}', { n: L(channel.name) }) : t('قناة بيع جديدة')} badge={<StateBadge ops={['SalesChannel.Upsert']} />}
-      description={t('القناة الجديدة بتظهر للكاشير وفي الدليفري وطلبات الأونلاين أول ما تتحفظ.')}
+    <Popup open onClose={onClose} size="lg" fb="channel-popup" title={<span className="flex items-center gap-2"><Store className="w-5 h-5 text-[var(--primary)]" />{channel ? t('تعديل قناة {n}', { n: L(channel.name) }) : t('قناة بيع جديدة')}<StateBadge ops={['SalesChannel.Upsert']} /></span>}
       footer={<><Button variant="ghost" onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" data-fb="channels:save" loading={busy} disabled={!valid} onClick={save}>{t('حفظ')}</Button></>}>
-      <div className="space-y-5">
+      <div className="space-y-5" onKeyDown={onKey}>
         <div className="grid sm:grid-cols-2 gap-3">
-          <Field label={t('اسم القناة')} required hint={t('مثلًا: طلبات، مرسول، الموقع')}><Input data-fb="channels:name-ar" value={nameAr} onChange={(e) => setNameAr(e.target.value)} autoFocus={!channel} /></Field>
-          <Field label={t('الاسم بالإنجليزي')} hint={t('اختياري')}><Input data-fb="channels:name-en" value={nameEn} onChange={(e) => setNameEn(e.target.value)} dir="ltr" /></Field>
+          <Field label={t('اسم القناة')} required><Input data-fb="channels:name-ar" value={nameAr} onChange={(e) => setNameAr(e.target.value)} autoFocus={!channel} /></Field>
+          <Field label={t('الاسم بالإنجليزي')}><Input data-fb="channels:name-en" value={nameEn} onChange={(e) => setNameEn(e.target.value)} dir="ltr" /></Field>
         </div>
         <Field label={t('نوع الطلب')} hint={typeLocked ? (isDefault ? t('القناة الأساسية نوعها ثابت') : t('اتباع عليها قبل كده — النوع ثابت')) : t('بيحدد المطبخ والخدمة والتوصيل')}>
           <SegmentedControl<'DINE_IN' | 'TAKEAWAY' | 'DELIVERY'> value={orderType} onChange={(v) => !typeLocked && setOrderType(v)} options={(['DINE_IN', 'TAKEAWAY', 'DELIVERY'] as const).map((x) => ({ id: x, label: orderTypeLabel(x), fb: `channels:type:${x}`, disabled: typeLocked && x !== orderType }))} />
@@ -141,7 +138,7 @@ function ChannelDrawer({ channel, all, onClose }: { channel: SalesChannelView | 
         <Field label={t('اللون')}>
           <div className="flex gap-2 flex-wrap">{COLORS.map((c) => <button key={c} type="button" aria-pressed={c === color} onClick={() => setColor(c)} className="w-8 h-8 rounded-full border-2" style={{ background: c, borderColor: c === color ? 'var(--foreground)' : 'transparent' }} title={c} />)}</div>
         </Field>
-        <Field label={t('ملاحظة')} hint={t('اختياري — مثلًا: عمولة التطبيق 20%')}><Input value={note} onChange={(e) => setNote(e.target.value)} /></Field>
+        <Field label={t('ملاحظة')}><Input value={note} onChange={(e) => setNote(e.target.value)} /></Field>
         {!isDefault && <Switch checked={active} onChange={setActive} label={active ? t('القناة شغالة — بتظهر عند بداية الطلب') : t('القناة متقفلة — مش هتظهر في طلبات جديدة')} />}
         {channel?.history?.length ? (
           <div>
@@ -150,8 +147,7 @@ function ChannelDrawer({ channel, all, onClose }: { channel: SalesChannelView | 
             <div className="text-[11px] text-dim mt-1">{t('آخر تعديل')}: {personText(channel.updatedByName)}</div>
           </div>
         ) : null}
-        <div className="text-[11px] text-dim flex items-start gap-1.5"><Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />{t('أي تعديل في قناة بيتسجل في سجل النشاط باسمك. تغيير طريقة التسعير بيمشي على قاعدة موافقة تغيير الأسعار.')}</div>
       </div>
-    </Drawer>
+    </Popup>
   );
 }
