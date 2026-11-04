@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { ArrowRight, Pencil, PhoneCall, MapPin, Plus, Trash2, Star, Crown, Merge, Gift, History, Bike, ShoppingBag, Phone, Mail, CheckCircle2 } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';
-import { Section, StateBadge, Button, Card, Pill, Money, Modal, Field, Input, Textarea, Banner, Tabs, Table, Spinner, Empty, KV, confirmDialog } from '../../ui';
+import { Section, StateBadge, Button, Card, Pill, Money, Modal, Field, Input, Textarea, Banner, Tabs, Table, Spinner, Empty, KV, confirmDialog, DateTime } from '../../ui';
 import { Tech } from '../../app/tech';
 import { t, L, tv } from '../../i18n';
 import { cn, money, dateTime } from '../../lib/format';
@@ -53,7 +53,7 @@ export default function CustomerProfile() {
             <StatTile label={t('الطلبات')} v={String(c.stats.orders)} />
             <StatTile label={t('إجمالي الصرف')} v={<Money v={c.stats.spent} plain />} />
             <StatTile label={t('متوسط الطلب')} v={<Money v={c.stats.average} plain />} />
-            <StatTile label={t('آخر طلب')} v={c.stats.lastOrderAt ? dateTime(c.stats.lastOrderAt) : '—'} small />
+            <StatTile label={t('آخر طلب')} v={<DateTime v={c.stats.lastOrderAt} />} small />
           </div>
           <Card title={<span className="flex items-center gap-2"><Star className="w-4 h-4 text-[var(--primary)]" />{t('نقاط الولاء')}</span>}>
             <div className="text-center space-y-1">
@@ -167,13 +167,13 @@ function Orders({ c }: { c: any }) {
     <div className="space-y-3">
       <Card title={<span className="flex items-center gap-2"><ShoppingBag className="w-4 h-4" />{t('الطلبات على السيستم')}</span>}>
         <Table head={[t('الطلب'), t('الوقت'), t('النوع'), t('الأصناف'), t('الإجمالي'), t('الحالة'), '']} empty={t('لسه مفيش طلبات على السيستم')}
-          rows={c.orders.map((o: any) => [<span className="num font-bold">#{o.number}</span>, <span className="text-xs num">{dateTime(o.createdAt)}</span>, o.channel === 'DELIVERY' ? t('دليفري') : o.channel === 'TAKEAWAY' ? t('تيك أواي') : t('صالة'), <span className="text-xs line-clamp-2">{L({ ar: o.items, en: o.itemsEn })}</span>, <Money v={o.payable} />, <StatusPill s={o.status} />,
+          rows={c.orders.map((o: any) => [<span className="num font-bold">#{o.number}</span>, <DateTime v={o.createdAt} className="text-xs" />, o.channel === 'DELIVERY' ? t('دليفري') : o.channel === 'TAKEAWAY' ? t('تيك أواي') : t('صالة'), <span className="text-xs line-clamp-2">{L({ ar: o.items, en: o.itemsEn })}</span>, <Money v={o.payable} />, <StatusPill s={o.status} />,
             <span className="flex gap-1">{o.deliveryId && <Button size="sm" variant="ghost" onClick={() => setOpen(o.deliveryId)}><Bike className="w-3.5 h-3.5" /></Button>}{o.status === 'COMPLETED' && <Button size="sm" variant="ghost" onClick={() => nav('receipt', { orderId: o.id })}>{t('الإيصال')}</Button>}</span>])} />
       </Card>
       {hist.length > 0 && (
         <Card title={<span className="flex items-center gap-2"><History className="w-4 h-4" />{t('توصيلات سابقة')}</span>}>
           <Table head={[t('الطلب'), t('الوقت'), t('المنطقة'), t('الطيار'), t('الدفع'), t('المبلغ')]}
-            rows={hist.map((d: any) => [<span className="num">#{d.orderNumber}</span>, <span className="text-xs num">{dateTime(d.createdAt)}</span>, d.zoneName, d.driverName ?? '—', t(PAYMENT_MODE[d.paymentMode]?.ar ?? ''), <Money v={d.amount} />])} />
+            rows={hist.map((d: any) => [<span className="num">#{d.orderNumber}</span>, <DateTime v={d.createdAt} className="text-xs" />, d.zoneName, d.driverName ?? '—', t(PAYMENT_MODE[d.paymentMode]?.ar ?? ''), <Money v={d.amount} />])} />
         </Card>
       )}
       {c.stats.orders > c.orders.length + hist.length && <div className="text-xs text-dim">{t('العدد الكلي فيه طلبات قديمة من قبل تشغيل السيستم ({n} طلب).', { n: c.stats.orders - c.orders.length - hist.length })}</div>}
@@ -194,7 +194,7 @@ function Points({ c }: { c: any }) {
         <>
           <div className="text-xs text-dim mb-3">{t('كل {e} ج.م من قيمة الأصناف = نقطة، والنقطة بـ {v} ج.م عند الصرف. المستوى بيتحدد بالنقاط اللي اتكسبت كلها ({l} نقطة).', { e: money(d.program.egpPerPoint, false), v: money(d.program.pointValue, false), l: d.lifetime })}</div>
           <Table head={[t('الوقت'), t('الحركة'), t('النقاط'), t('الرصيد بعدها'), t('الطلب'), t('التفاصيل')]} empty={t('مفيش حركة نقاط')}
-            rows={d.entries.map((e: any) => [<span className="text-xs num">{dateTime(e.at)}</span>, <Pill tone={ENTRY[e.kind]?.tone}>{t(ENTRY[e.kind]?.ar ?? e.kind)}</Pill>, <b className={cn('num', e.points > 0 ? 'text-[var(--success)]' : 'text-[var(--error)]')}>{e.points > 0 ? '+' : ''}{e.points}</b>, <span className="num">{e.balanceAfter}</span>, e.orderNumber ? <span className="num">#{e.orderNumber}</span> : '—', <span className="text-xs">{tv(e.reason) ?? ''}{personText(e.byName) ? <span className="text-dim"> · {personText(e.byName)}</span> : ''}{e.approvalGrantId ? <span className="text-dim"> · {t('بموافقة')}</span> : ''}</span>])} />
+            rows={d.entries.map((e: any) => [<DateTime v={e.at} className="text-xs" />, <Pill tone={ENTRY[e.kind]?.tone}>{t(ENTRY[e.kind]?.ar ?? e.kind)}</Pill>, <b className={cn('num', e.points > 0 ? 'text-[var(--success)]' : 'text-[var(--error)]')}>{e.points > 0 ? '+' : ''}{e.points}</b>, <span className="num">{e.balanceAfter}</span>, e.orderNumber ? <span className="num">#{e.orderNumber}</span> : '—', <span className="text-xs">{tv(e.reason) ?? ''}{personText(e.byName) ? <span className="text-dim"> · {personText(e.byName)}</span> : ''}{e.approvalGrantId ? <span className="text-dim"> · {t('بموافقة')}</span> : ''}</span>])} />
         </>
       )}
       {adj && <AdjustDialog c={c} balance={d?.balance ?? 0} onClose={() => setAdj(false)} />}

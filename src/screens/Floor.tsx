@@ -7,7 +7,7 @@ import { useCollect } from './cashier/PaymentPopup';
 import React, { useState } from 'react';
 import { Users, Clock, Plus, ArrowRightLeft, Link2, Unlink, DoorClosed, Wallet, ClipboardList, UserCog, CalendarClock, Minus, Sparkles, Map as MapIcon, LayoutGrid, Brush, ZoomIn, ZoomOut, Maximize2, Receipt, ChevronLeft, Armchair, Send } from 'lucide-react';
 import { useDev, useQuery, useCommand, errorText } from '../app/hooks';
-import { PageHeader, StateBadge, Pill, Modal, Button, Banner, Money, EmptyState, Tabs, SegmentedControl, Skeleton, useNow, FilterChips } from '../ui';
+import { PageHeader, StateBadge, Pill, Modal, Button, Banner, Money, EmptyState, Tabs, SegmentedControl, Skeleton, useNow, FilterChips, DateTime } from '../ui';
 import { Tech } from '../app/tech';
 import { personName, userLabel } from '../demo/people';
 import { t, L } from '../i18n';
@@ -164,7 +164,7 @@ function MapTable({ tb, stage, checks, px, onClick, selected, dim }: { tb: any; 
         </div>
       )}
       {stage === 'DIRTY' && <div className={cn('flex items-center gap-0.5 mt-0.5 font-bold', meta)} style={{ color: look.accent }}><Brush className="w-3 h-3" />{lvl < 2 ? `${tb.turn.minutes}${t('د')}` : `${t('تنظيف')} · ${tb.turn.minutes}${t('د')}`}</div>}
-      {stage === 'RESERVED' && <div className={cn('flex items-center gap-0.5 mt-0.5 num font-bold', meta)} style={{ color: look.accent }}><CalendarClock className="w-3 h-3" />{time(tb.reservation.at)}</div>}
+      {stage === 'RESERVED' && <div className={cn('flex items-center gap-0.5 mt-0.5 font-bold', meta)} style={{ color: look.accent }}><CalendarClock className="w-3 h-3" /><DateTime v={tb.reservation.at} time /></div>}
       {stage === 'FREE' && lvl > 0 && <div className={cn('mt-0.5 flex items-center gap-0.5 num', meta)} style={{ color: look.accent }}><Users className="w-3 h-3" />{tb.capacity}</div>}
       {o?.primary && o.checks > 1 && <span className="absolute -top-2 -end-2 min-w-5 h-5 px-1 rounded-full text-[10px] font-bold num flex items-center justify-center bg-[var(--card-raised)] border border-[var(--glass-border)]" title={t('{n} شيكات', { n: o.checks })}>{o.checks}</span>}
       {unsent > 0 && <span className="absolute -top-2 -start-2 h-5 px-1.5 rounded-full text-[10px] font-bold num flex items-center gap-0.5 justify-center bg-[var(--primary)] text-[var(--primary-foreground)]" title={t('لم يُرسل بعد')} data-fb={`table-unsent:${tb.name}`}><Send className="w-2.5 h-2.5 rtl:-scale-x-100" />{unsent}</span>}
@@ -193,7 +193,7 @@ function TableCard({ tb, stage, checks, onClick }: { tb: any; stage: TableStage;
       ) : stage === 'DIRTY' ? (
         <div className="mt-auto text-xs font-bold flex items-center gap-1" style={{ color: look.accent }}><Brush className="w-3 h-3" />{t('منذ {n} دقيقة', { n: tb.turn.minutes })}</div>
       ) : tb.reservation ? (
-        <div className="mt-auto text-xs font-bold flex items-center gap-1" style={{ color: 'var(--violet)' }}><CalendarClock className="w-3 h-3" />{tb.reservation.customer} · <span className="num">{time(tb.reservation.at)}</span></div>
+        <div className="mt-auto text-xs font-bold flex items-center gap-1" style={{ color: 'var(--violet)' }}><CalendarClock className="w-3 h-3" />{tb.reservation.customer} · <DateTime v={tb.reservation.at} time /></div>
       ) : null}
     </button>
   );
@@ -221,7 +221,7 @@ function CleanSheet({ tb, onClose, onSeat, title, sub }: { tb: any; onClose: () 
         <div className="rounded-2xl p-4 text-center border" style={{ background: LOOK.DIRTY.fill, borderColor: LOOK.DIRTY.edge }}>
           <Brush className="w-8 h-8 mx-auto" style={{ color: LOOK.DIRTY.accent }} />
           <div className="font-bold mt-2">{t('مستنية التنضيف من {n} دقيقة', { n: tb.turn.minutes })}</div>
-          <div className="text-xs text-dim mt-0.5">{t('من الساعة')} <span className="num">{time(tb.turn.since)}</span></div>
+          <div className="text-xs text-dim mt-0.5">{t('من الساعة')} <DateTime v={tb.turn.since} time /></div>
         </div>
         <p className="text-sm text-dim leading-relaxed">{t('الترابيزة بتتعلم «محتاجة تنضيف» أول ما القعدة تتقفل. لما الرانر ينضفها يدوس «اتنضفت» فترجع خضرا للويترز.')}</p>
       </div>
@@ -248,7 +248,7 @@ function OpenTable({ tb, onClose, title, sub, openCheck }: { tb: any; onClose: (
     <Modal open onClose={onClose} title={title} description={sub} badge={<StateBadge ops={['TableVisit.Open']} />} size="sm"
       footer={<><Button variant="ghost" loading={busy} onClick={() => open(false)} data-fb="open-table">{t('افتح الترابيزة بس')}</Button><Button variant="primary" size="lg" loading={busy} onClick={() => open(true)} data-fb="open-table-check"><Plus className="w-4 h-4" />{t('افتح + شيك جديد')}</Button></>}>
       <div className="space-y-5">
-        {tb.reservation && <Banner tone="info" title={t('محجوزة')}>{tb.reservation.customer} · <span className="num">{time(tb.reservation.at)}</span> · {tb.reservation.partySize} {t('أفراد')}</Banner>}
+        {tb.reservation && <Banner tone="info" title={t('محجوزة')}>{tb.reservation.customer} · <DateTime v={tb.reservation.at} time /> · {tb.reservation.partySize} {t('أفراد')}</Banner>}
         <div>
           <div className="text-sm font-bold mb-2">{t('عدد الضيوف')}</div>
           <div className="flex items-center justify-center gap-4 rounded-2xl surface-1 border line p-3">
@@ -301,7 +301,7 @@ function VisitSheet({ tableId, visitId, onClose, tables, title, sub, openCheck, 
         <div className="space-y-5">
           <div className="grid grid-cols-3 gap-2">
             <Fact icon={<Users />} label={t('الضيوف')} value={<span className="num">{v.guestCount}</span>} />
-            <Fact icon={<Clock />} label={t('قاعدين من')} value={<span className={cn('num', v.minutesSeated >= LONG_SEATED && 'text-[var(--warning-text)]')}>{v.minutesSeated} {t('د')}</span>} hint={<span className="num">{time(v.openedAt)}</span>} />
+            <Fact icon={<Clock />} label={t('قاعدين من')} value={<span className={cn('num', v.minutesSeated >= LONG_SEATED && 'text-[var(--warning-text)]')}>{v.minutesSeated} {t('د')}</span>} hint={<DateTime v={v.openedAt} time />} />
             <Fact icon={<UserCog />} label={t('الويتر')} value={<span className="text-sm">{firstName(v.serverName)}</span>} />
           </div>
 

@@ -23,7 +23,7 @@
 import React, { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Loader2, AlertTriangle, CheckCircle2, Info, XCircle, Search, Check, Inbox } from 'lucide-react';
-import { cn, money, CURRENCY } from '../lib/format';
+import { cn, money, CURRENCY, dateTimeParts } from '../lib/format';
 import { t, L, getLang } from '../i18n';
 import type { BadgeState } from '../mock/contracts';
 import { badgeOfOps, opsById } from '../mock/contracts';
@@ -395,6 +395,22 @@ export function Money({ v, text, className, big, tone, unit = true, plain, fb }:
   );
 }
 export const currencyText = () => CURRENCY;
+
+/** ux-09: a time stamp in reading order — «04 نوفمبر 07:16 ص» right to left in Arabic, «04 Nov 07:16» left to right in
+ *  English. The digits sit in `.num` pieces (tabular), the words between them; the whole is an isolate in the UI
+ *  direction, so it reads correctly inside a table cell, a `.num` parent or a left-to-right span (scripts/check-money.mjs
+ *  flags dateTime()/time() rendered inside a number element). `time` drops the date; `v` is an ISO string. */
+export function DateTime({ v, time: timeOnly, className, fb }: { v?: string | number | Date | null; time?: boolean; className?: string; fb?: string }) {
+  if (v === null || v === undefined || v === '') return <span className={cn('datetime', className)} data-fb={fb}>—</span>;
+  const p = dateTimeParts(v, !timeOnly);
+  const ar = getLang() === 'ar';
+  return (
+    <span className={cn('datetime', className)} dir={ar ? 'rtl' : 'ltr'} data-datetime data-fb={fb}>
+      {!timeOnly && <><span className="num" data-dt="day">{p.day}</span>{' '}<span data-dt="month">{p.month}</span>{' '}</>}
+      <span className="num" data-dt="time">{p.hm}</span>{p.period && <>{' '}<span data-dt="period">{p.period}</span></>}
+    </span>
+  );
+}
 
 export function KV({ rows, className }: { rows: [React.ReactNode, React.ReactNode][]; className?: string }) {
   return (

@@ -8,7 +8,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Armchair, ClipboardList, CheckCheck, Clock, Printer, RotateCcw, Users, Search } from 'lucide-react';
 import { useDev, useQuery } from '../../app/hooks';
-import { Money, EmptyState, Skeleton, SearchInput, Pill, useNow, SegmentedControl, FilterChips, Popover, Kbd, Button, Popup, toast } from '../../ui';
+import { Money, EmptyState, Skeleton, SearchInput, Pill, useNow, SegmentedControl, FilterChips, Popover, Kbd, Button, Popup, toast, DateTime } from '../../ui';
 import { t } from '../../i18n';
 import { cn, time } from '../../lib/format';
 import { clock } from '../../mock/clock';
@@ -184,7 +184,7 @@ function ClosedList({ list, loading }: { list: any[]; loading: boolean }) {
             <div key={o.id} className="rounded-2xl border border-[var(--glass-border)] bg-[var(--card-raised)] px-3 py-2 flex items-center gap-3" data-fb={`closed:${o.number}`}>
               <div className="flex-1 min-w-0">
                 <div className="font-bold truncate"><span className="num">#{o.number}</span> · {o.tableName ? `${t('ترابيزة')} ${o.tableName}` : nameOf(o) || placeOf(o)}</div>
-                <div className="text-xs text-dim num">{time(o.completedAt)}</div>
+                <div className="text-xs text-dim"><DateTime v={o.completedAt} time /></div>
               </div>
               <Money v={o.totals?.payable} className="text-lg" />
               <Button size="lg" variant="secondary" disabled={!can('print:reprint')} onClick={() => setReprint(o)} data-fb={`closed-reprint:${o.number}`}><Printer className="w-4 h-4" />{t('إعادة الطباعة')}</Button>

@@ -29,19 +29,26 @@ export function qty(v: string | number): string {
   return s.includes('.') ? s.replace(/\.?0+$/, '') : s;
 }
 
+/** «07:16 ص» / «07:16». Same rule as dateTime: inside `.num` use <DateTime v={iso} time />. */
 export function time(iso: string | null | undefined): string {
   if (!iso) return '—';
   return clock(new Date(iso));
 }
 // Arabic: "07:05 م" with Western digits and a colon (some ICU builds print "07.05" for ar-EG).
-function clock(d: Date, withDate = false): string {
+/** ux-09: the pieces of a time stamp in the UI language — day and month (with a date), hh:mm, and the Arabic ص/م. */
+export function dateTimeParts(iso: string | number | Date, withDate = true): { day: string; month: string; hm: string; period: string } {
   const ar = getLang() === 'ar';
-  const parts = new Intl.DateTimeFormat(ar ? 'ar-EG-u-nu-latn' : 'en-GB', { timeZone: 'Africa/Cairo', ...(withDate ? { day: '2-digit', month: 'short' } : {}), hour: '2-digit', minute: '2-digit', hour12: ar }).formatToParts(d);
+  const parts = new Intl.DateTimeFormat(ar ? 'ar-EG-u-nu-latn' : 'en-GB', { timeZone: 'Africa/Cairo', ...(withDate ? { day: '2-digit', month: 'short' } : {}), hour: '2-digit', minute: '2-digit', hour12: ar }).formatToParts(new Date(iso));
   const get = (k: string) => parts.find((p) => p.type === k)?.value ?? '';
-  const hm = `${get('hour')}:${get('minute')}`;
-  const tm = ar ? `${hm} ${get('dayPeriod')}`.trim() : hm;
-  return withDate ? `${get('day')} ${get('month')} ${tm}` : tm;
+  return { day: withDate ? get('day') : '', month: withDate ? get('month') : '', hm: `${get('hour')}:${get('minute')}`, period: ar ? get('dayPeriod') : '' };
 }
+function clock(d: Date, withDate = false): string {
+  const { day, month, hm, period } = dateTimeParts(d, withDate);
+  const tm = period ? `${hm} ${period}` : hm;
+  return withDate ? `${day} ${month} ${tm}` : tm;
+}
+/** «04 نوفمبر 07:16 ص» / «04 Nov 07:16» for running text (right to left in Arabic). Inside a number element (`.num`,
+ *  dir="ltr") the Arabic order breaks («نوفمبر 07:16 ص 04»): render <DateTime> there (scripts/check-money.mjs guards). */
 export function dateTime(iso: string | null | undefined): string {
   if (!iso) return '—';
   return clock(new Date(iso), true);

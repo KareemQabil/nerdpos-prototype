@@ -2,7 +2,7 @@
 import React, { useMemo, useState } from 'react';
 import { RefreshCw, Copy, Eye, AlertTriangle, Printer, Clock3, CheckCircle2, XCircle, Ban } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';
-import { PageHeader, StateBadge, Banner, Button, Pill, Select, Table, Card, useNow, StatGrid, StatCard, Toolbar, EmptyState } from '../../ui';
+import { PageHeader, StateBadge, Banner, Button, Pill, Select, Table, Card, useNow, StatGrid, StatCard, Toolbar, EmptyState, DateTime } from '../../ui';
 import { t, tLabel, tv } from '../../i18n';
 import { Tech } from '../../app/tech';
 import { deviceName } from '../../demo/people';
@@ -85,7 +85,7 @@ export default function PrintQueue() {
                 <PrintStatePill state={j.state} />,
                 <div className="text-xs space-y-0.5">
                   <div><span className="num font-bold">{(j.attempts ?? []).length}</span> {t('محاولة')}{errs.length > 0 && <span className="text-dim"> · <span className="num">{errs.length}</span> {t('فشلت')}</span>}</div>
-                  {errs.slice(-3).map((a: any, i: number) => <div key={i} className="text-[var(--error)]"><span className="num">{time(a.at)}</span> · {printErrorLabel(a.error)}</div>)}
+                  {errs.slice(-3).map((a: any, i: number) => <div key={i} className="text-[var(--error)]"><DateTime v={a.at} time /> · {printErrorLabel(a.error)}</div>)}
                 </div>,
                 <span className="text-xs">{j.state === 'FAILED' ? inTime(j.nextAtMs) : j.state === 'PENDING' ? t('دلوقتي') : j.state === 'DEAD' ? <span className="text-[var(--error)]">{t('خلصت المحاولات')}</span> : '—'}</span>,
                 <div className="flex gap-1.5 flex-wrap justify-end">

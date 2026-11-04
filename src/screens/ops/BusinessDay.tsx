@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Moon, CheckCircle2, XCircle, AlertTriangle, ChevronDown, ArrowLeft, CalendarDays, Lock, Receipt, Users, TrendingUp, Wallet, Ban, Percent, RotateCcw, Scale, HandCoins, Clock } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';
-import { Section, StateBadge, Card, Button, Pill, Banner, Money, Field, Input, Textarea, Table, Empty, Spinner, KV, confirmDialog } from '../../ui';
+import { Section, StateBadge, Card, Button, Pill, Banner, Money, Field, Input, Textarea, Table, Empty, Spinner, KV, confirmDialog, DateTime } from '../../ui';
 import { t, L, tLabel, tv } from '../../i18n';
 import { Tech } from '../../app/tech';
 import { cn, money, dateTime, dayLong } from '../../lib/format';
@@ -53,7 +53,7 @@ export default function BusinessDay() {
             <div><div className="font-bold">{dayName(x.date)}</div><div className="num text-[11px] text-dim">{x.date}</div></div>,
             <Money v={x.summary.netSales} />, <span className="num">{x.summary.orders}</span>, <Money v={x.summary.avgCheck} />,
             <Money v={x.summary.cashVariance} tone={Number(x.summary.cashVariance) === 0 ? 'success' : 'error'} />,
-            <div className="text-xs">{personText(x.closedByName)}<div className="text-dim num">{dateTime(x.closedAt)}</div></div>,
+            <div className="text-xs">{personText(x.closedByName)}<div className="text-dim"><DateTime v={x.closedAt} /></div></div>,
             x.lateOrders ? <Pill tone="warning">{x.lateOrders} {t('شيك')}</Pill> : <span className="text-dim">—</span>,
             <Button size="sm" variant="ghost" onClick={() => setDate(x.date)}>{t('افتح')}</Button>,
           ])} empty={t('لسه مفيش أيام اتقفلت')} />

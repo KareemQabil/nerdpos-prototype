@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import { Activity, ChefHat, Printer, FileCheck2, Webhook, RefreshCw, CheckCircle2, Clock, AlertTriangle, XCircle, Info, PlugZap } from 'lucide-react';
 import { useQuery, useCommand } from '../../app/hooks';
-import { Section, StateBadge, Card, Button, Pill, Tabs, Table, Modal, Empty, KV, Switch, Banner } from '../../ui';
+import { Section, StateBadge, Card, Button, Pill, Tabs, Table, Modal, Empty, KV, Switch, Banner, DateTime } from '../../ui';
 import { t, L, tLabel } from '../../i18n';
 import { Tech } from '../../app/tech';
 import { cn, dateTime, time } from '../../lib/format';
@@ -81,7 +81,7 @@ export default function SystemHealth() {
             <StatePill s={d.state} />,
             <span className="num">{d.attempts}</span>,
             d.lastErrorText ? <span className="text-xs">{L(d.lastErrorText)}<Tech><span className="num text-dim"> {d.lastError}</span></Tech></span> : <span className="text-dim">—</span>,
-            <div className="text-xs num">{dateTime(d.createdAt)}{d.nextAttemptAt && d.state === 'FAILED' ? <div className="text-dim">{t('المحاولة الجاية')} {time(d.nextAttemptAt)}</div> : null}</div>,
+            <div className="text-xs"><DateTime v={d.createdAt} />{d.nextAttemptAt && d.state === 'FAILED' ? <div className="text-dim">{t('المحاولة الجاية')} <DateTime v={d.nextAttemptAt} time /></div> : null}</div>,
             <div className="flex gap-1"><Redrive d={d} /><Button size="sm" variant="ghost" onClick={() => setOpen(d.id)} title={t('التفاصيل')}><Info className="w-3.5 h-3.5" /></Button></div>,
           ])} />
         )}
@@ -111,7 +111,7 @@ function DeliveryDialog({ id, onClose }: { id: string; onClose: () => void }) {
         <div className="space-y-3">
           <KV rows={[[t('رايحة لـ'), L(d.consumerName)], [t('الحالة'), <StatePill s={d.state} />], [t('المحاولات'), d.attempts], [t('اتعملت'), dateTime(d.createdAt)], ...(d.lastErrorText ? [[t('آخر مشكلة'), L(d.lastErrorText)] as [string, string]] : [])]} />
           {d.state === 'DEAD' && <Banner tone="warning">{t('وقفت بعد محاولات كتير. صلّح السبب (مثلاً شغّل الطابعة أو جدّد مفتاح الربط) وبعدين "ابعت تاني" — محتاجة موافقة مدير.')}</Banner>}
-          {d.history?.length > 0 && <div className="space-y-1"><div className="text-xs font-bold text-soft">{t('المحاولات')}</div>{d.history.map((h: any, i: number) => <div key={i} className="flex justify-between text-xs px-2 py-1 rounded surface-1"><span>{h.error ? (L(ERR(h.error)) || h.error) : t('وصلت')}</span><span className="num text-dim">{time(h.at)}</span></div>)}</div>}
+          {d.history?.length > 0 && <div className="space-y-1"><div className="text-xs font-bold text-soft">{t('المحاولات')}</div>{d.history.map((h: any, i: number) => <div key={i} className="flex justify-between text-xs px-2 py-1 rounded surface-1"><span>{h.error ? (L(ERR(h.error)) || h.error) : t('وصلت')}</span><DateTime v={h.at} time className="text-dim" /></div>)}</div>}
           <Tech><div className="num text-[10px] text-dim">{d.id} · {d.consumerId} · v{d.version}</div></Tech>
         </div>
       )}

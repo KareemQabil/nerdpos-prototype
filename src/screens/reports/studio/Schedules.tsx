@@ -5,7 +5,7 @@ import React, { useMemo, useState } from 'react';
 import { CalendarClock, Plus, Play, Pause, Trash2, ChevronDown, Send, FileText, Users, User, Eye, CheckCircle2, XCircle } from 'lucide-react';
 import { useDev, useQuery, useCommand, errorText } from '../../../app/hooks';
 import { call } from '../../../api/client';
-import { Button, Card, Pill, Modal, Field, Input, Select, SegmentedControl, Switch, EmptyState, Spinner, Banner, toast, StateBadge, SkeletonCard } from '../../../ui';
+import { Button, Card, Pill, Modal, Field, Input, Select, SegmentedControl, Switch, EmptyState, Spinner, Banner, toast, StateBadge, SkeletonCard, DateTime } from '../../../ui';
 import { t, L } from '../../../i18n';
 import { cn, dateTime } from '../../../lib/format';
 import { personText } from '../../../demo/people';
@@ -52,7 +52,7 @@ export function SchedulesPanel({ certified, prefill }: { certified: any[]; prefi
                     <div className="font-bold flex items-center gap-2 flex-wrap">{L(s.reportTitle)}{s.savedReportId ? <Pill size="sm" tone="violet">{t('من تقاريري')}</Pill> : <Pill size="sm" tone="success">{t('معتمد')}</Pill>}{!s.active && <Pill size="sm" tone="neutral">{t('متوقف')}</Pill>}</div>
                     <div className="text-sm text-soft">{s.frequency === 'DAILY' ? t('كل يوم') : t('كل {d}', { d: wd(s.weekday) })} {t('الساعة')} <span className="num">{s.time}</span> · {fmtLabel(s.format)}{tplName(s.templateId) ? ` · ${tplName(s.templateId)}` : ''}{s.burst ? ` · ${t('ملف لكل فرع')}` : ''}</div>
                     <div className="flex flex-wrap gap-1">{(s.recipientsV2 ?? s.recipients.map((x: string) => ({ kind: 'TEXT', label: x }))).map((r: any, i: number) => <Pill key={i} size="sm" tone="neutral">{r.kind === 'ROLE' ? <Users className="w-3 h-3 inline me-1" /> : <User className="w-3 h-3 inline me-1" />}{r.kind === 'TEXT' ? personText(r.label) : r.label}</Pill>)}</div>
-                    <div className="text-xs text-dim">{s.active ? <>{t('المرة الجاية')}: <span className="num">{dateTime(s.nextRunAt)}</span></> : t('مش هيتبعت لحد ما تشغّله')}{s.runs?.[0] ? <> · {t('آخر مرة')}: <span className="num">{dateTime(s.runs[0].at)}</span></> : null}</div>
+                    <div className="text-xs text-dim">{s.active ? <>{t('المرة الجاية')}: <DateTime v={s.nextRunAt} /></> : t('مش هيتبعت لحد ما تشغّله')}{s.runs?.[0] ? <> · {t('آخر مرة')}: <DateTime v={s.runs[0].at} /></> : null}</div>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Button size="sm" variant="outline" disabled={busy} onClick={() => runNow(s)} data-fb={`schedule:run:${s.id}`}><Play className="w-4 h-4" />{t('ابعته دلوقتي')}</Button>
@@ -68,7 +68,7 @@ export function SchedulesPanel({ certified, prefill }: { certified: any[]; prefi
                     {!s.runs?.length && <div className="text-sm text-dim">{t('لسه ما اتبعتش ولا مرة. دوس «ابعته دلوقتي» تشوف شكله.')}</div>}
                     {s.runs?.map((r: any, i: number) => (
                       <div key={i} className="rounded-xl surface-1 p-2.5 space-y-1.5">
-                        <div className="flex items-center gap-2 text-sm flex-wrap">{r.status === 'SENT' ? <CheckCircle2 className="w-4 h-4 text-[var(--success)]" /> : <XCircle className="w-4 h-4 text-[var(--error)]" />}<span className="num">{dateTime(r.at)}</span><span className="text-dim">{r.status === 'SENT' ? t('اتبعت') : t('ما اتبعتش')}</span></div>
+                        <div className="flex items-center gap-2 text-sm flex-wrap">{r.status === 'SENT' ? <CheckCircle2 className="w-4 h-4 text-[var(--success)]" /> : <XCircle className="w-4 h-4 text-[var(--error)]" />}<DateTime v={r.at} /><span className="text-dim">{r.status === 'SENT' ? t('اتبعت') : t('ما اتبعتش')}</span></div>
                         {r.outputs?.length ? (
                           <div className="flex flex-wrap gap-1.5">{r.outputs.map((o: any) => <Button key={o.id} size="sm" variant="outline" loading={loadingOut === o.id} onClick={() => openOutput(o.id)} data-fb={`schedule:output:${o.id}`}><Eye className="w-4 h-4" />{o.branchName}<span className="text-dim text-[11px]">→ {o.recipients.map((x: string) => personText(x)).join('، ')}</span></Button>)}</div>
                         ) : <div className="text-xs text-dim">{personText(r.note)}</div>}

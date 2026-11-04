@@ -4,7 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { TrendingUp, TrendingDown, Minus, Receipt, Users, Wallet, Download, CalendarClock, Plus, Pause, Play, Trash2, Send, FileSpreadsheet, FileText } from 'lucide-react';
 import { useDev, useQuery, useCommand, errorText } from '../../app/hooks';
 import { call } from '../../api/client';
-import { Card, Button, Pill, Modal, Field, Input, Select, Tabs, Table, Empty, StateBadge, Banner, toast, Money } from '../../ui';
+import { Card, Button, Pill, Modal, Field, Input, Select, Tabs, Table, Empty, StateBadge, Banner, toast, Money, DateTime } from '../../ui';
 import { t, L, tv } from '../../i18n';
 import { Tech } from '../../app/tech';
 import { cn, money, dateTime, dayShort as fmtDayShort } from '../../lib/format';
@@ -182,7 +182,7 @@ export function Schedules({ reports }: { reports: any[] }) {
           <span className="text-sm">{s.frequency === 'DAILY' ? t('كل يوم') : t('كل {d}', { d: wd(s.weekday) })} <span className="num">{s.time}</span></span>,
           <div className="flex flex-wrap gap-1">{s.recipients.map((r: string) => <Pill key={r} tone="neutral">{tv(personText(r))}</Pill>)}</div>,
           s.format === 'XLSX' ? t('إكسل') : 'CSV',
-          s.active ? <span className="num text-xs">{dateTime(s.nextRunAt)}</span> : <Pill tone="neutral">{t('متوقف')}</Pill>,
+          s.active ? <DateTime v={s.nextRunAt} className="text-xs" /> : <Pill tone="neutral">{t('متوقف')}</Pill>,
           s.runs?.[0] ? <span className="text-xs"><Send className="w-3 h-3 inline" /> {dateTime(s.runs[0].at)}</span> : <span className="text-dim">—</span>,
           <div className="flex gap-1">
             <Button size="sm" variant="ghost" disabled={busy} onClick={() => run('Report.ScheduleUpdate', { params: { scheduleId: s.id }, body: { active: !s.active, expectedVersion: s.version } }, { success: s.active ? t('اتوقف') : t('رجع يشتغل') })} title={s.active ? t('وقّف') : t('شغّل')}>{s.active ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}</Button>

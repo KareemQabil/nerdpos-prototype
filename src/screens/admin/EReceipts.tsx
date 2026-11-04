@@ -3,7 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { FileCheck2, RefreshCw, Link2, ShieldCheck, Clock, Wrench, Eye, Info } from 'lucide-react';
 import { useDev, useQuery, useCommand, errorText } from '../../app/hooks';
 import { call, ApiFailure } from '../../api/client';
-import { PageHeader, StateBadge, Banner, Button, Pill, Card, Tabs, Modal, Field, Textarea, Spinner, EmptyState, KV, Money, toast, StatGrid, StatCard, SkeletonCard } from '../../ui';
+import { PageHeader, StateBadge, Banner, Button, Pill, Card, Tabs, Modal, Field, Textarea, Spinner, EmptyState, KV, Money, toast, StatGrid, StatCard, SkeletonCard, DateTime } from '../../ui';
 import { t } from '../../i18n';
 import { Tech } from '../../app/tech';
 import { deviceName } from '../../demo/people';
@@ -153,7 +153,7 @@ function DocCard({ d, onReissue, canIssue, onOpen, onFix }: { d: any; onReissue:
       ]} />
       {(d.history ?? []).length > 0 && (
         <details className="mt-2 text-xs"><summary className="cursor-pointer text-dim">{t('السجل')} ({d.history.length})</summary>
-          <ul className="mt-1 space-y-0.5">{d.history.map((h: any, k: number) => <li key={k}><span className="num text-dim">{dateTime(h.at)}</span><Tech> · <span className="num">{h.kind}</span></Tech> · {typeof h.text === 'string' ? h.text : h.text?.ar}</li>)}</ul>
+          <ul className="mt-1 space-y-0.5">{d.history.map((h: any, k: number) => <li key={k}><DateTime v={h.at} className="text-dim" /><Tech> · <span className="num">{h.kind}</span></Tech> · {typeof h.text === 'string' ? h.text : h.text?.ar}</li>)}</ul>
         </details>
       )}
     </div>

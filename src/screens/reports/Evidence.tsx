@@ -4,7 +4,7 @@
 import React from 'react';
 import { Receipt, CheckCircle2, AlertTriangle, ExternalLink, FileSearch } from 'lucide-react';
 import { useDev, useQuery, errorText } from '../../app/hooks';
-import { Popup, Spinner, Banner, Pill, Table, Button, StateBadge } from '../../ui';
+import { Popup, Spinner, Banner, Pill, Table, Button, StateBadge, DateTime } from '../../ui';
 import { t, L, getLang } from '../../i18n';
 import { rangeText } from '../../reports/format';
 import { dateTime } from '../../lib/format';
@@ -20,7 +20,7 @@ function Rows({ rows, unit, onOpen }: { rows: any[]; unit?: string; onOpen: (ord
       rows={rows.map((e) => [
         <div className="min-w-0"><div className="truncate">{e.label}</div>{e.note && <div className="text-[10px] text-dim">{t(NOTE[e.note] ?? e.note)}</div>}<Tech><span className="num text-[10px] text-dim">{e.id}</span></Tech></div>,
         <Pill size="sm" tone="neutral">{t(KIND[e.kind] ?? e.kind)}</Pill>,
-        <span className="num text-xs whitespace-nowrap">{e.businessDate ?? (e.at ? dateTime(e.at) : '—')}</span>,
+        <span className="text-xs whitespace-nowrap">{e.businessDate ? <span className="num">{e.businessDate}</span> : <DateTime v={e.at} />}</span>,
         <Amt v={e.amount} unit={unit === 'EGP' ? undefined : unit} className="whitespace-nowrap" />,
         e.orderId ? <Button size="icon" variant="ghost" onClick={() => onOpen(e.orderId)} data-fb={`evidence-open:${e.orderId}`} title={t('افتح الشيك')} aria-label={t('افتح الشيك')}><Receipt className="w-4 h-4" /></Button> : null,
       ])} />
@@ -42,7 +42,7 @@ export function EvidencePopup({ spec, onClose }: { spec: EvidenceSpec | null; on
             <div className="text-sm text-soft">{L(r.metric.definition)}</div>
             {spec?.where && <div className="text-sm font-medium" data-fb="evidence-where">{spec.where}</div>}
             {Object.keys(r.cell ?? {}).length > 0 && <Tech><div className="text-[10px] text-dim num" dir="ltr">{Object.entries(r.cell).map(([k, v]) => `${k}=${v}`).join(' · ')}</div></Tech>}
-            <div className="text-xs text-dim">{rangeText(r.meta.from, r.meta.to, getLang() === 'en' ? 'en' : 'ar')} · {t('لحد')} <span className="num">{dateTime(r.meta.asOf)}</span> · {t('نسخة التعريف')} <span className="num">{r.metric.version}</span></div>
+            <div className="text-xs text-dim">{rangeText(r.meta.from, r.meta.to, getLang() === 'en' ? 'en' : 'ar')} · {t('لحد')} <DateTime v={r.meta.asOf} /> · {t('نسخة التعريف')} <span className="num">{r.metric.version}</span></div>
             {r.proof.holds === true && <div className="text-sm text-[var(--success)] flex items-center gap-1" data-fb="evidence-proof"><CheckCircle2 className="w-4 h-4" />{t('مجموع السجلات بيطلع نفس الرقم')} <span className="num text-xs text-dim">{r.proof.equation}</span></div>}
             {r.proof.holds === false && <div className="text-sm text-[var(--error)] flex items-center gap-1"><AlertTriangle className="w-4 h-4" />{t('المجموع مختلف — ده لازم يتراجع')} <span className="num text-xs">{r.proof.equation}</span></div>}
             {r.metric.pitfalls?.map((p: any, i: number) => <div key={i} className="text-[11px] text-[var(--warning-text)]">{t('تنبيه')}: {L(p)}</div>)}

@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Users, UserPlus, Search, Copy, Crown } from 'lucide-react';
 import { useDev, useQuery } from '../../app/hooks';
-import { PageHeader, StateBadge, Button, Card, Money, Select, Table, EmptyState, StatGrid, StatCard, Toolbar, SearchInput, FilterChips } from '../../ui';
+import { PageHeader, StateBadge, Button, Card, Money, Select, Table, EmptyState, StatGrid, StatCard, Toolbar, SearchInput, FilterChips, DateTime } from '../../ui';
 import { Tech } from '../../app/tech';
 import { t, L } from '../../i18n';
 import { cn, money, dateTime } from '../../lib/format';
@@ -53,7 +53,7 @@ export default function Customers() {
                 <span className="num font-bold text-[var(--primary)]">{c.loyalty.balance}</span>,
                 <span className="num">{c.stats.orders}</span>,
                 <Money v={c.stats.spent} />,
-                <span className="text-xs num">{c.stats.lastOrderAt ? dateTime(c.stats.lastOrderAt) : '—'}</span>,
+                <span className="text-xs">{c.stats.lastOrderAt ? <DateTime v={c.stats.lastOrderAt} /> : '—'}</span>,
               ];
             })} />
         )}

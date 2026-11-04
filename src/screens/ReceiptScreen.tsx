@@ -7,7 +7,7 @@ import { ArrowRight, Copy, Printer, FileText } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useDev, useQuery, useCommand, errorText } from '../app/hooks';
 import { Tech, useTech } from '../app/tech';
-import { Section, StateBadge, Banner, Button, Empty, Skeleton, Switch, Pill, Money } from '../ui';
+import { Section, StateBadge, Banner, Button, Empty, Skeleton, Switch, Pill, Money, DateTime } from '../ui';
 import { t, L } from '../i18n';
 import { money, qty, dateTime, cn } from '../lib/format';
 import { ReprintDialog, ReprintRuleNote } from './admin/output/ReprintDialog';
@@ -95,7 +95,7 @@ export default function ReceiptScreen() {
             <Row k={t('القناة')} v={channelLabel(r.channel)} text />
             {r.server && <Row k={t('الويتر')} v={r.server} text />}
             {r.cashier && <Row k={t('الكاشير')} v={r.cashier} text />}
-            {r.completedAt && <Row k={t('التاريخ')} v={dateTime(r.completedAt)} text />}
+            {r.completedAt && <Row k={t('التاريخ')} v={<DateTime v={r.completedAt} />} text />}
             <Row k={t('اليوم التجاري')} v={r.businessDate} />
             <Rule />
             <div className="space-y-1">

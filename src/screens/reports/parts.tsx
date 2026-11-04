@@ -2,7 +2,7 @@
 // the report header (business date, timezone, asOf, provisional/closed, definitions + versions, reconciliation).
 import React, { createContext, useContext, useState } from 'react';
 import { ShieldCheck, ShieldAlert, Clock, Info, CheckCircle2, AlertTriangle, BookOpen, ChevronDown } from 'lucide-react';
-import { Pill, Card, Button, Money } from '../../ui';
+import { Pill, Card, Button, Money, DateTime } from '../../ui';
 import { t, L, getLang } from '../../i18n';
 import { cn, dateTime, CURRENCY } from '../../lib/format';
 import { Tech } from '../../app/tech';
@@ -64,7 +64,7 @@ export function ReportHeader({ h, onShowRecon }: { h: any; onShowRecon?: () => v
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <Pill tone="neutral"><Clock className="w-3.5 h-3.5 inline me-1" />{t('اليوم التجاري')}: <span className="num ms-1">{h.period.from}{h.period.to !== h.period.from ? ` → ${h.period.to}` : ''}</span></Pill>
         <Pill tone="neutral">{t('توقيت القاهرة — اليوم بيبدأ {c}', { c: h.cutoff })}<Tech><span className="num ms-1">Africa/Cairo</span></Tech></Pill>
-        <Pill tone="neutral">{t('لحد')} <span className="num ms-1">{dateTime(h.asOf)}</span></Pill>
+        <Pill tone="neutral">{t('لحد')} <DateTime v={h.asOf} className="ms-1" /></Pill>
         {h.provisional ? <Pill tone="warning" dot title={h.provisionalReasons.map((x: Loc) => L(x)).join(' ')}>{t('مبدئي')}</Pill> : <Pill tone="success" dot>{t('نهائي — الأيام مقفولة')}</Pill>}
         <button type="button" onClick={onShowRecon} data-fb="report:recon-status" className="inline-flex"><Pill tone={STATUS_TONE[rec.status]} dot>{rec.status === 'UNEXPLAINED' ? <ShieldAlert className="w-3.5 h-3.5 inline me-1" /> : <ShieldCheck className="w-3.5 h-3.5 inline me-1" />}{t('المطابقة')}: {statusText(rec.status)} <span className="num ms-1 opacity-70">({rec.counts.MATCHED}✓ {rec.counts.EXPLAINED ? `${rec.counts.EXPLAINED}≈ ` : ''}{rec.counts.UNEXPLAINED ? `${rec.counts.UNEXPLAINED}✗` : ''})</span></Pill></button>
         <span className="flex-1" />

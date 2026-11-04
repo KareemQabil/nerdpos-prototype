@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { History, Wallet, Receipt, ClipboardList, ArrowRightLeft, CalendarDays } from 'lucide-react';
 import { TransferSessionDialog } from './ops/TransferSessionDialog';
 import { useDev, useQuery } from '../app/hooks';
-import { PageHeader, Input, Table, Money, Button, Toolbar, SearchInput, FilterChips, EmptyState, Modal, KV, StateBadge } from '../ui';
+import { PageHeader, Input, Table, Money, Button, Toolbar, SearchInput, FilterChips, EmptyState, Modal, KV, StateBadge, DateTime } from '../ui';
 import { t, L } from '../i18n';
 import { time, money, qty } from '../lib/format';
 import { StatusPill, HistoryDialog } from './order/CheckPanel';
@@ -46,7 +46,7 @@ function ChecksList({ onBoard }: { onBoard: () => void }) {
     <span className="num font-bold">#{o.number}</span>,
     <span className="font-bold">{placeOf(o)}</span>,
     <StatusPill s={o.status} />,
-    <span className="num text-xs text-soft">{o.businessDate === today ? t('النهارده') : o.businessDate} · {time(o.createdAt)}</span>,
+    <DateTime v={o.createdAt} className="text-xs text-soft" fb={`checks:when:${o.id}`} />,
     <span className="text-soft">{personName(null, o.serverName)}</span>,
     <Money v={o.totals.payable} />,
     <div className="flex gap-1 justify-end" onClick={(e) => e.stopPropagation()}>
@@ -92,7 +92,7 @@ function CheckDrawer({ o, onClose, onOpen, onHistory, onMove, onPay }: { o: any;
         {live(o) && <Button variant="primary" onClick={onOpen}><ClipboardList className="w-4 h-4" />{t('افتح الشيك')}</Button>}
       </>}>
       <div className="space-y-4">
-        <KV rows={[[t('اليوم'), <span className="num">{o.businessDate}</span>], [t('اتفتح'), <span className="num">{time(o.createdAt)}</span>], [t('الويتر / الكاشير'), personName(null, o.serverName)], ...(d.guestCount ? [[t('الضيوف'), <span className="num">{d.guestCount}</span>] as [string, React.ReactNode]] : [])]} />
+        <KV rows={[[t('اليوم'), <span className="num">{o.businessDate}</span>], [t('اتفتح'), <DateTime v={o.createdAt} time />], [t('الويتر / الكاشير'), personName(null, o.serverName)], ...(d.guestCount ? [[t('الضيوف'), <span className="num">{d.guestCount}</span>] as [string, React.ReactNode]] : [])]} />
         {d.lines ? (
           <div className="rounded-xl surface-1 border line p-3 space-y-1.5 text-sm">
             {d.lines.filter((l: any) => l.status !== 'REMOVED').map((l: any) => <div key={l.id} className={l.status === 'VOIDED' ? 'flex justify-between gap-2 line-through opacity-50' : 'flex justify-between gap-2'}><span><span className="num font-bold text-[var(--primary)]">{qty(l.quantity)}×</span> {L(l.name)}</span><Money v={l.lineTotal} plain /></div>)}

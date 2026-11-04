@@ -6,7 +6,7 @@ import React, { useMemo } from 'react';
 import { ClipboardList, Wallet, Receipt, ChefHat, Users } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';
 import { Board, BoardViewToggle, heatOf, minutesSince, FRESH, type ColumnDef, type MoveCheck, type Aging, type CardAction } from '../../ui/board';
-import { Money, Pill, Button, KV } from '../../ui';
+import { Money, Pill, Button, KV, DateTime } from '../../ui';
 import { t, L } from '../../i18n';
 import { qty, time, money } from '../../lib/format';
 import { clock, businessDate } from '../../mock/clock';
@@ -143,7 +143,7 @@ function OrderDetail({ o, onOpen, onCollect }: { o: any; onOpen: () => void; onC
   return (
     <div className="space-y-4" data-fb="order-detail">
       <div className="flex items-center gap-2 flex-wrap"><h2 className="text-lg font-bold">{t('شيك')} <span className="num">#{o.number}</span></h2><StatusPill s={o.status} /><Pill size="sm" tone={typeTone(o)}>{orderType(o)}</Pill></div>
-      <KV rows={[[t('المكان'), placeOf(o) || '—'], [t('الويتر / الكاشير'), personName(null, o.serverName)], [t('فُتح'), <span className="num">{time(o.createdAt)}</span>], ...(d.guestCount ? [[t('الضيوف'), <span className="num">{d.guestCount}</span>] as [string, React.ReactNode]] : [])]} />
+      <KV rows={[[t('المكان'), placeOf(o) || '—'], [t('الويتر / الكاشير'), personName(null, o.serverName)], [t('فُتح'), <DateTime v={o.createdAt} time />], ...(d.guestCount ? [[t('الضيوف'), <span className="num">{d.guestCount}</span>] as [string, React.ReactNode]] : [])]} />
       <div className="rounded-xl surface-1 border line p-3 space-y-1.5 text-sm">
         {lines.map((l: any) => (
           <div key={l.id} className={l.status === 'VOIDED' ? 'flex justify-between gap-2 line-through opacity-50' : 'flex justify-between gap-2'}>

@@ -7,7 +7,7 @@
 import React, { useEffect, useState } from 'react';
 import { RotateCcw, Check, X, Receipt, Search, Wallet, Coffee, ShieldCheck, Lock } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../app/hooks';
-import { PageHeader, Card, Input, Button, Field, Select, Money, Table, Pill, Textarea, Tabs, SearchInput, EmptyState, Skeleton, FilterChips, Toolbar, Banner, confirmDialog } from '../ui';
+import { PageHeader, Card, Input, Button, Field, Select, Money, Table, Pill, Textarea, Tabs, SearchInput, EmptyState, Skeleton, FilterChips, Toolbar, Banner, confirmDialog, DateTime } from '../ui';
 import { Tech } from '../app/tech';
 import { t, L } from '../i18n';
 import { cn, money, qty, dateTime } from '../lib/format';
@@ -147,7 +147,7 @@ function Cases({ q }: { q: any }) {
     <div className="space-y-3">
       <Toolbar className="!mb-0"><FilterChips value={f} onChange={setF} options={[{ id: 'ALL', label: t('الكل'), count: all.length }, { id: 'REQUESTED', label: t('مستني الصرف'), count: all.filter((r) => r.state === 'REQUESTED').length, tone: 'warning' }, { id: 'PAID', label: t('اتصرف'), count: all.filter((r) => r.state === 'PAID').length }, { id: 'S3', label: t('بعد قفل اليوم'), count: all.filter((r) => r.afterClose).length, tone: 'error' }]} /></Toolbar>
       <Table align={['start', 'end', 'start', 'start', 'start', 'start', 'start', 'end']} loading={q.loading} head={[t('الشيك'), t('المبلغ'), t('هيرجع إزاي'), t('المرحلة'), t('السبب'), t('مين عمل ومين وافق'), t('الحالة'), '']} rows={list.map((r: any) => [
-        <span className="num font-bold">#{r.orderNumber}<span className="block text-[10px] text-dim font-normal">{dateTime(r.requestedAt)}</span></span>, <Money v={r.amount} />, methodText(r.method),
+        <span className="font-bold"><span className="num">#{r.orderNumber}</span><DateTime v={r.requestedAt} className="block text-[10px] text-dim font-normal" /></span>, <Money v={r.amount} />, methodText(r.method),
         r.stage ? <Pill tone={r.stage === 'S3' ? 'error' : 'info'} data-fb={`refund-case-stage:${r.orderNumber}`}>{t(STAGE_TEXT[r.stage as 'S2'].short)}</Pill> : <span className="text-dim">—</span>,
         <span className="text-soft">{r.reason}<Tech><span className="num text-[10px] ms-1">{r.reasonCode}</span></Tech></span>,
         <span className="text-xs" data-fb={`refund-case-who:${r.orderNumber}`}>{t('طلب')}: {first(r.requestedByName)}{r.state === 'PAID' && <><br />{t('صرف')}: {first(r.paidByName)}{r.drawerOwnerName ? ` · ${t('من درج')} ${first(r.drawerOwnerName)}` : ''}<br /><ShieldCheck className="w-3 h-3 inline" /> {t('وافق')}: <b>{first(r.approverName)}</b></>}{r.afterClose && r.state === 'PAID' && <><br /><span className="text-[var(--error)]">{t('اتسجل يوم')} <span className="num">{r.businessDate}</span> ({t('الأصلي')} <span className="num">{r.originalBusinessDate}</span>)</span></>}</span>,

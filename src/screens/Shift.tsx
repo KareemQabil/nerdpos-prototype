@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { DoorOpen, ArrowDownToLine, Inbox, FileText, Lock, HandCoins, Printer, AlertTriangle, ArrowRightLeft, Clock, Wallet, Receipt, Minus, Plus, CheckCircle2, Scale, History } from 'lucide-react';
 import { useDev, useQuery, useCommand, errorText } from '../app/hooks';
-import { PageHeader, StateBadge, Card, Button, Field, Input, Select, Money, Banner, KV, Table, Modal, Pill, Tabs, Textarea, Stepper, StatGrid, StatCard, EmptyState, Skeleton } from '../ui';
+import { PageHeader, StateBadge, Card, Button, Field, Input, Select, Money, Banner, KV, Table, Modal, Pill, Tabs, Textarea, Stepper, StatGrid, StatCard, EmptyState, Skeleton, DateTime } from '../ui';
 import { t, L } from '../i18n';
 import { cn, time, dateTime } from '../lib/format';
 import { sign, sumAmounts, absAmount } from '../lib/cash';
@@ -41,7 +41,7 @@ export default function Shift() {
         <Table align={['start', 'start', 'start', 'start', 'start', 'end', 'end']} loading={past.loading} maxHeight={420}
           head={[t('الجهاز'), t('الكاشير'), t('الحالة'), t('فتحت'), t('اتقفلت'), t('فرق العد'), '']}
           rows={(past.data?.items ?? []).map((s: any) => [
-            deviceName(s.terminalId), personName(null, personText(s.cashierName)), <Pill tone={s.state === 'OPEN' ? 'success' : 'neutral'} dot>{s.state === 'OPEN' ? t('مفتوحة') : t('مقفولة')}</Pill>, <span className="num text-xs">{dateTime(s.openedAt)}</span>, <span className="num text-xs">{s.closedAt ? dateTime(s.closedAt) : '—'}</span>,
+            deviceName(s.terminalId), personName(null, personText(s.cashierName)), <Pill tone={s.state === 'OPEN' ? 'success' : 'neutral'} dot>{s.state === 'OPEN' ? t('مفتوحة') : t('مقفولة')}</Pill>, <DateTime v={s.openedAt} className="text-xs" />, <span className="text-xs">{s.closedAt ? <DateTime v={s.closedAt} /> : '—'}</span>,
             s.close ? <VarianceText v={s.close.variance} short /> : <span className="text-dim">—</span>,
             s.state === 'CLOSED' && canZ ? <Button size="sm" variant="ghost" onClick={() => setZ(s.id)} data-fb={`z-open:${s.id}`}><FileText className="w-3.5 h-3.5" />{t('تقرير القفلة')}</Button> : null,
           ])} empty={<EmptyState compact icon={<Clock />} title={t('لسه مفيش ورديات')} text={t('أول وردية هتظهر هنا بعد ما تتفتح.')} />} />
@@ -98,7 +98,7 @@ function OpenSession({ sid, onZ }: { sid: string; onZ: (id: string) => void }) {
         <OpenOrders sid={ses.id} />
         <div className="mt-4">
           <div className="text-sm font-bold mb-2">{t('حركات الدرج')}</div>
-          <Table maxHeight={320} dense align={['start', 'start', 'end', 'start', 'start']} head={[t('الوقت'), t('النوع'), t('المبلغ'), t('السبب'), '']} rows={ses.cashEntries.slice().reverse().map((e: any) => [<span className="num text-xs">{time(e.at)}</span>, kindLabel(e.kind), <Money v={e.amount} tone={OUT_KINDS.has(e.kind) ? 'error' : undefined} />, e.reasonCode ? (L(store.db.reasonCodes.find((x) => x.code === e.reasonCode)?.label) || e.reason || '') : (e.reason ?? ''), <span className="text-xs text-dim">{e.approvalGrantId ? t('بموافقة مدير') : ''}<Tech><span className="num"> {e.ref ?? ''}</span></Tech></span>])} empty={t('لسه مفيش حركات')} />
+          <Table maxHeight={320} dense align={['start', 'start', 'end', 'start', 'start']} head={[t('الوقت'), t('النوع'), t('المبلغ'), t('السبب'), '']} rows={ses.cashEntries.slice().reverse().map((e: any) => [<DateTime v={e.at} time className="text-xs" />, kindLabel(e.kind), <Money v={e.amount} tone={OUT_KINDS.has(e.kind) ? 'error' : undefined} />, e.reasonCode ? (L(store.db.reasonCodes.find((x) => x.code === e.reasonCode)?.label) || e.reason || '') : (e.reason ?? ''), <span className="text-xs text-dim">{e.approvalGrantId ? t('بموافقة مدير') : ''}<Tech><span className="num"> {e.ref ?? ''}</span></Tech></span>])} empty={t('لسه مفيش حركات')} />
         </div>
       </Card>
       {dlg === 'move' && <CashMoveDialog ses={ses} onClose={() => setDlg(null)} />}
@@ -174,7 +174,7 @@ export function ReportView({ r, z }: { r: any; z?: boolean }) {
         {z && <><div className="flex justify-between"><span>{t('اللي اتعد فعلًا')}</span><Money v={r.countedCash} /></div><div className="flex justify-between items-center border-t line pt-1.5"><span className="font-bold flex items-center gap-1"><Scale className="w-4 h-4" />{t('الفرق')}</span><VarianceText v={r.variance} /></div></>}
       </div>
       <div className="rounded-xl surface-1 border line p-3"><div className="text-xs font-bold text-soft mb-1.5">{t('شيكات لسه مفتوحة (مش بتمنع القفل)')}</div>{r.outstandingChecks.length === 0 ? <div className="text-dim text-xs">{t('مفيش')}</div> : r.outstandingChecks.map((o: any) => <div key={o.orderId} className="flex justify-between text-xs"><span><span className="num">#{o.number}</span> {o.table ? `· ${t('ترابيزة')} ${o.table}` : ''}</span><Money v={o.payable} /></div>)}</div>
-      <div className="text-[11px] text-dim">{z ? t('تقرير القفلة متثبت وقت القفل ومش بيتغير.') : t('تقرير نص الوردية لحظي — الأرقام بتتغير مع الشغل.')} · <span className="num">{dateTime(r.snapshotAt)}</span></div>
+      <div className="text-[11px] text-dim">{z ? t('تقرير القفلة متثبت وقت القفل ومش بيتغير.') : t('تقرير نص الوردية لحظي — الأرقام بتتغير مع الشغل.')} · <DateTime v={r.snapshotAt} /></div>
     </div>
   );
 }

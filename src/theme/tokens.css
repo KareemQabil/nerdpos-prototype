@@ -203,6 +203,8 @@ input, select, textarea { font: inherit; color: inherit; }
 /* An amount: number and currency on one baseline, currency smaller; follows the reading direction (RTL: number first). */
 .amount { display: inline-flex; align-items: baseline; gap: .28em; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .amount > .amount-unit { font-size: .58em; font-weight: 600; color: var(--text-soft); letter-spacing: 0; }
+/* ux-09: a time stamp in reading order (<DateTime>): an isolate in the UI direction, digits tabular, one line. */
+.datetime { unicode-bidi: isolate; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 /* Component classes live in the components layer so Tailwind utilities (ps-9, py-1, bg-…) can override them. */
 @layer components {

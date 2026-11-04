@@ -7,7 +7,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { FileBarChart, Search, Star, ShieldCheck, Wand2, MessageCircleQuestion, ArrowRight, ArrowLeft, Printer, Download, CalendarClock, Pencil, Copy, History, MoreHorizontal, ClipboardCheck, BookOpen, ChevronDown, Archive, Layers, FileSpreadsheet, FileText, LayoutTemplate, Activity, RefreshCw, Clock, Sparkles, User, Plus } from 'lucide-react';
 import { useDev, useQuery, useCommand, errorText } from '../../app/hooks';
 import { call } from '../../api/client';
-import { PageHeader, Tabs, Card, Button, Pill, SearchInput, FilterChips, EmptyState, Skeleton, SkeletonCard, Banner, Select, Spinner, toast, confirmDialog, StateBadge, Table } from '../../ui';
+import { PageHeader, Tabs, Card, Button, Pill, SearchInput, FilterChips, EmptyState, Skeleton, SkeletonCard, Banner, Select, Spinner, toast, confirmDialog, StateBadge, Table, DateTime } from '../../ui';
 import { t, L, getLang } from '../../i18n';
 import { cn, dateTime } from '../../lib/format';
 import { Tech } from '../../app/tech';
@@ -114,7 +114,7 @@ export function ReportsHome({ legacy, onLegacy }: { legacy: any[]; onLegacy: (id
                       {c.kind === 'certified' ? <Pill size="sm" tone="success"><ShieldCheck className="w-3 h-3 inline me-0.5" />{t('معتمد')}</Pill> : <Pill size="sm" tone="violet"><Sparkles className="w-3 h-3 inline me-0.5" />{t('مخصص')}</Pill>}
                       {c.owner && <span className="text-[11px] text-dim inline-flex items-center gap-0.5"><User className="w-3 h-3" />{c.owner.split(' — ')[0]}</span>}
                       {c.share && <span className="text-[11px] text-dim">· {c.share}</span>}
-                      {lastAt(c.id) && <span className="text-[11px] text-dim ms-auto num">{dateTime(lastAt(c.id)!)}</span>}
+                      {lastAt(c.id) && <DateTime v={lastAt(c.id)!} className="text-[11px] text-dim ms-auto" />}
                     </div>
                   </div>
                 ))}
@@ -145,7 +145,7 @@ function Shelf({ title, icon, children }: { title: string; icon: React.ReactNode
   return <div className="rounded-2xl border border-[var(--glass-border)] bg-[var(--card-raised)]/70 p-3 space-y-1"><div className="text-sm font-bold flex items-center gap-1.5 mb-1">{icon}{title}</div>{children}</div>;
 }
 function MiniRow({ c, at, onOpen }: { c: { kind: string; id: string; title: string }; at?: string | null; onOpen: () => void }) {
-  return <button type="button" onClick={onOpen} className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 hover:surface-2 text-start text-sm" data-fb={`shelf:${c.id}`}>{c.kind === 'certified' ? <ShieldCheck className="w-3.5 h-3.5 text-[var(--success)] shrink-0" /> : <Sparkles className="w-3.5 h-3.5 text-[var(--violet)] shrink-0" />}<span className="flex-1 truncate">{c.title}</span>{at && <span className="text-[11px] text-dim num shrink-0">{dateTime(at)}</span>}</button>;
+  return <button type="button" onClick={onOpen} className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 hover:surface-2 text-start text-sm" data-fb={`shelf:${c.id}`}>{c.kind === 'certified' ? <ShieldCheck className="w-3.5 h-3.5 text-[var(--success)] shrink-0" /> : <Sparkles className="w-3.5 h-3.5 text-[var(--violet)] shrink-0" />}<span className="flex-1 truncate">{c.title}</span>{at && <DateTime v={at} className="text-[11px] text-dim shrink-0" />}</button>;
 }
 
 // ─────────────────────────── shared report page chrome
@@ -433,7 +433,7 @@ function ActivityPanel() {
       <Table dense loading={q.loading && !q.data} head={[t('إمتى'), t('مين'), t('عمل إيه'), t('التقرير'), t('الفترة والفرع'), t('السطور')]} align={['start', 'start', 'start', 'start', 'start', 'end']}
         empty={<EmptyState compact icon={<Activity className="w-5 h-5" />} title={t('لسه مفيش حركة')} text={t('افتح أي تقرير أو نزّله وهيظهر هنا.')} />}
         rows={shown.map((a) => [
-          <span className="num text-xs whitespace-nowrap">{dateTime(a.at)}</span>,
+          <DateTime v={a.at} className="text-xs whitespace-nowrap" />,
           <span className="text-sm">{a.userName || t('السيستم')}</span>,
           <span className="text-sm">{actionText(a.action)}{a.format ? <Pill size="sm" tone="neutral" className="ms-1">{a.format === 'XLSX' ? t('إكسل') : a.format}</Pill> : null}</span>,
           <span className="text-sm truncate">{a.targetName}{a.targetKind === 'CERTIFIED' && <ShieldCheck className="w-3 h-3 inline ms-1 text-[var(--success)]" />}</span>,

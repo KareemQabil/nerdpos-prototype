@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { CalendarPlus, UserCheck, UserX, PiggyBank, CalendarClock, Phone, Users } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../app/hooks';
-import { PageHeader, Button, Field, Input, Select, Money, Table, Pill, Banner, Tabs, Popup, Kbd, FilterChips, Toolbar, EmptyState, confirmDialog } from '../ui';
+import { PageHeader, Button, Field, Input, Select, Money, Table, Pill, Banner, Tabs, Popup, Kbd, FilterChips, Toolbar, EmptyState, confirmDialog, DateTime } from '../ui';
 import { sign } from '../lib/cash';
 import { Tech } from '../app/tech';
 import { t } from '../i18n';
@@ -42,7 +42,7 @@ export default function Reservations() {
         <>
           <Toolbar className="!mb-0"><FilterChips value={f} onChange={setF} options={[{ id: 'BOOKED', label: t('الجايين') }, { id: 'ALL', label: t('الكل') }]} /></Toolbar>
           <Table loading={res.loading} align={['start', 'start', 'center', 'start', 'end', 'start', 'end']} head={[t('الميعاد'), t('الضيف'), t('الأفراد'), t('الترابيزة'), t('العربون'), t('الحالة'), '']} rows={list.map((r: any) => [
-            <span className="font-bold"><span className="num">{time(r.at)}</span><span className="block text-[11px] text-dim font-normal num">{dateTime(r.at)}</span></span>,
+            <span className="font-bold"><DateTime v={r.at} time /><DateTime v={r.at} className="block text-[11px] text-dim font-normal" /></span>,
             <span><b>{r.customer}</b><span className="block text-xs text-dim num" dir="ltr" style={{ textAlign: 'start' }}>{r.phone}</span></span>,
             <span className="num font-bold">{r.partySize}</span>,
             r.tableName ? `${t('ترابيزة')} ${r.tableName}` : <span className="text-dim">{t('لسه')}</span>,
@@ -55,7 +55,7 @@ export default function Reservations() {
       {tab === 'dep' && (
         <>
           <Banner tone="info">{t('العربون الكاش بيدخل الدرج، بس محاسبيًا هو فلوس للزبون عندنا. بيتحول مبيعات لما يتخصم من شيك (من شاشة التحصيل)، أو بيتصادر لو الزبون ما جاش.')}</Banner>
-          <Table loading={deps.loading} align={['start', 'start', 'end', 'start', 'start', 'start']} head={[t('الزبون'), t('عشان'), t('المبلغ'), t('اتدفع'), t('الحالة'), t('إمتى')]} rows={(deps.data?.items ?? []).map((d: any) => [<b>{d.customer}</b>, d.purpose === 'BOOKING' ? t('حجز') : t('طلب مسبق'), <Money v={d.amount} />, methodText(d.method), <Pill tone={DEP[d.state]?.[1] ?? 'neutral'} dot>{t(DEP[d.state]?.[0] ?? '—')}<Tech><span className="num opacity-70">{d.state}</span></Tech></Pill>, <span className="num text-xs">{dateTime(d.createdAt)}</span>])}
+          <Table loading={deps.loading} align={['start', 'start', 'end', 'start', 'start', 'start']} head={[t('الزبون'), t('عشان'), t('المبلغ'), t('اتدفع'), t('الحالة'), t('إمتى')]} rows={(deps.data?.items ?? []).map((d: any) => [<b>{d.customer}</b>, d.purpose === 'BOOKING' ? t('حجز') : t('طلب مسبق'), <Money v={d.amount} />, methodText(d.method), <Pill tone={DEP[d.state]?.[1] ?? 'neutral'} dot>{t(DEP[d.state]?.[0] ?? '—')}<Tech><span className="num opacity-70">{d.state}</span></Tech></Pill>, <DateTime v={d.createdAt} className="text-xs" />])}
             empty={<EmptyState compact icon={<PiggyBank />} title={t('مفيش عربون')} text={t('العربون بيتسجل مع الحجز.')} />} />
         </>
       )}

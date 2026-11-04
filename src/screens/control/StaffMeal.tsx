@@ -8,7 +8,7 @@ import { useQuery, useCommand } from '../../app/hooks';
 import { MenuGrid } from '../order/MenuGrid';
 import { ProductDialog, type LineDraft } from '../order/ProductDialog';
 import { needsDialog } from '../OrderScreen';
-import { Modal, StateBadge, Banner, Button, Pill, Field, Money, EmptyState, Skeleton, Switch, Avatar, SearchInput } from '../../ui';
+import { Modal, StateBadge, Banner, Button, Pill, Field, Money, EmptyState, Skeleton, Switch, Avatar, SearchInput, DateTime } from '../../ui';
 import { t, L } from '../../i18n';
 import { cn, money, time } from '../../lib/format';
 import { D } from '../../mock/money';
@@ -123,7 +123,7 @@ export function StaffMealsList({ dates }: { dates?: string }) {
           <div key={o.id} className={cn('rounded-xl border line surface-1 px-3 py-2 flex items-center gap-3 flex-wrap', voided && 'opacity-60')} data-fb={`staff-meal:${o.number}`}>
             <Avatar name={personName(null, o.staffMeal?.employeeName ?? o.customerName)} size="sm" />
             <div className="flex-1 min-w-[160px]">
-              <div className="font-bold text-sm">{personName(null, o.staffMeal?.employeeName ?? o.customerName)} <span className="num text-[11px] text-dim">#{o.number} · {time(o.createdAt)}</span></div>
+              <div className="font-bold text-sm">{personName(null, o.staffMeal?.employeeName ?? o.customerName)} <span className="text-[11px] text-dim"><span className="num">#{o.number}</span> · <DateTime v={o.createdAt} time /></span></div>
               <div className="text-[11px] text-dim">{o.lines.filter((l: any) => l.status !== 'REMOVED').map((l: any) => `${L(l.name)} ×${Number(l.quantity)}`).join(t('، '))}{o.staffMeal ? ` · ${money(o.staffMeal.value)} ${o.staffMeal.basis === 'COST' ? t('بالتكلفة') : t('بسعر البيع')}` : ''}</div>
             </div>
             {voided ? <Pill tone="neutral">{t('اتلغت')}</Pill> : held ? <Pill tone="warning"><ChefHat className="w-3 h-3" />{t('مستنية الإرسال')}</Pill> : <Pill tone="success"><CheckCircle2 className="w-3 h-3" />{t('راحت المطبخ')}</Pill>}

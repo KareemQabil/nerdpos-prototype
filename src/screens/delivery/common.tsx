@@ -2,7 +2,7 @@
 import React, { useRef, useState } from 'react';
 import { Bike, Car, Clock, MapPin, Phone, ChefHat, CheckCircle2, XCircle, AlertTriangle, Send, UserCheck, Ban, Banknote, CreditCard, Globe, History, Store } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';
-import { Modal, Button, Field, Input, Select, Textarea, Pill, Banner, KV, Money, StateBadge, Spinner, confirmDialog, Popover, Popup, Numpad, applyNumpadKey, useNumpadKeys, type NumpadKey } from '../../ui';
+import { Modal, Button, Field, Input, Select, Textarea, Pill, Banner, KV, Money, StateBadge, Spinner, confirmDialog, Popover, Popup, Numpad, applyNumpadKey, useNumpadKeys, type NumpadKey, DateTime } from '../../ui';
 import { sumAmounts, changePreview, sign, plainAmount } from '../../lib/cash';
 import { Tech } from '../../app/tech';
 import { t, L, tv, getLang } from '../../i18n';
@@ -281,7 +281,7 @@ export function DeliveryDetailBody({ id, onClose, stacked }: { id: string; onClo
               {d.timeline.map((h: any, i: number) => (
                 <li key={i} className="ms-4">
                   <span className="absolute -start-1.5 w-3 h-3 rounded-full bg-[var(--primary)] border-2 border-[var(--card,#0f172a)]" />
-                  <div className="text-[11px] text-dim num">{time(h.at)} · {personText(h.byName) ?? ''}</div>
+                  <div className="text-[11px] text-dim"><DateTime v={h.at} time /> · {personText(h.byName) ?? ''}</div>
                   <div className="text-sm">{L(h.text)}</div>
                   <Tech><div className="text-[10px] text-dim num">{h.kind}</div></Tech>
                 </li>

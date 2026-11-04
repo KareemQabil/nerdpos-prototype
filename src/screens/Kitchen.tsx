@@ -12,7 +12,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChefHat, Undo2, AlertTriangle, Flame, History, LayoutGrid, Layers, ConciergeBell, Volume2, VolumeX, Keyboard, X, Truck, RotateCcw, ArrowRightLeft, Trash2, PackageX, CheckCircle2, Clock } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../app/hooks';
-import { StateBadge, Tabs, Pill, Button, Empty, EmptyState, Skeleton, SegmentedControl, useNow, Modal, Popup, Field, Select, Input, Banner, Kbd, toast } from '../ui';
+import { StateBadge, Tabs, Pill, Button, Empty, EmptyState, Skeleton, SegmentedControl, useNow, Modal, Popup, Field, Select, Input, Banner, Kbd, toast, DateTime } from '../ui';
 import { t, L } from '../i18n';
 import { cn, qty, time } from '../lib/format';
 import { Tech } from '../app/tech';
@@ -378,11 +378,11 @@ function HistoryDialog({ tk, onClose }: { tk: any; onClose: () => void }) {
   return (
     <Modal open onClose={onClose} title={`${t('اللي حصل للتذكرة')} #${tk.orderNumber}`}>
       <div className="space-y-2 text-sm">
-        <div className="flex justify-between"><span>{t('وصلت المطبخ')}</span><span className="num">{time(tk.createdAt)}</span></div>
-        {tk.startedAt ? <div className="flex justify-between"><span>{t('بدأت (الشيف داس «ابدأ»)')}</span><span className="num">{time(tk.startedAt)}{tk.waitBeforeStartMinutes != null ? ` · ${t('استنت {m} دقيقة قبل ما تبدأ', { m: tk.waitBeforeStartMinutes })}` : ''}</span></div>
+        <div className="flex justify-between"><span>{t('وصلت المطبخ')}</span><DateTime v={tk.createdAt} time /></div>
+        {tk.startedAt ? <div className="flex justify-between"><span>{t('بدأت (الشيف داس «ابدأ»)')}</span><span><DateTime v={tk.startedAt} time />{tk.waitBeforeStartMinutes != null ? ` · ${t('استنت {m} دقيقة قبل ما تبدأ', { m: tk.waitBeforeStartMinutes })}` : ''}</span></div>
           : <div className="flex justify-between text-dim"><span>{t('العداد')}</span><span>{t('شغال من ساعة ما وصلت')}</span></div>}
-        {tk.readyAt && <div className="flex justify-between"><span>{t('جهزت')}</span><span className="num">{time(tk.readyAt)}</span></div>}
-        {(tk.history ?? []).map((h: any, i: number) => <div key={i} className="flex justify-between gap-2 border-t line pt-2"><span>{L(h.text)}</span><span className="num text-dim">{time(h.at)}</span></div>)}
+        {tk.readyAt && <div className="flex justify-between"><span>{t('جهزت')}</span><DateTime v={tk.readyAt} time /></div>}
+        {(tk.history ?? []).map((h: any, i: number) => <div key={i} className="flex justify-between gap-2 border-t line pt-2"><span>{L(h.text)}</span><DateTime v={h.at} time className="text-dim" /></div>)}
         <Tech><div className="num text-[10px] text-dim">{tk.id} · v{tk.version}</div></Tech>
       </div>
     </Modal>
@@ -423,7 +423,7 @@ function RecallPopup({ onClose, stations, reasons, dispatch }: { onClose: () => 
               <div className="font-bold">{headline(tk)} · <span className="num">#{tk.orderNumber}</span> · {t('الدفعة')} <span className="num">{tk.round}</span> · {stationLabel(tk.stationName)}</div>
               <div className="text-xs text-dim truncate">{tk.items.filter((x: any) => x.status === 'ACTIVE').map((x: any) => `${qty(x.quantity)}× ${L(x.name)}`).join(' · ')}</div>
             </div>
-            <Pill tone={tk.state === 'DONE' ? 'neutral' : 'success'}>{tk.state === 'DONE' ? t('سُلِّمت') : t('جاهز')} <span className="num">{time(tk.doneAt ?? tk.readyAt)}</span></Pill>
+            <Pill tone={tk.state === 'DONE' ? 'neutral' : 'success'}>{tk.state === 'DONE' ? t('سُلِّمت') : t('جاهز')} <DateTime v={tk.doneAt ?? tk.readyAt} time /></Pill>
             <Button size="lg" disabled={busy} onClick={() => doRecall(tk)} data-fb={`recall:${tk.orderNumber}:r${tk.round}`}><Undo2 className="w-4 h-4" />{t('استعادة')}{i === sel && <Kbd>Enter</Kbd>}</Button>
             {(tk.state === 'DONE' || tk.state === 'READY') && <Button size="lg" variant="outline" onClick={() => setRefire(tk)} data-fb={`recall-refire:${tk.orderNumber}:r${tk.round}`}><RotateCcw className="w-4 h-4" />{t('إعادة التحضير')}</Button>}
           </div>

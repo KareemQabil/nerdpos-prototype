@@ -4,7 +4,7 @@
 import React, { useMemo, useState } from 'react';
 import { ClipboardCheck, PackageSearch, Flag, CheckCircle2, XCircle, ListTree, ShieldCheck } from 'lucide-react';
 import { useQuery, useCommand, useDev } from '../../app/hooks';
-import { PageHeader, Card, Table, Pill, Button, Tabs, StatGrid, StatCard, FilterChips, Toolbar, EmptyState, Modal, Field, Textarea, Money, Banner, Popup, KV } from '../../ui';
+import { PageHeader, Card, Table, Pill, Button, Tabs, StatGrid, StatCard, FilterChips, Toolbar, EmptyState, Modal, Field, Textarea, Money, Banner, Popup, KV, DateTime } from '../../ui';
 import { t, L } from '../../i18n';
 import { dateTime, money, qty } from '../../lib/format';
 import { Tech } from '../../app/tech';
@@ -54,7 +54,7 @@ function Queue({ q, canDecide }: { q: any; canDecide: boolean }) {
         <Table loading={q.loading && !q.data} head={[t('الصنف'), t('الشيك'), t('المرحلة'), t('مين لغى ومين وافق'), t('السبب'), t('القيمة'), t('المراجعة'), '']} align={['start', 'start', 'start', 'start', 'start', 'end', 'start', 'end']}
           rows={items.map((r) => [
             <span className="font-bold">{L(r.name)} <span className="num text-dim">×{qty(r.quantity)}</span></span>,
-            <span className="num text-xs">#{r.orderNumber}<span className="block text-dim">{dateTime(r.at)}</span></span>,
+            <span className="text-xs"><span className="num">#{r.orderNumber}</span><DateTime v={r.at} className="block text-dim" /></span>,
             <StagePill s={r.stage} />,
             <span className="text-xs">{first(r.actorName)}<br /><ShieldCheck className="w-3 h-3 inline" /> <b>{first(r.approverName)}</b> {r.credentialKind ? <span className="text-dim">({t(CRED_AR[r.credentialKind] ?? '')})</span> : null}</span>,
             <span className="text-xs text-soft">{r.reason ?? '—'}</span>,

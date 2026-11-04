@@ -5,7 +5,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { Printer, X, FileText, ReceiptText } from 'lucide-react';
-import { Button, SegmentedControl } from '../../ui';
+import { Button, SegmentedControl, DateTime } from '../../ui';
 import { t, L } from '../../i18n';
 import { dateTime } from '../../lib/format';
 import { fmt, statusText, Amt } from './parts';
@@ -54,7 +54,7 @@ export function TemplatePreview({ run, onClose }: { run: any; onClose: () => voi
         ))}
       </div>
       <div className={receipt ? 'mt-3 border-t border-dashed border-black pt-2 text-center text-[10px] space-y-0.5' : 'mt-6 border-t border-black pt-2 text-[10px] flex justify-between gap-4'}>
-        <div>{t('اتطلع بواسطة')}: {v.generatedBy ?? '—'} · {t('لحد')} <span className="num">{dateTime(h.asOf)}</span></div>
+        <div>{t('اتطلع بواسطة')}: {v.generatedBy ?? '—'} · {t('لحد')} <DateTime v={h.asOf} /></div>
         <div>{t('التعريفات')}: {h.metrics.slice(0, 6).map((m: any) => `${L(m.label)} v${m.version}`).join('، ')}{h.metrics.length > 6 ? ' …' : ''}</div>
         {v.template?.footer?.map((l: string, i: number) => <div key={i}>{l}</div>)}
         <div className="num">{t('صفحة 1 من 1')} · nerdPOS</div>

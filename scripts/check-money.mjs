@@ -8,6 +8,10 @@
 //      formatter — money(x) without `, false`; the reports' fmt(x) / fmt(x, unit) unless the unit is a literal non-money
 //      unit ('count', 'unit', '%', 'minutes', 'hours'); fmtCell(…) / cellText(…); currencyText() — or has «ج.م» / EGP;
 //   2. a `value={money(x)}` / `v={money(x)}` prop (StatCard, Stat, Row, tiles render a plain string value inside `.num`).
+// ux-09, dates: «04 نوفمبر 07:16 ص» inside a left-to-right element reads «نوفمبر 07:16 ص 04». Time stamps go through
+// <DateTime v={iso} /> (or <DateTime v={iso} time />). Flags, the same way:
+//   3. a `num` / data-numeric / dir="ltr" element whose own text calls dateTime(…), time(…), dayLong(…) or dateTimeLong(…);
+//   4. a `value={dateTime(x)}` / `v={time(x)}` prop.
 // Usage: node scripts/check-money.mjs   (exit 1 with file:line list on a violation)
 import fs from 'fs';
 import path from 'path';
@@ -25,9 +29,11 @@ const files = [];
 // a currency-bearing formatter call or literal inside the element's own text
 const CURRENCY = /\b(?:money|fmt)\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\)|\bfmtMoney\(|\bfmtCell\(|\bcellText\(|\bcurrencyText\(\)|ج\.م|\bEGP\b|جنيه/g;
 const isBareMoney = (s) => (/^money\(/.test(s) && /,\s*false\s*\)$/.test(s)) || (/^fmt\(/.test(s) && /,\s*'(count|unit|%|minutes|hours)'\s*\)$/.test(s));
+const DATE = /\b(?:dateTime|time|dayLong|dateTimeLong)\(/g;
 const NUM_ATTR = /className=(?:"([^"]*)"|'([^']*)'|\{([^}]*)\})|data-numeric|dir="ltr"/g;
 
 const out = [];
+const dates = [];
 for (const f of files) {
   const src = fs.readFileSync(f, 'utf8');
   const lineOf = (i) => src.slice(0, i).split('\n').length;
@@ -56,15 +62,17 @@ for (const f of files) {
       if (isBareMoney(c)) continue;
       out.push(`${path.relative(ROOT, f)}:${lineOf(i)}  ${c.slice(0, 60)} inside a left-to-right number element`);
     }
+    for (const c of body.match(DATE) ?? []) dates.push(`${path.relative(ROOT, f)}:${lineOf(i)}  ${c}…) inside a left-to-right number element`);
   }
   // 2. value={money(x)} / v={money(x)} on a component (StatCard, Stat, Row, tiles put a plain string value inside `.num`)
   for (const m of src.matchAll(/\b(value|v)=\{\s*(money\((?:[^()]|\([^()]*\))*\))/g)) {
     if (isBareMoney(m[2])) continue;
     out.push(`${path.relative(ROOT, f)}:${lineOf(m.index)}  ${m[1]}=${m[2].slice(0, 50)} (pass <Money v={…} /> or the unit separately)`);
   }
+  // 4. value={dateTime(x)} / v={time(x)} (also behind a `cond ? … :`)
+  for (const m of src.matchAll(/\b(value|v)=\{\s*(?:[^{}]*\?\s*)?((?:dateTime|time|dayLong|dateTimeLong)\()/g)) dates.push(`${path.relative(ROOT, f)}:${lineOf(m.index)}  ${m[1]}=${m[2]}…) (pass <DateTime v={…} />)`);
 }
-if (out.length) {
-  console.error(`check-money: ${out.length} amount(s) with currency inside a left-to-right number element — use <Money>:\n` + out.join('\n'));
-  process.exit(1);
-}
-console.log(`check-money: OK (${files.length} files, no currency inside a number element)`);
+if (out.length) console.error(`check-money: ${out.length} amount(s) with currency inside a left-to-right number element — use <Money>:\n` + out.join('\n'));
+if (dates.length) console.error(`check-money: ${dates.length} time stamp(s) inside a left-to-right number element — use <DateTime>:\n` + dates.join('\n'));
+if (out.length || dates.length) process.exit(1);
+console.log(`check-money: OK (${files.length} files, no currency or time stamp inside a number element)`);

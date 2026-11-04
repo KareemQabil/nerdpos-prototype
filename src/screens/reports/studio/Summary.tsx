@@ -4,7 +4,7 @@ import React from 'react';
 import { Clock, AlertTriangle, CheckCircle2, Info, TrendingUp, TrendingDown } from 'lucide-react';
 import { t, L } from '../../../i18n';
 import { cn, dateTime } from '../../../lib/format';
-import { Pill, Banner } from '../../../ui';
+import { Pill, Banner, DateTime } from '../../../ui';
 import type { PivotResult, PivotNode } from '../../../reports/pivot';
 import type { ColumnView } from '../../../reports/studio';
 import { orderedMeasures, columnLabel } from '../../../reports/export/table';
@@ -20,7 +20,7 @@ export function StatusLine({ r, loading }: { r: PivotResult; loading?: boolean }
       {m.provisional
         ? <Pill tone="warning" dot title={m.provisionalReasons.map((x) => L(x)).join(' ')}>{t('مبدئي — ممكن يتغير')}</Pill>
         : <Pill tone="success" dot>{t('نهائي — الأيام مقفولة')}</Pill>}
-      <span className="inline-flex items-center gap-1 text-dim"><Clock className="w-3.5 h-3.5" />{t('الأرقام لحد')} <span className="num">{dateTime(m.asOf)}</span></span>
+      <span className="inline-flex items-center gap-1 text-dim"><Clock className="w-3.5 h-3.5" />{t('الأرقام لحد')} <DateTime v={m.asOf} /></span>
       <span className="text-dim">·</span>
       <span className="text-dim">{t('اليوم التجاري من {c} الفجر بتوقيت القاهرة', { c: m.cutoff })}</span>
       {m.compare && <><span className="text-dim">·</span><span className="text-dim">{t('مقارنة بـ')} {L(m.compare.label)} ({rangeText(m.compare.from, m.compare.to, lang())})</span></>}

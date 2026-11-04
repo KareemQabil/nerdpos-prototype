@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { ChefHat, Minus, Plus, Trash2, Ban, ArrowRightLeft, Send, Lock, Tag, Gift, XCircle, Printer, Wallet, Split, Merge, PenLine, Armchair, RefreshCw, History, CheckCircle2, Clock, AlertTriangle, Shuffle, Receipt, Users, StickyNote, ChevronDown, ChevronUp, MoreHorizontal } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';
-import { Button, Pill, Modal, Field, Select, Input, Textarea, Money, StateBadge, Banner, EmptyState, Tabs, Timeline, Skeleton, Kbd } from '../../ui';
+import { Button, Pill, Modal, Field, Select, Input, Textarea, Money, StateBadge, Banner, EmptyState, Tabs, Timeline, Skeleton, Kbd, DateTime } from '../../ui';
 import { inTopLayer } from '../../ui/Numpad';
 import { Tech } from '../../app/tech';
 import { t, L, tLabel } from '../../i18n';
@@ -132,7 +132,7 @@ export function CheckPanel({ order, refetch, mode, onCheckSwitch, variant = 'pan
           return (
             <div key={r} className="rounded-xl border line overflow-hidden">
               <div className="flex items-center justify-between gap-2 px-3 py-1.5 surface-1 text-xs">
-                <span className="font-bold flex items-center gap-1.5"><ChefHat className="w-3.5 h-3.5 text-dim" />{t('الدفعة')} <span className="num">{r}</span>{info?.firedAt && <span className="text-dim font-normal num">· {time(info.firedAt)}</span>}{info?.via === 'CONFIRM' && <span className="text-dim font-normal">· {t('مع التأكيد')}</span>}</span>
+                <span className="font-bold flex items-center gap-1.5"><ChefHat className="w-3.5 h-3.5 text-dim" />{t('الدفعة')} <span className="num">{r}</span>{info?.firedAt && <span className="text-dim font-normal">· <DateTime v={info.firedAt} time /></span>}{info?.via === 'CONFIRM' && <span className="text-dim font-normal">· {t('مع التأكيد')}</span>}</span>
                 <RoundStatus info={info} orderId={order.id} />
               </div>
               <div className="divide-y divide-[var(--line)]">{lines.map((l: any) => <LineRow key={l.id} l={l} locked draft={draft} cart={cart} flash={l.id === flashLineId} onVoid={canAsk('order:voidline') ? () => setDlg({ k: 'void', line: l }) : undefined} onMod={() => setDlg({ k: 'kmod', line: l })} onSeat={() => setDlg({ k: 'seat', line: l })} seats={seats} onQtyEdit={draft && l.status === 'ACTIVE' && canAsk('order:voidline') ? (a) => setQtyEdit({ line: l, anchor: a }) : undefined} onEdit={draft && l.status === 'ACTIVE' ? (a) => setLineEdit({ line: l, anchor: a }) : undefined} />)}</div>
