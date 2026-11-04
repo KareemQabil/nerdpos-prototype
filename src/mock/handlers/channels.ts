@@ -12,6 +12,7 @@ import { findOrCreateCustomer, zoneForArea, normPhone } from './customers';
 import { priceRuleAt } from '../pricing';
 import type { Capture } from '../types';
 import type { ExternalOrder, ExternalSource } from '../types-crm';
+import { channelForSource, mappedChannelOf } from '../sales-channels';
 
 export const SOURCES: Record<ExternalSource, { ar: string; en: string; color: string }> = {
   APP_1: { ar: 'تطبيق التوصيل ١', en: 'Delivery app 1', color: '#f97316' },
@@ -37,7 +38,7 @@ function extView(ctx: Ctx, e: ExternalOrder) {
   const ageMinutes = Math.max(0, Math.floor((ctx.now - e.receivedAtMs) / 60000));
   const zone = e.customer.address ? zoneForArea(db, e.customer.address.area) : null;
   return {
-    ...e, items, sourceLabel: SOURCES[e.source], ageMinutes, waitingTooLong: e.state === 'NEW' && ageMinutes >= 5, unmapped: items.filter((i) => !i.productId).length,
+    ...e, items, sourceLabel: SOURCES[e.source], salesChannel: (() => { const sc = channelForSource(db, e.source, e.fulfillment === 'DELIVERY' ? 'DELIVERY' : 'TAKEAWAY'); return { id: sc.id, name: sc.name, color: sc.color, isDefault: sc.isDefault }; })() /* ux-07: read from the Sales-channels mapping */, ageMinutes, waitingTooLong: e.state === 'NEW' && ageMinutes >= 5, unmapped: items.filter((i) => !i.productId).length,
     zone: zone ? { id: zone.id, name: zone.name, etaMinutes: zone.etaMinutes } : null, areaCovered: e.fulfillment === 'PICKUP' || !!zone,
     order: order ? { id: order.id, number: order.number, status: order.status } : null, delivery: delivery ? { id: delivery.id, number: delivery.number, state: delivery.state } : null,
     acceptedByName: e.acceptedBy ? userName(db, e.acceptedBy) : null,
@@ -141,7 +142,11 @@ export const channelHandlers: Record<string, Handler> = {
     const src = SOURCES[e.source];
     const cust = findOrCreateCustomer(ctx, { name: e.customer.name, phone: e.customer.phone, address: e.customer.address ?? null, source: 'ONLINE' });
     const channel = e.fulfillment === 'DELIVERY' ? 'DELIVERY' : 'TAKEAWAY';
-    let o = subCall(ctx, 'Order.Create', {}, { channel, customerId: cust?.id, label: `${src.ar} ${e.externalRef}`, note: e.note ?? undefined, ...(ctx.body.salesChannelId ? { salesChannelId: ctx.body.salesChannelId } : {}) /* r3C: the sales channel picked on accept (e.g. طلبات) */ });
+    // ux-07: the sales channel comes from the source mapping owned by Sales channels (one owner, no manual pick);
+    // a client that still sends a channel must name that same one
+    const mappedSc = channelForSource(db, e.source, channel);
+    if (ctx.body.salesChannelId && ctx.body.salesChannelId !== mappedSc.id) throw new ApiError('VALIDATION_FAILED', { field: 'salesChannelId', expected: mappedSc.id, reasonAr: `طلبات «${src.ar}» تُسجَّل على قناة «${mappedSc.name.ar}». غيّر الربط من شاشة قنوات البيع.` });
+    let o = subCall(ctx, 'Order.Create', {}, { channel, customerId: cust?.id, label: `${src.ar} ${e.externalRef}`, note: e.note ?? undefined, salesChannelId: mappedSc.id /* r3C: the sales channel picked on accept (e.g. طلبات) */ });
     const order = db.orders.find((x) => x.id === o.id)!;
     if (!cust) { order.customerName = e.customer.name; order.customerPhone = e.customer.phone; }
     order.externalOrderId = e.id;

@@ -294,6 +294,12 @@ const buildStaffMeal: Builder = (db, s) => db.orders.filter((o) => o.kind === 'S
   });
 });
 
+/** ux-07: the kitchen target of a branch — KitchenTimingPolicy (branch value, else the restaurant's), 15 minutes by default. */
+const kitchenTarget = (db: DB, branchId: string): number => {
+  const vals = ((db as any).policyValues ?? []).filter((v: any) => v.policyId === 'KitchenTimingPolicy');
+  const hit = vals.find((v: any) => v.scopeType === 'BRANCH' && v.scopeId === branchId) ?? vals.find((v: any) => v.scopeType === 'TENANT');
+  return Number(hit?.value?.targetMinutes ?? 15) || 15;
+};
 const buildKitchen: Builder = (db, s) => db.tickets.flatMap((t) => {
   const o = db.orders.find((x) => x.id === t.orderId);
   if (!o || !branchOk(s, o.branchId) || t.createdAtMs > s.asOfMs) return [];
@@ -302,7 +308,7 @@ const buildKitchen: Builder = (db, s) => db.tickets.flatMap((t) => {
   const st = db.stations.find((x) => x.id === t.stationId);
   const readyMs = t.readyAt && isoMs(t.readyAt) <= s.asOfMs ? isoMs(t.readyAt) : null;
   const mins = ((readyMs ?? s.asOfMs) - t.createdAtMs) / 60000;
-  const target = st?.targetMinutes ?? 15;
+  const target = kitchenTarget(db, o.branchId); // ux-07: the venue default (KitchenTimingPolicy), as on the kitchen screens
   return [{
     kind: 'kitchen' as FactKind, id: t.id, branchId: o.branchId, businessDate: bd, recordedMs: t.createdAtMs,
     dims: { ...dayDims(db, bd), branch: o.branchId, daypart: daypartOf(t.createdAtMs), hour: String(cairoHour(t.createdAtMs)).padStart(2, '0'), station: t.stationId, channel: t.channel, check: o.id },

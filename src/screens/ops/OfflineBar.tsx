@@ -1,5 +1,6 @@
 // Per-device network strip: "أوفلاين — N عمليات مستنية" while the network is cut, the commands still waiting after
 // it returns, and offline items that came back as conflicts needing a decision.
+import { techMode } from '../../app/tech';
 import React, { useSyncExternalStore, useState } from 'react';
 import { WifiOff, Wifi, RefreshCw, AlertTriangle, ListChecks } from 'lucide-react';
 import { useDev, useOfflineQueue, replayOffline, useQuery } from '../../app/hooks';
@@ -31,7 +32,7 @@ export function OfflineBar() {
           <><b>{t('{n} عمليات أوفلاين محتاجة قرار', { n: conflicts })}</b> <span className="text-dim text-xs">· {t('حاجة اتغيرت وانت من غير نت (صنف خلص أو الشيك اتعدل)')}</span></>
         )}
       </div>
-      {offline && <Button size="sm" variant="ghost" onClick={() => sim.setOffline(id, false)} data-fb="offline-reconnect"><Wifi className="w-4 h-4" />{t('رجّع النت (محاكاة)')}</Button>}
+      {offline && techMode.get() && <Button size="sm" variant="ghost" onClick={() => sim.setOffline(id, false)} data-fb="offline-reconnect"><Wifi className="w-4 h-4" />{t('رجّع النت (محاكاة)')}</Button>}
       {!offline && queued.length > 0 && <Button size="sm" variant="warning" loading={busy} onClick={async () => { setBusy(true); await replayOffline(id); setBusy(false); }} data-fb="offline-replay"><RefreshCw className="w-4 h-4" />{t('ابعت دلوقتي')}</Button>}
       {can('sync:read') && <Button size="sm" variant="outline" onClick={() => nav('sync')} data-fb="offline-open-sync"><ListChecks className="w-4 h-4" />{t('شاشة المزامنة')}</Button>}
     </div>

@@ -37,6 +37,16 @@ export function orderSalesChannel(db: DB, o: { channel: Channel; salesChannelId?
   return salesChannelById(db, o.salesChannelId) ?? defaultChannelFor(db, o.channel);
 }
 
+/** ux-07: the sales channel an online-order source lands on — the active channel that lists the source and sells this
+ *  order type; otherwise the order type's default channel. Owned here (Sales channels); online orders only read it. */
+export function channelForSource(db: DB, source: string, orderType: Channel): SalesChannel {
+  return salesChannelsOf(db).find((c) => c.active && c.orderType === orderType && (c.externalSources ?? []).includes(source)) ?? defaultChannelFor(db, orderType);
+}
+/** The channel a source is mapped to (any order type), for display; null = not mapped. */
+export function mappedChannelOf(db: DB, source: string): SalesChannel | null {
+  return salesChannelsOf(db).find((c) => c.active && (c.externalSources ?? []).includes(source)) ?? null;
+}
+
 /** Validates the channel picked for a new order of this order type; none = the order type's default channel. */
 export function resolveSalesChannel(db: DB, orderType: Channel, id: string | null | undefined): SalesChannel {
   if (!id) return defaultChannelFor(db, orderType);
@@ -58,7 +68,7 @@ export function seedSalesChannels(db: DB, nowMs: number) {
   const list = salesChannelsOf(db);
   list.push({
     id: 'sch_talabat', name: { ar: 'طلبات', en: 'Talabat' }, orderType: 'DELIVERY', isDefault: false, active: true, sortOrder: 40, color: '#ff5a00',
-    priceMode: 'OWN', follow: null, note: 'تطبيق توصيل — أسعاره أعلى عشان العمولة', createdAt: iso, createdBy: 'u_owner', updatedAt: iso, updatedBy: 'u_owner', version: 1,
+    priceMode: 'OWN', follow: null, note: 'تطبيق توصيل — أسعاره أعلى عشان العمولة', externalSources: ['APP_1'] /* ux-07: «تطبيق التوصيل ١» orders land here */, createdAt: iso, createdBy: 'u_owner', updatedAt: iso, updatedBy: 'u_owner', version: 1,
     history: [{ at: iso, by: 'u_owner', text: 'اتعملت قناة طلبات (دليفري) بأسعار خاصة' }],
   });
   const own: Record<string, string> = { p_tea: '30', p_turkish_coffee: '48', p_chicken_shawarma: '180', p_kofta: '265', p_mixed_grill: '385', p_beef_burger: '215' };

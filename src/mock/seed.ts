@@ -22,6 +22,9 @@ const DISPLAY_NAME_AR: Record<string, string> = {
   // ux-07: the canonical device names (same as DEVICE_NAMES in demo/people.ts)
   t_floor: 'تابلت الويتر', t_cash: 'جهاز الكاشير 1', t_kds: 'شاشة التسليم', t_admin: 'كمبيوتر المكتب', t_second_floor: 'تابلت الفرع الثاني',
 };
+/** ux-07: the demo tax carries a real tax name in the product (the pack's «ضريبة تجريبية (غير معتمدة)» was a dev label;
+ *  the rate is still illustrative until the accountant confirms the mapping — see PROTOTYPE_GAPS). */
+const TAX_DISPLAY_NAME: Record<string, { ar: string; en: string }> = { tax_demo: { ar: 'ضريبة القيمة المضافة', en: 'VAT' } };
 const KIND: Record<string, 'FLOOR' | 'CASH' | 'KDS' | 'ADMIN'> = { t_floor: 'FLOOR', t_cash: 'CASH', t_kds: 'KDS', t_admin: 'ADMIN', t_second_floor: 'FLOOR' };
 
 export function buildSeed(nowMs: number): DB {
@@ -54,7 +57,7 @@ export function buildSeed(nowMs: number): DB {
     availability: [],
     priceRules: [],
     taxPolicies: seed.tax_policies.map((t: any) => ({
-      id: t.key, name: t.name, jurisdiction: t.jurisdiction, rate: t.rate, calculationMode: t.calculationMode, roundingMode: t.roundingMode, roundingScale: t.roundingScale,
+      id: t.key, name: TAX_DISPLAY_NAME[t.key] ?? t.name, jurisdiction: t.jurisdiction, rate: t.rate, calculationMode: t.calculationMode, roundingMode: t.roundingMode, roundingScale: t.roundingScale,
       active: true, version: 1, history: [{ at: nowIso, by: 'provisioning', change: 'created from demo-provisioning 1.2.0' }], exemption: 'NONE', fiscalTaxType: null, fiscalSubtype: null,
     })),
     tables: seed.tables.items.map((t: any) => ({ id: t.key, branchId: t.branch ?? seed.tables.defaults.branch, name: t.name, area: t.area, capacity: t.capacity, active: true, version: 1 })),
@@ -176,7 +179,7 @@ const COLORS: Record<string, string> = { cat_hot: '#f59e0b', cat_cold: '#22d3ee'
 const ALLERGENS: Record<string, string[]> = { p_hummus: ['SESAME'], p_baba_ghanoush: ['SESAME'], p_beef_burger: ['GLUTEN', 'DAIRY'], p_om_ali: ['GLUTEN', 'DAIRY', 'NUTS'], p_kunafa: ['GLUTEN', 'DAIRY', 'NUTS'], p_chicken_shawarma: ['GLUTEN'] };
 
 function addDirectionCatalog(db: DB, from: number) {
-  db.categories.push({ id: 'cat_direction', name: { ar: 'اتجاه المنتج (مقترح)', en: 'Product direction (proposed)' }, active: true, sortOrder: 99, version: 1, colorCode: '#a855f7' });
+  db.categories.push({ id: 'cat_direction', name: { ar: 'أصناف جديدة', en: 'New items' } /* ux-07 owner default (was «اتجاه المنتج (مقترح)») */, active: true, sortOrder: 99, version: 1, colorCode: '#a855f7' });
   db.modifierGroups.push({ id: 'mod_side_sauce', name: { ar: 'صوص البطاطس', en: 'Side sauce' }, selectionRule: 'SINGLE', min: 1, max: 1, active: true, version: 1, options: [
     { id: 'opt_ketchup', name: { ar: 'كاتشب', en: 'Ketchup' }, priceDelta: m4('0'), active: true, version: 1 },
     { id: 'opt_garlic', name: { ar: 'ثومية', en: 'Garlic' }, priceDelta: m4('5'), active: true, version: 1 },

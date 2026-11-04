@@ -3,7 +3,7 @@
 // which stations each KDS terminal shows, whether it is the dispatch screen, and the «ابدأ» policy.
 import React, { useMemo, useState } from 'react';
 import { ChefHat, Route, Plus, Pencil, Power, Armchair, AlertTriangle, Users, MonitorPlay, ConciergeBell, Save } from 'lucide-react';
-import { useCommand, useDev } from '../../app/hooks';
+import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Banner, Button, Card, EmptyState, Field, Input, PageHeader, Pill, Select, StatCard, StatGrid, StateBadge, Switch, Table, Tabs, SegmentedControl } from '../../ui';
 import { t, L, tv } from '../../i18n';
 import { Tech } from '../../app/tech';
@@ -71,6 +71,7 @@ function ScreensTab() {
 }
 function ScreenCard({ sc, stations, perm }: { sc: any; stations: any[]; perm: { ok: boolean; title?: string } }) {
   const { run, busy } = useCommand();
+  const { auth } = useDev();
   const [ids, setIds] = useState<string[]>(sc.stationIds);
   const [dispatch, setDispatch] = useState<boolean>(sc.dispatch);
   const [start, setStart] = useState<string>(sc.start);
@@ -78,6 +79,9 @@ function ScreenCard({ sc, stations, perm }: { sc: any; stations: any[]; perm: { 
   const [warn, setWarn] = useState<string>(sc.warnMinutes ? String(sc.warnMinutes) : '');
   const [late, setLate] = useState<string>(sc.lateMinutes ? String(sc.lateMinutes) : '');
   const [itemBump, setItemBump] = useState<boolean>(sc.itemBump !== false);
+  // ux-07: one kitchen-timing source — this screen's colours, else the venue default (KitchenTimingPolicy in Settings)
+  const venueQ = useQuery<any>('Settings.Effective', { query: { policyId: 'KitchenTimingPolicy', scopeType: 'BRANCH', scopeId: auth.branchId } });
+  const venue: { targetMinutes: number; alertMinutes: number } | null = venueQ.data?.value ?? null;
   const timerDirty = warn !== (sc.warnMinutes ? String(sc.warnMinutes) : '') || late !== (sc.lateMinutes ? String(sc.lateMinutes) : '');
   const timerOk = (!warn && !late) || (/^\d+$/.test(warn) && /^\d+$/.test(late) && Number(warn) >= 1 && Number(late) > Number(warn) && Number(late) <= 180);
   const dirty = ids.join(',') !== sc.stationIds.join(',') || dispatch !== sc.dispatch || start !== sc.start || timerDirty || itemBump !== (sc.itemBump !== false);
@@ -106,7 +110,7 @@ function ScreenCard({ sc, stations, perm }: { sc: any; stations: any[]; perm: { 
             <Input value={warn} onChange={(e) => setWarn(e.target.value.replace(/[^0-9]/g, '').slice(0, 3))} disabled={!perm.ok} inputMode="numeric" className="!w-20 num text-center" data-fb={`kds-screen-warn:${sc.terminalId}`} aria-label={t('أصفر من')} />
             <span className="inline-flex items-center gap-1.5 text-sm"><span className="w-3 h-3 rounded-full bg-[var(--error)]" />{t('أحمر من')}</span>
             <Input value={late} onChange={(e) => setLate(e.target.value.replace(/[^0-9]/g, '').slice(0, 3))} disabled={!perm.ok} inputMode="numeric" className="!w-20 num text-center" data-fb={`kds-screen-late:${sc.terminalId}`} aria-label={t('أحمر من')} />
-            {!warn && !late && <span className="text-xs text-dim">{t('حسب سياسة توقيت المطبخ')}</span>}
+            {!warn && !late && <span className="text-xs text-dim" data-fb={`kds-screen-inherit:${sc.terminalId}`}>{venue ? t('يرث من الإعداد العام: أصفر من {w} · أحمر من {r} دقيقة', { w: venue.targetMinutes, r: Math.max(venue.targetMinutes, venue.alertMinutes) }) : t('يرث من الإعداد العام')}</span>}
           </div>
         </Field>
         <div className="flex items-center justify-between gap-3 rounded-xl surface-1 px-3 py-2.5">

@@ -1,5 +1,6 @@
 // Delivery board (dispatch): columns by status, assign / dispatch / deliver / fail / cancel, late highlighting,
 // and a simple map with the zones, the drivers and the open orders (simulated GPS).
+import { useTech } from '../../app/tech';
 import React, { useEffect, useRef, useState } from 'react';
 import { Bike, PhoneCall, ChefHat, Clock, Map as MapIcon, LayoutGrid, Navigation, Globe, Banknote, List as ListIcon, ClipboardList, Send } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';
@@ -197,6 +198,7 @@ function DeliveryBoard({ mode, onMode }: { mode: 'board' | 'list' | 'map'; onMod
 function MapView({ zones, drivers, deliveries, restaurant, onOpen }: { zones: any[]; drivers: any[]; deliveries: any[]; restaurant?: { x: number; y: number }; onOpen: (id: string) => void }) {
   const { auth, can } = useDev();
   const [gps, setGps] = useState(false);
+  const tech = useTech(); // ux-07: «محاكاة تحرك الطيارين» is a demo control
   const ref = useRef({ drivers, zones });
   ref.current = { drivers, zones };
   useEffect(() => {
@@ -220,7 +222,7 @@ function MapView({ zones, drivers, deliveries, restaurant, onOpen }: { zones: an
   return (
     <div className="flex-1 min-h-0 grid lg:grid-cols-[1fr_320px] gap-3">
       <Card className="min-h-0" title={<span className="flex items-center gap-2"><MapIcon className="w-4 h-4" />{t('الخريطة')}</span>} badge={<StateBadge ops={['DeliveryZone.List', 'Driver.List', 'Driver.UpdateLocation']} />}
-        actions={can('delivery:dispatch') && <Switch checked={gps} onChange={setGps} label={<span className="flex items-center gap-1 text-xs"><Navigation className="w-3.5 h-3.5" />{t('محاكاة تحرك الطيارين')}</span>} />}>
+        actions={can('delivery:dispatch') && tech && <Switch checked={gps} onChange={setGps} label={<span className="flex items-center gap-1 text-xs"><Navigation className="w-3.5 h-3.5" />{t('محاكاة تحرك الطيارين')}</span>} />}>
         <MiniMap zones={zones} drivers={drivers} deliveries={deliveries} restaurant={restaurant} height={420} />
         <div className="flex gap-3 text-[11px] text-dim mt-2 flex-wrap">
           <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#22c55e]" />{t('متاح')}</span>

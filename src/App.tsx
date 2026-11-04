@@ -71,7 +71,7 @@ export default function App() {
 
         {/* demo tools */}
         <div className="flex items-center gap-0.5 shrink-0" role="group" aria-label={t('أدوات التجربة')}>
-          <ChromeBtn fb="chrome:policy" on={panel === 'policy'} onClick={() => toggle('policy')} icon={<SlidersHorizontal className="w-4 h-4" />} label={t('إعدادات المطعم')} tip={t('غيّر طريقة شغل المطعم (الخدمة، الدرج، الموافقات…) وشوف الأجهزة بتتصرف إزاي')} labelAt="wide" />
+          <ChromeBtn fb="chrome:policy" on={panel === 'policy'} onClick={() => toggle('policy')} icon={<SlidersHorizontal className="w-4 h-4" />} label={t('سياسات التجربة')} tip={t('للعرض فقط: غيّر سياسات المطعم التجريبي فورًا وبلا موافقة. الإعدادات الفعلية في شاشة «الإعدادات والأسباب».')} labelAt="wide" />
           <ChromeBtn fb="chrome:walk" on={panel === 'walk'} onClick={() => toggle('walk')} icon={<PlayCircle className="w-4 h-4" />} label={t('رحلات بالخطوة')} tip={t('قصص جاهزة من يوم المطعم، خطوة بخطوة')} labelAt="wide" />
           <ChromeBtn fb="chrome:scenarios" on={panel === 'scenarios'} onClick={() => toggle('scenarios')} icon={<FlaskConical className="w-4 h-4" />} label={t('سيناريوهات الفشل')} tip={t('جرّب حاجات المفروض السيستم يرفضها أو يتصرف فيها صح')} />
           <Simulators />

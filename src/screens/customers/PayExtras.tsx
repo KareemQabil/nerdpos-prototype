@@ -1,5 +1,6 @@
 // Checkout extras used by the payment screen: pay with loyalty points, and an external card/wallet
 // authorization (card terminal, online card link, InstaPay, wallet) followed by the normal capture.
+import { useTech } from '../../app/tech';
 import React, { useState } from 'react';
 import { Star, CreditCard, ShieldCheck, Gift } from 'lucide-react';
 import { useQuery, useCommand } from '../../app/hooks';
@@ -46,7 +47,9 @@ export function ExternalAuthBox({ order, remaining }: { order: any; remaining: s
   const { run, busy } = useCommand();
   const [provider, setProvider] = useState('CARD_TERMINAL');
   const [amount, setAmount] = useState('');
-  const [approve, setApprove] = useState(true);
+  const [approveSim, setApprove] = useState(true);
+  const tech = useTech(); // ux-07: the bank / wallet answer switch is a demo control; without it the request is approved
+  const approve = tech ? approveSim : true;
   const [last, setLast] = useState<any>(null);
   const plain = money(remaining, false).replace(/,/g, '');
   const go = async () => {
@@ -62,7 +65,7 @@ export function ExternalAuthBox({ order, remaining }: { order: any; remaining: s
     <div className="space-y-3" data-fb="external-box">
       <div className="grid grid-cols-2 gap-1.5">{PROVIDERS.map(([k, v]) => <button key={k} onClick={() => setProvider(k)} data-fb={`provider:${k}`} className={cn('h-11 rounded-xl border text-sm', provider === k ? 'border-[var(--primary)] bg-[var(--primary-container)] font-bold' : 'surface-1 border-[var(--glass-border)]')}>{t(v)}</button>)}</div>
       <Field label={t('المبلغ')} hint={t('الافتراضي = المتبقي')}><Input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" placeholder={plain} className="num" /></Field>
-      <div className="rounded-xl border border-dashed line p-2.5 flex items-center justify-between gap-2"><span className="text-xs text-dim">{t('محاكاة رد البنك / المحفظة')}</span><Switch checked={approve} onChange={setApprove} label={approve ? t('هيوافق') : t('هيرفض')} /></div>
+      {tech && <div className="rounded-xl border border-dashed line p-2.5 flex items-center justify-between gap-2"><span className="text-xs text-dim">{t('محاكاة رد البنك / المحفظة')}</span><Switch checked={approve} onChange={setApprove} label={approve ? t('هيوافق') : t('هيرفض')} /></div>}
       {last?.state === 'DECLINED' && <Banner tone="error">{t('اترفضت')}: {last.declineReason}</Banner>}
       {last?.state === 'APPROVED' && <Banner tone="success">{t('اتوافق')} — <span className="num">{last.reference}</span></Banner>}
       <Button variant="primary" size="xl" className="w-full" loading={busy} onClick={go} data-fb="external-authorize"><ShieldCheck className="w-5 h-5" />{t('اطلب الموافقة وادفع')}</Button>

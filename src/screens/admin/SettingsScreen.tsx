@@ -100,7 +100,8 @@ function PolicyCard({ p, scopeType, scopeId, scopeName, nameOf, ctx }: { p: Poli
           <Tech><div className="text-[10px] text-dim num" dir="ltr">{p.id}</div></Tech>
         </div>
         <div className="flex items-center gap-1 flex-wrap justify-end">
-          <Pill tone={stateTone[p.state]} title={t(STATE_TEXT[p.state].help)}>{t(STATE_TEXT[p.state].label)}</Pill>
+          {/* ux-07: the product shows the setting and its value; design status (متفق عليه / جديد في التصميم…) is team-only */}
+          <Tech><Pill tone={stateTone[p.state]} title={t(STATE_TEXT[p.state].help)}>{t(STATE_TEXT[p.state].label)}</Pill></Tech>
           {p.sensitive && <Pill tone="warning">{t('حساس')}</Pill>}
         </div>
       </div>
@@ -114,10 +115,13 @@ function PolicyCard({ p, scopeType, scopeId, scopeName, nameOf, ctx }: { p: Poli
         {editing ? <PolicyEditor p={p} value={draft} onChange={setDraft} /> : value === undefined && !eff.error ? <div className="text-xs text-dim">{t('بيحمّل…')}</div> : <PolicyValueView p={p} value={value} ctx={ctx} big />}
       </div>
       {row && <div className="text-[10px] text-dim">{t('آخر تغيير')}: {dateTime(row.updatedAt)} · {nameOf(row.updatedBy)}<Tech> · <span className="num">{row.source}</span></Tech></div>}
-      {reacts && <div className="text-[11px]"><span className="text-dim">{t('هتلاحظ التغيير في')}: </span>{reacts}</div>}
-      {value !== undefined && <PolicyCompare p={p} current={value} inherited={!row} ctx={ctx} />}
+      <Tech>
+        {/* ux-07: demo / design commentary (where it shows, Egypt profile, safe default) — technical details only */}
+        {reacts && <div className="text-[11px]"><span className="text-dim">{t('هتلاحظ التغيير في')}: </span>{reacts}</div>}
+        {value !== undefined && <PolicyCompare p={p} current={value} inherited={!row} ctx={ctx} />}
+      </Tech>
       <div className="flex items-center gap-3 flex-wrap text-[11px] text-dim"><span>{appliesToText(p.appliesTo)}</span><ScopesLine p={p} /></div>
-      {question && <div className="text-[11px] rounded-lg bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] border border-[color-mix(in_srgb,var(--warning)_30%,transparent)] px-2 py-1 flex gap-1"><HelpCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[var(--warning)]" /><span><b>{t('سؤال للخبير')}:</b> {question}</span></div>}
+      <Tech>{question && <div className="text-[11px] rounded-lg bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] border border-[color-mix(in_srgb,var(--warning)_30%,transparent)] px-2 py-1 flex gap-1"><HelpCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[var(--warning)]" /><span><b>{t('سؤال للخبير')}:</b> {question}</span></div>}</Tech>
       {!scopeAllowed && <div className="text-[11px] text-[var(--warning)]">{t('الإعداد ده مينفعش يتظبط لفرع لوحده — اختار «المطعم كله» من فوق.')}</div>}
       <div className="flex items-center gap-2 flex-wrap">
         {editing ? (

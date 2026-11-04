@@ -7,7 +7,7 @@ import { cn } from '../../lib/format';
 
 export interface SalesChannelView {
   id: string; name: { ar: string; en: string }; orderType: 'DINE_IN' | 'TAKEAWAY' | 'DELIVERY'; isDefault: boolean; active: boolean; sortOrder: number; color: string;
-  priceMode: 'OWN' | 'FOLLOW'; follow: { channelId: string; percent: string; roundingStep: string } | null; note?: string | null;
+  priceMode: 'OWN' | 'FOLLOW'; follow: { channelId: string; percent: string; roundingStep: string } | null; note?: string | null; externalSources?: string[];
   ownPrices: number | null; orders: number; followers: { id: string; name: { ar: string; en: string } }[]; followsName: { ar: string; en: string } | null;
   version: number; history: { at: string; by: string; text: string }[]; updatedAt: string; updatedByName: string; createdByName: string;
 }

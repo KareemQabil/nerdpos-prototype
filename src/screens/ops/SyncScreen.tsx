@@ -51,8 +51,9 @@ export default function SyncScreen() {
           actions={offline ? <Pill tone="error">{t('أوفلاين')}</Pill> : <Pill tone="success">{t('متصل')}</Pill>}>
           <div className="space-y-3">
             <div className="flex gap-2 flex-wrap">
-              {offline ? <Button variant="success" onClick={() => sim.setOffline(id, false)} data-fb="sync-reconnect"><Wifi className="w-4 h-4" />{t('رجّع النت (محاكاة)')}</Button>
-                : <Button variant="danger" onClick={() => sim.setOffline(id, true)} data-fb="sync-go-offline"><WifiOff className="w-4 h-4" />{t('اقطع النت عن الجهاز ده (محاكاة)')}</Button>}
+              {/* ux-07: network simulation is a demo control (technical details only) */}
+              <Tech>{offline ? <Button variant="success" onClick={() => sim.setOffline(id, false)} data-fb="sync-reconnect"><Wifi className="w-4 h-4" />{t('رجّع النت (محاكاة)')}</Button>
+                : <Button variant="danger" onClick={() => sim.setOffline(id, true)} data-fb="sync-go-offline"><WifiOff className="w-4 h-4" />{t('اقطع النت عن الجهاز ده (محاكاة)')}</Button>}</Tech>
               {!offline && queued.length > 0 && <Button variant="warning" loading={busy} onClick={async () => { setBusy(true); await replayOffline(id); setBusy(false); }} data-fb="sync-replay"><RefreshCw className="w-4 h-4" />{t('ابعت المستني دلوقتي')}</Button>}
             </div>
             <div className="text-xs font-bold text-soft">{t('مستني يتبعت ({n})', { n: queued.length })}</div>

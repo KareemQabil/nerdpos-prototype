@@ -215,7 +215,9 @@ function metaOf(ctx: Ctx, ticketId: string): TicketMeta {
 function ticketView(ctx: Ctx, t: KitchenTicket, kt?: { targetMinutes: number; alertMinutes: number }) {
   const timing = kt ?? policy<{ targetMinutes: number; alertMinutes: number }>('KitchenTimingPolicy') ?? { targetMinutes: 15, alertMinutes: 20 };
   const st = ctx.db.stations.find((s) => s.id === t.stationId);
-  const target = st?.targetMinutes ?? timing.targetMinutes;
+  // ux-07: one timing source — the venue default (KitchenTimingPolicy); a kitchen screen's own colours override it on
+  // that screen (withScreenTiming). Per-station targets are gone (they had no editor and contradicted both).
+  const target = timing.targetMinutes;
   const alert = Math.max(target, timing.alertMinutes);
   const end = t.readyAt ? Date.parse(t.readyAt) : clock.now();
   const age = Math.max(0, Math.floor((end - t.createdAtMs) / 60000));

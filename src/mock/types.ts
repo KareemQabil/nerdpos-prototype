@@ -121,7 +121,7 @@ export interface Order {
   /** r3B (E08): short display number for the guest / kitchen call-out (ShortOrderNumberPolicy); `number` stays the immutable transaction id */ shortNo?: string | null;
 }
 
-export interface KitchenStation { id: string; branchId: string; name: string; active: boolean; version: number; targetMinutes?: number }
+export interface KitchenStation { id: string; branchId: string; name: string; active: boolean; version: number }
 export interface RoutingRule { id: string; branchId: string; priority: number; match: { productId?: string; categoryId?: string; channel?: Channel }; stationId: string; destination: 'STATION' | 'NO_TICKET'; active: boolean; version: number }
 export type KitchenState = 'NEW' | 'IN_PROGRESS' | 'READY' | 'DONE';
 export interface KitchenTicketItem { lineId: string; name: Loc; quantity: string; modifiers: Loc[]; note?: string; status: 'ACTIVE' | 'CANCELLED'; allergens?: string[]; children?: string[]; seat?: number | null; mods?: { at: string; text: string }[] }

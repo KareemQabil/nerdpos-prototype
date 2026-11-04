@@ -14,6 +14,9 @@ export interface SalesChannel {
   priceMode: 'OWN' | 'FOLLOW';
   follow: { channelId: string; percent: string; roundingStep: string } | null;
   note?: string | null;
+  /** ux-07: online-order sources (delivery apps, website, WhatsApp) whose orders land on this channel. The sales channel
+   *  owns the mapping; accepting an online order reads it (no manual pick). One source → at most one channel. */
+  externalSources?: string[];
   createdAt: string; createdBy: string; updatedAt: string; updatedBy: string; version: number;
   history: { at: string; by: string; text: string }[];
 }

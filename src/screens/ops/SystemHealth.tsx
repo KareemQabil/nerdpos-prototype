@@ -65,8 +65,10 @@ export default function SystemHealth() {
         <div className="flex flex-wrap gap-4 items-center text-sm">
           <span>{t('شاشة المطبخ')}: <Pill tone={s.kds === 'UP' ? 'success' : 'error'}>{s.kds === 'UP' ? t('شغالة') : s.kds === 'SLOW' ? t('بطيئة') : t('واقعة')}</Pill></span>
           <span>{t('منظومة الضرايب')}: <Pill tone={s.eta === 'UP' ? 'success' : 'error'}>{s.eta === 'UP' ? t('شغالة') : s.eta === 'REJECT' ? t('بترفض') : t('مش بترد')}</Pill></span>
-          <Switch checked={(s as any).webhooks === 'DOWN'} onChange={(v) => sim.set({ webhooks: v ? 'DOWN' : 'UP' } as any)} label={t('محاكاة: البرامج التانية واقعة')} />
-          <span className="text-[11px] text-dim">{t('باقي الأعطال (الطابعة، المطبخ، الضرايب) من "محاكاة الأعطال" فوق.')}</span>
+          <Tech>
+            <Switch checked={(s as any).webhooks === 'DOWN'} onChange={(v) => sim.set({ webhooks: v ? 'DOWN' : 'UP' } as any)} label={t('محاكاة: البرامج التانية واقعة')} />
+            <span className="text-[11px] text-dim">{t('باقي الأعطال (الطابعة، المطبخ، الضرايب) من "محاكاة الأعطال" فوق.')}</span>
+          </Tech>
         </div>
       </Card>
       <Card title={<span className="flex items-center gap-2"><Activity className="w-4 h-4" />{t('العمليات')}</span>}

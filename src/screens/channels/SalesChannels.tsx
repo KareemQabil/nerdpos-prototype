@@ -91,13 +91,18 @@ function ChannelPopup({ channel, all, onClose }: { channel: SalesChannelView | n
   const [color, setColor] = useState(channel?.color ?? COLORS[0]);
   const [active, setActive] = useState(channel?.active ?? true);
   const [note, setNote] = useState(channel?.note ?? '');
+  // ux-07: this channel owns its online-order sources; accepting an online order reads the mapping (no manual pick)
+  const [srcs, setSrcs] = useState<string[]>(channel?.externalSources ?? []);
+  const srcQ = useQuery<any>('SalesChannel.List', { query: { includeInactive: 'true' } });
+  const sources: Record<string, { ar: string; en: string }> = srcQ.data?.sources ?? {};
+  const takenBy = (src: string) => all.find((c) => c.id !== channel?.id && c.active && (c.externalSources ?? []).includes(src));
   const isDefault = !!channel?.isDefault;
   const typeLocked = isDefault || (channel?.orders ?? 0) > 0;
   const pctOk = /^-?\d{1,3}(\.\d{1,2})?$/.test(percent.trim()) && Number(percent) >= -50 && Number(percent) <= 200;
   const valid = nameAr.trim().length >= 2 && (mode === 'OWN' || (followId && pctOk));
   const save = async () => {
     if (!valid || busy) return;
-    const body: any = { name: { ar: nameAr.trim(), en: nameEn.trim() || nameAr.trim() }, orderType, priceMode: mode, color, active, note: note.trim() || null };
+    const body: any = { name: { ar: nameAr.trim(), en: nameEn.trim() || nameAr.trim() }, orderType, priceMode: mode, color, active, note: note.trim() || null, externalSources: orderType === 'DINE_IN' ? [] : srcs };
     if (mode === 'FOLLOW') body.follow = { channelId: followId, percent: percent.trim(), roundingStep: step };
     if (channel) body.expectedVersion = channel.version;
     const r = await run('SalesChannel.Upsert', { params: { salesChannelId: channel?.id ?? 'new' }, body }, { success: channel ? t('القناة اتحدثت') : t('قناة {n} اتعملت — تقدر تبيع عليها دلوقتي', { n: nameAr.trim() }) });
@@ -138,6 +143,16 @@ function ChannelPopup({ channel, all, onClose }: { channel: SalesChannelView | n
         <Field label={t('اللون')}>
           <div className="flex gap-2 flex-wrap">{COLORS.map((c) => <button key={c} type="button" aria-pressed={c === color} onClick={() => setColor(c)} className="w-8 h-8 rounded-full border-2" style={{ background: c, borderColor: c === color ? 'var(--foreground)' : 'transparent' }} title={c} />)}</div>
         </Field>
+        {orderType !== 'DINE_IN' && Object.keys(sources).length > 0 && (
+          <Field label={t('الطلبات الإلكترونية من')}>
+            <div className="flex gap-1.5 flex-wrap" data-fb="channels:sources">{Object.entries(sources).map(([k, v]) => {
+              const other = takenBy(k);
+              const on = srcs.includes(k);
+              return <button key={k} type="button" disabled={!!other} aria-pressed={on} data-fb={`channels:source:${k}`} title={other ? t('مربوط بقناة {n}', { n: L(other.name) }) : undefined} onClick={() => setSrcs(on ? srcs.filter((x) => x !== k) : [...srcs, k])}
+                className={'h-9 px-3 rounded-lg border text-sm disabled:opacity-40 ' + (on ? 'border-[var(--primary)] bg-[var(--primary-container)] text-[var(--primary)] font-bold' : 'border-[var(--glass-border)] text-soft')}>{L(v)}{other && <span className="text-[11px] ms-1">· {L(other.name)}</span>}</button>;
+            })}</div>
+          </Field>
+        )}
         <Field label={t('ملاحظة')}><Input value={note} onChange={(e) => setNote(e.target.value)} /></Field>
         {!isDefault && <Switch checked={active} onChange={setActive} label={active ? t('القناة شغالة — بتظهر عند بداية الطلب') : t('القناة متقفلة — مش هتظهر في طلبات جديدة')} />}
         {channel?.history?.length ? (

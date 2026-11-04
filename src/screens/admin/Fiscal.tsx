@@ -220,7 +220,7 @@ function MappingCard({ mappings }: { mappings: any[] }) {
           })} />
       )}
       <div className="flex justify-between items-center gap-2 mt-3 flex-wrap">
-        <Button size="sm" variant="ghost" onClick={fillDemo} disabled={!missing.length} data-fb="fiscal:map:fill-demo">{t('املأ أكواد تجريبية للناقص (عرض)')}</Button>
+        <Tech fallback={<span />}><Button size="sm" variant="ghost" onClick={fillDemo} disabled={!missing.length} data-fb="fiscal:map:fill-demo">{t('املأ أكواد تجريبية للناقص (عرض)')}</Button></Tech>
         <Button variant="primary" loading={busy} disabled={!changed.length} onClick={save} data-fb="fiscal:map:save"><Save className="w-4 h-4" />{t('حفظ التعديلات')} <span className="num">({changed.length})</span></Button>
       </div>
     </Card>

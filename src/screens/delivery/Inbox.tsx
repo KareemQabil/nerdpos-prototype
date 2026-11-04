@@ -1,6 +1,5 @@
 // Online orders inbox: orders from the delivery apps, the website and WhatsApp wait here; accept with a prep time
 // (items are linked to the menu once) or reject with a reason. Accepted orders go to the kitchen and to delivery.
-import { SalesChannelPicker } from '../channels/common'; // r3C sales channels
 import React, { useMemo, useState } from 'react';
 import { Globe, Inbox as InboxIcon, Check, X, Link2, Clock, AlertTriangle, MapPin, Bike, ShoppingBag, Sparkles, Phone } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';
@@ -27,11 +26,11 @@ export default function Inbox() {
       <Section title={t('الطلبات الأونلاين')} badge={<StateBadge ops={['Channel.IngestExternalOrder', 'ExternalOrder.Find', 'ExternalOrder.Accept', 'ExternalOrder.Reject', 'ChannelItemMap.Set']} />}
         sub={t('الطلبات اللي جاية من تطبيقات التوصيل والموقع والواتساب. اقبل الطلب وحدد وقت التحضير — يتبعت للمطبخ ويظهر في لوحة الدليفري.')}
         actions={<>
-          <div className="flex items-center gap-1.5 rounded-xl border border-dashed line px-2 py-1">
+          <Tech><div className="flex items-center gap-1.5 rounded-xl border border-dashed line px-2 py-1">
             <span className="text-[11px] text-dim flex items-center gap-1"><Sparkles className="w-3.5 h-3.5" />{t('تجربة')}</span>
             <div className="w-48"><Select value={source} onChange={(e) => setSource(e.target.value)} options={Object.entries(sources).map(([k, v]: any) => ({ value: k, label: v.ar }))} className="text-sm" /></div>
             <Button size="sm" variant="outline" loading={busy} onClick={simulate} data-fb="simulate-online">{t('محاكاة طلب جديد')}</Button>
-          </div>
+          </div></Tech>
           <Button variant="ghost" onClick={() => nav('delivery-board')}><Bike className="w-4 h-4" />{t('لوحة الدليفري')}</Button>
         </>} />
       <Tabs value={tab} onChange={setTab} tabs={[
@@ -41,7 +40,7 @@ export default function Inbox() {
       ]} />
       {!terminal?.drawer && tab === 'NEW' && <Banner tone="warning">{t('قبول الطلبات بيتعمل من جهاز الكاشير اللي فيه وردية درج مفتوحة.')}</Banner>}
       {q.loading && !list.length && <Spinner />}
-      {!q.loading && !list.length && <Empty icon={<InboxIcon className="w-12 h-12" />} text={tab === 'NEW' ? t('مفيش طلبات مستنية — جرّب "محاكاة طلب جديد"') : t('مفيش طلبات هنا')} />}
+      {!q.loading && !list.length && <Empty icon={<InboxIcon className="w-12 h-12" />} text={tab === 'NEW' ? t('لا توجد طلبات جديدة') : t('مفيش طلبات هنا')} />}
       <div className="grid lg:grid-cols-2 gap-3">
         {list.map((e) => <ExternalCard key={e.id} e={e} />)}
       </div>
@@ -126,14 +125,18 @@ function ItemRow({ e, it }: { e: any; it: any }) {
 function AcceptDialog({ e, onClose }: { e: any; onClose: () => void }) {
   const { run, busy } = useCommand();
   const [prep, setPrep] = useState(20);
-  const [sc, setSc] = useState(''); // r3C: sales channel ('' = default of the order type)
-  const ok = async () => { const r = await run('ExternalOrder.Accept', { params: { externalOrderId: e.id }, body: { prepMinutes: prep, expectedVersion: e.version, ...(sc ? { salesChannelId: sc } : {}) } }, { success: t('الطلب اتقبل واتبعت للمطبخ') }); if (r) onClose(); };
+  const { nav, can } = useDev();
+  // ux-07: the sales channel is not picked here — it comes from the source mapping in «قنوات البيع» (one owner)
+  const ok = async () => { const r = await run('ExternalOrder.Accept', { params: { externalOrderId: e.id }, body: { prepMinutes: prep, expectedVersion: e.version } }, { success: t('الطلب اتقبل واتبعت للمطبخ') }); if (r) onClose(); };
   return (
     <Modal open onClose={onClose} title={`${t('قبول الطلب')} ${e.externalRef}`} badge={<StateBadge ops={['ExternalOrder.Accept', 'Order.Create', 'Delivery.Create', 'Order.Confirm']} />}
       footer={<><Button variant="ghost" onClick={onClose}>{t('رجوع')}</Button><Button variant="success" loading={busy} onClick={ok} data-fb="accept-confirm"><Check className="w-4 h-4" />{t('اقبل وابعت للمطبخ')}</Button></>}>
       <div className="space-y-3">
         <div className="text-sm">{t('الطلب هيظهر للعميل على')} {L(e.sourceLabel)} {t('بالوقت ده.')}</div>
-        <SalesChannelPicker orderType={e.fulfillment === 'DELIVERY' ? 'DELIVERY' : 'TAKEAWAY'} fb="accept-channel" label={t('قناة البيع (الأسعار)')} value={sc} onChange={setSc} />
+        <div className="flex items-center justify-between gap-2 rounded-xl surface-1 border line px-3 py-2" data-fb="accept-channel">
+          <span className="text-sm"><span className="text-dim">{t('قناة البيع')}: </span><b data-fb="accept-channel:name">{L(e.salesChannel?.name)}</b></span>
+          {can('saleschannel:manage') && <Button size="sm" variant="ghost" onClick={() => { onClose(); nav('saleschannels'); }} data-fb="accept-channel:manage">{t('ربط المصادر')}</Button>}
+        </div>
         <Field label={t('وقت التحضير')}>
           <div className="grid grid-cols-4 gap-1.5">{[15, 20, 30, 45].map((m) => <button key={m} onClick={() => setPrep(m)} data-fb={`prep:${m}`} className={cn('h-12 rounded-xl border text-sm font-bold num', prep === m ? 'border-[var(--primary)] bg-[var(--primary-container)]' : 'surface-1 border-[var(--glass-border)]')}>{m} {t('د')}</button>)}</div>
         </Field>

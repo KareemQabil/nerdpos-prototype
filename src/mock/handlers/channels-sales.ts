@@ -7,6 +7,7 @@ import { checkVersion, need, page, userName } from './util';
 import { ORDER_TYPES, salesChannelsOf, salesChannelById, priceKeyOf } from '../sales-channels';
 import type { Channel } from '../types';
 import type { SalesChannel } from '../types-channels';
+import { SOURCES } from './channels';
 
 const STEPS = ['0', '0.25', '0.50', '1', '5'];
 const typeAr = (c: Channel) => ({ DINE_IN: 'صالة', TAKEAWAY: 'تيك أواي', DELIVERY: 'دليفري' } as Record<string, string>)[c];
@@ -36,7 +37,7 @@ function followsItself(all: SalesChannel[], id: string, start: string | null): b
 export const salesChannelHandlers: Record<string, Handler> = {
   'SalesChannel.List': (ctx) => {
     const all = salesChannelsOf(ctx.db).filter((c) => c.active || ctx.query.includeInactive === 'true').filter((c) => !ctx.query.orderType || c.orderType === ctx.query.orderType);
-    return page([...all].sort((a, b) => a.sortOrder - b.sortOrder).map((c) => channelView(ctx, c)), { ...ctx.query, limit: ctx.query.limit ?? '100' });
+    return { ...page([...all].sort((a, b) => a.sortOrder - b.sortOrder).map((c) => channelView(ctx, c)), { ...ctx.query, limit: ctx.query.limit ?? '100' }), sources: SOURCES /* ux-07: the online-order sources a channel can own */ };
   },
   'SalesChannel.Upsert': (ctx) => {
     const db = ctx.db;
@@ -80,6 +81,14 @@ export const salesChannelHandlers: Record<string, Handler> = {
     need(/^#[0-9a-fA-F]{6}$/.test(color), 'VALIDATION_FAILED', { field: 'color' });
     const sortOrder = Number(b.sortOrder ?? cur?.sortOrder ?? (Math.max(0, ...all.map((c) => c.sortOrder)) + 10));
     need(Number.isFinite(sortOrder), 'VALIDATION_FAILED', { field: 'sortOrder' });
+    // ux-07: online-order sources this channel owns (one source → at most one active channel; delivery / takeaway only)
+    const externalSources: string[] = [...new Set<string>((b.externalSources ?? cur?.externalSources ?? []).map(String))];
+    for (const src of externalSources) need(src in SOURCES, 'VALIDATION_FAILED', { field: 'externalSources', value: src, reasonAr: 'مصدر طلبات غير معروف' });
+    if (externalSources.length) need(orderType !== 'DINE_IN', 'VALIDATION_FAILED', { field: 'externalSources', reasonAr: 'الطلبات الإلكترونية دليفري أو تيك أواي فقط' });
+    for (const src of externalSources) {
+      const other = all.find((c) => c.id !== cur?.id && c.active && (c.externalSources ?? []).includes(src));
+      need(!other, 'VALIDATION_FAILED', { field: 'externalSources', value: src, reasonAr: `المصدر «${SOURCES[src as keyof typeof SOURCES]?.ar ?? src}» مربوط بقناة «${other?.name.ar ?? ''}». فك الربط من هناك أولًا.` });
+    }
 
     // a change of what the channel sells at (follow source / percent) is a price change → the PRICE_CHANGE rule decides
     const pricingChanged = !!cur && (cur.priceMode !== priceMode || JSON.stringify(cur.follow) !== JSON.stringify(follow));
@@ -90,7 +99,7 @@ export const salesChannelHandlers: Record<string, Handler> = {
       const base = `sch_${(nameEn || 'channel').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 24) || 'channel'}`;
       let id = base; let i = 2;
       while (all.some((c) => c.id === id)) id = `${base}_${i++}`;
-      const c: SalesChannel = { id, name: { ar: nameAr, en: nameEn }, orderType, isDefault: false, active, sortOrder, color, priceMode, follow, note: b.note ?? null, createdAt: ctx.nowIso, createdBy: ctx.user!.id, updatedAt: ctx.nowIso, updatedBy: ctx.user!.id, version: 1, history: [{ at: ctx.nowIso, by: ctx.user!.id, text: `اتعملت قناة ${nameAr} (${typeAr(orderType)}) — ${priceText(priceMode, follow)}` }] };
+      const c: SalesChannel = { id, name: { ar: nameAr, en: nameEn }, orderType, isDefault: false, active, sortOrder, color, priceMode, follow, note: b.note ?? null, externalSources, createdAt: ctx.nowIso, createdBy: ctx.user!.id, updatedAt: ctx.nowIso, updatedBy: ctx.user!.id, version: 1, history: [{ at: ctx.nowIso, by: ctx.user!.id, text: `اتعملت قناة ${nameAr} (${typeAr(orderType)}) — ${priceText(priceMode, follow)}` }] };
       all.push(c);
       ctx.audit(`sales channel created: ${nameEn} (${orderType}, ${priceMode === 'FOLLOW' ? `follows ${follow!.channelId} ${follow!.percent}%` : 'own prices'})`, id, true);
       return { status: 201, body: channelView(ctx, c) };
@@ -102,7 +111,8 @@ export const salesChannelHandlers: Record<string, Handler> = {
     if (cur.active !== active) changes.push(active ? 'اتفتحت' : 'اتقفلت');
     if (cur.color !== color) changes.push('اللون');
     if (cur.sortOrder !== sortOrder) changes.push('الترتيب');
-    Object.assign(cur, { name: { ar: nameAr, en: nameEn }, orderType, priceMode, follow, active, color, sortOrder, note: b.note !== undefined ? b.note : cur.note, updatedAt: ctx.nowIso, updatedBy: ctx.user!.id, version: cur.version + 1 });
+    if ((cur.externalSources ?? []).join(',') !== externalSources.join(',')) changes.push(`مصادر الطلبات الإلكترونية: ${externalSources.map((x) => SOURCES[x as keyof typeof SOURCES]?.ar ?? x).join('، ') || '—'}`);
+    Object.assign(cur, { name: { ar: nameAr, en: nameEn }, orderType, priceMode, follow, active, color, sortOrder, externalSources, note: b.note !== undefined ? b.note : cur.note, updatedAt: ctx.nowIso, updatedBy: ctx.user!.id, version: cur.version + 1 });
     cur.history.unshift({ at: ctx.nowIso, by: ctx.user!.id, text: changes.join(' · ') || 'من غير تغيير' });
     ctx.audit(`sales channel ${cur.name.en} changed: ${changes.length} change(s)${pricingChanged ? ' incl. pricing' : ''}`, cur.id, true, b.approvalGrantId);
     return channelView(ctx, cur);

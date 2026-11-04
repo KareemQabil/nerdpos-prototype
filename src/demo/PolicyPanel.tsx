@@ -43,7 +43,7 @@ export function PolicyPanel({ onClose }: { onClose: () => void }) {
     <div className="flex flex-col h-full" data-screen="POLICY_PANEL">
       <div className="px-4 py-3 border-b line flex items-center gap-2">
         <div className="flex-1 min-w-0">
-          <div className="font-bold">{t('إعدادات المطعم (للتجربة)')}<Tech><span className="text-dim font-normal text-xs ms-1">Policy Panel</span></Tech></div>
+          <div className="font-bold">{t('سياسات التجربة')}<span className="ms-2 align-middle text-[10px] font-bold px-1.5 py-0.5 rounded bg-[color-mix(in_srgb,var(--warning)_18%,transparent)] text-[var(--warning-text)]" data-fb="policy-panel:demo-only">{t('للعرض فقط')}</span><Tech><span className="text-dim font-normal text-xs ms-1">Policy Panel</span></Tech></div>
           <div className="text-[11px] text-dim">{t('كل اختيار هنا بيغيّر طريقة شغل المطعم. جرّب تغيّر واحد وشوف الأجهزة بتتصرف إزاي. التغيير بيطبق على اللي جاي بس — الشيكات القديمة زي ما هي.')}</div>
         </div>
         <button onClick={onClose} title={t('قفل')} className="w-8 h-8 rounded-lg surface-1 flex items-center justify-center"><X className="w-4 h-4" /></button>

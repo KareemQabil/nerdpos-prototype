@@ -99,7 +99,7 @@ export const POLICY_GROUPS = [
   { id: 'fiscal', title: 'الإيصال الإلكتروني', titleEn: 'E-receipt' },
   { id: 'access', title: 'الدخول والأمان', titleEn: 'Access & security' },
   { id: 'inventory', title: 'المخزن والمشتريات', titleEn: 'Inventory & purchasing' },
-  { id: 'direction', title: 'إمكانيات الاتجاه (مقترح)', titleEn: 'Direction capabilities (proposed)' },
+  { id: 'direction', title: 'إعدادات إضافية', titleEn: 'More settings' }, // ux-07: was «إمكانيات الاتجاه (مقترح)»
 ];
 
 const q = (id: string) => ({ egValue: egVal(id)?.value, confidence: egVal(id)?.confidence, reviewer: egVal(id)?.reviewer, question: egVal(id)?.expertQuestion });
@@ -163,7 +163,7 @@ export const POLICIES: PolicyMeta[] = [
   { id: 'CredentialPolicy', group: 'access', title: 'طول الرقم السري والباسورد', titleEn: 'Credentials', description: 'أقل طول للباسورد وطول الـ PIN.', state: 'CANONICAL', scopes: ['TENANT'], appliesTo: 'NEW_ACTIONS', editor: { kind: 'object', fields: [{ key: 'passwordMinLength', label: 'الباسورد', kind: 'number' }, { key: 'pinLength', label: 'PIN', kind: 'number' }] }, canonicalDefault: canon('CredentialPolicy') },
 
   // ───────── direction
-  { id: 'DirectionCatalogDemo', group: 'direction', title: 'إظهار أصناف الاتجاه في المنيو', titleEn: 'Show direction demo items', description: 'قسم "اتجاه المنتج" فيه بيتزا بأحجام ونص ونص، وجبة كومبو، وشيشة عليها ضريبة جدول. (بيانات عرض مش من ملف الـ seed)', state: 'DIRECTION', scopes: ['TENANT'], appliesTo: 'NEW_ACTIONS', editor: { kind: 'bool' }, canonicalDefault: true },
+  { id: 'DirectionCatalogDemo', group: 'direction', title: 'إظهار الأصناف الجديدة في القائمة', titleEn: 'Show the new items on the menu', description: 'قسم «أصناف جديدة»: بيتزا بمقاسات ونص ونص، ووجبة كومبو، وشيشة عليها ضريبة جدول.', state: 'DIRECTION', scopes: ['TENANT'], appliesTo: 'NEW_ACTIONS', editor: { kind: 'bool' }, canonicalDefault: true },
   { id: 'HalfAndHalfPricingPolicy', group: 'direction', title: 'سعر البيتزا نص ونص', titleEn: 'Half-and-half pricing', description: 'السعر = النص الأغلى، ولا متوسط النصين، ولا مجموع سعر النصين (كل نص بنسبة من سعره).', state: 'DIRECTION', scopes: ['TENANT'], appliesTo: 'NEW_CHECKS', editor: { kind: 'enum', options: ['HIGHER_HALF', 'AVERAGE', 'SUM_OF_HALVES'] }, canonicalDefault: 'HIGHER_HALF', question: 'المطاعم عندكم بتحسب النص ونص بالأغلى ولا بالمتوسط؟' },
   { id: 'SplitAllocationPolicy', group: 'direction', title: 'توزيع القروش عند التقسيم', titleEn: 'Split allocation', description: 'قاعدة واحدة ثابتة: أكبر باقي، والفرق الأخير على آخر حصة. الخصم والخدمة بيتوزعوا بنفس القاعدة.', state: 'DIRECTION', scopes: ['TENANT'], appliesTo: 'NEW_ACTIONS', editor: { kind: 'object', fields: [{ key: 'method', label: 'الطريقة', kind: 'enum', options: ['LARGEST_REMAINDER'] }, { key: 'residual', label: 'الفرق على', kind: 'enum', options: ['LAST_SHARE', 'FIRST_SHARE'] }] }, canonicalDefault: { method: 'LARGEST_REMAINDER', residual: 'LAST_SHARE' } },
   { id: 'TipDistributionPolicy', group: 'direction', title: 'توزيع البقشيش', titleEn: 'Tip distribution', description: 'البقشيش للويتر صاحب الشيك، ولا صندوق مشترك يتوزع آخر الوردية.', state: 'DIRECTION', scopes: ['TENANT', 'BRANCH'], appliesTo: 'NEW_ACTIONS', editor: { kind: 'enum', options: ['PER_SERVER', 'POOLED'] }, canonicalDefault: 'PER_SERVER', question: 'البقشيش بيتجمع ويتقسم، ولا كل ويتر ياخد بتاعه؟' },

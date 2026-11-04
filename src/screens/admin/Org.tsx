@@ -4,7 +4,7 @@ import { Building2, GitBranch, MonitorSmartphone, Plus, Pencil, Power, Wrench, L
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Banner, Button, Card, EmptyState, Field, Input, KV, PageHeader, Pill, Select, StatCard, StatGrid, StateBadge, Switch, Table, Textarea, toast } from '../../ui';
 import { t, getLang } from '../../i18n';
-import { Tech } from '../../app/tech';
+import { Tech, useTech } from '../../app/tech';
 import { demo } from '../../mock/demo';
 import { egProfile } from '../../mock/contracts';
 import { policyMeta } from '../../mock/policyRegistry';
@@ -115,7 +115,7 @@ function BranchesCard() {
         empty={<EmptyState compact icon={<GitBranch />} title={t('مفيش فروع لسه')} text={t('ابدأ بالفرع الأول من «فرع جديد».')} />} />
       <div className="mt-3 space-y-2">
         <div className="text-xs text-dim leading-relaxed">{t('أي بيعة قبل ساعة البداية بتتحسب على اليوم اللي فات: بيعة الساعة 2 الفجر بتدخل في تقارير امبارح. الساعة دي من السيرفر، مش من ساعة الجهاز.')}</div>
-        {cal && <div className="text-[11px] rounded-lg bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] border border-[color-mix(in_srgb,var(--warning)_30%,transparent)] px-2 py-1"><b>{t('سؤال للخبير')}:</b> {t('المطعم بيقفل الساعة كام؟ بداية اليوم 4 الفجر مناسبة؟')}<Tech> <Pill tone="warning">{cal.confidence}</Pill> {cal.expertQuestion}</Tech></div>}
+        <Tech>{cal && <div className="text-[11px] rounded-lg bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] border border-[color-mix(in_srgb,var(--warning)_30%,transparent)] px-2 py-1"><b>{t('سؤال للخبير')}:</b> {t('المطعم بيقفل الساعة كام؟ بداية اليوم 4 الفجر مناسبة؟')}<Tech> <Pill tone="warning">{cal.confidence}</Pill> {cal.expertQuestion}</Tech></div>}</Tech>
       </div>
       {open && <BranchModal onClose={() => setOpen(false)} />}
     </Card>
@@ -235,6 +235,7 @@ function DecommissionModal({ term, self, onClose }: { term: any; self: boolean; 
 
 // ───────── provisioning (J-A1 step 6, internal tool)
 function ProvisioningCard() {
+  const tech = useTech();
   const eff = useQuery<any>('Settings.Effective', { query: { policyId: 'FloorIntakePolicy', scopeType: 'TENANT', scopeId: 'biz' } });
   const hist = useList<any>('Policy.History', { params: { policyId: 'FloorIntakePolicy' } });
   const { can } = useDev();
@@ -260,15 +261,16 @@ function ProvisioningCard() {
             <div className="text-xs">{t('للعرض بس: تقدر ترجّع القيم الأصلية تاني فوق التعديلات اللي اتعملت.')}</div>
           </Banner>
         )}
-        <Table dense maxHeight={460} head={[t('الإعداد'), t('القيمة في مصر'), t('مين يأكدها'), t('سؤال للخبير')]}
+        {/* ux-07: who confirms a value and the expert questions are design commentary — technical details only */}
+        <Table dense maxHeight={460} head={tech ? [t('الإعداد'), t('القيمة في مصر'), t('مين يأكدها'), t('سؤال للخبير')] : [t('الإعداد'), t('القيمة في مصر')]}
           rows={egProfile.values.map((v) => {
             const meta = policyMeta.get(v.policyId);
             const q = meta ? policyQuestion(meta) : undefined;
             return [
               <div className="min-w-0"><div className="font-bold text-sm">{meta ? policyTitle(meta) : v.policyId}</div><Tech><div className="num text-[10px] text-dim">{v.policyId} · {v.scope}</div></Tech></div>,
               <div className="text-xs leading-relaxed max-w-[340px]">{meta ? valueSummary(meta, v.value) : show(v.value)}<Tech><div className="num text-[10px] text-dim break-all" dir="ltr">{show(v.value)}</div></Tech></div>,
-              <span className="text-xs">{confidenceText(v.confidence, v.reviewer)}</span>,
-              <span className="text-xs text-dim">{q ?? '—'}<Tech><span className="block" dir="ltr">{v.expertQuestion}</span></Tech></span>,
+              ...(tech ? [<span className="text-xs">{confidenceText(v.confidence, v.reviewer)}</span>,
+                <span className="text-xs text-dim">{q ?? '—'}<span className="block" dir="ltr">{v.expertQuestion}</span></span>] : []),
             ];
           })} />
         <div className="grid md:grid-cols-2 gap-3">
@@ -276,10 +278,12 @@ function ProvisioningCard() {
             <div className="text-xs font-bold text-soft mb-1.5">{t('بيانات بيدخلها صاحب المطعم من شاشاتها')}</div>
             <div className="space-y-1.5">{egProfile.owner_data.map((d) => <div key={d.id} className="text-xs rounded-lg surface-1 border line px-3 py-2"><div className="font-bold">{t(ownerTitle[d.id] ?? d.id)}</div><div className="text-dim">{t('من: {s}', { s: t(ownerScreen[d.id] ?? '—') })} · {confidenceText(d.confidence)}</div><Tech><div className="num text-[10px] text-dim" dir="ltr">{d.id} · {d.operation} · {d.expertQuestion}</div></Tech></div>)}</div>
           </div>
+          <Tech>
           <div>
             <div className="text-xs font-bold text-soft mb-1.5">{t('قيم لسه مستنية رأي الخبير')}</div>
             <div className="space-y-1.5">{egProfile.pending.map((d, i) => { const meta = policyMeta.get(d.policyId); return <div key={d.policyId + i} className="text-xs rounded-lg surface-1 border line px-3 py-2"><div className="font-bold">{meta ? policyTitle(meta) : d.policyId}</div><div className="text-dim">{meta && d.policyId !== 'ApprovalRequirementPolicy' ? valueSummary(meta, d.value) : t('قواعد موافقة إضافية')} · {confidenceText(d.confidence)}</div><Tech><div className="num text-[10px] text-dim" dir="ltr">{d.policyId} · {d.awaiting} · {d.expertQuestion}</div></Tech></div>; })}</div>
           </div>
+          </Tech>
         </div>
         <Tech><div className="text-[11px] text-dim">{t('المصدر: rules/EG.profile.json')}</div></Tech>
       </div>
