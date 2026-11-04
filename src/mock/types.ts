@@ -161,7 +161,7 @@ export interface ApprovalGrant {
   issuedAt: string; expiresAtMs: number; consumedAt: string | null; consumedBy: string | null; reason?: string;
   /** r3A: how the approver proved who they are, and the permission they lent when the actor lacked it */ credentialKind?: import('./types-control').CredentialKind; overridePermission?: string | null;
 }
-export interface ReasonCode { id: string; kind: string; code: string; label: Loc; requiresNote: boolean; sortOrder: number; active: boolean; version: number }
+export interface ReasonCode { id: string; kind: string; code: string; label: Loc; requiresNote: boolean; sortOrder: number; active: boolean; version: number; /** ux-11: an inactive duplicate kept for history points to the code used instead */ replacedBy?: string }
 export interface PolicyValue { id: string; policyId: string; scopeType: ScopeType; scopeId: string; value: unknown; version: number; updatedAt: string; updatedBy: string; source: string }
 export interface PolicyHistory { id: string; policyId: string; scopeType: ScopeType; scopeId: string; oldValue: unknown; newValue: unknown; at: string; by: string; via: 'PANEL' | 'SETTINGS' | 'SEED' | 'PROFILE'; note?: string }
 

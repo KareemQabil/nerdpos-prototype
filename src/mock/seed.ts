@@ -120,7 +120,11 @@ export function buildSeed(nowMs: number): DB {
   const egCodes = egProfile.owner_data.find((d) => d.id === 'EG-REASON-CODES')?.data.codes ?? [];
   for (const c of egCodes) {
     if (rc.some((x) => x.kind === c.kind && x.code === c.code)) continue;
-    rc.push({ id: `rc_${++r}`, kind: c.kind, code: c.code, label: c.label, requiresNote: c.requiresNote, sortOrder: 100 + r, active: true, version: 1 });
+    // ux-11: the EG profile repeats two demo codes under another code with the same label (CASH_MOVE FLOAT_TOPUP =
+    // FLOAT_TOP_UP, NO_SALE CHANGE = GIVE_CHANGE). The duplicate is kept INACTIVE (not deleted), so history that used it
+    // stays readable and the reason tiles show each reason once.
+    const same = rc.find((x) => x.kind === c.kind && x.active && x.label.ar === c.label.ar);
+    rc.push({ id: `rc_${++r}`, kind: c.kind, code: c.code, label: c.label, requiresNote: c.requiresNote, sortOrder: 100 + r, active: !same, version: 1, ...(same ? { replacedBy: same.code } : {}) });
   }
   // Reprint reasons (PRN-GAP-06 proposal)
   rc.push({ id: `rc_${++r}`, kind: 'REPRINT', code: 'CUSTOMER_ASKED', label: { en: 'Customer asked', ar: 'العميل طلب' }, requiresNote: false, sortOrder: 10, active: true, version: 1 });
