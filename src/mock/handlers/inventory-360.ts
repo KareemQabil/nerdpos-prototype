@@ -74,7 +74,7 @@ function itemStages(ctx: Ctx, it: InvItem) {
   const since = ctx.now - 30 * DAY;
   const reqDocs = srs(inv).filter((s) => whIds.has(s.warehouseId) && ['DRAFT', 'SUBMITTED'].includes(s.state) && s.lines.some((l) => l.itemId === it.id));
   const requested = reqDocs.reduce((a, s) => a.plus(s.lines.filter((l) => l.itemId === it.id).reduce((b, l) => b.plus(l.requestedQuantity), D(0))), D(0));
-  const openPos = inv.purchaseOrders.filter((p) => whIds.has(p.warehouseId) && ['DRAFT', 'ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state) && p.lines.some((l) => l.itemId === it.id));
+  const openPos = inv.purchaseOrders.filter((p) => whIds.has(p.warehouseId) && ['DRAFT', 'PENDING_APPROVAL', 'ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state) && p.lines.some((l) => l.itemId === it.id));
   const ordered = openPos.reduce((a, p) => { const rec = poReceived(db, p); return a.plus(p.lines.filter((l) => l.itemId === it.id).reduce((b, l) => b.plus(Decimal.max(D(l.orderedQuantity).times(l.factor).minus(rec.get(l.id) ?? 0), 0)), D(0))); }, D(0));
   const recs = inv.receipts.filter((r) => whIds.has(r.warehouseId) && r.state === 'POSTED' && Date.parse(r.at) >= since && r.lines.some((l) => l.itemId === it.id));
   const received = recs.reduce((a, r) => a.plus(r.lines.filter((l) => l.itemId === it.id).reduce((b, l) => b.plus(l.quantity), D(0))), D(0));

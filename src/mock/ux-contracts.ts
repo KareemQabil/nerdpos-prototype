@@ -23,3 +23,23 @@ export function applyUx04Extensions(ops: OperationDef[]) {
     op.note = `${op.note ? op.note + ' · ' : ''}ux-04 extension: ${Object.keys(ext).join(', ')}`;
   }
 }
+
+// ux-05 (boards): purchase-order approval step. «بانتظار الاعتماد» is a real state: a buyer sends the draft for
+// approval; issuing it then needs an approver's grant (PURCHASE_ORDER_APPROVE, same popup / PIN / X-Command-Id retry as
+// the till); returning it to draft needs a reason. Issuing a draft directly stays as before (backward compatible).
+export const UX05_PROPOSED_OPERATIONS: OperationDef[] = [
+  { id: 'PurchaseOrder.Submit', module: 'purchasing', kind: 'CMD', method: 'POST', path: '/purchase-orders/{purchaseOrderId}/submit', permission: 'purchaseorder:update', input: { purchaseOrderId: { type: 'Ref<purchasing.PurchaseOrder>', required: true }, expectedVersion: { type: 'Version', required: true } }, output: 'PurchaseOrderView', errors: ['PURCHASE_ORDER_NOT_FOUND', 'PURCHASE_ORDER_NOT_DRAFT', 'CONCURRENCY_CONFLICT', 'VALIDATION_FAILED'], approval: null, backend_state: 'PROPOSED', note: 'ux-05: DRAFT → PENDING_APPROVAL; the order is locked while waiting' },
+  { id: 'PurchaseOrder.ReturnToDraft', module: 'purchasing', kind: 'CMD', method: 'POST', path: '/purchase-orders/{purchaseOrderId}/return-to-draft', permission: 'purchaseorder:issue', input: { purchaseOrderId: { type: 'Ref<purchasing.PurchaseOrder>', required: true }, expectedVersion: { type: 'Version', required: true }, reason: { type: 'Text', required: true } }, output: 'PurchaseOrderView', errors: ['PURCHASE_ORDER_NOT_FOUND', 'PURCHASE_ORDER_NOT_PENDING_APPROVAL', 'CONCURRENCY_CONFLICT', 'VALIDATION_FAILED'], approval: null, backend_state: 'PROPOSED', note: 'ux-05: PENDING_APPROVAL → DRAFT with a required reason (the approver refuses it)' },
+];
+export const UX05_INPUT_EXTENSIONS: Record<string, Record<string, { type: string; required: boolean }>> = {
+  'PurchaseOrder.Issue': { approvalGrantId: { type: 'Ref<approvals.ApprovalGrant>', required: false } }, // from PENDING_APPROVAL: PURCHASE_ORDER_APPROVE grant
+};
+export function applyUx05Extensions(ops: OperationDef[]) {
+  for (const op of ops) {
+    const ext = UX05_INPUT_EXTENSIONS[op.id];
+    if (!ext) continue;
+    op.input = { ...(op.input ?? {}), ...ext };
+    op.note = `${op.note ? op.note + ' · ' : ''}ux-05 extension: ${Object.keys(ext).join(', ')}`;
+    if (op.id === 'PurchaseOrder.Issue') { op.errors = [...new Set([...(op.errors ?? []), 'APPROVAL_REQUIRED', 'APPROVAL_GRANT_INVALID', 'SELF_APPROVAL_DENIED'])]; op.approval = { mode: 'WHEN_PENDING_APPROVAL', action: 'PURCHASE_ORDER_APPROVE' }; }
+  }
+}

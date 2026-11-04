@@ -140,7 +140,7 @@ function suggestRows(db: DB, warehouseId: string, nowMs: number) {
     const lv = it.levels[warehouseId];
     const q = D(onHand(inv, it.id, warehouseId));
     const suggested = Decimal.max(D(lv.par).minus(q), 0);
-    const onOrder = inv.purchaseOrders.filter((p) => p.warehouseId === warehouseId && ['DRAFT', 'ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state)).reduce((a, p) => {
+    const onOrder = inv.purchaseOrders.filter((p) => p.warehouseId === warehouseId && ['DRAFT', 'PENDING_APPROVAL', 'ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state)).reduce((a, p) => {
       const rec = poReceived(db, p);
       return a.plus(p.lines.filter((l) => l.itemId === it.id).reduce((b, l) => b.plus(Decimal.max(D(l.orderedQuantity).times(l.factor).minus(rec.get(l.id) ?? 0), 0)), D(0)));
     }, D(0));

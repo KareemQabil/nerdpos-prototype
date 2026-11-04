@@ -106,10 +106,11 @@ function poView(db: DB, po: PurchaseOrder) {
     receivedValue: m4(inv.receipts.filter((r) => r.purchaseOrderId === po.id && r.state === 'POSTED').reduce((a, r) => a.plus(r.total), D(0))),
     receiptIds: inv.receipts.filter((r) => r.purchaseOrderId === po.id).map((r) => r.id),
     createdByName: userName(db, po.createdBy),
+    submittedByName: po.submittedBy ? userName(db, po.submittedBy) : null, approvedByName: po.approvedBy ? userName(db, po.approvedBy) : null, returnedByName: po.returnedBy ? userName(db, po.returnedBy) : null,
   };
 }
 function refreshPoState(db: DB, po: PurchaseOrder) {
-  if (['DRAFT', 'CLOSED', 'CANCELLED'].includes(po.state)) return;
+  if (['DRAFT', 'PENDING_APPROVAL', 'CLOSED', 'CANCELLED'].includes(po.state)) return;
   const rec = poReceived(db, po);
   const any = [...rec.values()].some((v) => v.gt(0));
   const all = po.lines.every((l) => (rec.get(l.id) ?? D(0)).gte(D(l.orderedQuantity).times(l.factor)));
@@ -516,7 +517,7 @@ export const inventoryHandlers: Record<string, Handler> = {
         const pack = it.packs.find((p) => p.id === it.purchasePackId) ?? null;
         const packs = pack ? gap.dividedBy(pack.factor).toDecimalPlaces(0, Decimal.ROUND_UP) : null;
         const suggested = pack ? packs!.times(pack.factor) : gap;
-        const openPo = inv.purchaseOrders.filter((p) => ['DRAFT', 'ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state) && p.warehouseId === w.id && p.lines.some((l) => l.itemId === it.id)).map((p) => ({ id: p.id, number: p.number, state: p.state }));
+        const openPo = inv.purchaseOrders.filter((p) => ['DRAFT', 'PENDING_APPROVAL', 'ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state) && p.warehouseId === w.id && p.lines.some((l) => l.itemId === it.id)).map((p) => ({ id: p.id, number: p.number, state: p.state }));
         rows.push({
           item: itemBrief(db, it), warehouse: whBrief(db, w.id), onHand: qn(q), min: lv.min, par: lv.par, state: levelState(inv, it, w.id),
           suggestedQuantity: qn(suggested), suggestedPacks: packs ? qn(packs) : null, pack, unitCost: it.lastCost !== '0.0000' ? it.lastCost : it.avgCost,
@@ -1041,12 +1042,42 @@ export const inventoryHandlers: Record<string, Handler> = {
   },
   'PurchaseOrder.Issue': (ctx) => {
     const po = getPo(ctx);
+    // ux-05 (proposed): an order sent for approval is issued only with an approver's grant (same approval flow as the till)
+    if (po.state !== 'DRAFT' && po.state !== 'PENDING_APPROVAL') throw new ApiError('PURCHASE_ORDER_NOT_DRAFT', { state: po.state });
+    checkVersion(po, ctx.body.expectedVersion);
+    activeSupplier(ctx, po.supplierId);
+    let grantId: string | undefined;
+    if (po.state === 'PENDING_APPROVAL') {
+      const view = poView(ctx.db, po);
+      const g = ctx.requireApproval({ action: 'PURCHASE_ORDER_APPROVE', targetType: 'purchasing.PurchaseOrder', targetId: po.id, context: { purchaseOrderId: po.id, supplierId: po.supplierId, total: view.total, lineCount: po.lines.length }, grantId: ctx.body.approvalGrantId });
+      grantId = g?.id;
+      po.approvedAt = ctx.nowIso; po.approvedBy = g?.approverUserId ?? ctx.user!.id; po.approvalGrantId = g?.id ?? null;
+      po.history.unshift({ at: ctx.nowIso, by: po.approvedBy, text: 'APPROVED' });
+    }
+    po.state = 'ISSUED'; po.issuedAt = ctx.nowIso; po.issuedBy = ctx.user!.id; po.version++;
+    po.history.unshift({ at: ctx.nowIso, by: ctx.user!.id, text: 'ISSUED' });
+    ctx.audit(`purchase order ${po.number} issued${grantId ? ' (approved)' : ''}`, po.id, !!grantId, grantId);
+    return poView(ctx.db, po);
+  },
+  'PurchaseOrder.Submit': (ctx) => {
+    const po = getPo(ctx);
     if (po.state !== 'DRAFT') throw new ApiError('PURCHASE_ORDER_NOT_DRAFT', { state: po.state });
     checkVersion(po, ctx.body.expectedVersion);
     activeSupplier(ctx, po.supplierId);
-    po.state = 'ISSUED'; po.issuedAt = ctx.nowIso; po.issuedBy = ctx.user!.id; po.version++;
-    po.history.unshift({ at: ctx.nowIso, by: ctx.user!.id, text: 'ISSUED' });
-    ctx.audit(`purchase order ${po.number} issued`, po.id);
+    if (!po.lines.length) throw new ApiError('VALIDATION_FAILED', { field: 'lines', rule: 'at least one line' });
+    po.state = 'PENDING_APPROVAL'; po.submittedAt = ctx.nowIso; po.submittedBy = ctx.user!.id; po.returnedAt = null; po.returnReason = null; po.version++;
+    po.history.unshift({ at: ctx.nowIso, by: ctx.user!.id, text: 'SUBMITTED' });
+    ctx.audit(`purchase order ${po.number} sent for approval`, po.id);
+    return poView(ctx.db, po);
+  },
+  'PurchaseOrder.ReturnToDraft': (ctx) => {
+    const po = getPo(ctx);
+    if (po.state !== 'PENDING_APPROVAL') throw new ApiError('PURCHASE_ORDER_NOT_PENDING_APPROVAL', { state: po.state }, 409);
+    checkVersion(po, ctx.body.expectedVersion);
+    const reason = reqText(ctx, 'reason');
+    po.state = 'DRAFT'; po.returnedAt = ctx.nowIso; po.returnedBy = ctx.user!.id; po.returnReason = reason; po.version++;
+    po.history.unshift({ at: ctx.nowIso, by: ctx.user!.id, text: `RETURNED — ${reason}` });
+    ctx.audit(`purchase order ${po.number} returned to draft: ${reason}`, po.id, true);
     return poView(ctx.db, po);
   },
   'PurchaseOrder.Find': (ctx) => {
@@ -1073,7 +1104,7 @@ export const inventoryHandlers: Record<string, Handler> = {
   },
   'PurchaseOrder.Cancel': (ctx) => {
     const po = getPo(ctx);
-    if (!['DRAFT', 'ISSUED'].includes(po.state)) throw new ApiError(po.state === 'PARTIALLY_RECEIVED' ? 'PURCHASE_ORDER_HAS_RECEIPTS' : 'PURCHASE_ORDER_NOT_OPEN', { state: po.state });
+    if (!['DRAFT', 'PENDING_APPROVAL', 'ISSUED'].includes(po.state)) throw new ApiError(po.state === 'PARTIALLY_RECEIVED' ? 'PURCHASE_ORDER_HAS_RECEIPTS' : 'PURCHASE_ORDER_NOT_OPEN', { state: po.state });
     checkVersion(po, ctx.body.expectedVersion);
     if (invOf(ctx.db).receipts.some((r) => r.purchaseOrderId === po.id)) throw new ApiError('PURCHASE_ORDER_HAS_RECEIPTS', { purchaseOrderId: po.id });
     po.cancelReason = reqText(ctx, 'reason');
@@ -1290,7 +1321,7 @@ export const inventoryHandlers: Record<string, Handler> = {
       branchId: scope, stockValue, byWarehouse, lowCount: low, outCount: out, negativeCount: negative, expiredCount: expired.length, expiringCount: expiring.length,
       expiredValue: m4(expired.reduce((a, l) => a.plus(D(l.remaining).times(inv.items.find((i) => i.id === l.itemId)?.avgCost ?? 0)), D(0))),
       sales7: m4(sales7), waste7: m4(waste7), receipts7: m4(receipts7), variance30: m4(variance30), days, dishes, avgFoodCostPercent: dishes.length ? avgFood.toDecimalPlaces(1).toFixed(1) : null, recent, topWaste,
-      openPurchaseOrders: inv.purchaseOrders.filter((p) => (!scope || p.branchId === scope) && ['DRAFT', 'ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state)).length,
+      openPurchaseOrders: inv.purchaseOrders.filter((p) => (!scope || p.branchId === scope) && ['DRAFT', 'PENDING_APPROVAL', 'ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state)).length,
       inTransit: inv.transfers.filter((t) => t.state === 'DISPATCHED' && (whIds.has(t.toWarehouseId) || whIds.has(t.fromWarehouseId))).length,
       openCounts: inv.counts.filter((c) => whIds.has(c.warehouseId) && (c.state === 'DRAFT' || c.state === 'SUBMITTED')).length,
       salesWarehouseMissing: db.branches.filter((b) => (!scope || b.id === scope) && b.active && !salesWarehouse(db, b.id)).map((b) => ({ id: b.id, name: b.name })),
@@ -1383,7 +1414,7 @@ function supplierView(db: DB, s: { id: string; name: string } & Record<string, a
   const since = clock.now() - 30 * 86_400_000;
   const recs = inv.receipts.filter((r) => r.supplierId === s.id && r.state === 'POSTED');
   return {
-    ...s, openPurchaseOrders: inv.purchaseOrders.filter((p) => p.supplierId === s.id && ['DRAFT', 'ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state)).length,
+    ...s, openPurchaseOrders: inv.purchaseOrders.filter((p) => p.supplierId === s.id && ['DRAFT', 'PENDING_APPROVAL', 'ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state)).length,
     lastReceiptAt: recs[0]?.at ?? null, purchased30: m4(recs.filter((r) => Date.parse(r.at) >= since).reduce((a, r) => a.plus(r.total), D(0))),
     itemCount: inv.items.filter((i) => i.defaultSupplierId === s.id).length,
   };

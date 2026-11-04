@@ -107,7 +107,7 @@ export interface Supplier {
   notes: string | null; active: boolean; version: number; createdAt: string;
 }
 
-export type PurchaseOrderState = 'DRAFT' | 'ISSUED' | 'PARTIALLY_RECEIVED' | 'RECEIVED' | 'CLOSED' | 'CANCELLED';
+export type PurchaseOrderState = 'DRAFT' | 'PENDING_APPROVAL' | 'ISSUED' | 'PARTIALLY_RECEIVED' | 'RECEIVED' | 'CLOSED' | 'CANCELLED';
 export interface PurchaseOrderLine {
   id: string; itemId: string; packId: string | null; factor: string; orderedQuantity: string; orderedUnitCost: Money;
   /** round 3: link to the store request line and what the store keeper asked for (stock units) */
@@ -120,6 +120,9 @@ export interface PurchaseOrder {
   history: { at: string; by: string; text: string }[];
   /** round 3: the store request this order came from */
   storeRequestId?: string | null;
+  /** ux-05 (proposed): sent for approval, approved (issued with a grant) or returned to draft */
+  submittedAt?: string | null; submittedBy?: string | null; approvedAt?: string | null; approvedBy?: string | null; approvalGrantId?: string | null;
+  returnedAt?: string | null; returnedBy?: string | null; returnReason?: string | null;
 }
 
 export interface GoodsReceiptLine {
