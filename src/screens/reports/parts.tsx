@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState } from 'react';
 import { ShieldCheck, ShieldAlert, Clock, Info, CheckCircle2, AlertTriangle, BookOpen, ChevronDown } from 'lucide-react';
 import { Pill, Card, Button, Money, DateTime } from '../../ui';
 import { t, L, getLang } from '../../i18n';
-import { cn, dateTime, CURRENCY } from '../../lib/format';
+import { cn, CURRENCY } from '../../lib/format';
 import { Tech } from '../../app/tech';
 
 export type Loc = { ar: string; en: string };

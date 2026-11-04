@@ -6,7 +6,7 @@ import { TransferSessionDialog } from './ops/TransferSessionDialog';
 import { useDev, useQuery } from '../app/hooks';
 import { PageHeader, Input, Table, Money, Button, Toolbar, SearchInput, FilterChips, EmptyState, Modal, KV, StateBadge, DateTime } from '../ui';
 import { t, L } from '../i18n';
-import { time, money, qty } from '../lib/format';
+import { money, qty } from '../lib/format';
 import { StatusPill, HistoryDialog } from './order/CheckPanel';
 import { clock, businessDate } from '../mock/clock';
 import { personName } from '../demo/people';

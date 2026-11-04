@@ -7,7 +7,7 @@ import { useDev, useQuery, useCommand, errorText } from '../../../app/hooks';
 import { call } from '../../../api/client';
 import { Button, Card, Pill, Modal, Field, Input, Select, SegmentedControl, Switch, EmptyState, Spinner, Banner, toast, StateBadge, SkeletonCard, DateTime } from '../../../ui';
 import { t, L } from '../../../i18n';
-import { cn, dateTime } from '../../../lib/format';
+import { cn } from '../../../lib/format';
 import { personText } from '../../../demo/people';
 import { PrintStudio, type PrintSource } from './PrintStudio';
 

@@ -3,7 +3,7 @@
 import React from 'react';
 import { Clock, AlertTriangle, CheckCircle2, Info, TrendingUp, TrendingDown } from 'lucide-react';
 import { t, L } from '../../../i18n';
-import { cn, dateTime } from '../../../lib/format';
+import { cn } from '../../../lib/format';
 import { Pill, Banner, DateTime } from '../../../ui';
 import type { PivotResult, PivotNode } from '../../../reports/pivot';
 import type { ColumnView } from '../../../reports/studio';

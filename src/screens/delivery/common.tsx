@@ -6,7 +6,7 @@ import { Modal, Button, Field, Input, Select, Textarea, Pill, Banner, KV, Money,
 import { sumAmounts, changePreview, sign, plainAmount } from '../../lib/cash';
 import { Tech } from '../../app/tech';
 import { t, L, tv, getLang } from '../../i18n';
-import { cn, money, time, dateTime, qty } from '../../lib/format';
+import { cn, money, time, qty } from '../../lib/format';
 import { clock } from '../../mock/clock';
 import { addressText, AllergyWarning, TierBadge } from '../customers/common';
 import { personText } from '../../demo/people';

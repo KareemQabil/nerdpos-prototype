@@ -7,7 +7,7 @@ import { useQuery, useCommand } from '../../app/hooks';
 import { Section, StateBadge, Card, Button, Pill, Tabs, Table, Modal, Empty, KV, Switch, Banner, DateTime } from '../../ui';
 import { t, L, tLabel } from '../../i18n';
 import { Tech } from '../../app/tech';
-import { cn, dateTime, time } from '../../lib/format';
+import { cn, dateTime } from '../../lib/format';
 import { sim } from '../../mock/sim';
 import { useSim } from './OfflineBar';
 

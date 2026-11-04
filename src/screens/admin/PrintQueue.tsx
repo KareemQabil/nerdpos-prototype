@@ -6,7 +6,7 @@ import { PageHeader, StateBadge, Banner, Button, Pill, Select, Table, Card, useN
 import { t, tLabel, tv } from '../../i18n';
 import { Tech } from '../../app/tech';
 import { deviceName } from '../../demo/people';
-import { dateTime, time } from '../../lib/format';
+import { dateTime } from '../../lib/format';
 import { PrintStatePill, printStateLabel, docTypeLabel, printErrorLabel, inTime } from './output/labels';
 import { ReprintDialog } from './output/ReprintDialog';
 

@@ -10,7 +10,7 @@ import { Armchair, ClipboardList, CheckCheck, Clock, Printer, RotateCcw, Users, 
 import { useDev, useQuery } from '../../app/hooks';
 import { Money, EmptyState, Skeleton, SearchInput, Pill, useNow, SegmentedControl, FilterChips, Popover, Kbd, Button, Popup, toast, DateTime } from '../../ui';
 import { t } from '../../i18n';
-import { cn, time } from '../../lib/format';
+import { cn } from '../../lib/format';
 import { clock } from '../../mock/clock';
 import { keyLabel } from '../../app/keymap';
 import { inScanBurst } from '../../app/scanburst';

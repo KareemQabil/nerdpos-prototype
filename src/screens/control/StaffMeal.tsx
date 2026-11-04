@@ -10,7 +10,7 @@ import { ProductDialog, type LineDraft } from '../order/ProductDialog';
 import { needsDialog } from '../OrderScreen';
 import { Modal, StateBadge, Banner, Button, Pill, Field, Money, EmptyState, Skeleton, Switch, Avatar, SearchInput, DateTime } from '../../ui';
 import { t, L } from '../../i18n';
-import { cn, money, time } from '../../lib/format';
+import { cn, money } from '../../lib/format';
 import { D } from '../../mock/money';
 import { Tech } from '../../app/tech';
 import { personName, personRole } from '../../demo/people';

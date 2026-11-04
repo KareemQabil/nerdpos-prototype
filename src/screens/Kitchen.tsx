@@ -14,7 +14,7 @@ import { ChefHat, Undo2, AlertTriangle, Flame, History, LayoutGrid, Layers, Conc
 import { useDev, useQuery, useCommand } from '../app/hooks';
 import { StateBadge, Tabs, Pill, Button, Empty, EmptyState, Skeleton, SegmentedControl, useNow, Modal, Popup, Field, Select, Input, Banner, Kbd, toast, DateTime } from '../ui';
 import { t, L } from '../i18n';
-import { cn, qty, time } from '../lib/format';
+import { cn, qty } from '../lib/format';
 import { Tech } from '../app/tech';
 import { stationName } from '../demo/humanLog';
 import { profileById } from '../app/profiles';

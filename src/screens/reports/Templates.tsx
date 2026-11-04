@@ -7,7 +7,6 @@ import { createPortal } from 'react-dom';
 import { Printer, X, FileText, ReceiptText } from 'lucide-react';
 import { Button, SegmentedControl, DateTime } from '../../ui';
 import { t, L } from '../../i18n';
-import { dateTime } from '../../lib/format';
 import { fmt, statusText, Amt } from './parts';
 
 type Paper = 'A4' | 'RECEIPT';

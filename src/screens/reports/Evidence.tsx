@@ -7,7 +7,6 @@ import { useDev, useQuery, errorText } from '../../app/hooks';
 import { Popup, Spinner, Banner, Pill, Table, Button, StateBadge, DateTime } from '../../ui';
 import { t, L, getLang } from '../../i18n';
 import { rangeText } from '../../reports/format';
-import { dateTime } from '../../lib/format';
 import { Tech } from '../../app/tech';
 import { fmt, Amt, type EvidenceSpec } from './parts';
 

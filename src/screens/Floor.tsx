@@ -11,7 +11,7 @@ import { PageHeader, StateBadge, Pill, Modal, Button, Banner, Money, EmptyState,
 import { Tech } from '../app/tech';
 import { personName, userLabel } from '../demo/people';
 import { t, L } from '../i18n';
-import { cn, money, time } from '../lib/format';
+import { cn, money } from '../lib/format';
 import { sumAmounts } from '../lib/cash';
 import { StatusPill } from './order/CheckPanel';
 import { FloorCanvas, Seats, shapeClass } from './ops/FloorCanvas';

@@ -5,7 +5,7 @@ import { useDev, useQuery } from '../../app/hooks';
 import { PageHeader, StateBadge, Button, Card, Money, Select, Table, EmptyState, StatGrid, StatCard, Toolbar, SearchInput, FilterChips, DateTime } from '../../ui';
 import { Tech } from '../../app/tech';
 import { t, L } from '../../i18n';
-import { cn, money, dateTime } from '../../lib/format';
+import { cn, money } from '../../lib/format';
 import { TAGS, TagPills, TierBadge, CustomerPicker, addressText } from './common';
 
 export default function Customers() {

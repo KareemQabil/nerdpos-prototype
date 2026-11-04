@@ -4,7 +4,7 @@ import { Award, Crown, Plus, Pencil, Star, Search } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';
 import { PageHeader, StateBadge, Button, Card, Pill, Money, Modal, Field, Input, Switch, Tabs, Table, Spinner, Select, StatGrid, StatCard, currencyText, DateTime } from '../../ui';
 import { t, L, tv } from '../../i18n';
-import { cn, money, dateTime } from '../../lib/format';
+import { cn, money } from '../../lib/format';
 import { PolicyCard } from './PolicyCard';
 import { entryLabel } from './CustomerProfile';
 import { personText } from '../../demo/people';
