@@ -62,7 +62,7 @@ export function LevelPill({ state }: { state: string }) {
   return <Pill tone={s.tone}>{t(s.ar)}</Pill>;
 }
 export const PO_STATE: Record<string, { ar: string; tone: 'neutral' | 'info' | 'warning' | 'success' | 'error' | 'primary' }> = {
-  DRAFT: { ar: 'مسودة', tone: 'neutral' }, ISSUED: { ar: 'اتبعت للمورد', tone: 'info' }, PARTIALLY_RECEIVED: { ar: 'اتستلم جزء', tone: 'warning' }, RECEIVED: { ar: 'اتستلم كله', tone: 'success' }, CLOSED: { ar: 'مقفول', tone: 'primary' }, CANCELLED: { ar: 'ملغي', tone: 'error' },
+  DRAFT: { ar: 'مسودة', tone: 'neutral' }, PENDING_APPROVAL: { ar: 'بانتظار الاعتماد', tone: 'warning' }, ISSUED: { ar: 'اتبعت للمورد', tone: 'info' }, PARTIALLY_RECEIVED: { ar: 'اتستلم جزء', tone: 'warning' }, RECEIVED: { ar: 'اتستلم كله', tone: 'success' }, CLOSED: { ar: 'مقفول', tone: 'primary' }, CANCELLED: { ar: 'ملغي', tone: 'error' },
 };
 export const TRANSFER_STATE: Record<string, { ar: string; tone: 'neutral' | 'info' | 'success' | 'error' }> = {
   DRAFT: { ar: 'مسودة', tone: 'neutral' }, DISPATCHED: { ar: 'في الطريق', tone: 'info' }, RECEIVED: { ar: 'اتستلم', tone: 'success' }, CANCELLED: { ar: 'ملغي', tone: 'error' },

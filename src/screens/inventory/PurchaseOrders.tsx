@@ -1,10 +1,14 @@
 // Purchase orders: draft (by hand or from the low-stock suggestions, one per supplier), issue to the supplier,
 // receive against it (partially or fully), close the remainder or cancel.
 import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, ShoppingBag, Send, XCircle, Lock, PackageCheck, Pencil, Trash2, Save, MessageSquareText, Wand2 } from 'lucide-react';
+import { Plus, ShoppingBag, Send, XCircle, Lock, PackageCheck, Pencil, Trash2, Save, MessageSquareText, Wand2, ShieldCheck, Undo2 } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
-import { Banner, Button, Card, Empty, EmptyState, Field, Input, KV, Modal, Drawer, Money, PageHeader, Pill, Section, Select, Spinner, StatCard, StatGrid, StateBadge, Table, Textarea, Toolbar } from '../../ui';
+import { Banner, Button, Card, Empty, EmptyState, Field, Input, KV, Money, PageHeader, Pill, Popup, Section, Select, Spinner, StatCard, StatGrid, StateBadge, Table, Textarea, Toolbar } from '../../ui';
+import { FullPage, SplitDetail, DetailPanel } from './purchasingLayout';
+import { BoardViewToggle } from '../../ui/board';
+import { useBoardView } from '../../app/useBoardView';
+import PurchasingBoard from '../boards/PurchasingBoard';
 import { t, L, tv } from '../../i18n';
 import { dateTime, money } from '../../lib/format';
 import { BranchScope, ItemPicker, PO_STATE, Qty, StatePill, WarehouseSelect, fmtQty, unitLabel, useBranchScope, useItemsCatalog, useList, useWarehouses, Inp, Sel } from './common';
@@ -15,7 +19,14 @@ import { ChainView } from './Chain';
 
 const OPS = ['PurchaseOrder.Create', 'PurchaseOrder.Update', 'PurchaseOrder.Issue', 'PurchaseOrder.Find', 'PurchaseOrder.Get', 'PurchaseOrder.Close', 'PurchaseOrder.Cancel', 'Inventory.LowStock'];
 
+// ux-05: the purchasing board or this list (board / list switch, remembered per user). Details open in the page.
 export default function PurchaseOrders() {
+  const { view, setView } = useBoardView('purchasing');
+  if (view === 'board') return <PurchasingBoard onList={() => setView('list')} />;
+  return <PurchaseOrderList onBoard={() => setView('board')} />;
+}
+
+function PurchaseOrderList({ onBoard }: { onBoard: () => void }) {
   const { params } = useDev();
   const scope = useBranchScope();
   const [state, setState] = useState('');
@@ -28,7 +39,7 @@ export default function PurchaseOrders() {
   const [suggest, setSuggest] = useState(!!params?.fromLowStock);
   useEffect(() => { if (params?.fromLowStock) setSuggest(true); if (params?.create) setEditor({ supplierId: params?.supplierId }); }, [params?.fromLowStock, params?.create, params?.supplierId]);
   const all = useList<any>('PurchaseOrder.Find', { branchId: scope.branchId });
-  const openPos = all.items.filter((p) => ['DRAFT', 'ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state));
+  const openPos = all.items.filter((p) => ['DRAFT', 'PENDING_APPROVAL', 'ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state));
   const waiting = all.items.filter((p) => ['ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state));
   const today = new Date(clock.now()).toISOString().slice(0, 10);
   const late = waiting.filter((p) => p.expectedDate && p.expectedDate < today);
@@ -36,13 +47,14 @@ export default function PurchaseOrders() {
   return (
     <div className="space-y-4">
       <PageHeader icon={<ShoppingBag />} title={t('أوامر الشراء')} badge={<StateBadge ops={OPS} />} description={t('اطلب من المورد: مسودة ← اتبعت للمورد ← اتستلم جزء أو كله ← اتقفل. ممكن تعمل الأوامر أوتوماتيك من النواقص.')}
-        actions={<><BranchScope scope={scope} /><Button data-fb="po:suggest" onClick={() => setSuggest(true)}><Wand2 className="w-4 h-4" />{t('من النواقص')}</Button><Button data-fb="po:new" variant="primary" onClick={() => setEditor({})}><Plus className="w-4 h-4" />{t('أمر شراء جديد')}</Button></>} />
+        actions={<><BranchScope scope={scope} /><Button data-fb="po:suggest" onClick={() => setSuggest(true)}><Wand2 className="w-4 h-4" />{t('من النواقص')}</Button><Button data-fb="po:new" variant="primary" onClick={() => setEditor({})}><Plus className="w-4 h-4" />{t('أمر شراء جديد')}</Button><BoardViewToggle value="list" onChange={(v) => v === 'board' && onBoard()} /></>} />
       <StatGrid>
         <StatCard label={t('أوامر مفتوحة')} value={openPos.length} icon={<ShoppingBag />} loading={loading} hint={t('بقيمة {m}', { m: money(String(openPos.reduce((a, p) => a + Number(p.total), 0))) })} onClick={() => setState(state === 'DRAFT,ISSUED,PARTIALLY_RECEIVED' ? '' : 'DRAFT,ISSUED,PARTIALLY_RECEIVED')} />
         <StatCard label={t('مسودات لسه ما اتبعتتش')} value={all.items.filter((p) => p.state === 'DRAFT').length} icon={<Pencil />} loading={loading} onClick={() => setState(state === 'DRAFT' ? '' : 'DRAFT')} />
         <StatCard label={t('مستنيين الاستلام')} value={waiting.length} icon={<PackageCheck />} tone={waiting.length ? 'info' : 'neutral'} loading={loading} onClick={() => setState(state === 'ISSUED,PARTIALLY_RECEIVED' ? '' : 'ISSUED,PARTIALLY_RECEIVED')} />
         <StatCard label={t('متأخرين عن ميعاد التوريد')} value={late.length} icon={<XCircle />} tone={late.length ? 'error' : 'neutral'} loading={loading} hint={late.length ? late.map((p) => tv(p.supplierName)).slice(0, 2).join(t('، ')) : t('كله في ميعاده')} />
       </StatGrid>
+      <SplitDetail onClose={() => setOpen(null)} detail={open ? <PoView id={open} onClose={() => setOpen(null)} onEdit={(po) => { setOpen(null); setEditor({ po }); }} /> : null} list={
       <Card padding="sm">
         <Toolbar>
           <Sel className="w-52" data-fb="po:state" value={state} onChange={(e) => setState(e.target.value)} options={[{ value: '', label: t('كل الحالات') }, { value: 'DRAFT,ISSUED,PARTIALLY_RECEIVED', label: t('المفتوحة بس') }, { value: 'ISSUED,PARTIALLY_RECEIVED', label: t('مستنية الاستلام') }, ...Object.entries(PO_STATE).map(([k, v]) => ({ value: k, label: t(v.ar) }))]} />
@@ -57,15 +69,14 @@ export default function PurchaseOrders() {
           <span className={`num text-xs ${p.expectedDate && p.expectedDate < today && ['ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state) ? 'text-[var(--error)] font-bold' : ''}`}>{p.expectedDate ?? '—'}</span>,
           <Button size="sm" variant={p.state === 'DRAFT' || ['ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state) ? 'outline' : 'ghost'} onClick={(e) => { e.stopPropagation(); setOpen(p.id); }}>{p.state === 'DRAFT' ? t('راجع وابعت') : ['ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state) ? t('استلم') : t('اعرض')}</Button>,
         ])} />
-      </Card>
+      </Card>} />
       {suggest && <Suggestions branchId={scope.branchId} onClose={() => setSuggest(false)} onDone={(id) => { setSuggest(false); if (id) setOpen(id); }} />}
       {editor && <PoEditor init={editor} onClose={() => setEditor(null)} onSaved={(id) => { setEditor(null); setOpen(id); }} />}
-      <PoView id={open} onClose={() => setOpen(null)} onEdit={(po) => { setOpen(null); setEditor({ po }); }} />
     </div>
   );
 }
 
-function Suggestions({ branchId, onClose, onDone }: { branchId?: string; onClose: () => void; onDone: (id?: string) => void }) {
+export function Suggestions({ branchId, onClose, onDone }: { branchId?: string; onClose: () => void; onDone: (id?: string) => void }) {
   const { run, busy } = useCommand();
   const low = useList<any>('Inventory.LowStock', { branchId });
   const suppliers = useList<any>('Supplier.List', { active: 'true' });
@@ -97,7 +108,7 @@ function Suggestions({ branchId, onClose, onDone }: { branchId?: string; onClose
   };
   const total = [...groups.values()].flat().reduce((a, { p }) => a + Number(p.packs) * Number(p.cost), 0);
   return (
-    <Modal open onClose={onClose} xwide title={t('اطلب النواقص')} badge={<StateBadge ops={['Inventory.LowStock', 'PurchaseOrder.Create']} />}
+    <FullPage onBack={onClose} fb="po-suggest-page" title={t('اطلب النواقص')} badge={<StateBadge ops={['Inventory.LowStock', 'PurchaseOrder.Create']} />}
       footer={<><span className="text-sm me-auto">{t('{n} أمر شراء', { n: groups.size })} · <b className="num">{money(total.toFixed(4))}</b></span><Button onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" data-fb="po-suggest:create" loading={busy} disabled={!groups.size} onClick={create}><ShoppingBag className="w-4 h-4" />{t('اعمل أوامر الشراء (مسودة)')}</Button></>}>
       {low.loading && !low.raw ? <Spinner /> : rows.length === 0 ? <Empty text={already.length ? t('كل النواقص عليها أوامر شراء مفتوحة بالفعل.') : t('مفيش نواقص — كله فوق الحد الأدنى.')} /> : (
         <div className="space-y-3">
@@ -120,12 +131,12 @@ function Suggestions({ branchId, onClose, onDone }: { branchId?: string; onClose
           {already.length > 0 && <div className="text-xs text-dim">{t('عليهم أوامر مفتوحة')}: {already.map((r) => `${L(r.item.name)} (${r.openPurchaseOrders.map((o: any) => o.number).join(t('، '))})`).join(' · ')}</div>}
         </div>
       )}
-    </Modal>
+    </FullPage>
   );
 }
 
 interface PLine { itemId: string; packId: string; orderedQuantity: string; orderedUnitCost: string }
-function PoEditor({ init, onClose, onSaved }: { init: any; onClose: () => void; onSaved: (id: string) => void }) {
+export function PoEditor({ init, onClose, onSaved }: { init: any; onClose: () => void; onSaved: (id: string) => void }) {
   const { run, busy } = useCommand();
   const { auth } = useDev();
   const po = init.po;
@@ -149,7 +160,7 @@ function PoEditor({ init, onClose, onSaved }: { init: any; onClose: () => void; 
   };
   const [showAll, setShowAll] = useState(false);
   return (
-    <Drawer width="xl" open onClose={onClose} title={po ? t('تعديل أمر شراء {n}', { n: po.number }) : t('أمر شراء جديد')} badge={<StateBadge ops={[po ? 'PurchaseOrder.Update' : 'PurchaseOrder.Create']} />}
+    <FullPage onBack={onClose} fb="po-editor-page" title={po ? t('تعديل أمر شراء {n}', { n: po.number }) : t('أمر شراء جديد')} badge={<StateBadge ops={[po ? 'PurchaseOrder.Update' : 'PurchaseOrder.Create']} />}
       footer={<><span className="text-sm me-auto">{t('الإجمالي')}: <b className="num">{money(total.toFixed(4))}</b></span><Button onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" data-fb="po-edit:save" loading={busy} disabled={!supplierId || !wh || !lines.some((l) => l.itemId && Number(l.orderedQuantity) > 0)} onClick={save}><Save className="w-4 h-4" />{t('احفظ مسودة')}</Button></>}>
       <div className="space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
@@ -173,12 +184,14 @@ function PoEditor({ init, onClose, onSaved }: { init: any; onClose: () => void; 
         })} />
         <Button size="sm" data-fb="po-edit:add" onClick={() => setLines([...lines, { itemId: '', packId: '', orderedQuantity: '', orderedUnitCost: '' }])}><Plus className="w-3.5 h-3.5" />{t('صنف كمان')}</Button>
       </div>
-    </Drawer>
+    </FullPage>
   );
 }
 
-function PoView({ id, onClose, onEdit }: { id: string | null; onClose: () => void; onEdit: (po: any) => void }) {
+export function PoView({ id, onClose, onEdit }: { id: string | null; onClose: () => void; onEdit: (po: any) => void }) {
   const { run, busy } = useCommand();
+  const { can } = useDev();
+  const [back, setBack] = useState(false);
   const q = useQuery<any>(id ? 'PurchaseOrder.Get' : null, { params: { purchaseOrderId: id } });
   const po = q.data;
   const [ask, setAsk] = useState<null | 'cancel' | 'close'>(null);
@@ -189,19 +202,22 @@ function PoView({ id, onClose, onEdit }: { id: string | null; onClose: () => voi
   const open = po && ['ISSUED', 'PARTIALLY_RECEIVED'].includes(po.state);
   const message = po ? `${t('السلام عليكم')} ${po.supplierName}،\n${t('طلبية رقم')} ${po.number}${po.expectedDate ? ` — ${t('التوريد يوم')} ${po.expectedDate}` : ''}:\n${po.lines.map((l: any) => `• ${L(l.item?.name)}: ${fmtQty(l.orderedQuantity)} ${l.packId ? L(l.item?.packs?.find((p: any) => p.id === l.packId)?.name) : unitLabel(l.item?.unit)}`).join('\n')}\n${t('الإجمالي التقريبي')}: ${money(po.total)}\n${t('شكرًا')}` : '';
   return (
-    <Drawer width="xl" open onClose={onClose} title={po ? <span className="flex items-center gap-2">{t('أمر شراء')} <span className="num">{po.number}</span> — {tv(po.supplierName)}</span> : t('أمر شراء')} badge={po ? <><StatePill map={PO_STATE} state={po.state} /><StateBadge ops={OPS} /></> : undefined}
+    <DetailPanel fb="po-detail" title={po ? <span className="flex items-center gap-2 min-w-0"><span className="truncate">{t('أمر شراء')} <span className="num">{po.number}</span> — {tv(po.supplierName)}</span></span> : t('أمر شراء')} badge={po ? <><StatePill map={PO_STATE} state={po.state} /><StateBadge ops={OPS} /></> : undefined}
       footer={po && <>
-        {['DRAFT', 'ISSUED'].includes(po.state) && <Button variant="danger" data-fb="po-view:cancel" onClick={() => { setReason(''); setAsk('cancel'); }}><XCircle className="w-4 h-4" />{t('الغي')}</Button>}
+        {['DRAFT', 'PENDING_APPROVAL', 'ISSUED'].includes(po.state) && <Button variant="danger" data-fb="po-view:cancel" onClick={() => { setReason(''); setAsk('cancel'); }}><XCircle className="w-4 h-4" />{t('الغي')}</Button>}
         {open && <Button data-fb="po-view:close" onClick={() => { setReason(''); setAsk('close'); }}><Lock className="w-4 h-4" />{t('اقفل الأمر (الباقي مش جاي)')}</Button>}
         <Button variant="ghost" data-fb="po-view:message" onClick={() => setMsg(!msg)}><MessageSquareText className="w-4 h-4" />{t('رسالة للمورد')}</Button>
         <div className="flex-1" />
         {po.state === 'DRAFT' && <Button data-fb="po-view:edit" onClick={() => onEdit(po)}><Pencil className="w-4 h-4" />{t('تعديل')}</Button>}
+        {po.state === 'DRAFT' && <Button data-fb="po-view:submit" loading={busy} disabled={!can('purchaseorder:update')} onClick={() => run('PurchaseOrder.Submit', { params: { purchaseOrderId: po.id }, body: { expectedVersion: po.version } }, { success: t('تم الإرسال للاعتماد') })}><ShieldCheck className="w-4 h-4" />{t('إرسال للاعتماد')}</Button>}
         {po.state === 'DRAFT' && <Button variant="primary" data-fb="po-view:issue" loading={busy} onClick={() => run('PurchaseOrder.Issue', { params: { purchaseOrderId: po.id }, body: { expectedVersion: po.version } }, { success: t('أمر الشراء اتبعت للمورد') })}><Send className="w-4 h-4" />{t('ابعت للمورد')}</Button>}
+        {po.state === 'PENDING_APPROVAL' && <Button data-fb="po-view:return" disabled={!can('purchaseorder:issue')} onClick={() => setBack(true)}><Undo2 className="w-4 h-4" />{t('إعادة للمسودة')}</Button>}
+        {po.state === 'PENDING_APPROVAL' && <Button variant="primary" data-fb="po-view:approve" loading={busy} disabled={!can('purchaseorder:issue')} onClick={() => run('PurchaseOrder.Issue', { params: { purchaseOrderId: po.id }, body: { expectedVersion: po.version } }, { success: t('تم الاعتماد والإرسال للمورد') })}><ShieldCheck className="w-4 h-4" />{t('اعتماد وإرسال')}</Button>}
         {open && <Button variant="success" data-fb="po-view:receive" onClick={() => setReceive(true)}><PackageCheck className="w-4 h-4" />{t('استلام')}</Button>}
       </>}>
       {!po ? <Spinner /> : (
         <div className="space-y-3">
-          <KV rows={[[t('يستلم في'), `${tv(po.warehouse.name)} — ${tv(po.warehouse.branchName)}`], [t('ميعاد التوريد'), po.expectedDate ?? '—'], [t('اتعمل'), `${dateTime(po.createdAt)} · ${personText(po.createdByName)}`], [t('ملاحظة'), tv(po.note) ?? '—'], ...(po.closeReason ? [[t('سبب القفل'), po.closeReason] as [string, string]] : []), ...(po.cancelReason ? [[t('سبب الإلغاء'), tv(po.cancelReason)] as [string, string]] : [])]} />
+          <KV rows={[[t('يستلم في'), `${tv(po.warehouse.name)} — ${tv(po.warehouse.branchName)}`], [t('ميعاد التوريد'), po.expectedDate ?? '—'], [t('اتعمل'), `${dateTime(po.createdAt)} · ${personText(po.createdByName)}`], [t('ملاحظة'), tv(po.note) ?? '—'], ...(po.closeReason ? [[t('سبب القفل'), po.closeReason] as [string, string]] : []), ...(po.cancelReason ? [[t('سبب الإلغاء'), tv(po.cancelReason)] as [string, string]] : []), ...(po.submittedAt ? [[t('أُرسل للاعتماد'), `${dateTime(po.submittedAt)} · ${personText(po.submittedByName)}`] as [string, string]] : []), ...(po.approvedAt ? [[t('اعتمده'), `${personText(po.approvedByName)} · ${dateTime(po.approvedAt)}`] as [string, string]] : []), ...(po.returnReason && po.state === 'DRAFT' ? [[t('سبب الإعادة'), po.returnReason] as [string, string]] : [])]} />
           {msg && <Textarea readOnly className="min-h-[140px] text-sm" value={message} onFocus={(e) => e.currentTarget.select()} />}
           <Table head={[t('الصنف'), ...(po.storeRequestId ? [t('المخزن طلب')] : []), t('المطلوب'), t('سعر العبوة'), t('الإجمالي'), t('اتستلم'), t('باقي')]} rows={po.lines.map((l: any) => [
             <span className="font-bold">{L(l.item?.name)}</span>,
@@ -225,16 +241,30 @@ function PoView({ id, onClose, onEdit }: { id: string | null; onClose: () => voi
         </div>
       )}
       {ask && po && (
-        <Modal open onClose={() => setAsk(null)} title={ask === 'cancel' ? t('إلغاء أمر الشراء') : t('قفل أمر الشراء')} badge={<StateBadge ops={[ask === 'cancel' ? 'PurchaseOrder.Cancel' : 'PurchaseOrder.Close']} />}
+        <Popup open onClose={() => setAsk(null)} size="sm" fb="po-ask" title={ask === 'cancel' ? t('إلغاء أمر الشراء') : t('قفل أمر الشراء')}
           footer={<><Button onClick={() => setAsk(null)}>{t('رجوع')}</Button><Button variant="danger" data-fb="po-ask:go" loading={busy} disabled={ask === 'cancel' && !reason.trim()} onClick={async () => { const r = await run(ask === 'cancel' ? 'PurchaseOrder.Cancel' : 'PurchaseOrder.Close', { params: { purchaseOrderId: po.id }, body: { expectedVersion: po.version, reason } }, { success: ask === 'cancel' ? t('أمر الشراء اتلغى') : t('أمر الشراء اتقفل — الباقي اتلغى') }); if (r) setAsk(null); }}>{ask === 'cancel' ? t('الغي') : t('اقفل')}</Button></>}>
           <div className="space-y-2">
             <div className="text-sm">{ask === 'cancel' ? t('الإلغاء بيتعمل بس لو لسه ما اتستلمش أي حاجة.') : t('القفل بيلغي الكمية الباقية اللي لسه ما وصلتش، واللي اتستلم بيفضل زي ما هو.')}</div>
             <Field label={t('السبب')}><Textarea data-fb="po-ask:reason" value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
           </div>
-        </Modal>
+        </Popup>
       )}
+      {back && po && <ReturnPopup po={po} onClose={() => setBack(false)} />}
       {receive && po && <ReceiveDialog po={po} onClose={() => setReceive(false)} />}
-    </Drawer>
+    </DetailPanel>
   );
 }
-const poHistoryText = (s: string) => s.replace(/^DRAFT — (.+)$/, (_m, n) => `${t('اتعمل مسودة من طلبية المخزن')} ${n}`).replace(/^invoiced (\S+)$/, (_m, n) => `${t('اتعملت فاتورة المورد')} ${n}`).replace(/^DRAFT$/, t('اتعمل مسودة')).replace(/^ISSUED$/, t('اتبعت للمورد')).replace(/^CANCELLED/, t('اتلغى')).replace(/^CLOSED/, t('اتقفل')).replace('lines updated', t('الأصناف اتعدلت')).replace(/^received (\S+) → (\S+)$/, (_m, n, st) => `${t('استلام')} ${n} ← ${t(PO_STATE[st]?.ar ?? st)}`).replace(/^received → (\S+)$/, (_m, st) => `${t('استلام')} ← ${t(PO_STATE[st]?.ar ?? st)}`).replace(/^receipt (\S+) reversed → (\S+)$/, (_m, n, st) => `${t('إلغاء استلام')} ${n} ← ${t(PO_STATE[st]?.ar ?? st)}`);
+/** Return a purchase order waiting for approval to its buyer, with the reason (required). */
+export function ReturnPopup({ po, onClose, onDone }: { po: any; onClose: () => void; onDone?: (ok: boolean) => void }) {
+  const { run, busy } = useCommand();
+  const [reason, setReason] = useState('');
+  const go = async () => { const r = await run('PurchaseOrder.ReturnToDraft', { params: { purchaseOrderId: po.id }, body: { expectedVersion: po.version, reason: reason.trim() } }, { success: t('أُعيد أمر الشراء للمسودة') }); if (r) { onDone?.(true); onClose(); } };
+  return (
+    <Popup open onClose={() => { onDone?.(false); onClose(); }} size="sm" fb="po-return" title={<span>{t('إعادة للمسودة')} · <span className="num">{po.number}</span></span>}
+      footer={<><Button onClick={() => { onDone?.(false); onClose(); }}>{t('إلغاء')}</Button><Button variant="danger" loading={busy} disabled={reason.trim().length < 3} onClick={go} data-fb="po-return:go">{t('إعادة للمسودة')}</Button></>}>
+      <Field label={t('السبب')} required><Textarea autoFocus data-autofocus data-fb="po-return:reason" value={reason} onChange={(e) => setReason(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && reason.trim().length >= 3) { e.preventDefault(); go(); } }} /></Field>
+    </Popup>
+  );
+}
+
+const poHistoryText = (s: string) => s.replace(/^SUBMITTED$/, t('أُرسل للاعتماد')).replace(/^APPROVED$/, t('اعتُمد')).replace(/^RETURNED — (.+)$/, (_m, r) => `${t('أُعيد للمسودة')} — ${r}`).replace(/^DRAFT — (.+)$/, (_m, n) => `${t('اتعمل مسودة من طلبية المخزن')} ${n}`).replace(/^invoiced (\S+)$/, (_m, n) => `${t('اتعملت فاتورة المورد')} ${n}`).replace(/^DRAFT$/, t('اتعمل مسودة')).replace(/^ISSUED$/, t('اتبعت للمورد')).replace(/^CANCELLED/, t('اتلغى')).replace(/^CLOSED/, t('اتقفل')).replace('lines updated', t('الأصناف اتعدلت')).replace(/^received (\S+) → (\S+)$/, (_m, n, st) => `${t('استلام')} ${n} ← ${t(PO_STATE[st]?.ar ?? st)}`).replace(/^received → (\S+)$/, (_m, st) => `${t('استلام')} ← ${t(PO_STATE[st]?.ar ?? st)}`).replace(/^receipt (\S+) reversed → (\S+)$/, (_m, n, st) => `${t('إلغاء استلام')} ${n} ← ${t(PO_STATE[st]?.ar ?? st)}`);

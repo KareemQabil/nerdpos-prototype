@@ -7,7 +7,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ClipboardList, Plus, Send, XCircle, ShoppingBag, FileText, PackageCheck, Save, Trash2, Wand2, Receipt as ReceiptIcon, Workflow } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
-import { Banner, Button, Card, Drawer, EmptyState, Field, Input, KV, Money, Modal, PageHeader, Pill, Select, Spinner, StatCard, StatGrid, StateBadge, Switch, Table, Tabs, Textarea, Toolbar } from '../../ui';
+import { Banner, Button, Card, EmptyState, Field, Input, KV, Money, PageHeader, Pill, Popup, Select, Spinner, StatCard, StatGrid, StateBadge, Switch, Table, Tabs, Textarea, Toolbar } from '../../ui';
+import { FullPage, SplitDetail, DetailPanel } from './purchasingLayout';
 import { t, L, tv } from '../../i18n';
 import { cn, dateTime, money } from '../../lib/format';
 import { BranchScope, ItemPicker, Qty, StatePill, WarehouseSelect, fmtQty, unitLabel, useBranchScope, useItemsCatalog, useList, useWarehouses, Inp, Sel } from './common';
@@ -55,6 +56,7 @@ export default function Purchasing() {
         ...(canBuy ? [{ id: 'invoices' as Tab, label: t('فواتير الموردين'), count: invs.items.length, fb: 'pur:tab-invoices' }] : []),
       ]} />
       {tab === 'requests' || !canBuy ? (
+        <SplitDetail onClose={() => setOpenSr(null)} detail={openSr ? <StoreRequestView id={openSr} onClose={() => setOpenSr(null)} /> : null} list={
         <Card padding="sm">
           <Table loading={loading} onRowClick={(i) => setOpenSr(reqs.items[i].id)} align={['start', 'start', 'start', 'end', 'start', 'start']}
             empty={<EmptyState compact icon={<ClipboardList />} title={t('مفيش طلبيات مخزن')} text={t('أمين المخزن يعمل طلبية بالنواقص — الكمية بتتحسب لوحدها (المستهدف − الموجود) ويقدر يعدلها.')} action={can('storerequest:create') ? <Button variant="primary" onClick={() => setNewReq({})}>{t('طلبية مخزن جديدة')}</Button> : undefined} />}
@@ -63,8 +65,9 @@ export default function Purchasing() {
               <span className="num">{r.lines.length}</span>, <span className="text-xs">{personText(r.createdByName)} · {dateTime(r.createdAt)}</span>,
               r.purchaseOrders.length ? <span className="text-xs num">{r.purchaseOrders.map((p: any) => p.number).join(t('، '))}</span> : <span className="text-dim text-xs">—</span>,
             ])} />
-        </Card>
+        </Card>} />
       ) : (
+        <SplitDetail onClose={() => setOpenInv(null)} detail={openInv ? <InvoiceView id={openInv} onClose={() => setOpenInv(null)} /> : null} list={
         <div className="space-y-3">
           {pending.items.length > 0 && (
             <Card title={t('استلامات مستنية فاتورة المورد')} description={t('الفاتورة بتتعمل على اللي اتستلم فعلًا — مش على اللي اتطلب.')} padding="sm">
@@ -85,11 +88,9 @@ export default function Purchasing() {
                 <Money v={x.total} className="text-xs" />,
               ])} />
           </Card>
-        </div>
+        </div>} />
       )}
       {newReq && <StoreRequestEditor presetItemId={newReq.itemId} onClose={() => setNewReq(null)} onSaved={(id) => { setNewReq(null); setOpenSr(id); }} />}
-      {openSr && <StoreRequestView id={openSr} onClose={() => setOpenSr(null)} />}
-      {openInv && <InvoiceView id={openInv} onClose={() => setOpenInv(null)} />}
       {direct && <DirectInvoiceDialog onClose={() => setDirect(false)} onDone={(id) => { setDirect(false); setTab('invoices'); setOpenInv(id); }} />}
     </div>
   );
@@ -121,8 +122,8 @@ export function StoreRequestEditor({ presetItemId, onClose, onSaved }: { presetI
     if (r) onSaved(r.id);
   };
   return (
-    <Drawer width="xl" open onClose={onClose} title={t('طلبية مخزن جديدة')} badge={<StateBadge ops={['StoreRequest.Suggest', 'StoreRequest.Create']} />}
-      description={t('الكمية المقترحة = المستهدف − الموجود. عدّلها براحتك (مواسم، أعياد، المورد مش بيجي كل يوم).')}
+    <FullPage onBack={onClose} title={t('طلبية مخزن جديدة')} badge={<StateBadge ops={['StoreRequest.Suggest', 'StoreRequest.Create']} />}
+      sub={t('الكمية المقترحة = المستهدف − الموجود. عدّلها براحتك (مواسم، أعياد، المورد مش بيجي كل يوم).')}
       footer={<><span className="text-sm me-auto">{t('{n} صنف', { n: chosen.length })}</span><Button onClick={onClose}>{t('إلغاء')}</Button><Button data-fb="sr-edit:draft" loading={busy} disabled={!chosen.length} onClick={() => save(false)}><Save className="w-4 h-4" />{t('مسودة')}</Button><Button variant="primary" data-fb="sr-edit:submit" loading={busy} disabled={!chosen.length || !wh} onClick={() => save(true)}><Send className="w-4 h-4" />{t('ابعت للمشتريات')}</Button></>}>
       <div className="space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -149,7 +150,7 @@ export function StoreRequestEditor({ presetItemId, onClose, onSaved }: { presetI
             })} />
         )}
       </div>
-    </Drawer>
+    </FullPage>
   );
 }
 
@@ -162,7 +163,7 @@ function StoreRequestView({ id, onClose }: { id: string; onClose: () => void }) 
   const [toPo, setToPo] = useState(false);
   const [cancel, setCancel] = useState<string | null>(null);
   return (
-    <Drawer width="xl" open onClose={onClose} title={sr ? <span className="flex items-center gap-2">{t('طلبية مخزن')} <span className="num">{sr.number}</span> — {tv(sr.warehouse.name)}</span> : t('طلبية مخزن')} badge={sr ? <><StatePill map={SR_STATE} state={sr.state} /><StateBadge ops={['StoreRequest.Get', 'StoreRequest.CreatePurchaseOrders']} /></> : undefined}
+    <DetailPanel title={sr ? <span className="flex items-center gap-2">{t('طلبية مخزن')} <span className="num">{sr.number}</span> — {tv(sr.warehouse.name)}</span> : t('طلبية مخزن')} badge={sr ? <><StatePill map={SR_STATE} state={sr.state} /><StateBadge ops={['StoreRequest.Get', 'StoreRequest.CreatePurchaseOrders']} /></> : undefined}
       footer={sr && <>
         {['DRAFT', 'SUBMITTED'].includes(sr.state) && can('storerequest:create') && <Button variant="danger" data-fb="sr-view:cancel" onClick={() => setCancel('')}><XCircle className="w-4 h-4" />{t('الغي')}</Button>}
         <div className="flex-1" />
@@ -184,11 +185,11 @@ function StoreRequestView({ id, onClose }: { id: string; onClose: () => void }) 
       )}
       {toPo && sr && <ToPurchaseOrders sr={sr} onClose={() => setToPo(false)} />}
       {cancel !== null && sr && (
-        <Modal open onClose={() => setCancel(null)} title={t('إلغاء طلبية المخزن')} footer={<><Button onClick={() => setCancel(null)}>{t('رجوع')}</Button><Button variant="danger" loading={busy} disabled={!cancel.trim()} onClick={async () => { if (await run('StoreRequest.Cancel', { params: { storeRequestId: sr.id }, body: { expectedVersion: sr.version, reason: cancel } }, { success: t('الطلبية اتلغت') })) setCancel(null); }}>{t('الغي')}</Button></>}>
+        <Popup open size="sm" onClose={() => setCancel(null)} title={t('إلغاء طلبية المخزن')} footer={<><Button onClick={() => setCancel(null)}>{t('رجوع')}</Button><Button variant="danger" loading={busy} disabled={!cancel.trim()} onClick={async () => { if (await run('StoreRequest.Cancel', { params: { storeRequestId: sr.id }, body: { expectedVersion: sr.version, reason: cancel } }, { success: t('الطلبية اتلغت') })) setCancel(null); }}>{t('الغي')}</Button></>}>
           <Field label={t('السبب')}><Textarea value={cancel} onChange={(e) => setCancel(e.target.value)} /></Field>
-        </Modal>
+        </Popup>
       )}
-    </Drawer>
+    </DetailPanel>
   );
 }
 
@@ -219,7 +220,7 @@ function ToPurchaseOrders({ sr, onClose }: { sr: any; onClose: () => void }) {
   };
   const total = [...groups.values()].flat().reduce((a, { r }) => a + Number(r.qty) * Number(r.cost), 0);
   return (
-    <Modal open onClose={onClose} xwide title={t('أوامر شراء من طلبية {n}', { n: sr.number })} badge={<StateBadge ops={['StoreRequest.CreatePurchaseOrders']} />}
+    <FullPage onBack={onClose} title={t('أوامر شراء من طلبية {n}', { n: sr.number })} badge={<StateBadge ops={['StoreRequest.CreatePurchaseOrders']} />}
       footer={<><span className="text-sm me-auto">{t('{n} أمر شراء', { n: groups.size })} · <b className="num">{money(total.toFixed(4))}</b></span><Switch checked={issue} onChange={setIssue} label={t('ابعتها للمورد على طول')} /><Button onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" data-fb="to-po:create" loading={busy} disabled={!groups.size} onClick={create}><ShoppingBag className="w-4 h-4" />{t('اعمل أوامر الشراء')}</Button></>}>
       <div className="space-y-3">
         <Banner tone="info">{t('مسؤول المشتريات يقرر الكمية حسب الفلوس والمورد — ممكن تختلف عن طلبية المخزن، والفرق هيفضل باين في المستندات.')}</Banner>
@@ -241,7 +242,7 @@ function ToPurchaseOrders({ sr, onClose }: { sr: any; onClose: () => void }) {
           ];
         })} />
       </div>
-    </Modal>
+    </FullPage>
   );
 }
 
@@ -268,7 +269,7 @@ function InvoiceFromReceiptDialog({ receipt, onClose, onDone }: { receipt: any; 
     if (r) onDone(r.id);
   };
   return (
-    <Modal open onClose={onClose} wide title={t('فاتورة المورد على إذن {n}', { n: receipt.number })} badge={<StateBadge ops={['SupplierInvoice.FromReceipt']} />}
+    <Popup open size="lg" onClose={onClose} title={t('فاتورة المورد على إذن {n}', { n: receipt.number })}
       footer={<><span className="text-sm me-auto">{t('الإجمالي')}: <b className="num">{money(total.toFixed(4))}</b></span><Button onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" data-fb="invoice:post" loading={busy} onClick={post}><FileText className="w-4 h-4" />{t('سجّل الفاتورة')}</Button></>}>
       <div className="space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -285,7 +286,7 @@ function InvoiceFromReceiptDialog({ receipt, onClose, onDone }: { receipt: any; 
         ])} />
         <Banner tone="info">{t('الكمية في الفاتورة = اللي اتستلم بالظبط ومينفعش تتغير. لو المورد كاتب سعر مختلف، اكتبه — الفرق بيظهر كـ«فرق سعر» والرصيد مش بيتغير.')}</Banner>
       </div>
-    </Modal>
+    </Popup>
   );
 }
 
@@ -293,7 +294,7 @@ function InvoiceView({ id, onClose }: { id: string; onClose: () => void }) {
   const q = useQuery<any>('SupplierInvoice.Get', { params: { invoiceId: id } });
   const x = q.data;
   return (
-    <Drawer width="xl" open onClose={onClose} title={x ? <span className="flex items-center gap-2">{t('فاتورة مورد')} <span className="num">{x.number}</span> — {tv(x.supplierName)}</span> : t('فاتورة مورد')} badge={x ? <><Pill tone={x.kind === 'DIRECT' ? 'violet' : 'info'}>{x.kind === 'DIRECT' ? t('فاتورة مباشرة') : t('من الاستلام')}</Pill><StateBadge ops={['SupplierInvoice.Get']} /></> : undefined}>
+    <DetailPanel title={x ? <span className="flex items-center gap-2">{t('فاتورة مورد')} <span className="num">{x.number}</span> — {tv(x.supplierName)}</span> : t('فاتورة مورد')} badge={x ? <><Pill tone={x.kind === 'DIRECT' ? 'violet' : 'info'}>{x.kind === 'DIRECT' ? t('فاتورة مباشرة') : t('من الاستلام')}</Pill><StateBadge ops={['SupplierInvoice.Get']} /></> : undefined}>
       {!x ? <Spinner /> : (
         <div className="space-y-4">
           <KV rows={[[t('رقم فاتورة المورد'), x.supplierInvoiceNo ?? '—'], [t('المخزن'), tv(x.warehouse.name)], [t('اتسجلت'), `${dateTime(x.at)} · ${personText(x.userName)}`], [t('ميعاد الدفع'), x.dueDate ?? '—'], [t('أذون الاستلام'), x.receiptNumbers.join(t('، '))], ...(x.purchaseOrderNumber ? [[t('أمر الشراء'), x.purchaseOrderNumber] as [string, string]] : []), ...(x.storeRequestNumber ? [[t('طلبية المخزن'), x.storeRequestNumber] as [string, string]] : [])]} />
@@ -306,7 +307,7 @@ function InvoiceView({ id, onClose }: { id: string; onClose: () => void }) {
           <Tech><div className="text-[11px] num text-dim">{x.id}</div></Tech>
         </div>
       )}
-    </Drawer>
+    </DetailPanel>
   );
 }
 
@@ -332,7 +333,7 @@ function DirectInvoiceDialog({ onClose, onDone }: { onClose: () => void; onDone:
     if (r) onDone(r.id);
   };
   return (
-    <Drawer width="xl" open onClose={onClose} title={t('فاتورة مورد مباشرة')} badge={<StateBadge ops={['SupplierInvoice.PostDirect']} />} description={t('البضاعة وصلت من غير أمر شراء (زي الصيدليات): مستند واحد بيدخّل البضاعة المخزن ويحدّث التكلفة ويسجل الفاتورة.')}
+    <FullPage onBack={onClose} title={t('فاتورة مورد مباشرة')} badge={<StateBadge ops={['SupplierInvoice.PostDirect']} />} sub={t('البضاعة وصلت من غير أمر شراء (زي الصيدليات): مستند واحد بيدخّل البضاعة المخزن ويحدّث التكلفة ويسجل الفاتورة.')}
       footer={<><span className="text-sm me-auto">{t('الإجمالي')}: <b className="num">{money(total.toFixed(4))}</b></span><Button onClick={onClose}>{t('إلغاء')}</Button><Button variant="success" data-fb="direct:post" loading={busy} disabled={!valid} onClick={post}><PackageCheck className="w-4 h-4" />{t('سجّل الفاتورة واستلم')}</Button></>}>
       <div className="space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -358,7 +359,7 @@ function DirectInvoiceDialog({ onClose, onDone }: { onClose: () => void; onDone:
         })} />
         <Button size="sm" data-fb="direct:add" onClick={() => setLines([...lines, { itemId: '', packId: '', quantity: '', unitCost: '', expiryDate: '' }])}><Plus className="w-3.5 h-3.5" />{t('صنف كمان')}</Button>
       </div>
-    </Drawer>
+    </FullPage>
   );
 }
 export { Wand2, Toolbar };
