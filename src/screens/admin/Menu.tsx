@@ -1,14 +1,16 @@
 // B1 Menu admin: products (sizes, combos, half-and-half, pictures), categories, units, modifier groups (required/optional,
 // defaults, order, sub-choices, ingredients no/less/extra, sold out today), menus & dayparts, and the "sold out today" board.
+// ux-06: a product, the quick add and the step-by-step wizard open as full pages with back (params.openProduct + ptab,
+// params.quickProduct, params.newProduct); the menu page stays mounted underneath so its scroll is kept.
 import { unitLabel } from '../inventory/common';
 import React, { useState } from 'react';
-import { Plus, Pencil, Search, Image as ImageIcon, Save, ArrowUp, ArrowDown, Star, CircleSlash, RotateCcw, Layers, Pizza, Ruler, ScanSearch, Zap } from 'lucide-react';
+import { Plus, Pencil, Search, Image as ImageIcon, Save, ArrowUp, ArrowDown, Star, CircleSlash, RotateCcw, Layers, Pizza, Ruler, ScanSearch, Zap, UtensilsCrossed } from 'lucide-react';
 import { useCommand } from '../../app/hooks';
-import { Banner, Button, Card, Field, Input, Modal, Money, Pill, Section, Select, StateBadge, Switch, Table, Tabs , EmptyState } from '../../ui';
+import { Banner, Button, Card, Field, FillPage, Input, MasterDetail, Modal, Money, PageHeader, Pill, Select, StateBadge, Switch, Table, Tabs , EmptyState } from '../../ui';
 import { Tech } from '../../app/tech';
 import { t, L, tv } from '../../i18n';
 import { LocInputs, PolicyChip, Radio, Swatch, allergenLabel, availabilityLabel, availabilityTone, useItems, usePolicy } from './catalog/common';
-import { ProductCreate, ProductDrawer, type DrawerTab } from './catalog/ProductEditor';
+import { ProductCreate, ProductPage, type DrawerTab } from './catalog/ProductEditor';
 import { NewProductWizard } from './catalog/NewProductWizard';
 import { useDev } from '../../app/hooks';
 import { MenusAdmin } from '../menu/MenusAdmin';
@@ -18,47 +20,52 @@ type Tab = 'products' | 'categories' | 'units' | 'modifiers' | 'menus' | 'soldou
 const OPS = ['Category.Create', 'Category.Configure', 'Unit.Create', 'Unit.Configure', 'Product.Create', 'Product.Configure', 'Product.NameCheck', 'Product.SetModifierGroups', 'Product.SetTaxPolicy', 'Product.SetAvailability', 'ModifierGroup.Create', 'ModifierGroup.Configure', 'ModifierOption.Create', 'ModifierOption.Configure', 'Variant.Upsert', 'Product.SetCombo', 'Menu.Upsert'];
 
 export default function Menu() {
+  const { params, nav } = useDev();
   const [tab, setTab] = useState<Tab>('products');
+  const go = (p: Record<string, any>) => nav('menu', p);
+  const productId: string | undefined = params?.openProduct;
+  const ptab = (params?.ptab === 'direction' ? 'sizes' : params?.ptab ?? 'data') as DrawerTab;
   const sku = usePolicy<any>('SkuGenerationPolicy');
   const names = usePolicy<any>('ProductNameUniquenessPolicy');
   const reasons = usePolicy<Record<string, string>>('AvailabilityReasonPolicy');
   const nap = usePolicy<string>('NewProductAvailabilityPolicy');
-  return (
-    <div className="space-y-4">
-      <Section title={t('المنيو')} badge={<StateBadge ops={OPS} />} sub={t('الأصناف بأحجامها ووجباتها والنص ونص، الإضافات، المنيوهات ومواعيدها، واللي خلص النهارده')} />
+  const page = (
+    <FillPage>
+      <PageHeader className="!mb-0" icon={<UtensilsCrossed />} title={t('المنيو')} badge={<StateBadge ops={OPS} />} />
       <Tech>
-        <div className="flex flex-wrap gap-1.5 mb-3" data-fb="menu:policies">
+        <div className="flex flex-wrap gap-1.5" data-fb="menu:policies">
           <PolicyChip id="SkuGenerationPolicy" value={sku?.mode ?? '…'} />
           <PolicyChip id="ProductNameUniquenessPolicy" value={names?.default ?? '…'} />
           <PolicyChip id="AvailabilityReasonPolicy" value={reasons ? `SOLD_OUT ${reasons.SOLD_OUT} · BLOCKED ${reasons.BLOCKED}` : '…'} />
           <PolicyChip id="NewProductAvailabilityPolicy" value={nap ?? '…'} />
         </div>
       </Tech>
-      <Banner tone="info">{t('تعديلات المنيو والأسعار والضرايب بتسري على الطلبات الجديدة بس؛ السطور اللي اتسجلت في الشيكات بتفضل بسعرها وضريبتها وإضافاتها.')}</Banner>
       <Tabs<Tab> variant="underline" value={tab} onChange={setTab} tabs={[
         { id: 'products', label: t('الأصناف') }, { id: 'categories', label: t('الأقسام') }, { id: 'modifiers', label: t('الإضافات') },
         { id: 'menus', label: t('المنيوهات والمواعيد') }, { id: 'soldout', label: t('خلص النهارده') }, { id: 'units', label: t('الوحدات') },
       ]} />
-      {tab === 'products' && <Products />}
+      {tab === 'products' && <Products onOpen={(id, pt) => go({ openProduct: id, ptab: pt })} onQuick={() => go({ quickProduct: 1 })} onWizard={() => go({ newProduct: 1 })} />}
       {tab === 'categories' && <Categories />}
       {tab === 'units' && <Units />}
       {tab === 'modifiers' && <Modifiers />}
       {tab === 'menus' && <MenusAdmin />}
       {tab === 'soldout' && <SoldOutBoard />}
-    </div>
+    </FillPage>
   );
+  const detail = productId ? <ProductPage key={productId} productId={productId} tab={ptab} onTab={(x) => go({ openProduct: productId, ptab: x })} onClose={() => go({})} />
+    : params?.newProduct ? <NewProductWizard open onClose={() => go({})} />
+    : params?.quickProduct ? <ProductCreate open onClose={() => go({})} onCreated={(id, x) => go({ openProduct: id, ptab: x })} />
+    : null;
+  return <MasterDetail fb="menu" side={false} open={!!detail} list={page} detail={detail} />;
 }
 
 // ───────── products
-function Products() {
+function Products({ onOpen, onQuick, onWizard }: { onOpen: (id: string, tab?: DrawerTab) => void; onQuick: () => void; onWizard: () => void }) {
   const [cat, setCat] = useState('');
   const [active, setActive] = useState<'all' | 'true' | 'false'>('true');
   const [qText, setQ] = useState('');
-  const [creating, setCreating] = useState(false);
-  const { params, nav } = useDev();
-  const [wizard, setWizard] = useState(!!params?.newProduct);
-  const [open, setOpen] = useState<{ id: string; tab?: DrawerTab } | null>(params?.openProduct ? { id: params.openProduct } : null);
-  React.useEffect(() => { if (params?.openProduct) setOpen({ id: params.openProduct }); if (params?.newProduct) setWizard(true); }, [params?.openProduct, params?.newProduct]);
+  const { nav } = useDev();
+  const setOpen = (o: { id: string; tab?: DrawerTab }) => onOpen(o.id, o.tab);
   const cats = useItems<any>('Category.List');
   const units = useItems<any>('Unit.List');
   const list = useItems<any>('Catalog.Search', { query: { categoryId: cat || undefined, active: active === 'all' ? undefined : active, q: qText.trim() || undefined } });
@@ -66,18 +73,18 @@ function Products() {
   const unitCode = (id: string) => { const u = units.items.find((x) => x.id === id); return u ? <>{u.precision ? t('بالوزن') : t('بالقطعة')}<Tech> · {u.code}</Tech></> : '—'; };
   const shown = list.items;
   return (
-    <div className="space-y-3">
+    <div className="flex-1 min-h-[20rem] flex flex-col gap-3">
       <div className="flex flex-wrap gap-2 items-end">
         <Field label={t('بحث')} className="w-64"><div className="relative"><Search className="w-4 h-4 absolute top-3 start-3 text-dim" /><Input data-fb="products:search" style={{ paddingInlineStart: 36 }} value={qText} onChange={(e) => setQ(e.target.value)} placeholder={t('اسم، كود أو باركود')} /></div></Field>
         <Field label={t('القسم')} className="w-52"><Select data-fb="products:category" value={cat} onChange={(e) => setCat(e.target.value)} options={[{ value: '', label: t('كل الأقسام') }, ...cats.items.map((c) => ({ value: c.id, label: L(c.name) }))]} /></Field>
         <Field label={t('الحالة')} className="w-40"><Select data-fb="products:active" value={active} onChange={(e) => setActive(e.target.value as any)} options={[{ value: 'true', label: t('الشغالة') }, { value: 'false', label: t('المؤرشفة') }, { value: 'all', label: t('الكل') }]} /></Field>
         <div className="flex-1" />
-        <Button data-fb="products:quick" variant="ghost" onClick={() => setCreating(true)} title={t('الفورم القديمة: الاسم والسعر بس، والباقي من درج الصنف')}><Zap className="w-4 h-4" />{t('إضافة سريعة')}</Button>
-        <Button data-fb="products:new" variant="primary" onClick={() => setWizard(true)}><Plus className="w-4 h-4" />{t('صنف جديد (خطوة بخطوة)')}</Button>
+        <Button data-fb="products:quick" variant="ghost" onClick={onQuick}><Zap className="w-4 h-4" />{t('إضافة سريعة')}</Button>
+        <Button data-fb="products:new" variant="primary" onClick={onWizard}><Plus className="w-4 h-4" />{t('صنف جديد (خطوة بخطوة)')}</Button>
       </div>
       <div className="text-[11px] text-dim">{t('{n} صنف', { n: shown.length })}</div>
-      <Table maxHeight={680} loading={list.loading && !list.items.length} onRowClick={(i) => setOpen({ id: shown[i].id })}
-        empty={<EmptyState compact title={t('مفيش أصناف بالبحث ده')} text={t('غيّر البحث أو ضيف صنف جديد.')} />}
+      <Table fill loading={list.loading && !list.items.length} onRowClick={(i) => setOpen({ id: shown[i].id })}
+        empty={<EmptyState compact title={t('مفيش أصناف بالبحث ده')} action={<Button variant="primary" onClick={onWizard}><Plus className="w-4 h-4" />{t('صنف جديد')}</Button>} />}
         head={['', t('الصنف'), t('الكود'), t('القسم'), t('الوحدة'), t('الضريبة'), t('الإضافات'), t('في الفرع'), '']} rows={shown.map((p) => [
         p.imageUrl ? <img src={p.imageUrl} alt="" className="w-10 h-10 rounded-lg object-cover" /> : <span className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: (p.colorCode ?? '#64748b') + '33' }}><ImageIcon className="w-4 h-4 text-dim" /></span>,
         <div className="min-w-[180px]">
@@ -106,9 +113,6 @@ function Products() {
           <Button size="sm" variant="ghost" data-fb={`products:open:${p.id}`} onClick={(e) => { e.stopPropagation(); setOpen({ id: p.id }); }}><Pencil className="w-3.5 h-3.5" />{t('فتح')}</Button>
         </div>,
       ])} />
-      <ProductCreate open={creating} onClose={() => setCreating(false)} onCreated={(id, tab) => { setCreating(false); setOpen({ id, tab }); }} />
-      <NewProductWizard open={wizard} onClose={() => setWizard(false)} />
-      <ProductDrawer productId={open?.id ?? null} initialTab={open?.tab ?? 'data'} onClose={() => setOpen(null)} />
     </div>
   );
 }

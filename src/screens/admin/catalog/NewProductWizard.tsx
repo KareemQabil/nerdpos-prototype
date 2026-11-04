@@ -4,10 +4,11 @@
 // It only calls the existing operations, in order (Product.Create → Catalog.SetPrice → Product.SetAvailability →
 // Recipe.Define or InventoryItem.Configure + InventoryItem.SetLevels + GoodsReceipt.Post), so the separate admin
 // screens keep working and every rule (approvals, name check, price rules) still applies.
+// ux-06: a full page with back, the steps on top and the wizard buttons in a sticky footer (params.newProduct).
 import React, { useEffect, useMemo, useState } from 'react';
 import { Check as CheckIcon, ChevronLeft, ChevronRight, CookingPot, Package, CircleSlash, Plus, Trash2, Loader2, XCircle, ShoppingCart, ScanSearch, UtensilsCrossed, Sparkles } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../../app/hooks';
-import { Banner, Button, Drawer, Field, Input, KV, Pill, Select, StateBadge, Stepper, Table } from '../../../ui';
+import { Banner, Button, DetailPane, Field, Input, KV, Pill, Select, StateBadge, Stepper, Table } from '../../../ui';
 import { Tech } from '../../../app/tech';
 import { t, L, tv } from '../../../i18n';
 import { cn, money } from '../../../lib/format';
@@ -148,10 +149,10 @@ export function NewProductWizard({ open, onClose, onCreated }: { open: boolean; 
   );
 
   return (
-    <Drawer width="xl" open={open} onClose={onClose} title={t('صنف جديد — خطوة بخطوة')} icon={<Sparkles className="w-5 h-5" />}
+    <DetailPane fb="product-wizard" onClose={onClose} escape={false} backLabel={t('قائمة الطعام')} title={t('صنف جديد — خطوة بخطوة')} icon={<Sparkles />}
       badge={<StateBadge ops={['Product.Create', 'Catalog.SetPrice', 'Product.SetAvailability', 'Recipe.Define', 'InventoryItem.Configure', 'InventoryItem.SetLevels', 'GoodsReceipt.Post']} />}
-      description={t('كل اللي يحتاجه الصنف عشان يتباع في مكان واحد: الاسم، السعر في كل قناة، الضريبة، بيتخزن إزاي، الحد الأدنى وأول استلام.')} footer={footer}>
-      <div className="space-y-4" data-fb="new-product-wizard">
+      footer={footer}>
+      <div className="space-y-4 max-w-[1100px]" data-fb="new-product-wizard">
         <Stepper steps={steps} current={done ? 5 : step} onStep={(i) => { if (!saving && !done && i < step) setStep(i); }} />
 
         {step === 0 && !done && (
@@ -288,6 +289,6 @@ export function NewProductWizard({ open, onClose, onCreated }: { open: boolean; 
           </div>
         )}
       </div>
-    </Drawer>
+    </DetailPane>
   );
 }
