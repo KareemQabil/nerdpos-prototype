@@ -282,13 +282,15 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
       setPendQty(''); curId.current = null;
       // the current order is kept (held) — say so, with one tap back to it
       if (order && draft && active.length && !order.visitId) { const back = order.id; offerUndo({ text: t('عُلِّق الطلب #{n}', { n: order.number }), label: t('استرجاع'), fb: 'park-back', run: async () => { go({ orderId: back, mode: 'sell' }); return true; } }); }
+      // ux-05: «جديد» starts a new check in the current mode (a delivery starts with the customer)
+      if (mode === 'delivery') { go({ orderId: null }); setStartOpen('new'); return; }
       go({ orderId: null, mode: 'sell' });
     } },
     label: { id: 'label', label: t('تسمية الطلب'), icon: <BadgeCheck />, fb: 'bar:label', disabled: (!!order && !openStatus) || !can('order:updatedetails'), run: async (a) => { if (await ensureOrder()) setLabelAnchor(a ?? document.querySelector<HTMLElement>(`[data-device="${deviceId}"] [data-fb="bar:more"]`)); } },
     held: { id: 'held', label: t('المعلقة'), icon: <PauseCircle />, badge: held.length || undefined, disabled: !held.length, fb: 'bar:held', run: (a) => setHeldAnchor(heldAnchor ? null : a) },
     customer: { id: 'customer', label: t('العميل'), icon: <UserRound />, fb: 'bar:customer', disabled: !can('order:setcustomer') || (!!order && !openStatus), run: async () => { if (await ensureOrder()) setCustOpen(true); } },
     discount: { id: 'discount', label: t('الخصم'), icon: <Tag />, fb: 'bar:discount', disabled: !editable || !active.length || !canAsk('order:applydiscount'), lock: needsApproval('ORDER_DISCOUNT', 'order:applydiscount'), waiting: waitingFor(['Order.ApplyDiscount']), run: () => checkAction.current?.('discount') },
-    orders: { id: 'orders', label: t('الطلبات'), icon: <ClipboardList />, fb: 'bar:orders', run: () => nav('checks') },
+    orders: { id: 'orders', label: t('الشيكات'), icon: <ClipboardList />, fb: 'bar:orders', run: () => nav('checks') },
     delivery: { id: 'delivery', label: t('دليفري'), icon: <Bike />, fb: 'counter-delivery', disabled: !can('delivery:create'), run: () => nav('delivery-new') },
     staffMeal: { id: 'staffMeal', label: t('وجبة موظف'), icon: <Coffee />, fb: 'staff-meal', run: () => setStaffMeal(true) },
     staffMeals: { id: 'staffMeals', label: t('وجبات الموظفين'), icon: <Utensils />, fb: 'staff-meals-list-open', run: () => setMeals(true) },
@@ -348,7 +350,7 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
     viewClosed: () => { if (!allowed.includes('collect')) return; if (mode !== 'collect') switchMode('collect'); setView('closed'); },
   });
 
-  const actionLabels: Partial<Record<KeyAction, string>> = { primary: t('الزر الرئيسي'), shortcuts: t('الاختصارات'), new: t('طلب جديد'), held: t('الطلبات المعلقة'), customer: t('العميل'), discount: t('الخصم'), orders: t('الطلبات'), more: t('المزيد'), mode: t('الوضع التالي'), modeTakeaway: t('وضع تيك أواي'), modeDineIn: t('وضع الصالة'), modeDelivery: t('وضع دليفري'), search: t('البحث'), viewTables: t('تحصيل: الترابيزات'), viewChecks: t('تحصيل: الشيكات'), viewClosed: t('تحصيل: المغلقة اليوم') };
+  const actionLabels: Partial<Record<KeyAction, string>> = { primary: t('الزر الرئيسي'), shortcuts: t('الاختصارات'), new: t('طلب جديد'), held: t('الطلبات المعلقة'), customer: t('العميل'), discount: t('الخصم'), orders: t('الشيكات'), more: t('المزيد'), mode: t('الوضع التالي'), modeTakeaway: t('وضع تيك أواي'), modeDineIn: t('وضع الصالة'), modeDelivery: t('وضع دليفري'), search: t('البحث'), viewTables: t('الصالة: الترابيزات'), viewChecks: t('الصالة: الشيكات'), viewClosed: t('الصالة: المغلقة اليوم') };
 
   const activeDeliveries: any[] = (deliveriesQ.data?.items ?? []).filter((d: any) => d.state !== 'DELIVERED' && d.state !== 'CANCELLED');
   const modeOpts = ([

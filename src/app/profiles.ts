@@ -129,6 +129,13 @@ export function profileFor(roleNames: string[], deviceKind: string | null): Prof
   const has = (...k: string[]) => r.some((x) => k.some((y) => x.includes(y)));
   if (has('owner', 'bootstrap')) return profileById(deviceKind === 'CASH' ? 'cashier' : 'owner');
   if (has('manager')) return profileById(deviceKind === 'CASH' ? 'shiftManager' : deviceKind === 'KDS' ? 'kitchenManager' : 'branchManager');
+  // ux-05: roles named after a profile get it (counter-only, call center, dispatch, purchasing, store)
+  if (has('barista')) return profileById('barista');
+  if (has('bartender')) return profileById('bartender');
+  if (has('call center', 'callcenter')) return profileById('callCenter');
+  if (has('dispatch')) return profileById('dispatcher');
+  if (has('purchas')) return profileById('purchasing');
+  if (has('storekeeper')) return profileById('storekeeper');
   if (has('cashier')) return profileById('cashier');
   if (has('waiter', 'server')) return profileById('waiter');
   if (has('chef', 'kitchen', 'cook')) return profileById('stationChef');

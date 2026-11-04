@@ -6898,4 +6898,8 @@ export const en: Record<string, string> = {
   "بعد كم دقيقة في نفس الحالة يُعد الطلب متأخرًا على اللوحة؟": "After how many minutes in the same state is an order late on the board?",
   "لون الكارت وعلامة «متأخر» وفلتر «متأخر» في اللوحات": "Card colour, the “late” mark and the “late” filter on the boards",
   "اعتماد أمر شراء": "Purchase order approval",
+  "المنتهية اليوم": "Finished today",
+  "الصالة: الترابيزات": "Dine-in: tables",
+  "الصالة: الشيكات": "Dine-in: checks",
+  "الصالة: المغلقة اليوم": "Dine-in: closed today",
 };

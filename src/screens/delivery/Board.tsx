@@ -52,7 +52,7 @@ export function useDeliveryBoardDefs() {
     { id: 'cooking', title: t('قيد التحضير'), tone: 'warning' },
     { id: 'ready', title: t('جاهز للخروج'), tone: 'success' },
     { id: 'rider', title: t('مع الطيار'), tone: 'info' },
-    { id: 'done', title: t('تم التوصيل'), tone: 'neutral', collapsed: true, final: true },
+    { id: 'done', title: t('المنتهية اليوم'), tone: 'neutral', collapsed: true, final: true },
   ];
   const canMove = (d: any, to: string): MoveCheck | null => {
     const from = DL_STAGE(d);

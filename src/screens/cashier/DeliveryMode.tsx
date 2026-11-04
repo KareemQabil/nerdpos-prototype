@@ -170,19 +170,33 @@ export function RiderCashButton({ size = 'md' }: { size?: 'sm' | 'md' }) {
   );
 }
 
+/** Inline, permission-gated actions of one delivery on the cashier screen: open the check, out, delivered. */
+export function DeliveryInlineActions({ d, onOpenCheck }: { d: any; onOpenCheck: (d: any) => void }) {
+  const { can } = useDev();
+  const { run } = useCommand();
+  const [complete, setComplete] = useState(false);
+  const dispatch = () => run('Delivery.Dispatch', { params: { deliveryId: d.id }, body: { expectedVersion: d.version, toState: 'PICKED_UP' } }, { success: t('خرج الطلب مع الطيار'), refId: d.id });
+  const deliver = () => (d.order && sign(d.order.remaining) > 0 ? setComplete(true) : run('Delivery.Complete', { params: { deliveryId: d.id }, body: { expectedVersion: d.version } }, { success: t('تم التسليم للعميل'), refId: d.id }));
+  return (
+    <div className="flex gap-1 flex-wrap" data-no-drag>
+      {d.orderId && <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onOpenCheck(d); }} data-fb={`dq-open:${d.number}`}><ClipboardList className="w-3.5 h-3.5" />{t('الشيك')}</Button>}
+      {d.state === 'ASSIGNED' && can('delivery:dispatch') && <Button size="sm" variant="primary" onClick={(e) => { e.stopPropagation(); dispatch(); }} data-fb={`dq-out:${d.number}`}><Send className="w-3.5 h-3.5 rtl:-scale-x-100" />{t('خروج')}</Button>}
+      {d.state === 'PICKED_UP' && can('delivery:complete') && <Button size="sm" variant="success" onClick={(e) => { e.stopPropagation(); deliver(); }} data-fb={`dq-delivered:${d.number}`}><CheckCircle2 className="w-3.5 h-3.5" />{t('تم التسليم')}</Button>}
+      {complete && <CompleteDialog d={d} onClose={() => setComplete(false)} />}
+    </div>
+  );
+}
+
 /** Active deliveries beside the sale area: the delivery board's cards in one column, grouped by state. */
 export function DeliveryQueue({ list, onOpenCheck, current }: { list: any[]; onOpenCheck: (d: any) => void; current: string | null }) {
   useNow(15000);
   const { can } = useDev();
   const { run } = useCommand();
   const [q, setQ] = useState('');
-  const [complete, setComplete] = useState<any>(null);
   const now = clock.now();
   const needle = q.trim().toLowerCase();
   const shown = list.filter((d) => deliveryStage(d) !== 'done' && (!needle || `${d.number} ${d.orderNumber} ${d.phone ?? ''} ${d.customerName ?? ''}`.toLowerCase().includes(needle)));
   const groups: [string, string][] = [['new', t('جديد')], ['cooking', t('قيد التحضير')], ['ready', t('جاهز للخروج')], ['rider', t('مع الطيار')]];
-  const dispatch = (d: any) => run('Delivery.Dispatch', { params: { deliveryId: d.id }, body: { expectedVersion: d.version, toState: 'PICKED_UP' } }, { success: t('خرج الطلب مع الطيار'), refId: d.id });
-  const deliver = (d: any) => (d.order && sign(d.order.remaining) > 0 ? setComplete(d) : run('Delivery.Complete', { params: { deliveryId: d.id }, body: { expectedVersion: d.version } }, { success: t('تم التسليم للعميل'), refId: d.id }));
   return (
     <div className="h-full min-h-0 flex flex-col gap-2 rounded-2xl border border-[var(--glass-border)] surface-1 p-2" data-fb="delivery-queue">
       <div className="flex items-center gap-2 px-1"><span className="font-bold text-sm flex-1">{t('الطلبات النشطة')} <span className="num text-dim">{shown.length}</span></span></div>
@@ -200,11 +214,7 @@ export function DeliveryQueue({ list, onOpenCheck, current }: { list: any[]; onO
                   return (
                     <div key={d.id} data-fb={`dq:${d.number}`} data-late={a.late || undefined} className={cn('rounded-xl glass border p-2 space-y-1.5', d.orderId === current && 'ring-2 ring-[var(--primary)]', a.late && 'board-late')} style={{ borderColor: 'var(--glass-border)', borderInlineStartWidth: a.heat ? 3 : 1, borderInlineStartColor: a.heat ? (a.late ? 'var(--error)' : 'color-mix(in srgb, var(--warning) 70%, var(--error))') : 'var(--glass-border)' }}>
                       <DeliveryCardBody d={d} compact a={a} />
-                      <div className="flex gap-1 flex-wrap">
-                        {d.orderId && <Button size="sm" variant="ghost" onClick={() => onOpenCheck(d)} data-fb={`dq-open:${d.number}`}><ClipboardList className="w-3.5 h-3.5" />{t('الشيك')}</Button>}
-                        {d.state === 'ASSIGNED' && can('delivery:dispatch') && <Button size="sm" variant="primary" onClick={() => dispatch(d)} data-fb={`dq-out:${d.number}`}><Send className="w-3.5 h-3.5 rtl:-scale-x-100" />{t('خروج')}</Button>}
-                        {d.state === 'PICKED_UP' && can('delivery:complete') && <Button size="sm" variant="success" onClick={() => deliver(d)} data-fb={`dq-delivered:${d.number}`}><CheckCircle2 className="w-3.5 h-3.5" />{t('تم التسليم')}</Button>}
-                      </div>
+                      <DeliveryInlineActions d={d} onOpenCheck={onOpenCheck} />
                     </div>
                   );
                 })}
@@ -215,7 +225,6 @@ export function DeliveryQueue({ list, onOpenCheck, current }: { list: any[]; onO
         {!shown.length && <div className="text-xs text-dim text-center py-6">{t('لا يوجد')}</div>}
       </div>
       <RiderCashButton size="sm" />
-      {complete && <CompleteDialog d={complete} onClose={() => setComplete(null)} />}
     </div>
   );
 }
@@ -233,7 +242,7 @@ export function CashierDeliveryBoard({ list, loading, onNew, onOpenCheck, toolba
         filters={[{ id: 'late', label: t('متأخر'), test: (d: any) => !!d.late }, { id: 'norider', label: t('بلا طيار'), test: (d: any) => !d.driverId && (d.state === 'PENDING' || d.state === 'FAILED') }]}
         sort={(a: any, b: any) => a.promisedAtMs - b.promisedAtMs} canMove={defs.canMove} onMove={defs.onMove}
         cardActions={(d) => deliveryCardActions(d, { can, dispatch: defs.dispatch, openCheck: onOpenCheck })}
-        renderCard={(d: any, c) => <DeliveryCardBody d={d} compact a={c.aging} />}
+        renderCard={(d: any, c) => <div className="space-y-1.5"><DeliveryCardBody d={d} compact a={c.aging} /><DeliveryInlineActions d={d} onOpenCheck={onOpenCheck} /></div>}
         toolbarStart={<>{toolbarStart}{can('delivery:create') && <Button size="lg" variant="primary" onClick={onNew} data-fb="delivery-new-start"><PhoneCall className="w-5 h-5" />{t('طلب دليفري جديد')}</Button>}</>}
         toolbarEnd={<RiderCashButton />} />
       {defs.popups}

@@ -169,14 +169,20 @@ export function Board<T>(props: BoardProps<T>) {
   const autoScroll = useRef<{ raf: number; x: number; y: number } | null>(null);
   const canDrag = group === 'status' && !!onMove;
 
-  const endDrag = useCallback((dropX?: number, dropY?: number) => {
+  // window listeners are stable wrappers over the latest render's handlers (no stale closures across drags)
+  const live = useRef<{ move: (e: PointerEvent) => void; up: (e: PointerEvent) => void; cancel: (e: PointerEvent) => void; activate: () => void }>(null!);
+  const stable = useMemo(() => ({
+    move: (e: PointerEvent) => live.current.move(e), up: (e: PointerEvent) => live.current.up(e), cancel: (e: PointerEvent) => live.current.cancel(e),
+    touch: (e: TouchEvent) => { if (dragRef.current?.active) e.preventDefault(); }, activate: () => live.current.activate(),
+  }), []);
+  function endDrag(dropX?: number, dropY?: number) {
     const d = dragRef.current;
     if (!d) return;
     clearTimeout(d.timer);
-    window.removeEventListener('pointermove', onMoveP);
-    window.removeEventListener('pointerup', onUpP);
-    window.removeEventListener('pointercancel', onCancelP);
-    window.removeEventListener('touchmove', blockTouch);
+    window.removeEventListener('pointermove', stable.move);
+    window.removeEventListener('pointerup', stable.up);
+    window.removeEventListener('pointercancel', stable.cancel);
+    window.removeEventListener('touchmove', stable.touch);
     if (autoScroll.current) { cancelAnimationFrame(autoScroll.current.raf); autoScroll.current = null; }
     dragRef.current = null;
     if (!d.active) return;
@@ -196,8 +202,7 @@ export function Board<T>(props: BoardProps<T>) {
     }
     ghost?.remove();
     void doMove(x, over);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [byKey, doMove]);
+  }
 
   function colAt(x: number, y: number): string | null {
     const el = document.elementFromPoint(x, y) as HTMLElement | null;
@@ -212,7 +217,6 @@ export function Board<T>(props: BoardProps<T>) {
     ghost.style.opacity = '0.4';
     setTimeout(() => ghost.remove(), 240);
   }
-  function blockTouch(e: TouchEvent) { if (dragRef.current?.active) e.preventDefault(); }
   function activate() {
     const d = dragRef.current;
     if (!d || d.active) return;
@@ -258,21 +262,23 @@ export function Board<T>(props: BoardProps<T>) {
   }
   function onUpP(e: PointerEvent) { if (dragRef.current && e.pointerId === dragRef.current.pointerId) endDrag(e.clientX, e.clientY); }
   function onCancelP(e: PointerEvent) { if (dragRef.current && e.pointerId === dragRef.current.pointerId) endDrag(); }
+  live.current = { move: onMoveP, up: onUpP, cancel: onCancelP, activate };
   const onCardPointerDown = (e: React.PointerEvent<HTMLElement>, k: string) => {
     if (!canDrag || e.button !== 0 || dragRef.current) return;
+    if (!e.currentTarget.contains(e.target as Node)) return; // a popup portaled from inside the card
     if ((e.target as HTMLElement).closest('button, a, input, select, textarea, [data-no-drag]')) return;
     const el = e.currentTarget;
     const rect = el.getBoundingClientRect();
     dragRef.current = { key: k, x0: e.clientX, y0: e.clientY, el, pointerId: e.pointerId, type: e.pointerType, timer: null, active: false, ghost: null, dx: e.clientX - rect.left, dy: e.clientY - rect.top, rect };
-    window.addEventListener('pointermove', onMoveP);
-    window.addEventListener('pointerup', onUpP);
-    window.addEventListener('pointercancel', onCancelP);
+    window.addEventListener('pointermove', stable.move);
+    window.addEventListener('pointerup', stable.up);
+    window.addEventListener('pointercancel', stable.cancel);
     if (e.pointerType === 'touch') {
-      window.addEventListener('touchmove', blockTouch, { passive: false });
-      dragRef.current.timer = setTimeout(activate, 280);
+      window.addEventListener('touchmove', stable.touch, { passive: false });
+      dragRef.current.timer = setTimeout(stable.activate, 280);
     }
   };
-  useEffect(() => () => { dragRef.current?.ghost?.remove(); endDrag(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => { dragRef.current?.ghost?.remove(); dragRef.current && (dragRef.current.active = false); endDrag(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── keyboard: arrows move the focus, Enter opens, M / Space opens the move menu
   const focusCard = (k: string) => (rootRef.current?.querySelector(`[data-board-card="${CSS.escape(k)}"]`) as HTMLElement | null)?.focus();
@@ -392,8 +398,8 @@ export function Board<T>(props: BoardProps<T>) {
                                 tabIndex={0} role="button" aria-label={props.cardLabel?.(x)} aria-current={isSel || undefined}
                                 onPointerDown={(e) => onCardPointerDown(e, k)}
                                 onContextMenu={(e) => { if (dragRef.current) e.preventDefault(); }}
-                                onClick={() => { if (!justDragged.current) setSelected(isSel ? null : k); }}
-                                onKeyDown={(e) => onCardKey(e, x)}
+                                onClick={(e) => { if (!justDragged.current && e.currentTarget.contains(e.target as Node)) setSelected(isSel ? null : k); }}
+                                onKeyDown={(e) => { if (e.currentTarget === e.target) onCardKey(e, x); }}
                                 className={cn('group relative rounded-xl glass border text-start select-none outline-none transition-[box-shadow,opacity,transform] duration-150 focus-visible:ring-2 focus-visible:ring-[var(--primary)]',
                                   compact ? 'p-2 text-[13px]' : 'p-2.5', canDrag ? 'cursor-grab active:cursor-grabbing touch-manipulation' : 'cursor-pointer',
                                   isSel && 'ring-2 ring-[var(--primary)]', drag?.key === k && 'opacity-30', busy && 'opacity-70', snap === k && 'board-snap', a.late && 'board-late')}
