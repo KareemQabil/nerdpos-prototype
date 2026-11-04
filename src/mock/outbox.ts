@@ -18,15 +18,7 @@ export function routeLines(db: DB, order: Order, lineIds: string[]) {
   const byStation = new Map<string, string[]>();
   const suppressed: string[] = [];
   const parts = new Map<string, ComboPart>(); // menu area: combo components routed to their own stations (menu-kitchen.ts)
-  const rules = db.routingRules.filter((r) => r.active && r.branchId === order.branchId).sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id));
-  const ruleFor = (productId: string | undefined, categoryId: string | undefined) => rules.find((r) => {
-    const st = db.stations.find((s) => s.id === r.stationId);
-    if (r.destination === 'STATION' && (!st || !st.active)) return false;
-    if (r.match.productId && r.match.productId !== productId) return false;
-    if (r.match.categoryId && r.match.categoryId !== categoryId) return false;
-    if (r.match.channel && r.match.channel !== order.channel) return false;
-    return true;
-  });
+  const ruleFor = routingRuleFor(db, order.branchId, order.channel);
   for (const lid of lineIds) {
     const line = order.lines.find((l) => l.id === lid);
     if (!line) continue;
@@ -209,4 +201,18 @@ let ticker: ReturnType<typeof setInterval> | null = null;
 export function startTicker() {
   if (ticker) return;
   ticker = setInterval(() => runOutbox(), 1000);
+}
+
+/** The routing rule a line of this product / category takes on a branch and channel (first active match by priority;
+ *  a rule to an inactive station is skipped). ux-15: shared with the product page's kitchen tab (Product.Usage). */
+export function routingRuleFor(db: DB, branchId: string, channel: string) {
+  const rules = db.routingRules.filter((r) => r.active && r.branchId === branchId).sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id));
+  return (productId: string | undefined, categoryId: string | undefined) => rules.find((r) => {
+    const st = db.stations.find((s) => s.id === r.stationId);
+    if (r.destination === 'STATION' && (!st || !st.active)) return false;
+    if (r.match.productId && r.match.productId !== productId) return false;
+    if (r.match.categoryId && r.match.categoryId !== categoryId) return false;
+    if (r.match.channel && r.match.channel !== channel) return false;
+    return true;
+  });
 }

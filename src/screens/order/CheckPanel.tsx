@@ -2,7 +2,7 @@
 // note); lines not sent yet stay editable (quick − / + and remove). Totals come from the server preview.
 import React, { useState } from 'react';
 import { ChefHat, Minus, Plus, Trash2, Ban, ArrowRightLeft, Send, Lock, Tag, Gift, XCircle, Printer, Wallet, Split, Merge, PenLine, Armchair, RefreshCw, History, CheckCircle2, Clock, AlertTriangle, Shuffle, Receipt, Users, StickyNote, ChevronDown, ChevronUp, MoreHorizontal } from 'lucide-react';
-import { useDev, useQuery, useCommand } from '../../app/hooks';
+import { useDev, useQuery, useCommand, useReasonMin } from '../../app/hooks';
 import { Button, Pill, Modal, Field, Select, Input, Textarea, Money, StateBadge, Banner, EmptyState, Tabs, Timeline, Skeleton, Kbd, DateTime } from '../../ui';
 import { inTopLayer } from '../../ui/Numpad';
 import { Tech } from '../../app/tech';
@@ -46,6 +46,7 @@ export function CheckPanel({ order, refetch, mode, onCheckSwitch, variant = 'pan
   const { run, busy } = useCommand();
   const pay = useCollect(); // ux-07: the one payment popup (no separate payment page)
   const [dlg, setDlg] = useState<null | { k: string; line?: any }>(null);
+  const [removing, setRemoving] = useState<any | null>(null); // ux-15: a discount / promotion being removed (reason popup)
   const cart = variant === 'cart';
   if (actionRef) actionRef.current = (k) => (k === 'history' ? setShowHist(true) : setDlg({ k }));
   const [showHist, setShowHist] = useState(false);
@@ -158,12 +159,17 @@ export function CheckPanel({ order, refetch, mode, onCheckSwitch, variant = 'pan
             ))}
           </div>
         )}
-        {order.discounts.filter((d: any) => d.active).map((d: any) => (
-          <div key={d.id} className="flex items-center justify-between gap-2 text-xs rounded-xl px-3 py-2 border border-[color-mix(in_srgb,var(--error)_30%,transparent)] bg-[color-mix(in_srgb,var(--error)_8%,transparent)]">
-            <span className="flex items-center gap-1.5 min-w-0"><Tag className="w-3.5 h-3.5 text-[var(--error)] shrink-0" /><b>{d.label ? L(d.label) : t('خصم')} {d.type === 'PERCENTAGE' ? <span className="num">{d.value}%</span> : <Money v={d.value} plain />}</b><span className="text-dim truncate">· <ReasonText kind="DISCOUNT" code={d.reasonCode} />{d.approvalGrantId ? ` · ${t('بموافقة مدير')}` : ''}</span></span>
-            {draft && <button className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--error)] hover:bg-[color-mix(in_srgb,var(--error)_14%,transparent)] shrink-0" title={t('شيل الخصم')} aria-label={t('شيل الخصم')} onClick={() => run('Order.RemoveDiscount', { params: { orderId: order.id, discountId: d.id }, body: {} }, { success: t('الخصم اتشال') })}><XCircle className="w-4 h-4" /></button>}
-          </div>
-        ))}
+        {order.discounts.filter((d: any) => d.active).map((d: any) => {
+          // ux-15: what the server took off for this line (totals.discountLines), not the rule's raw value
+          const amt = order.totals?.discountLines?.find((x: any) => x.discountId === d.id)?.amount;
+          return (
+            <div key={d.id} data-fb={`check-discount:${d.id}`} className="flex items-center justify-between gap-2 text-xs rounded-xl px-3 py-2 border border-[color-mix(in_srgb,var(--error)_30%,transparent)] bg-[color-mix(in_srgb,var(--error)_8%,transparent)]">
+              <span className="flex items-center gap-1.5 min-w-0"><Tag className="w-3.5 h-3.5 text-[var(--error)] shrink-0" /><b className="truncate">{d.label ? L(d.label) : t('خصم')}{d.code ? <span className="num font-normal"> · {d.code}</span> : null}</b>{amt !== undefined ? <b className="shrink-0">−<Money v={amt} plain /></b> : d.type === 'PERCENTAGE' ? <span className="num">{d.value}%</span> : <Money v={d.value} plain />}<span className="text-dim truncate">· <ReasonText kind="DISCOUNT" code={d.reasonCode} />{d.approvalGrantId ? ` · ${t('بموافقة مدير')}` : ''}</span></span>
+              {draft && <button data-fb={`check-discount-remove:${d.id}`} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--error)] hover:bg-[color-mix(in_srgb,var(--error)_14%,transparent)] shrink-0" title={t('إزالة الخصم')} aria-label={t('إزالة الخصم')} onClick={() => setRemoving(d)}><XCircle className="w-4 h-4" /></button>}
+            </div>
+          );
+        })}
+        {removing && <RemoveDiscountDialog order={order} d={removing} onClose={() => setRemoving(null)} />}
         {order.comp && <Banner tone="success" title={t('ضيافة كاملة — الشيك مجاني')}><ReasonText kind="COMP" code={order.comp.reasonCode} /></Banner>}
       </div>
 
@@ -456,24 +462,89 @@ function SeatDialog({ order, line, onClose }: { order: any; line: any; onClose: 
   );
 }
 
+/** ux-15: removing a discount or promotion from the check — the line stays on the check with the reason
+ *  (PromotionPolicy.removeReason REQUIRED by default). */
+function RemoveDiscountDialog({ order, d, onClose }: { order: any; d: any; onClose: () => void }) {
+  const { run, busy } = useCommand();
+  const min = useReasonMin();
+  const rules = useQuery<any>('Settings.Effective', { query: { policyId: 'PromotionPolicy', scopeType: 'TENANT', scopeId: 'biz' } });
+  const required = (rules.data?.value?.removeReason ?? 'REQUIRED') === 'REQUIRED';
+  const [reason, setReason] = useState('');
+  const submit = async () => { if (await run('Order.RemoveDiscount', { params: { orderId: order.id, discountId: d.id }, body: { reason: reason.trim() || undefined, expectedVersion: order.version } }, { success: d.promotionId ? t('تمت إزالة العرض') : t('تمت إزالة الخصم') })) onClose(); };
+  return (
+    <Modal open onClose={onClose} size="sm" title={d.promotionId ? t('إزالة العرض؟') : t('إزالة الخصم؟')} badge={<StateBadge ops={['Order.RemoveDiscount']} />}
+      footer={<><Button variant="ghost" onClick={onClose}>{t('رجوع')}</Button><Button variant="danger" loading={busy} disabled={required && reason.trim().length < min} onClick={submit} data-fb="discount-remove:confirm">{d.promotionId ? t('إزالة العرض') : t('إزالة الخصم')}</Button></>}>
+      <div className="space-y-3" data-fb="discount-remove:popup">
+        <div className="text-sm font-bold">{d.label ? L(d.label) : t('خصم')}</div>
+        <Field label={t('السبب')} required={required} hint={required ? t('{n} أحرف على الأقل', { n: min }) : t('اختياري')}><Textarea value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} data-fb="discount-remove:reason" /></Field>
+      </div>
+    </Modal>
+  );
+}
+
+const REFUSAL: Record<string, string> = {
+  INACTIVE: 'موقوف', NOT_LIVE: 'خارج موعده', CODE_REQUIRED: 'يحتاج رمزًا', ALREADY_ON_CHECK: 'على الشيك', TOTAL: 'بلغ حد الاستخدام', PER_DAY: 'بلغ حد اليوم',
+  CUSTOMER_REQUIRED: 'أضف العميل أولًا', TIER: 'لمستوى ولاء آخر', PER_CUSTOMER: 'استخدمه العميل من قبل', NO_STACKING: 'على الشيك خصم آخر', MANUAL_WITH_PROMOTION: 'لا يُجمع مع خصم المدير',
+  EXCLUSIVE: 'لا يُجمع مع خصم آخر', PER_CHECK: 'بلغ عدد العروض على الشيك', MIN_SUBTOTAL: 'الشيك أقل من الحد الأدنى', NO_QUALIFYING_ITEMS: 'لا أصناف مؤهلة',
+};
+const refusalText = (r: any) => (r ? t(REFUSAL[r.rule] ?? 'لا ينطبق الآن') : '');
+
+/** ux-15: the cashier's discount popup — the promotions this check can get now (server amounts), a promotion code
+ *  (checked against this check, amount shown before applying), and the manager discount (reason, approval rule). */
 function DiscountDialog({ order, onClose }: { order: any; onClose: () => void }) {
   const { run } = useCommand();
   const reasons = useReasons('DISCOUNT');
-  const promos = useQuery<any>('Promotion.Find', { query: {} });
   const thr = useQuery<any>('Settings.Effective', { query: { policyId: 'ApprovalRequirementPolicy', scopeType: 'TENANT', scopeId: 'biz' } });
-  const [type, setType] = useState<'PERCENTAGE' | 'FIXED_AMOUNT' | 'PROMO'>('PERCENTAGE');
+  const options = useQuery<any>('Order.PromotionOptions', { params: { orderId: order.id } });
+  const [type, setType] = useState<'OFFERS' | 'PERCENTAGE' | 'FIXED_AMOUNT' | 'PROMO'>('OFFERS');
   const [value, setValue] = useState('10');
   const [code, setCode] = useState('');
+  const [checked, setChecked] = useState<{ code: string; item: any | null; error: string | null } | null>(null);
   const [rc, setRc] = useState('');
   const [note, setNote] = useState('');
   const rule = thr.data?.value?.ORDER_DISCOUNT;
-  const live = (promos.data?.items ?? []).filter((p: any) => p.kind === 'AUTOMATIC' && p.liveNow);
-  const submit = () => run('Order.ApplyDiscount', { params: { orderId: order.id }, body: { expectedVersion: order.version, discount: type === 'PROMO' ? { promotionCode: code } : { type, value }, reasonCode: type === 'PROMO' ? 'PROMOTION' : rc, reason: note || undefined } }, { success: t('الخصم اتطبق') }).then((r) => { if (r) onClose(); });
+  const offers: any[] = options.data?.items ?? [];
+  const done = (r: any) => { if (r) onClose(); };
+  const applyPromo = (promotionId: string) => run('Order.ApplyDiscount', { params: { orderId: order.id }, body: { expectedVersion: order.version, discount: { promotionId } } }, { success: t('تم تطبيق العرض') }).then(done);
+  const applyCode = () => run('Order.ApplyDiscount', { params: { orderId: order.id }, body: { expectedVersion: order.version, discount: { promotionCode: code.trim() } } }, { success: t('تم تطبيق العرض') }).then(done);
+  const checkCode = async () => {
+    const c = code.trim().toUpperCase();
+    const r = await run<any>('Order.PromotionOptions', { params: { orderId: order.id }, query: { code: c } }, {});
+    const item = r?.items?.find((x: any) => x.kind === 'CODED') ?? null;
+    setChecked({ code: c, item, error: r ? null : t('رمز العرض غير صحيح') });
+  };
+  const submitManual = () => run('Order.ApplyDiscount', { params: { orderId: order.id }, body: { expectedVersion: order.version, discount: { type, value }, reasonCode: rc, reason: note || undefined } }, { success: t('تم تطبيق الخصم') }).then(done);
+  const manual = type === 'PERCENTAGE' || type === 'FIXED_AMOUNT';
+  const footer = manual ? <Button variant="primary" onClick={submitManual} disabled={!rc || !value} data-fb="discount-apply">{t('طبّق الخصم')}</Button>
+    : type === 'PROMO' ? (checked?.item?.applicable && checked.code === code.trim().toUpperCase() ? <Button variant="primary" onClick={applyCode} data-fb="promo-code:apply">{t('تطبيق العرض')}</Button> : <Button variant="primary" onClick={checkCode} disabled={!code.trim()} data-fb="promo-code:check">{t('تحقق من الرمز')}</Button>) : null;
   return (
-    <Modal open onClose={onClose} title={t('خصم على الشيك')} badge={<StateBadge ops={['Order.ApplyDiscount', 'Promotion.ValidateCode']} />} footer={<><Button variant="ghost" onClick={onClose}>{t('رجوع')}</Button><Button variant="primary" onClick={submit} disabled={type === 'PROMO' ? !code : !rc || !value} data-fb="discount-apply">{t('طبّق الخصم')}</Button></>}>
+    <Modal open onClose={onClose} title={t('خصم على الشيك')} badge={<StateBadge ops={['Order.PromotionOptions', 'Order.ApplyDiscount']} />} footer={<><Button variant="ghost" onClick={onClose}>{t('رجوع')}</Button>{footer}</>}>
       <div className="space-y-4">
-        <Tabs value={type} onChange={setType} tabs={[{ id: 'PERCENTAGE', label: t('نسبة %') }, { id: 'FIXED_AMOUNT', label: t('مبلغ') }, { id: 'PROMO', label: t('كود عرض') }]} />
-        {type !== 'PROMO' ? (
+        <Tabs value={type} onChange={(v) => setType(v as any)} tabs={[{ id: 'OFFERS', label: <span data-fb="discount-tab:OFFERS">{t('العروض')}{offers.filter((x) => x.applicable).length ? <span className="num ms-1 opacity-70">{offers.filter((x) => x.applicable).length}</span> : null}</span> }, { id: 'PROMO', label: <span data-fb="discount-tab:PROMO">{t('رمز عرض')}</span> }, { id: 'PERCENTAGE', label: t('نسبة %') }, { id: 'FIXED_AMOUNT', label: t('مبلغ') }]} />
+        {type === 'OFFERS' && (
+          <div className="space-y-2" data-fb="discount-offers">
+            {options.loading && !offers.length ? <Skeleton className="h-16" /> : offers.length === 0 ? <div className="text-sm text-dim py-6 text-center">{t('لا توجد عروض تلقائية الآن')}</div> : offers.filter((x) => x.kind === 'AUTOMATIC').map((x) => (
+              <div key={x.promotionId} data-fb={`offer:${x.promotionId}`} className={cn('flex items-center gap-3 rounded-xl border px-3 py-2', x.applicable ? 'border-[color-mix(in_srgb,var(--success)_40%,transparent)]' : 'border-[var(--glass-border)] opacity-80')}>
+                <Gift className="w-4 h-4 text-[var(--primary)] shrink-0" />
+                <div className="flex-1 min-w-0"><div className="font-bold text-sm truncate">{L(x.name)}</div><div className="text-[11px] text-dim truncate">{L(x.summary)}</div></div>
+                {x.onCheck ? <Pill tone="success">{t('على الشيك')}</Pill> : x.applicable ? <><b className="text-sm text-[var(--error)] shrink-0">−<Money v={x.amount} plain /></b><Button size="sm" variant="primary" onClick={() => applyPromo(x.promotionId)} data-fb={`offer-apply:${x.promotionId}`}>{t('تطبيق')}</Button></> : <Pill tone="neutral">{refusalText(x.refusal)}</Pill>}
+              </div>
+            ))}
+          </div>
+        )}
+        {type === 'PROMO' && (
+          <div className="space-y-3">
+            <Field label={t('الرمز')} hint={t('مثلًا WELCOME50')}><Input value={code} onChange={(e) => { setCode(e.target.value.toUpperCase()); }} className="num" data-fb="promo-code" onKeyDown={(e) => { if (e.key === 'Enter' && code.trim()) checkCode(); }} /></Field>
+            {checked && checked.code === code.trim().toUpperCase() && (checked.item ? (
+              <div className={cn('flex items-center gap-3 rounded-xl border px-3 py-2', checked.item.applicable ? 'border-[color-mix(in_srgb,var(--success)_40%,transparent)]' : 'border-[color-mix(in_srgb,var(--warning)_40%,transparent)]')} data-fb="promo-code:result">
+                <Gift className="w-4 h-4 text-[var(--primary)] shrink-0" />
+                <div className="flex-1 min-w-0"><div className="font-bold text-sm">{L(checked.item.name)}</div><div className="text-[11px] text-dim">{L(checked.item.summary)}</div></div>
+                {checked.item.onCheck ? <Pill tone="success">{t('على الشيك')}</Pill> : checked.item.applicable ? <b className="text-sm text-[var(--error)]">−<Money v={checked.item.amount} plain /></b> : <Pill tone="warning">{refusalText(checked.item.refusal)}</Pill>}
+              </div>
+            ) : <Banner tone="error">{checked.error ?? t('رمز العرض غير صحيح')}</Banner>)}
+          </div>
+        )}
+        {manual && (
           <>
             <Field label={type === 'PERCENTAGE' ? t('النسبة') : t('المبلغ بالجنيه')}>
               <div className="flex gap-1.5 flex-wrap mb-1.5">{(type === 'PERCENTAGE' ? ['5', '10', '15', '20', '50'] : ['10', '25', '50', '100']).map((x) => <button key={x} onClick={() => setValue(x)} className={cn('h-10 px-3.5 rounded-xl border text-sm font-bold num', value === x ? 'bg-[var(--primary)] text-[var(--primary-foreground)] border-transparent' : 'surface-1 border-[var(--glass-border)]')}>{x}{type === 'PERCENTAGE' ? '%' : ''}</button>)}</div>
@@ -483,11 +554,7 @@ function DiscountDialog({ order, onClose }: { order: any; onClose: () => void })
             <Field label={t('ملاحظة (اختياري)')}><Input value={note} onChange={(e) => setNote(e.target.value)} /></Field>
             {rule && <div className="text-xs text-dim">{t('موافقة المدير')}: {ruleSentence('ORDER_DISCOUNT', rule)}.</div>}
           </>
-        ) : (
-          <Field label={t('الكود')} hint={t('مثلًا WELCOME50')}><Input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} className="num" /></Field>
         )}
-        <div className="text-[11px] text-dim leading-relaxed">{t('الخصم بيتوزع على الأصناف والخدمة بالتناسب. خصمين على نفس الشيك مش مسموح.')}</div>
-        {live.length > 0 && <Banner tone="success">{t('عرض شغال دلوقتي')}: {live.map((p: any) => L(p.name)).join(t('، '))} — {t('مش بيتطبق لوحده، اختاره من «كود عرض».')}</Banner>}
       </div>
     </Modal>
   );

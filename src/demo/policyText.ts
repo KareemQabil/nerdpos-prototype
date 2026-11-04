@@ -96,6 +96,9 @@ const PLAIN: Record<string, Plain> = {
   PrintRoutingPolicy: { title: 'الطابعة البديلة', explain: 'ما يحدث للورقة إذا لم تتوفر طابعة الجهاز.', reacts: 'طابور الطباعة.' },
   DeviceHealthPolicy: { title: 'انقطاع الشاشات', explain: 'متى تُعد شاشة العرض غير متصلة.', reacts: 'حالة الشاشات في «الأجهزة».' },
   KeyMapPolicy: { title: 'تغيير مفاتيح الاختصار', explain: 'من يغيّر مفاتيح الاختصار لجهاز.', reacts: 'نافذة مفاتيح الاختصار.' },
+  // ux-15 — promotions and the life of a product
+  PromotionPolicy: { title: 'قواعد العروض على الشيك', explain: 'كيف تجتمع العروض على الشيك، وكيف تُقرَّب مبالغها، ومتى يلزم سبب لإزالتها.', reacts: 'نافذة الخصم والعروض على الكاشير.' },
+  ProductRemovalPolicy: { title: 'حذف الأصناف', explain: 'الصنف الذي بيع لا يُحذف بل يُوقف. هل يُحذف صنف أُضيف بالخطأ ولم يُستخدم؟', reacts: 'صفحة الصنف.' },
   SplitLimitPolicy: { title: 'عدد الشيكات مايزيدش عن عدد الأفراد', explain: 'على الترابيزة، الشيك الجديد أو التقسيم مايخليش عدد الشيكات أكتر من عدد الأفراد القاعدين (3 أفراد = 3 شيكات بالكتير).', reacts: 'زرار «شيك جديد» والتقسيم على الترابيزة.' },
 };
 
@@ -225,6 +228,12 @@ const OPTIONS: Record<string, Record<string, OptText>> = {
   'CustomerDisplayPolicy.idleContent': { ASSIGNED_ONLY: O('المحتوى المخصص للشاشة فقط'), ASSIGNED_AND_PROMOTIONS: O('المحتوى المخصص مع العروض النشطة وأصناف القائمة') },
   'PrintRoutingPolicy.fallback': { NONE: O('تبقى المهمة فاشلة حتى إعادة المحاولة'), BRANCH_BACKUP: O('تذهب إلى الطابعة البديلة للفرع') },
   'KeyMapPolicy.changeBy': { MANAGERS: O('المدير فقط'), ANY_SIGNED_IN: O('المدير ومن يعمل على الجهاز') },
+  // ux-15
+  'PromotionPolicy.stackBase': { REMAINDER: O('على المتبقي بعد العروض السابقة'), ORIGINAL: O('على المبلغ الأصلي') },
+  'PromotionPolicy.manualWithPromotion': { DENY: O('غير مسموح'), ALLOW: O('مسموح') },
+  'PromotionPolicy.rounding': { DOWN: O('للأدنى دائمًا'), CHECK: O('بتقريب الشيك') },
+  'PromotionPolicy.removeReason': { REQUIRED: O('مطلوب'), OPTIONAL: O('اختياري') },
+  'ProductRemovalPolicy.mode': { RETIRE_ONLY: O('الإيقاف فقط'), DELETE_UNSOLD: O('حذف الصنف غير المستخدم') },
   'StaffMealAllowancePolicy.basis': { SALE_PRICE: O('بسعر البيع', 'الوجبة بتتحسب من الحد بسعرها في المنيو.'), COST: O('بالتكلفة', 'الوجبة بتتحسب بتكلفة خاماتها من الوصفة.') },
 };
 // Generic fallbacks for policies added later by other screens.
@@ -280,6 +289,7 @@ const FIELD_LABEL: Record<string, string> = {
   'CustomerPrivacyPolicy.phoneDisplay': 'عرض الرقم', 'CustomerPrivacyPolicy.revealMode': 'صاحب صلاحية عرض الرقم', 'CustomerPrivacyPolicy.riderAccess': 'الطيار يرى رقم طلبه', 'CustomerPrivacyPolicy.partialSearch': 'البحث بجزء من الرقم', // ux-13
   'LoyaltyProgramPolicy.enabled': 'البرنامج مفعّل', 'LoyaltyProgramPolicy.egpPerPoint': 'المبلغ المقابل لنقطة واحدة', 'LoyaltyProgramPolicy.earnBase': 'تُحسب النقاط على', 'LoyaltyProgramPolicy.pointValue': 'قيمة النقطة عند الصرف', 'LoyaltyProgramPolicy.minRedeemPoints': 'أقل عدد نقاط للصرف', 'LoyaltyProgramPolicy.maxRedeemPercent': 'أقصى نسبة من الشيك تُدفع بالنقاط', 'LoyaltyProgramPolicy.expiryMonths': 'تنتهي النقاط بعد',
   'RefundCancelPolicy.cancelBy': 'من يسحب الطلب', 'ReasonTextPolicy.minLength': 'أقل عدد حروف', 'DriverPayPolicy.payoutDrawer': 'من يصرف ومن أي درج',
+  'PromotionPolicy.maxPromotionsPerCheck': 'أقصى عدد عروض على الشيك', 'PromotionPolicy.stackBase': 'العرض التالي يُحسب', 'PromotionPolicy.manualWithPromotion': 'خصم المدير مع العرض', 'PromotionPolicy.rounding': 'تقريب مبلغ العرض', 'PromotionPolicy.removeReason': 'سبب الإزالة', 'ProductRemovalPolicy.mode': 'إزالة الصنف', // ux-15
   'CustomerDisplayPolicy.idleContent': 'المحتوى وهي خاملة', 'CustomerDisplayPolicy.slideSeconds': 'مدة الشريحة', 'CustomerDisplayPolicy.thanksSeconds': 'مدة شاشة الشكر', 'PrintRoutingPolicy.fallback': 'عند تعذّر طابعة الجهاز', 'DeviceHealthPolicy.offlineAfterSeconds': 'غير متصلة بعد', 'KeyMapPolicy.changeBy': 'من يغيّر المفاتيح', // ux-14
   'ApprovalCredentialPolicy.methods': 'الطرق المسموحة', 'StaffMealAllowancePolicy.enabled': 'فيه حد في اليوم', 'StaffMealAllowancePolicy.basis': 'بيتحسب', 'StaffMealAllowancePolicy.dailyLimit': 'الحد لكل موظف في اليوم',
 };

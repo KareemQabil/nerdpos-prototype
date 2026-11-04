@@ -9,6 +9,7 @@ import { policyFields } from '../policies';
 import { reasonText } from '../drawer-count';
 import { menuState } from '../menu-engine';
 import { checkVersion, need } from './util';
+import { routingRuleFor } from '../outbox';
 import type { DB, Product } from '../types';
 
 export interface ProductRemovalRule { mode: 'RETIRE_ONLY' | 'DELETE_UNSOLD' }
@@ -36,7 +37,13 @@ const find = (ctx: Ctx) => { const p = ctx.db.products.find((x) => x.id === ctx.
 export const productLifecycleHandlers: Record<string, Handler> = {
   'Product.Usage': (ctx) => {
     const p = find(ctx);
-    return { ...view(ctx.db, p), removal: productRemovalRule(), canDelete: canDelete(ctx.db, p).ok, deleteBlockers: canDelete(ctx.db, p).blockers };
+    // the kitchen station of each order type on this branch, by the same rule the kitchen tickets use (outbox.ts)
+    const routing = ctx.branchId ? (['DINE_IN', 'TAKEAWAY', 'DELIVERY'] as const).map((channel) => {
+      const r = routingRuleFor(ctx.db, ctx.branchId!, channel)(p.id, p.categoryId);
+      const st = r ? ctx.db.stations.find((s) => s.id === r.stationId) : null;
+      return { channel, ruleId: r?.id ?? null, ruleVersion: r?.version ?? null, source: !r ? 'NONE' : r.match.productId ? 'PRODUCT' : r.match.categoryId ? 'CATEGORY' : 'DEFAULT', destination: r?.destination ?? null, stationId: st?.id ?? null, stationName: st?.name ?? null };
+    }) : [];
+    return { ...view(ctx.db, p), removal: productRemovalRule(), canDelete: canDelete(ctx.db, p).ok, deleteBlockers: canDelete(ctx.db, p).blockers, routing };
   },
   'Product.Retire': (ctx) => {
     const p = find(ctx);

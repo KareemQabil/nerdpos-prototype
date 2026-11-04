@@ -15,6 +15,7 @@ import { ImageInput } from '../../menu/parts';
 import { VariantsEditor } from './VariantsEditor';
 import { ComboEditor } from './ComboEditor';
 import { HalfEditor } from './HalfEditor';
+import { KitchenTab, PricesTab, ProductLifecycle } from './ProductLife';
 
 type Loc = { ar: string; en: string };
 
@@ -156,7 +157,7 @@ export function ProductCreate({ open, onClose, onCreated }: { open: boolean; onC
 }
 
 // ───────── product page (was a drawer)
-export type ProductTab = 'data' | 'sizes' | 'combo' | 'half' | 'modifiers' | 'tax' | 'availability';
+export type ProductTab = 'data' | 'prices' | 'sizes' | 'combo' | 'half' | 'modifiers' | 'kitchen' | 'tax' | 'availability';
 export function ProductPage({ productId, onClose, tab, onTab }: { productId: string; onClose: () => void; tab: ProductTab; onTab: (t: ProductTab) => void }) {
   const q = useQuery<any>('Product.Get', { params: { productId } });
   const setTab = onTab;
@@ -169,14 +170,18 @@ export function ProductPage({ productId, onClose, tab, onTab }: { productId: str
           <Readiness p={p} />
           <Tabs<ProductTab> value={tab} onChange={setTab} tabs={[
             { id: 'data', label: t('البيانات'), fb: 'product-tab:data' },
+            { id: 'prices', label: t('الأسعار'), fb: 'product-tab:prices' },
             { id: 'sizes', label: <span className="inline-flex items-center gap-1">{t('الأحجام')}{p.variants?.length ? <span className="num text-xs opacity-70">{p.variants.filter((v: any) => v.active).length}</span> : null}</span> },
             { id: 'combo', label: <span className="inline-flex items-center gap-1">{t('الوجبة')}{p.combo?.length ? <span className="num text-xs opacity-70">{p.combo.length}</span> : null}</span> },
             { id: 'half', label: t('نص ونص') },
             { id: 'modifiers', label: t('الإضافات') },
+            { id: 'kitchen', label: t('المطبخ'), fb: 'product-tab:kitchen' },
             { id: 'tax', label: t('الضريبة') },
             { id: 'availability', label: t('التوفر والمنيو') },
           ]} />
           {tab === 'data' && <DataTab p={p} />}
+          {tab === 'prices' && <PricesTab p={p} />}
+          {tab === 'kitchen' && <KitchenTab p={p} />}
           {tab === 'sizes' && <VariantsEditor p={p} />}
           {tab === 'combo' && <ComboEditor p={p} />}
           {tab === 'half' && <HalfEditor p={p} />}
@@ -194,12 +199,12 @@ function Readiness({ p }: { p: any }) {
   const { me, auth } = useDev();
   const branchId = me?.branchId ?? auth.branchId;
   const hist = useItems<any>('Product.PriceHistory', { params: { productId: p.id }, query: { branchId, variantId: 'BASE' } });
-  const current = hist.items.filter((r) => r.state === 'CURRENT');
+  const current = hist.items.filter((r) => r.state === 'CURRENT' && !r.salesChannelId); // ux-15: the order types' own lists (a sales channel's list is on «الأسعار»)
   const steps: [boolean, React.ReactNode][] = [
     [!!p.taxPolicyId, <>{t('ضريبة')}: {p.taxPolicyName ? L(p.taxPolicyName) : '—'}</>],
     [current.length > 0, <>{t('سعر في الفرع')}: {current.length ? current.map((r) => <span key={r.id} className="ms-1">{channelLabel(r.channel)} <Money v={r.amount} /></span>) : t('مفيش لسه')}</>],
     [p.availability?.state === 'AVAILABLE', <>{t('في الفرع')}: {availabilityLabel(p.availability?.state)}</>],
-    [p.active, <>{p.active ? t('الصنف شغال') : t('الصنف مؤرشف')}</>],
+    [p.active, <>{p.active ? t('معروض للبيع') : t('موقوف')}</>],
   ];
   return (
     <div className="flex flex-wrap gap-2" data-fb="product:readiness">
@@ -216,7 +221,7 @@ function DataTab({ p }: { p: any }) {
   const { run, busy } = useCommand();
   const cats = useItems<any>('Category.List');
   const units = useItems<any>('Unit.List');
-  const init = () => ({ categoryId: p.categoryId, sku: p.sku, imageUrl: p.imageUrl ?? '', colorCode: p.colorCode ?? '#22d3ee', active: p.active, calories: p.calories != null ? String(p.calories) : '' });
+  const init = () => ({ categoryId: p.categoryId, sku: p.sku, imageUrl: p.imageUrl ?? '', colorCode: p.colorCode ?? '#22d3ee', calories: p.calories != null ? String(p.calories) : '' });
   const [name, setName] = useState<Loc>(p.name);
   const [desc, setDesc] = useState<Loc>(p.description ?? { ar: '', en: '' });
   const [f, setF] = useState(init);
@@ -226,7 +231,7 @@ function DataTab({ p }: { p: any }) {
     setName(p.name); setDesc(p.description ?? { ar: '', en: '' }); setF(init());
     setAllergens(p.allergens ?? []); setTableTax((p.chargeTags ?? []).includes('TABLE_TAX'));
   }, [p.version, p.id]); // eslint-disable-line react-hooks/exhaustive-deps
-  const save = () => run('Product.Configure', { params: { productId: p.id }, body: { name, categoryId: f.categoryId, sku: f.sku, imageUrl: f.imageUrl, colorCode: f.colorCode, active: f.active, description: desc, calories: f.calories, allergens, chargeTags: tableTax ? ['TABLE_TAX'] : [], expectedVersion: p.version } }, { success: t('اتحفظ — بيسري على الطلبات الجديدة بس') });
+  const save = () => run('Product.Configure', { params: { productId: p.id }, body: { name, categoryId: f.categoryId, sku: f.sku, imageUrl: f.imageUrl, colorCode: f.colorCode, description: desc, calories: f.calories, allergens, chargeTags: tableTax ? ['TABLE_TAX'] : [], expectedVersion: p.version } }, { success: t('اتحفظ — بيسري على الطلبات الجديدة بس') });
   const unit = units.items.find((u) => u.id === p.unitId);
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-4">
@@ -235,11 +240,10 @@ function DataTab({ p }: { p: any }) {
         <NameCheckHint name={name} excludeProductId={p.id} />
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Field label={t('القسم')}><Select data-fb="product-edit:category" value={f.categoryId} onChange={(e) => setF({ ...f, categoryId: e.target.value })} options={cats.items.map((c) => ({ value: c.id, label: L(c.name) }))} /></Field>
-          <Field label={t('كود الصنف (SKU)')} hint={t('فريد حتى بين الأصناف المؤرشفة')}><Input data-fb="product-edit:sku" value={f.sku} onChange={(e) => setF({ ...f, sku: e.target.value })} dir="ltr" /></Field>
+          <Field label={t('كود الصنف (SKU)')} hint={t('فريد حتى بين الأصناف الموقوفة')}><Input data-fb="product-edit:sku" value={f.sku} onChange={(e) => setF({ ...f, sku: e.target.value })} dir="ltr" /></Field>
           <Field label={t('الوحدة')} hint={t('ثابتة بعد الإنشاء')}><Input value={unit ? unit.code : p.unitId} disabled dir="ltr" /></Field>
           <Field label={t('السعرات الحرارية')}><Input data-fb="product-edit:calories" inputMode="numeric" value={f.calories} onChange={(e) => setF({ ...f, calories: e.target.value.replace(/[^0-9]/g, '') })} /></Field>
           <Field label={t('اللون')}><div className="flex gap-2"><input type="color" data-fb="product-edit:color" value={f.colorCode} onChange={(e) => setF({ ...f, colorCode: e.target.value })} className="w-10 h-10 rounded-lg bg-transparent border border-[var(--glass-border)]" /><Input value={f.colorCode} onChange={(e) => setF({ ...f, colorCode: e.target.value })} dir="ltr" /></div></Field>
-          <Field label={t('الحالة')} hint={t('الأرشفة بدل المسح')}><Switch checked={f.active} onChange={(v) => setF({ ...f, active: v })} label={f.active ? t('شغال') : t('مؤرشف')} /></Field>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label={t('الوصف (عربي)')} hint={t('بيظهر للكاشير في شاشة الصنف')}><Textarea data-fb="product-edit:desc-ar" value={desc.ar} onChange={(e) => setDesc({ ...desc, ar: e.target.value })} className="min-h-[56px]" /></Field>
@@ -250,6 +254,7 @@ function DataTab({ p }: { p: any }) {
           <AllergenPicker value={allergens} onChange={setAllergens} fb="product-edit" />
           <Check fb="product-edit:table-tax" checked={tableTax} onChange={setTableTax}>{t('عليه ضريبة جدول (شيشة، مكسرات…)')}</Check>
         </div>
+        <ProductLifecycle p={p} />
         <div className="flex justify-end"><Button data-fb="product-edit:save" variant="primary" loading={busy} onClick={save}><Save className="w-4 h-4" />{t('حفظ التعديل')}</Button></div>
       </div>
       <div className="space-y-3">

@@ -57,12 +57,13 @@ export default function Prices() {
 const chName = (c: SalesChannelView | undefined) => (c ? L(c.name) : '');
 const sourceText = (src: string, c?: SalesChannelView) => src === 'FOLLOW' ? t('محسوب من {x}', { x: c?.followsName ? L(c.followsName) : t('قناة تانية') }) : src === 'ORDER_TYPE' ? t('مفيش سعر خاص — بسعر {x}', { x: orderTypeLabel(c?.orderType ?? '') }) : t('سعر خاص بالقناة');
 
-function ProductPrices({ branchId, branchName, sched }: { branchId: string; branchName?: string; sched?: string }) {
-  const products = useItems<any>('Catalog.Search', { query: { active: 'true' } });
+/** One product's prices per channel and size on a branch. ux-15: also the «الأسعار» tab of the product page (fixedProductId). */
+export function ProductPrices({ branchId, branchName, sched, fixedProductId }: { branchId: string; branchName?: string; sched?: string; fixedProductId?: string }) {
+  const products = useItems<any>('Catalog.Search', { query: { active: fixedProductId ? undefined : 'true', limit: fixedProductId ? 500 : undefined } });
   const cats = useItems<any>('Category.List');
   const channels = useSalesChannels();
   const list = useQuery<any>('Catalog.PriceList', { query: { branchId } });
-  const [productId, setProductId] = useState('');
+  const [productId, setProductId] = useState(fixedProductId ?? '');
   const [variantId, setVariantId] = useState('');
   const [channelId, setChannelId] = useState<string>('sch_dine_in');
   useEffect(() => { if (!productId && products.items[0]) setProductId(products.items[0].id); }, [products.items, productId]);
@@ -74,12 +75,12 @@ function ProductPrices({ branchId, branchName, sched }: { branchId: string; bran
   return (
     <>
       <div className="flex flex-wrap gap-3 items-end mb-4">
-        <Field label={t('الصنف')} className="w-72"><Select data-fb="prices:product" value={productId} onChange={(e) => setProductId(e.target.value)} options={products.items.map((p) => ({ value: p.id, label: `${L(p.name)} · ${p.sku}` }))} /></Field>
+        {!fixedProductId && <Field label={t('الصنف')} className="w-72"><Select data-fb="prices:product" value={productId} onChange={(e) => setProductId(e.target.value)} options={products.items.map((p) => ({ value: p.id, label: `${L(p.name)} · ${p.sku}` }))} /></Field>}
         {variants.length > 0 && <Field label={t('الحجم')} className="w-52"><Select data-fb="prices:variant" value={variantId} onChange={(e) => setVariantId(e.target.value)} options={[{ value: '', label: t('سعر الصنف (الأساسي)') }, ...variants.map((v: any) => ({ value: v.id, label: t('سعر خاص: {n}', { n: L(v.name) }) }))]} /></Field>}
         <Field label={t('القناة')}><Tabs<string> value={channel?.id ?? ''} onChange={setChannelId} tabs={channels.items.map((c) => ({ id: c.id, label: <span className="inline-flex items-center gap-1.5" data-fb={`prices:channel:${c.id}`}><ChannelDot color={c.color} />{L(c.name)}</span> }))} /></Field>
       </div>
       {product && channel && <PriceScope product={product} variant={variants.find((v: any) => v.id === variantId) ?? null} branchId={branchId} channel={channel} effective={effective} sched={sched} />}
-      <PriceGrid branchId={branchId} branchName={branchName} cats={cats.items} data={list.data} loading={list.loading} channels={channels.items} onPick={(id, vid, ch) => { setProductId(id); if (ch) setChannelId(ch); setTimeout(() => setVariantId(vid ?? ''), 0); }} selected={productId} />
+      {!fixedProductId && <PriceGrid branchId={branchId} branchName={branchName} cats={cats.items} data={list.data} loading={list.loading} channels={channels.items} onPick={(id, vid, ch) => { setProductId(id); if (ch) setChannelId(ch); setTimeout(() => setVariantId(vid ?? ''), 0); }} selected={productId} />}
     </>
   );
 }
