@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Bike, Car, Clock, MapPin, Phone, ChefHat, CheckCircle2, XCircle, AlertTriangle, Send, UserCheck, Ban, Banknote, CreditCard, Globe, History, Store } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';
-import { Modal, Button, Field, Input, Select, Textarea, Pill, Banner, KV, Money, StateBadge, Spinner, confirmDialog } from '../../ui';
+import { Modal, Button, Field, Input, Select, Textarea, Pill, Banner, KV, Money, StateBadge, Spinner, confirmDialog, Popover } from '../../ui';
 import { Tech } from '../../app/tech';
 import { t, L, tv } from '../../i18n';
 import { cn, money, time, dateTime, qty } from '../../lib/format';
@@ -132,7 +132,7 @@ export function AssignDialog({ d, onClose, dispatch }: { d: any; onClose: () => 
   );
 }
 
-export function CompleteDialog({ d, onClose }: { d: any; onClose: () => void }) {
+export function CompleteDialog({ d, onClose, onSuccess }: { d: any; onClose: () => void; onSuccess?: () => void }) {
   const { run, busy } = useCommand();
   const remaining = d.order?.remaining ?? '0.0000';
   const toCollect = Number(remaining) > 0;
@@ -140,7 +140,7 @@ export function CompleteDialog({ d, onClose }: { d: any; onClose: () => void }) 
   const [ref, setRef] = useState('');
   const ok = async () => {
     const r = await run('Delivery.Complete', { params: { deliveryId: d.id }, body: { expectedVersion: d.version, collectedMethod: toCollect ? method : undefined, reference: method === 'CARD' ? ref : undefined } }, { success: t('الطلب اتسلّم للعميل') });
-    if (r) onClose();
+    if (r) { if (onSuccess) onSuccess(); else onClose(); }
   };
   return (
     <Modal open onClose={onClose} title={t('تأكيد التسليم')} badge={<StateBadge ops={['Delivery.Complete']} />} footer={<><Button variant="ghost" onClick={onClose}>{t('رجوع')}</Button><Button variant="success" loading={busy} disabled={toCollect && method === 'CARD' && !ref.trim()} onClick={ok} data-fb="confirm-delivered"><CheckCircle2 className="w-4 h-4" />{t('اتسلّم')}</Button></>}>
@@ -229,12 +229,23 @@ export function DeliveryActions({ d, size = 'sm', onOpen }: { d: any; size?: 'sm
 
 export function DeliveryDetail({ id, onClose }: { id: string; onClose: () => void }) {
   const q = useQuery<any>('Delivery.Get', { params: { deliveryId: id } });
-  const { nav } = useDev();
   const d = q.data;
   return (
     <Modal open onClose={onClose} wide title={d ? `${t('توصيل')} ${d.number} · ${t('طلب')} #${d.orderNumber}` : t('التوصيل')} badge={<StateBadge ops={['Delivery.Get']} />}>
+      <DeliveryDetailBody id={id} onClose={onClose} />
+    </Modal>
+  );
+}
+
+/** ux-05: the delivery details as page content (beside the board on wide screens, full page on narrow). */
+export function DeliveryDetailBody({ id, onClose, stacked }: { id: string; onClose: () => void; stacked?: boolean }) {
+  const q = useQuery<any>('Delivery.Get', { params: { deliveryId: id } });
+  const { nav } = useDev();
+  const d = q.data;
+  return (
+    <>
       {!d ? <Spinner /> : (
-        <div className="grid md:grid-cols-2 gap-4">
+        <div className={cn('grid gap-4', !stacked && 'md:grid-cols-2')} data-fb="delivery-detail">
           <div className="space-y-3">
             <div className="flex items-center gap-2 flex-wrap"><StatePill s={d.state} />{d.kitchen && d.state === 'PENDING' && <Pill tone={KITCHEN[d.kitchen.state]?.tone}><ChefHat className="w-3 h-3" />{t(KITCHEN[d.kitchen.state]?.ar ?? d.kitchen.state)}</Pill>}<Eta d={d} />{d.sourceLabel && <Pill tone="info"><Globe className="w-3 h-3" />{d.sourceLabel}</Pill>}</div>
             <KV rows={[
@@ -278,8 +289,61 @@ export function DeliveryDetail({ id, onClose }: { id: string; onClose: () => voi
           </div>
         </div>
       )}
-    </Modal>
+    </>
   );
 }
 
 export { MapPin, Store, AlertTriangle };
+
+// ───────── ux-05: pick the رider from the card (popover) or after a drop (centered popup) — Delivery.Assign
+/** The riders on shift with their load and cash; picking one assigns (or changes) the rider of the delivery. */
+export function RiderList({ d, onDone }: { d: any; onDone: (ok: boolean) => void }) {
+  const drivers = useQuery<any>('Driver.List', { query: {} });
+  const { run, busy } = useCommand();
+  const list: any[] = (drivers.data?.items ?? []).filter((x: any) => x.onShift);
+  const max = drivers.data?.rules?.maxActivePerDriver ?? 3;
+  const pick = async (drv: any) => {
+    const r = await run('Delivery.Assign', { params: { deliveryId: d.id }, body: { expectedVersion: d.version, driverId: drv.id } }, { success: t('تم تسليم الطلب إلى {n}', { n: drv.name }), refId: d.id });
+    onDone(!!r);
+  };
+  if (drivers.loading && !drivers.data) return <div className="p-3"><Spinner /></div>;
+  if (!list.length) return <div className="p-3 text-sm text-dim">{t('لا يوجد طيارون في الوردية')}</div>;
+  return (
+    <div className="flex flex-col gap-1" data-fb="rider-list">
+      {list.map((drv) => {
+        const full = drv.activeCount >= max && drv.id !== d.driverId;
+        const same = drv.id === d.driverId;
+        const sameZone = drv.active.some((a: any) => a.zoneId === d.zoneId && a.id !== d.id);
+        return (
+          <button key={drv.id} type="button" disabled={busy || full || same} onClick={() => pick(drv)} data-fb={`rider:${drv.id}`}
+            className="w-full flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-start hover:bg-[var(--surface-2)] focus-visible:bg-[var(--surface-2)] outline-none disabled:opacity-45">
+            <VehicleIcon v={drv.vehicle} className="w-4 h-4 text-[var(--primary)] shrink-0" />
+            <span className="flex-1 min-w-0"><span className="font-bold text-sm block truncate">{drv.name}</span><span className="text-[11px] text-dim">{t(DRIVER_STATUS[drv.status]?.ar)} · <span className="num">{drv.activeCount}/{max}</span>{sameZone ? ` · ${t('نفس المنطقة')}` : ''}{same ? ` · ${t('الطيار الحالي')}` : ''}</span></span>
+            <Money v={drv.cashInHand} tone={drv.overCashLimit ? 'error' : 'dim'} className="text-[11px]" />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Rider chip on a delivery card / row: shows the rider (or «بلا طيار») and opens the picker in a popover. */
+export function RiderButton({ d, size = 'sm' }: { d: any; size?: 'sm' | 'md' }) {
+  const { can } = useDev();
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const may = can('delivery:assign') && ['PENDING', 'FAILED', 'ASSIGNED'].includes(d.state) && d.order?.status !== 'DRAFT';
+  const label = d.driver ? d.driver.name : t('بلا طيار');
+  if (!may) return d.driver ? <span className="text-xs inline-flex items-center gap-1 text-[var(--info)] min-w-0 truncate"><VehicleIcon v={d.driver.vehicle} className="w-3.5 h-3.5 shrink-0" />{d.driver.name}</span> : null;
+  return (
+    <>
+      <button type="button" data-no-drag data-fb={`rider-pick:${d.number}`} onClick={(e) => { e.stopPropagation(); setAnchor(anchor ? null : e.currentTarget); }}
+        className={cn('inline-flex items-center gap-1 rounded-lg border font-bold min-w-0', size === 'sm' ? 'h-7 px-2 text-xs' : 'h-9 px-3 text-sm', d.driver ? 'border-[var(--glass-border)] text-[var(--info)] hover:bg-[var(--surface-2)]' : 'border-dashed border-[color-mix(in_srgb,var(--primary)_55%,transparent)] text-[var(--primary)] hover:bg-[var(--primary-container)]')}>
+        {d.driver ? <VehicleIcon v={d.driver.vehicle} className="w-3.5 h-3.5 shrink-0" /> : <UserCheck className="w-3.5 h-3.5 shrink-0" />}<span className="truncate">{d.driver ? label : t('تعيين طيار')}</span>
+      </button>
+      <Popover anchor={anchor} open={!!anchor} onClose={() => setAnchor(null)} side="auto" width={300} label={t('اختيار الطيار')} fb="rider-popover">
+        <div className="px-2.5 pt-1.5 pb-1 text-[11px] font-bold text-dim">{d.driver ? t('تغيير الطيار') : t('اختيار الطيار')} · <span className="num">{d.number}</span></div>
+        <RiderList d={d} onDone={(ok) => { if (ok) setAnchor(null); }} />
+      </Popover>
+    </>
+  );
+}

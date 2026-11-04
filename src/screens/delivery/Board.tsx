@@ -1,116 +1,194 @@
 // Delivery board (dispatch): columns by status, assign / dispatch / deliver / fail / cancel, late highlighting,
 // and a simple map with the zones, the drivers and the open orders (simulated GPS).
 import React, { useEffect, useRef, useState } from 'react';
-import { Bike, PhoneCall, ChefHat, AlertTriangle, Clock, Map as MapIcon, LayoutGrid, Navigation, Globe, Banknote } from 'lucide-react';
+import { Bike, PhoneCall, ChefHat, Clock, Map as MapIcon, LayoutGrid, Navigation, Globe, Banknote, List as ListIcon, ClipboardList, Send } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';
 import { call } from '../../api/client';
-import { PageHeader, StateBadge, Button, Pill, Empty, EmptyState, SegmentedControl, Money, Card, Switch, useNow } from '../../ui';
-import { t, L } from '../../i18n';
-import { cn, money } from '../../lib/format';
-import { STATE, KITCHEN, PAYMENT_MODE, DRIVER_STATUS, Eta, MiniMap, DeliveryActions, DeliveryDetail, VehicleIcon } from './common';
+import { PageHeader, StateBadge, Button, Pill, EmptyState, SegmentedControl, Money, Card, Switch, useNow, Table, Popup, confirmDialog } from '../../ui';
+import { t } from '../../i18n';
+import { cn, time } from '../../lib/format';
+import { sign } from '../../lib/cash';
+import { clock } from '../../mock/clock';
+import { STATE, KITCHEN, PAYMENT_MODE, DRIVER_STATUS, Eta, MiniMap, DeliveryDetail, DeliveryDetailBody, VehicleIcon, RiderButton, RiderList, CompleteDialog, StatePill } from './common';
 import { addressText } from '../customers/common';
+import { Board, FRESH, type Aging, type ColumnDef, type MoveCheck, type CardAction } from '../../ui/board';
+import { useBoardView } from '../../app/useBoardView';
+import { usePendingMove, AgeChip } from '../boards/common';
 
-const COLS: { id: string; title: string; filter: (d: any) => boolean; tone: string }[] = [
-  { id: 'kitchen', title: 'في المطبخ', filter: (d) => d.state === 'PENDING' && d.kitchen?.state !== 'READY', tone: 'border-cyan-400/50' },
-  { id: 'ready', title: 'جاهز للخروج', filter: (d) => d.state === 'PENDING' && d.kitchen?.state === 'READY', tone: 'border-emerald-400/60' },
-  { id: 'assigned', title: 'مع الطيار', filter: (d) => d.state === 'ASSIGNED', tone: 'border-sky-400/50' },
-  { id: 'road', title: 'في الطريق', filter: (d) => d.state === 'PICKED_UP', tone: 'border-purple-400/60' },
-  { id: 'failed', title: 'محاولة فشلت', filter: (d) => d.state === 'FAILED', tone: 'border-red-400/60' },
-  { id: 'done', title: 'خلص النهارده', filter: (d) => d.state === 'DELIVERED' || d.state === 'CANCELLED', tone: 'border-[var(--glass-border)]' },
-];
+export default function DeliveryBoardScreen() {
+  const { view, setView } = useBoardView('delivery');
+  const [mode, setMode] = useState<'board' | 'list' | 'map'>(view);
+  useEffect(() => { setMode((m) => (m === 'map' ? m : view)); }, [view]);
+  const pick = (v: 'board' | 'list' | 'map') => { setMode(v); if (v !== 'map') setView(v); };
+  return <DeliveryBoard mode={mode} onMode={pick} />;
+}
 
-export default function DeliveryBoard() {
-  useNow(15000);
-  const { nav, can } = useDev();
-  const board = useQuery<any>('Delivery.Board', { query: { scope: 'active' } });
-  const zones = useQuery<any>('DeliveryZone.List', { query: {} });
-  const drivers = useQuery<any>('Driver.List', { query: {} });
-  const inbox = useQuery<any>(can('channel:manage') ? 'ExternalOrder.Find' : null, { query: { state: 'NEW', limit: 1 } });
-  const [view, setView] = useState<'board' | 'map'>('board');
-  const [open, setOpen] = useState<string | null>(null);
-  const list: any[] = board.data?.items ?? [];
-  const s = board.data?.summary;
-  const grace = board.data?.rules?.graceMinutes ?? 10;
-  const newOnline = inbox.data?.counts?.NEW ?? 0;
-  // the four live columns always show; "failed" and "done today" only when they have orders
-  const shownCols = COLS.filter((c) => ['kitchen', 'ready', 'assigned', 'road'].includes(c.id) || list.some(c.filter));
+const DL_STAGE = (d: any): string | null => {
+  if (d.state === 'DELIVERED' || d.state === 'CANCELLED') return 'done';
+  if (d.state === 'ASSIGNED' || d.state === 'PICKED_UP') return 'rider';
+  if (d.state === 'FAILED') return 'ready';
+  if (d.state !== 'PENDING') return null;
+  const k = d.kitchen?.state;
+  return k === 'READY' || k === 'HANDED' ? 'ready' : k === 'COOKING' ? 'cooking' : 'new';
+};
+export const deliveryStage = DL_STAGE;
+export const deliveryAging = (d: any, now: number): Aging => {
+  const st = DL_STAGE(d);
+  if (st === 'done') return { ...FRESH, timer: d.state === 'DELIVERED' ? time(d.deliveredAt) : t('ملغى') };
+  const left = Math.round((d.promisedAtMs - now) / 60000);
+  const heat = d.late ? 3 : left <= 5 || d.readyWaiting ? 2 : left <= 12 ? 1 : 0;
+  return { heat: heat as 0 | 1 | 2 | 3, late: !!d.late, timer: left >= 0 ? t('باقي {n} د', { n: left }) : t('تأخر {n} د', { n: -left }), title: `${t('الوصول المتوقع')} ${time(d.promisedAt)}` };
+};
+const unpaid = (d: any) => !!d.order && sign(d.order.remaining) > 0;
+
+/** The board columns and moves of a delivery (shared by the dispatch board and the cashier's delivery mode). */
+export function useDeliveryBoardDefs() {
+  const { can } = useDev();
+  const { run } = useCommand();
+  const rider = usePendingMove<any>();
+  const complete = usePendingMove<any>();
+  const columns: ColumnDef[] = [
+    { id: 'new', title: t('جديد'), tone: 'primary' },
+    { id: 'cooking', title: t('قيد التحضير'), tone: 'warning' },
+    { id: 'ready', title: t('جاهز للخروج'), tone: 'success' },
+    { id: 'rider', title: t('مع الطيار'), tone: 'info' },
+    { id: 'done', title: t('تم التوصيل'), tone: 'neutral', collapsed: true, final: true },
+  ];
+  const canMove = (d: any, to: string): MoveCheck | null => {
+    const from = DL_STAGE(d);
+    if (from === to) return null;
+    if (from === 'done') return { ok: false, reason: t('التوصيل انتهى — السجل لا يتغير') };
+    if (to === 'new' || to === 'cooking' || (to === 'ready' && from !== 'rider')) return { ok: false, reason: t('حالة التحضير يحدّثها المطبخ') };
+    if (to === 'ready') return { ok: false, reason: t('لا يمكن سحب الطلب من الطيار — غيّر الطيار من الكارت') };
+    if (to === 'rider') {
+      if (!can('delivery:assign')) return { ok: false, reason: t('لا تملك صلاحية تعيين الطيار') };
+      if (d.order?.status === 'DRAFT') return { ok: false, reason: t('لم يُرسل الطلب للمطبخ بعد') };
+      return { ok: true, label: t('اختيار الطيار') };
+    }
+    if (to === 'done') {
+      if (!can('delivery:complete')) return { ok: false, reason: t('لا تملك صلاحية تأكيد التسليم') };
+      if (d.state !== 'PICKED_UP') return { ok: false, reason: from === 'rider' ? t('سجّل خروج الطلب أولًا') : t('الطلب لم يخرج مع طيار بعد') };
+      return { ok: true, label: unpaid(d) ? t('تحصيل وتسليم') : t('تأكيد التسليم') };
+    }
+    return { ok: false };
+  };
+  const onMove = async (d: any, to: string) => {
+    if (to === 'rider') return rider.ask(d);
+    if (to === 'done') {
+      if (unpaid(d)) return complete.ask(d);
+      return !!(await run('Delivery.Complete', { params: { deliveryId: d.id }, body: { expectedVersion: d.version } }, { success: t('تم التسليم للعميل'), refId: d.id }));
+    }
+    return false;
+  };
+  const dispatch = async (d: any) => {
+    if (!(d.kitchen?.state === 'READY' || d.kitchen?.state === 'HANDED') && !(await confirmDialog(t('لم ينتهِ المطبخ من هذا الطلب. إخراجه الآن؟')))) return;
+    await run('Delivery.Dispatch', { params: { deliveryId: d.id }, body: { expectedVersion: d.version, toState: 'PICKED_UP' } }, { success: t('خرج الطلب مع الطيار'), refId: d.id });
+  };
+  const popups = (
+    <>
+      {rider.open && (
+        <Popup open onClose={() => rider.done(false)} size="sm" title={<span>{t('اختيار الطيار')} · <span className="num">{rider.open.number}</span></span>} fb="rider-popup">
+          <RiderList d={rider.open} onDone={(ok) => ok && rider.done(true)} />
+        </Popup>
+      )}
+      {complete.open && <CompleteDialog d={complete.open} onClose={() => complete.done(false)} onSuccess={() => complete.done(true)} />}
+    </>
+  );
+  return { columns, canMove, onMove, dispatch, popups };
+}
+
+export function DeliveryCardBody({ d, compact, a }: { d: any; compact: boolean; a: Aging }) {
+  const PM = PAYMENT_MODE[d.paymentMode];
   return (
-    <div data-screen="DL2" className="h-full flex flex-col gap-3 min-h-0">
-      <PageHeader className="!mb-0" title={t('لوحة الدليفري')} ops={['Delivery.Board', 'Delivery.Assign', 'Delivery.Dispatch', 'Delivery.Complete', 'Delivery.FailAttempt', 'Delivery.Cancel']}
-        description={t('كل طلبات التوصيل من المطبخ لحد باب العميل. الطلب بيتحسب متأخر بعد الوقت المتوقع بـ {g} دقيقة.', { g: grace })}
-        actions={<>
-          {newOnline > 0 && <Button variant="warning" onClick={() => nav('online-orders')} data-fb="go-inbox"><Globe className="w-4 h-4" />{t('طلبات أونلاين جديدة')} ({newOnline})</Button>}
-          {can('delivery:create') && <Button variant="primary" onClick={() => nav('delivery-new')} data-fb="new-delivery"><PhoneCall className="w-4 h-4" />{t('طلب دليفري جديد')}</Button>}
-          <SegmentedControl value={view} onChange={setView} options={[{ id: 'board', label: t('اللوحة'), icon: <LayoutGrid />, fb: 'dl-view:board' }, { id: 'map', label: t('الخريطة'), icon: <MapIcon />, fb: 'dl-view:map' }]} />
-        </>} />
-      {s && (
-        <div className="grid grid-cols-3 xl:grid-cols-6 gap-2 shrink-0">
-          <Stat label={t('في المطبخ / جديد')} v={s.pending} />
-          <Stat label={t('جاهز ومستني طيار')} v={s.readyWaiting} tone={s.readyWaiting ? 'warning' : undefined} hint={t('أكتر من {m} دقيقة', { m: board.data?.rules?.readyWaitMinutes ?? 10 })} />
-          <Stat label={t('مع الطيارين')} v={s.onRoad} />
-          <Stat label={t('متأخر')} v={s.late} tone={s.late ? 'error' : undefined} />
-          <Stat label={t('محاولات فشلت')} v={s.failed} tone={s.failed ? 'error' : undefined} />
-          <Stat label={t('اتسلّم النهارده')} v={s.delivered} tone="success" />
+    <div className="space-y-1.5" data-fb={`delivery:${d.number}`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="font-bold text-sm truncate">{d.customerName || t('عميل')}</div>
+          <div className="text-[11px] text-dim"><span className="num">{d.number}</span> · <span className="num">#{d.orderNumber}</span> · {d.zoneName}</div>
         </div>
-      )}
-      {view === 'board' && !board.loading && !list.length ? (
-        <EmptyState icon={<Bike />} title={t('مفيش طلبات دليفري مفتوحة دلوقتي')} text={t('أول ما تاخد طلب بالتليفون أو يوصل طلب أونلاين هيظهر هنا.')} action={can('delivery:create') && <Button variant="primary" onClick={() => nav('delivery-new')}><PhoneCall className="w-4 h-4" />{t('ابدأ طلب دليفري')}</Button>} />
-      ) : view === 'board' ? (
-        <div className="flex-1 min-h-0 grid gap-3 overflow-x-auto" style={{ gridTemplateColumns: `repeat(${shownCols.length}, minmax(210px, 1fr))` }}>
-          {shownCols.map((c) => {
-            const items = list.filter(c.filter);
-            return (
-              <div key={c.id} className={cn('rounded-2xl border-t-4 surface-1 flex flex-col min-h-0', c.tone)} data-fb={`col:${c.id}`}>
-                <div className="px-3 py-2 font-bold flex items-center justify-between text-sm">{t(c.title)}<Pill tone="neutral">{items.length}</Pill></div>
-                <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                  {items.map((d) => <DeliveryCard key={d.id} d={d} onOpen={() => setOpen(d.id)} />)}
-                  {!items.length && <Empty text={t('مفيش')} />}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <MapView zones={zones.data?.items ?? []} drivers={drivers.data?.items ?? []} deliveries={list} restaurant={zones.data?.restaurant} onOpen={setOpen} />
-      )}
-      {open && <DeliveryDetail id={open} onClose={() => setOpen(null)} />}
+        <AgeChip a={a} />
+      </div>
+      {!compact && <div className="text-xs text-soft line-clamp-1">{addressText(d.address, false)}</div>}
+      <div className="flex items-center gap-1 flex-wrap">
+        {d.state === 'PENDING' && d.kitchen?.state && <Pill size="sm" tone={KITCHEN[d.kitchen.state]?.tone ?? 'neutral'}><ChefHat className="w-3 h-3" />{t(KITCHEN[d.kitchen.state]?.ar ?? '')}</Pill>}
+        {d.state === 'PICKED_UP' && <Pill size="sm" tone="violet">{t('في الطريق')}</Pill>}
+        {d.state === 'CANCELLED' && <Pill size="sm" tone="neutral">{t('ملغى')}</Pill>}
+        {d.readyWaiting && <Pill size="sm" tone="warning"><Clock className="w-3 h-3" />{t('جاهز بلا طيار')}</Pill>}
+        {d.attempts?.length > 0 && d.state === 'FAILED' && <Pill size="sm" tone="error">{t('محاولة فاشلة')} {d.attempts.length}</Pill>}
+        {d.sourceLabel && <Pill size="sm" tone="info">{d.sourceLabel}</Pill>}
+      </div>
+      <div className="flex items-center justify-between gap-2 text-xs">
+        <span className="flex items-center gap-1 text-dim min-w-0 truncate">{PM && <PM.icon className="w-3.5 h-3.5 shrink-0" />}{t(PM?.ar ?? '')}</span>
+        {unpaid(d) ? <span className="font-bold text-[var(--warning-text)] whitespace-nowrap">{t('للتحصيل')} <Money v={d.order.remaining} className="text-xs" /></span> : <span className="text-[var(--success)] font-bold">{t('مدفوع')}</span>}
+      </div>
+      <div className="flex items-center gap-1.5 flex-wrap"><RiderButton d={d} />{d.cod && !d.cod.settled && d.state === 'DELIVERED' && <span className="text-[11px] text-[var(--warning-text)] inline-flex items-center gap-1"><Banknote className="w-3 h-3" />{t('المبلغ مع الطيار')}</span>}</div>
     </div>
   );
 }
 
-function Stat({ label, v, tone, hint }: { label: string; v: number; tone?: 'error' | 'warning' | 'success'; hint?: string }) {
-  const c = tone === 'error' ? 'text-[var(--error)]' : tone === 'warning' ? 'text-[var(--warning)]' : tone === 'success' ? 'text-[var(--success)]' : '';
-  return <div className="glass rounded-xl px-3 py-2" title={hint}><div className="text-[11px] text-soft font-bold truncate">{label}</div><div className={cn('text-2xl font-extrabold num', c)} style={{ textAlign: 'start' }}>{v}</div></div>;
+export function deliveryCardActions(d: any, ctx: { can: (p: string) => boolean; dispatch: (d: any) => void; openCheck?: (d: any) => void }): CardAction[] {
+  const out: CardAction[] = [];
+  if (ctx.openCheck && d.orderId) out.push({ id: 'open-check', label: t('فتح الشيك'), icon: <ClipboardList className="w-4 h-4" />, onSelect: () => ctx.openCheck!(d) });
+  if (d.state === 'ASSIGNED') out.push({ id: 'dispatch', label: t('خروج الطلب'), icon: <Send className="w-4 h-4" />, onSelect: () => ctx.dispatch(d), disabled: !ctx.can('delivery:dispatch'), reason: t('لا تملك صلاحية إخراج الطلب'), tone: 'primary' });
+  return out;
 }
 
-function DeliveryCard({ d, onOpen }: { d: any; onOpen: () => void }) {
-  const PM = PAYMENT_MODE[d.paymentMode];
-  const unpaid = d.order && Number(d.order.remaining) > 0;
+function DeliveryBoard({ mode, onMode }: { mode: 'board' | 'list' | 'map'; onMode: (v: 'board' | 'list' | 'map') => void }) {
+  useNow(15000);
+  const { nav, can, me } = useDev();
+  const board = useQuery<any>('Delivery.Board', { query: { scope: 'active' } });
+  const zones = useQuery<any>('DeliveryZone.List', { query: {} });
+  const drivers = useQuery<any>('Driver.List', { query: {} });
+  const inbox = useQuery<any>(can('channel:manage') ? 'ExternalOrder.Find' : null, { query: { state: 'NEW', limit: 1 } });
+  const [open, setOpen] = useState<string | null>(null);
+  const defs = useDeliveryBoardDefs();
+  const list: any[] = board.data?.items ?? [];
+  const newOnline = inbox.data?.counts?.NEW ?? 0;
+  const now = clock.now();
+  const freeRiders = (drivers.data?.items ?? []).filter((x: any) => x.onShift && x.status === 'AVAILABLE').length;
+  const columns = defs.columns.map((c) => (c.id === 'ready' && drivers.data ? { ...c, wip: freeRiders } : c));
+  const zoneNames = [...new Set(list.map((d) => d.zoneName).filter(Boolean))] as string[];
+  const modeSwitch = <SegmentedControl size="sm" value={mode} onChange={onMode} options={[{ id: 'board', label: t('لوحة'), icon: <LayoutGrid />, fb: 'view:board' }, { id: 'list', label: t('قائمة'), icon: <ListIcon />, fb: 'view:list' }, { id: 'map', label: t('الخريطة'), icon: <MapIcon />, fb: 'dl-view:map' }]} />;
+  const actionsEnd = <>
+    {newOnline > 0 && <Button size="sm" variant="warning" onClick={() => nav('online-orders')} data-fb="go-inbox"><Globe className="w-4 h-4" />{t('طلبات إلكترونية جديدة')} ({newOnline})</Button>}
+    {can('delivery:create') && <Button size="sm" variant="primary" onClick={() => nav('delivery-new')} data-fb="new-delivery"><PhoneCall className="w-4 h-4" />{t('طلب دليفري جديد')}</Button>}
+    {modeSwitch}
+  </>;
+  if (mode === 'board') {
+    return (
+      <div data-screen="DL2" className="h-full flex flex-col gap-3 min-h-0" data-fb="delivery-board">
+        <Board id="delivery" title={t('لوحة الدليفري')} userId={me?.user?.id} items={board.data ? list : null} itemKey={(d: any) => d.id} columns={columns} columnOf={DL_STAGE} aging={(d) => deliveryAging(d, now)} amount={(d: any) => d.amount}
+          search={(d: any) => `${d.number} ${d.orderNumber} ${d.customerName ?? ''} ${d.phone ?? ''} ${d.zoneName ?? ''} ${d.driver?.name ?? ''}`} searchPlaceholder={t('رقم الطلب أو الهاتف أو الاسم')}
+          filters={[
+            { id: 'late', label: t('متأخر'), test: (d: any) => !!d.late },
+            { id: 'norider', label: t('بلا طيار'), test: (d: any) => !d.driverId && (d.state === 'PENDING' || d.state === 'FAILED') },
+            { id: 'collect', label: t('للتحصيل'), test: (d: any) => unpaid(d) },
+            ...zoneNames.map((z) => ({ id: `zone:${z}`, label: z, group: 'zone', test: (d: any) => d.zoneName === z })),
+          ]}
+          timeBuckets={{ columns: [{ id: 't:late', title: t('متأخر'), tone: 'error' }, { id: 't:now', title: t('الآن'), tone: 'warning' }, { id: 't:hour', title: t('خلال ساعة'), tone: 'info' }, { id: 't:later', title: t('لاحقًا'), tone: 'neutral' }], of: (d: any) => { if (d.late) return 't:late'; const left = (d.promisedAtMs - now) / 60000; return left <= 10 ? 't:now' : left <= 60 ? 't:hour' : 't:later'; } }}
+          sort={(a: any, b: any) => a.promisedAtMs - b.promisedAtMs}
+          canMove={defs.canMove} onMove={defs.onMove}
+          cardActions={(d) => deliveryCardActions(d, { can, dispatch: defs.dispatch })}
+          cardLabel={(d: any) => `${d.number} · ${d.customerName ?? ''}`}
+          renderCard={(d: any, c) => <DeliveryCardBody d={d} compact={c.compact} a={c.aging} />}
+          renderDetail={(d: any, close) => <DeliveryDetailBody id={d.id} onClose={close} stacked />}
+          toolbarEnd={actionsEnd} />
+        {defs.popups}
+      </div>
+    );
+  }
   return (
-    <div data-fb={`delivery:${d.number}`} className={cn('rounded-xl glass p-2.5 space-y-1.5 border-2', d.late ? 'border-red-500/70 animate-pulse-glow' : d.readyWaiting ? 'border-amber-400/60' : 'border-transparent')}>
-      <div className="flex items-start justify-between gap-2">
-        <button onClick={onOpen} className="text-start min-w-0">
-          <div className="font-bold text-sm truncate">{d.customerName || t('عميل')}</div>
-          <div className="text-[11px] text-dim"><span className="num">{d.number}</span> · <span className="num">#{d.orderNumber}</span></div>
-        </button>
-        <Eta d={d} />
-      </div>
-      <div className="text-xs text-soft line-clamp-2">{d.zoneName} · {addressText(d.address, false)}</div>
-      <div className="flex items-center gap-1 flex-wrap">
-        {d.state === 'PENDING' && <Pill tone={KITCHEN[d.kitchen?.state]?.tone ?? 'neutral'}><ChefHat className="w-3 h-3" />{t(KITCHEN[d.kitchen?.state]?.ar ?? '')}</Pill>}
-        {d.late && <Pill tone="error"><AlertTriangle className="w-3 h-3" />{t('متأخر')} {d.lateMinutes} {t('د')}</Pill>}
-        {d.readyWaiting && <Pill tone="warning"><Clock className="w-3 h-3" />{t('جاهز ومستني')}</Pill>}
-        {d.sourceLabel && <Pill tone="info">{d.sourceLabel}</Pill>}
-        {d.attempts?.length > 0 && <Pill tone="error">{t('محاولة')} {d.attempts.length}: {L(d.reasonLabels?.at(-1))}</Pill>}
-      </div>
-      <div className="flex items-center justify-between text-xs">
-        <span className="flex items-center gap-1 text-dim">{PM && <PM.icon className="w-3.5 h-3.5" />}{t(PM?.ar ?? '')}</span>
-        <span className="num font-bold">{unpaid ? <span className="text-[var(--warning)]">{t('يتحصّل')} {money(d.order.remaining)}</span> : <span className="text-[var(--success)]">{t('مدفوع')}</span>}</span>
-      </div>
-      {d.driver && <div className="text-xs flex items-center gap-1 text-[var(--info)]"><VehicleIcon v={d.driver.vehicle} className="w-3.5 h-3.5" />{d.driver.name}</div>}
-      {d.cod && !d.cod.settled && d.state === 'DELIVERED' && <div className="text-[11px] text-[var(--warning)] flex items-center gap-1"><Banknote className="w-3 h-3" />{t('الفلوس لسه مع الطيار')}</div>}
-      {d.order?.status === 'DRAFT' && <div className="text-[11px] text-[var(--warning)]">{t('الطلب لسه ما اتبعتش للمطبخ')}</div>}
-      <DeliveryActions d={d} onOpen={onOpen} />
+    <div data-screen="DL2" className="h-full flex flex-col gap-3 min-h-0">
+      <PageHeader className="!mb-0" title={t('لوحة الدليفري')} ops={['Delivery.Board', 'Delivery.Assign', 'Delivery.Dispatch', 'Delivery.Complete', 'Delivery.FailAttempt', 'Delivery.Cancel']} actions={actionsEnd} />
+      {mode === 'list' ? (
+        <Table loading={board.loading && !board.data} onRowClick={(i) => setOpen(list[i].id)} maxHeight="calc(100vh - 230px)"
+          head={[t('الرقم'), t('العميل'), t('المنطقة'), t('الحالة'), t('الطيار'), t('الوصول المتوقع'), t('القيمة')]} align={['start', 'start', 'start', 'start', 'start', 'start', 'end']}
+          rows={list.map((d) => [<span className="num font-bold">{d.number}</span>, <span className="font-bold">{d.customerName}</span>, d.zoneName, <StatePill s={d.state} />, <RiderButton d={d} />, <Eta d={d} />, <Money v={d.amount} />])}
+          empty={<EmptyState compact icon={<Bike />} title={t('لا توجد طلبات دليفري')} action={can('delivery:create') && <Button variant="primary" onClick={() => nav('delivery-new')}><PhoneCall className="w-4 h-4" />{t('طلب دليفري جديد')}</Button>} />} />
+      ) : (
+        <MapView zones={zones.data?.items ?? []} drivers={drivers.data?.items ?? []} deliveries={list} restaurant={zones.data?.restaurant} onOpen={setOpen} />
+      )}
+      {open && <DeliveryDetail id={open} onClose={() => setOpen(null)} />}
     </div>
   );
 }
