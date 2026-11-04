@@ -34,7 +34,7 @@ const R1: StepDef[] = [
     if (!st) st = await api<any>(a, 'KitchenStation.Create', { body: { name: 'PASTRY' } }, log, 'PASTRY');
     if (!store.db.routingRules.some((r) => r.match.productId === 'p_om_ali')) await api(a, 'RoutingRule.Create', { body: { priority: 5, match: { productId: 'p_om_ali' }, stationId: st!.id } }, log, 'Om Ali → PASTRY (priority 5)');
   } },
-  { id: 'J-R1-3', device: 't_cash', user: 'demo-cashier-a', screen: 'shift', run: async (log) => {
+  { id: 'J-R1-3', device: 't_cash', user: 'demo-cashier-a', screen: 'counter' /* ux-10: the shift opens and closes in popups over the sale screen */, run: async (log) => {
     const c = await as('t_cash', 'demo-cashier-a', log);
     if (!openSession('t_cash')) await api(c, 'Session.Open', { body: { terminalId: 't_cash', openingFloat: '500.00' } }, log, 'float 500.00');
     else log({ ok: null, text: 'shift already open', plain: t('الوردية كانت مفتوحة قبل كده') });
@@ -128,7 +128,7 @@ const R1: StepDef[] = [
     const c2 = checksOf(lastVisit('7')!.id)[1];
     await api(c, 'Order.Complete', { params: { orderId: c2.id }, body: { expectedVersion: order(c2.id).version } }, log, 'complete check 2');
   } },
-  { id: 'J-R1-17', device: 't_cash', user: 'demo-cashier-a', screen: 'shift', run: async (log) => {
+  { id: 'J-R1-17', device: 't_cash', user: 'demo-cashier-a', screen: 'counter' /* ux-10: the shift opens and closes in popups over the sale screen */, run: async (log) => {
     const c = await as('t_cash', 'demo-cashier-a', log);
     const s = openSession('t_cash');
     if (!s) return log({ ok: null, text: 'no open shift', plain: t('مفيش وردية مفتوحة') });
@@ -139,7 +139,7 @@ const R1: StepDef[] = [
     const r = await api<any>(c, 'Session.Close', { params: { sessionId: s.id }, body: { expectedVersion: store.db.sessions.find((x2) => x2.id === s.id)!.version, countedCash: (500 + cash).toFixed(2) } }, log, `count ${(500 + cash).toFixed(2)}`);
     log({ ok: true, text: `variance ${r.variance} · outstanding checks ${r.z.outstandingChecks.length} (check 1 does not block)`, plain: t('الشيك الأول لسه مفتوح، ومش مانع قفل الوردية') });
   } },
-  { id: 'J-R1-18', device: 't_cash', user: 'demo-cashier-b', screen: 'shift', run: async (log) => {
+  { id: 'J-R1-18', device: 't_cash', user: 'demo-cashier-b', screen: 'counter' /* ux-10: the shift opens and closes in popups over the sale screen */, run: async (log) => {
     const prev = devices.get('t_cash');
     if (prev.token) { try { await api(devices.auth('t_cash'), 'Auth.Logout', { body: {} }, log, 'cashier A logout'); } catch { /* ignore */ } devices.logout('t_cash'); }
     const c = await as('t_cash', 'demo-cashier-b', log);

@@ -6934,4 +6934,18 @@ export const en: Record<string, string> = {
   "أُلغي طلب المرتجع": "Refund request cancelled",
   "إلغاء طلب المرتجع": "Cancel refund request",
   "تأكيد الإلغاء": "Confirm cancellation",
+  // ux-10: shift and drawer inside the sale screen
+  "لا توجد ورديات": "No shifts",
+  "إدخال نقدية": "Cash in",
+  "صرف نقدية": "Cash out",
+  "عدّ الدرج وإغلاق الوردية": "Count the drawer and close the shift",
+  "لا توجد أسباب": "No reasons",
+  "فُتحت الوردية": "Shift opened",
+  "الرصيد الافتتاحي": "Opening float",
+  "فتح الوردية": "Open the shift",
+  "منذ": "Since",
+  "المبلغ الإجمالي": "Total amount",
+  "العد مؤكد — بانتظار موافقة المدير": "Count confirmed — waiting for the manager's approval",
+  "طلب الموافقة": "Request approval",
+  "تأكيد العد": "Confirm the count",
 };

@@ -34,6 +34,8 @@ import { SoldOutPopup } from '../menu/SoldOutBoard';
 import { SalesChannelPicker } from '../channels/common';
 import { CustomerPicker } from '../customers/common';
 import { customerDisplay } from '../../app/customerDisplay';
+import { drawerBus } from '../../app/drawerBus';
+import { useDrawerOn } from './DrawerPopups';
 
 type Mode = 'sell' | 'collect' | 'delivery';
 const MODE_OF: Record<SaleMode, Mode> = { takeaway: 'sell', dinein: 'collect', delivery: 'delivery' };
@@ -70,6 +72,7 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
   const profile = useProfile(); // ux-09: role or the user's override
   const keys = useKeymap(deviceId, 'sale', profile.keys);
   const showKeys = profile.input !== 'touch';
+  const drawerOn = useDrawerOn(); // ux-10: the drawer's popups (DrawerHost on the sale screen)
   const orderId: string | null = params.orderId ?? null;
   const o = useQuery<any>(orderId ? 'Order.Get' : null, { params: { orderId } });
   const order = o.data && o.data.id === orderId ? o.data : null;
@@ -320,7 +323,8 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
     split: { id: 'split', label: t('تقسيم'), icon: <Split />, disabled: !editable || !order?.visitId, run: () => checkAction.current?.('split') },
     merge: { id: 'merge', label: t('دمج'), icon: <Merge />, disabled: !editable || !order?.visitId, run: () => checkAction.current?.('merge') },
     soldOut: { id: 'soldOut', label: t('خلص النهارده'), icon: <PackageX />, run: () => setSoldOutOpen(true) },
-    drawer: { id: 'drawer', label: t('الوردية والدرج'), icon: <Wallet />, fb: 'bar:drawer', run: () => nav('shift') },
+    // ux-10: the shift and the drawer are popups over this screen (never the shift page)
+    drawer: { id: 'drawer', label: t('الوردية والدرج'), icon: <Wallet />, fb: 'bar:drawer', disabled: !drawerOn, run: () => drawerBus.request(deviceId, 'hub') },
     shortcuts: { id: 'shortcuts', label: t('الاختصارات'), icon: <Keyboard />, fb: 'bar:shortcuts', run: () => setKeysOpen(true) },
   };
   const withKey = (a: BarAction): BarAction => ({ ...a, hotkey: keys[a.id as KeyAction] });
@@ -365,7 +369,8 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
     viewClosed: () => { if (!allowed.includes('collect')) return; if (mode !== 'collect') switchMode('collect'); setView('closed'); },
   }, 'sale', profile.keys);
 
-  const actionLabels: Partial<Record<KeyAction, string>> = { primary: t('الزر الرئيسي'), shortcuts: t('الاختصارات'), new: t('شيك جديد'), held: t('الطلبات المعلقة'), customer: t('العميل'), discount: t('الخصم'), orders: t('الشيكات'), more: t('المزيد'), mode: t('الوضع التالي'), modeTakeaway: t('وضع تيك أواي'), modeDineIn: t('وضع الصالة'), modeDelivery: t('وضع دليفري'), search: t('البحث'), viewTables: t('الصالة: الترابيزات'), viewChecks: t('الصالة: الشيكات'), viewClosed: t('الصالة: المغلقة اليوم') };
+  const actionLabels: Partial<Record<KeyAction, string>> = { primary: t('الزر الرئيسي'), shortcuts: t('الاختصارات'), new: t('شيك جديد'), held: t('الطلبات المعلقة'), customer: t('العميل'), discount: t('الخصم'), orders: t('الشيكات'), more: t('المزيد'), mode: t('الوضع التالي'), modeTakeaway: t('وضع تيك أواي'), modeDineIn: t('وضع الصالة'), modeDelivery: t('وضع دليفري'), search: t('البحث'), viewTables: t('الصالة: الترابيزات'), viewChecks: t('الصالة: الشيكات'), viewClosed: t('الصالة: المغلقة اليوم'),
+    ...(drawerOn ? { drawer: t('الوردية والدرج'), cashIn: t('إدخال نقدية'), cashOut: t('صرف نقدية'), noSale: t('فتح الدرج من غير بيع'), xReport: t('تقرير X'), closeShift: t('عدّ الدرج وإغلاق الوردية') } : {}) };
 
   const activeDeliveries: any[] = (deliveriesQ.data?.items ?? []).filter((d: any) => d.state !== 'DELIVERED' && d.state !== 'CANCELLED');
   const modeOpts = ([
@@ -498,9 +503,6 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
 
 export function NoDrawer() {
   return <EmptyState icon={<ShoppingBag />} title={t('هذا الجهاز بلا درج نقدية')} />;
-}
-export function NoShift({ onOpen }: { onOpen: () => void }) {
-  return <EmptyState icon={<Wallet />} title={t('لا توجد وردية مفتوحة')} action={<Button variant="primary" size="xl" onClick={onOpen} data-fb="counter-open-shift">{t('فتح وردية')}</Button>} />;
 }
 
 /** Name the current order quickly (e.g. «أحمد – سيارة بيضاء»): one field, Enter saves, Esc closes. */

@@ -23,6 +23,8 @@ import { ControlApprovalDialog } from '../screens/control/ApprovalDialog'; // r3
 import { ruleSentence, contextFieldLabel, contextValueText } from '../demo/policyText';
 import { Sidebar, visibleScreens, markPane, startScreenFor } from './DeviceNav';
 import { useProfile } from './useProfile';
+import { profileShows } from './profiles';
+import { drawerBus } from './drawerBus';
 export { visibleScreens } from './DeviceNav';
 
 const KIND_ICON: Record<string, React.ComponentType<{ className?: string }>> = { CASH: ShoppingCart, FLOOR: Armchair, KDS: ChefHat, ADMIN: Briefcase, BO: Building2 };
@@ -120,11 +122,13 @@ function Chip({ icon, children, tone = 'neutral', title, onClick, className, fb 
   return <Comp onClick={onClick} title={title} data-fb={fb} className={cn('h-8 px-2.5 rounded-full border text-xs font-bold inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 [&_svg]:w-3.5 [&_svg]:h-3.5 [&_svg]:shrink-0', c, onClick && 'hover:brightness-110 transition', className)}>{icon}{children}</Comp>;
 }
 function Header() {
-  const { me, terminal, auth, id, nav } = useDev();
+  const { me, terminal, auth, id, nav, screen, can } = useDev();
   useNow(15000);
   const s = useSyncExternalStore(sim.subscribe, sim.get);
   const offline = (s.offlineDevices ?? []).includes(id);
-  const session = useQuery<any>(terminal?.drawer ? 'Session.Current' : null, { query: { terminalId: terminal?.id } });
+  const sessionQ = useQuery<any>(terminal?.drawer ? 'Session.Current' : null, { query: { terminalId: terminal?.id } });
+  // ux-10: after a close the re-read is refused (SESSION_NOT_FOUND) and useQuery keeps the last data — that is «no shift»
+  const session = sessionQ.error?.code === 'SESSION_NOT_FOUND' ? { ...sessionQ, data: null } : sessionQ;
   const branch = store.db.branches.find((b) => b.id === (me?.branchId ?? auth.branchId));
   const bd = businessDate(clock.now(), branch?.timezone, branch?.businessDayCutoff);
   const lang = useLang();
@@ -134,6 +138,10 @@ function Header() {
   const roleText = personRole(me?.user?.username, dn) || me?.user?.roleAssignments?.map((r: any) => roleLabel(r.roleName)).join(t('، '));
   const profile = useProfile();
   const profileText = L(profile.role);
+  // ux-10: the shift chip opens the drawer's popups over the sale screen (the cashier never leaves it); a person who
+  // does not work the sale screen here gets the shift history page instead
+  const saleDrawer = !!terminal?.drawer && !profile.hidden.includes('drawer') && profileShows(profile, 'counter') && can('order:create');
+  const onShift = saleDrawer ? () => { if (screen !== 'counter') nav('counter'); drawerBus.request(id, session.data ? 'hub' : 'open'); } : can('session:read') ? () => nav('shift') : undefined;
   const opener = session.data ? (() => { const u = store.db.users.find((x) => x.id === session.data.userId); return personName(u?.username, u?.displayName); })() : null;
   return (
     <header className="@container/hdr h-14 shrink-0 flex items-center gap-3 px-4 border-b line device-header">
@@ -147,8 +155,8 @@ function Header() {
       <div className="flex items-center gap-1.5 min-w-0 shrink overflow-x-auto scrollbar-hide">
         {offline && <Chip tone="error" icon={<WifiOff />} fb="hdr-offline" title={t('الجهاز ده مفصول عن النت (محاكاة). الحركات بتتحفظ على الجهاز وتتبعت لما النت يرجع.')} onClick={() => sim.setOffline(id, false)}>{t('مفيش نت')}</Chip>}
         {terminal?.drawer && (session.data
-          ? <Chip tone="success" icon={<Wallet />} title={t('الوردية المفتوحة على الجهاز ده')} onClick={() => nav('shift')} fb="hdr-shift"><span className="@max-[34rem]/hdr:hidden">{t('الوردية مفتوحة')} · </span>{opener}</Chip>
-          : <Chip tone="warning" icon={<Wallet />} title={t('اضغط عشان تفتح وردية')} onClick={() => nav('shift')} fb="hdr-shift">{t('مفيش وردية — افتح وردية')}</Chip>)}
+          ? <Chip tone="success" icon={<Wallet />} title={t('الوردية المفتوحة على الجهاز ده')} onClick={onShift} fb="hdr-shift"><span className="@max-[34rem]/hdr:hidden">{t('الوردية مفتوحة')} · </span>{opener}</Chip>
+          : <Chip tone="warning" icon={<Wallet />} title={t('اضغط عشان تفتح وردية')} onClick={onShift} fb="hdr-shift">{t('مفيش وردية — افتح وردية')}</Chip>)}
         {terminal && !terminal.drawer && <Chip className="@max-[44rem]/hdr:hidden" title={t('الجهاز ده مالوش درج فلوس — التحصيل بيتم على جهاز الكاشير')}>{t('من غير درج')}</Chip>}
         <Chip tone="primary" icon={<CalendarDays />} title={t('اليوم التجاري بيبدأ الساعة 4 الفجر بتوقيت القاهرة — البيع بعد نص الليل بيتحسب على اليوم اللي قبله')}><span className="@max-[38rem]/hdr:hidden">{t('اليوم التجاري')}</span> <span>{dayName(bd)}</span><Tech><span className="num ms-1">{bd}</span></Tech></Chip>
         <Chip icon={<Clock3 />} className="num @max-[30rem]/hdr:hidden" title={t('وقت السيرفر — مش قابل للتعديل')}>{localTime(clock.now(), branch?.timezone)}</Chip>
