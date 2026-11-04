@@ -5,7 +5,7 @@ import { ShieldCheck, ShieldAlert, Clock, Info, CheckCircle2, AlertTriangle, Boo
 import { Pill, Card, Button, Money, DateTime } from '../../ui';
 import { t, L, getLang } from '../../i18n';
 import { cn, currency } from '../../lib/format';
-import { rangeText } from '../../reports/format';
+import { rangeText, dayText as dayWords } from '../../reports/format';
 import { Tech } from '../../app/tech';
 
 export type Loc = { ar: string; en: string };
@@ -63,8 +63,8 @@ export function ReportHeader({ h, onShowRecon }: { h: any; onShowRecon?: () => v
   return (
     <Card padding="sm" className="space-y-2" data-fb="report-header">
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <Pill tone="primary" data-fb="report:business-day"><Clock className="w-3.5 h-3.5 inline me-1" />{h.period.to !== h.period.from ? t('الفترة') : t('اليوم التجاري')}: <span className="ms-1">{rangeText(h.period.from, h.period.to, getLang())}</span></Pill>
-        {h.venue?.branches?.length > 0 && <Pill tone="neutral" data-fb="report:scope">{h.venue.branches.map((b: any) => b.name).join('، ')}</Pill>}
+        <span className="inline-flex" data-fb="report:business-day" data-from={h.period.from} data-to={h.period.to}><Pill tone="primary"><Clock className="w-3.5 h-3.5 inline me-1" />{h.period.to !== h.period.from ? t('الفترة') : t('اليوم التجاري')}: <span className="ms-1">{rangeText(h.period.from, h.period.to, getLang())}</span></Pill></span>
+        {h.venue?.branches?.length > 0 && <span className="inline-flex" data-fb="report:scope"><Pill tone="neutral">{h.venue.branches.map((b: any) => b.name).join('، ')}</Pill></span>}
         <Pill tone="neutral">{t('يبدأ اليوم {c}', { c: h.cutoff })}<Tech><span className="num ms-1">Africa/Cairo</span></Tech></Pill>
         <Pill tone="neutral">{t('لحد')} <DateTime v={h.asOf} className="ms-1" /></Pill>
         {h.provisional ? <Pill tone="warning" dot title={h.provisionalReasons.map((x: Loc) => L(x)).join(' ')}>{t('مبدئي')}</Pill> : <Pill tone="success" dot>{t('نهائي — الأيام مقفولة')}</Pill>}
@@ -72,9 +72,8 @@ export function ReportHeader({ h, onShowRecon }: { h: any; onShowRecon?: () => v
         <span className="flex-1" />
         <Button size="sm" variant="ghost" onClick={() => setDefs(!defs)} data-fb="report:definitions"><BookOpen className="w-4 h-4" />{t('التعريفات والنسخ')} <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', defs && 'rotate-180')} /></Button>
       </div>
-      {h.days.length <= 7 && h.days.length > 1 && <div className="flex flex-wrap gap-1 text-[11px]">{h.days.map((d: any) => <span key={d.date} className={cn('px-2 py-0.5 rounded-md surface-1', d.status === 'OPEN' && 'text-[var(--warning-text)]')}><span className="num">{d.date.slice(5)}</span> {dayText(d.status)}</span>)}</div>}
-      {h.provisional && <div className="text-xs text-[var(--warning-text)] flex items-start gap-1"><AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />{h.provisionalReasons.map((x: Loc) => L(x)).join(' ')}</div>}
-      {h.preLaunch && <div className="text-xs text-dim flex items-start gap-1"><Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />{t('قبل {d}: إجماليات يومية مستوردة فقط.', { d: h.launchDate })}</div>}
+      {h.days.length <= 7 && h.days.length > 1 && <div className="flex flex-wrap gap-1 text-[11px]">{h.days.map((d: any) => <span key={d.date} className={cn('px-2 py-0.5 rounded-md surface-1', d.status === 'OPEN' && 'text-[var(--warning-text)]')}>{dayWords(d.date, getLang())} · {dayText(d.status)}</span>)}</div>}
+      {h.preLaunch && <div className="text-xs text-dim flex items-start gap-1"><Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />{t('قبل {d}: إجماليات يومية مستوردة فقط.', { d: dayWords(h.launchDate, getLang()) })}</div>}
       {defs && (
         <div className="grid @3xl/main:grid-cols-2 gap-2 pt-1" data-fb="report:definitions-list">
           {h.metrics.map((m: any) => (

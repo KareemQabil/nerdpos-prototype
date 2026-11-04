@@ -49,7 +49,7 @@ function QTable({ run, b }: { run: any; b: any }) {
       footer={(c, j) => j === 0 ? <span className="font-bold text-soft">{t('الإجمالي')} <span className="text-[10px] font-normal text-dim">({t('محسوب من جديد')})</span></span> : c.id.startsWith('m:') ? <Val v={r.totals[c.id.slice(2)]} unit={unitOf(run, c.id.slice(2))} spec={spec(c.id.slice(2))} /> : null} />
   );
 }
-const DIM_AR: Record<string, string> = { business_date: 'اليوم', business_week: 'الأسبوع', daypart: 'الفترة', hour: 'الساعة', branch: 'الفرع', channel: 'القناة', staff: 'الموظف', product: 'الصنف', category: 'القسم', payment_method: 'طريقة الدفع', drawer: 'الوردية', void_reason: 'السبب', approval_actor: 'اللي وافق', stage: 'المرحلة', disposition: 'المصير', station: 'المحطة', inventory_item: 'الخامة', supplier: 'المورد', fiscal_status: 'حالة الإيصال', order: 'الأوردر', check: 'الشيك', table: 'الترابيزة' };
+const DIM_AR: Record<string, string> = { business_date: 'اليوم', business_week: 'الأسبوع', daypart: 'الفترة', hour: 'الساعة', branch: 'الفرع', channel: 'القناة', staff: 'الموظف', product: 'الصنف', category: 'القسم', payment_method: 'طريقة الدفع', drawer: 'الوردية', void_reason: 'السبب', approval_actor: 'الموافق', stage: 'المرحلة', disposition: 'المصير', station: 'المحطة', inventory_item: 'الخامة', supplier: 'المورد', fiscal_status: 'حالة الإيصال', order: 'الأوردر', check: 'الشيك', table: 'الترابيزة', driver: 'الطيار', zone: 'منطقة التوصيل' };
 
 function Bars({ run, b }: { run: any; b: any }) {
   const r = b.result; const m = b.metrics[0]; const d = r.dimensions[0];

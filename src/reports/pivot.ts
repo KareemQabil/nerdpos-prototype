@@ -93,10 +93,10 @@ export function resolvePeriod(preset: PeriodPreset, today: string, custom?: { fr
   }
 }
 export function comparePeriod(mode: CompareMode, from: string, to: string): { from: string; to: string; label: Loc } {
-  if (mode === 'last_week') return { from: addDays(from, -7), to: addDays(to, -7), label: L('نفس الأيام الأسبوع اللي فات', 'Same days last week') };
-  if (mode === 'last_year') return { from: addDays(from, -364), to: addDays(to, -364), label: L('نفس الأيام السنة اللي فاتت', 'Same days last year') };
+  if (mode === 'last_week') return { from: addDays(from, -7), to: addDays(to, -7), label: L('الأيام نفسها من الأسبوع الماضي', 'Same days last week') };
+  if (mode === 'last_year') return { from: addDays(from, -364), to: addDays(to, -364), label: L('الأيام نفسها من العام الماضي', 'Same days last year') };
   const n = daysBetween(from, to); const pto = addDays(from, -1);
-  return { from: addDays(pto, -(n - 1)), to: pto, label: L('الفترة اللي قبلها', 'Previous period') };
+  return { from: addDays(pto, -(n - 1)), to: pto, label: L('الفترة السابقة', 'Previous period') };
 }
 const EXTRA_LABEL: Record<ExtraKind, Loc> = {
   share_total: L('من الإجمالي', '% of total'), share_parent: L('من المجموعة', '% of group'), rank: L('الترتيب', 'Rank'),
@@ -123,10 +123,10 @@ export function calcFormula(c: CalcDef): Loc {
 export const READY_CALCS: (CalcDef & { label: Loc; hint: Loc })[] = [
   { id: 'avg_order', kind: 'ratio', a: 'item_net_sales', b: 'order_count', label: L('متوسط الأوردر', 'Average order'), hint: L('صافي مبيعات الأصناف على عدد الأوردرات (القعدة أوردر واحد).', 'Item net sales per order (a visit is one order).') },
   { id: 'discount_rate', kind: 'share', a: 'discount_amount', b: 'gross_item_sales', label: L('نسبة الخصم', 'Discount rate'), hint: L('الخصومات من المبيعات قبل الخصم.', 'Discounts as a share of gross item sales.') },
-  { id: 'refund_rate', kind: 'share', a: 'tender_refunded', b: 'tender_collected', label: L('نسبة المرتجع من المتحصل', 'Refunds % of collected'), hint: L('المرتجعات المصروفة من الفلوس اللي دخلت.', 'Refunds paid as a share of money collected.') },
+  { id: 'refund_rate', kind: 'share', a: 'tender_refunded', b: 'tender_collected', label: L('نسبة المرتجع من المتحصل', 'Refunds % of collected'), hint: L('المرتجعات المصروفة من المبالغ المحصلة.', 'Refunds paid as a share of money collected.') },
   { id: 'price_per_unit', kind: 'ratio', a: 'item_net_sales', b: 'sold_quantity', label: L('متوسط سعر القطعة', 'Average price per unit'), hint: L('صافي مبيعات الأصناف على الكمية المباعة.', 'Item net sales per unit sold.') },
-  { id: 'void_rate', kind: 'share', a: 'void_value', b: 'gross_item_sales', label: L('نسبة الإلغاءات', 'Void rate'), hint: L('قيمة الأصناف اللي اتشالت من المبيعات قبل الخصم.', 'Removed value as a share of gross item sales.') },
-  { id: 'uncollected', kind: 'difference', a: 'recognized_sales_total', b: 'tender_collected', label: L('الفواتير ناقص المتحصل', 'Billed minus collected'), hint: L('الفرق بين المطلوب على الشيكات والفلوس اللي دخلت (مش لازم يبقى صفر — شوف جسر اليوم).', 'Billed minus collected (not necessarily zero — see the EOD bridge).') },
+  { id: 'void_rate', kind: 'share', a: 'void_value', b: 'gross_item_sales', label: L('نسبة الإلغاءات', 'Void rate'), hint: L('قيمة الأصناف المُزالة من المبيعات قبل الخصم.', 'Removed value as a share of gross item sales.') },
+  { id: 'uncollected', kind: 'difference', a: 'recognized_sales_total', b: 'tender_collected', label: L('الفواتير ناقص المتحصل', 'Billed minus collected'), hint: L('الفرق بين المطلوب على الشيكات والمبالغ المحصلة (لا يلزم أن يكون صفرًا — راجع جسر اليوم).', 'Billed minus collected (not necessarily zero — see the EOD bridge).') },
 ];
 
 interface Ctx2 { db: DB; caller: Caller; cache: Map<string, Fact[]>; base: { filters: Record<string, string[]>; exclude: Record<string, string[]>; branchIds?: string[] }; metrics: string[] }
@@ -158,10 +158,10 @@ function evalLevels(c: Ctx2, rows: string[], cols: string[], from: string, to: s
 
 /** Why a period cannot give a value for this metric at this grouping (null = it can). */
 function coverageReason(meta: QueryMeta, metric: string, dims: string[]): Loc | null {
-  if (meta.days.some((d) => d.source === 'NONE')) return L('فترة المقارنة فيها أيام من غير أي بيانات (قبل ما نبدأ نسجل) — مش هنقول صفر.', 'The comparison period has days with no data at all — not zero.');
+  if (meta.days.some((d) => d.source === 'NONE')) return L('في فترة المقارنة أيام بلا أي بيانات (قبل بدء التسجيل) — ولن نقول صفرًا.', 'The comparison period has days with no data at all — not zero.');
   if (meta.days.some((d) => d.source === 'HISTORY')) {
     const cov = preLaunchCoverage(metric);
-    if (!cov.ok) return L('الأيام دي قبل تشغيل السيستم وعندها إجمالي يومي بس — الرقم ده مش متسجل فيها.', 'Those days precede launch (daily totals only) — this number was not recorded.');
+    if (!cov.ok) return L('هذه الأيام قبل تشغيل النظام ولها إجمالي يومي فقط — وهذا الرقم غير مسجل فيها.', 'Those days precede launch (daily totals only) — this number was not recorded.');
     const bad = cov.dims ? dims.find((d) => !cov.dims!.includes(d)) : undefined;
     if (bad) return L(`الأيام دي عندها إجمالي يومي بس — مش متقسم حسب «${dimensionById.get(bad)?.label.ar ?? bad}».`, `Those days only have daily totals — not broken down by ${dimensionById.get(bad)?.label.en ?? bad}.`);
   }
@@ -202,7 +202,7 @@ export function pivot(db: DB, caller: Caller, specIn: PivotSpec): PivotResult {
   const refusedIds = new Set(probe.meta.refused.map((r) => r.metric));
   const naIds = new Set(probe.meta.notAvailable.map((r) => r.metric));
   c.metrics = allMetrics.filter((m) => !refusedIds.has(m) && !naIds.has(m));
-  const naCell = (m: string): Cell => NA(probe.meta.notAvailable.find((x) => x.metric === m)?.reason ?? L('مش متاح', 'Not available'));
+  const naCell = (m: string): Cell => NA(probe.meta.notAvailable.find((x) => x.metric === m)?.reason ?? L('غير متاح', 'Not available'));
   const branchIds = probe.meta.branchIds;
   c.base.branchIds = branchIds;
   const asOf = probe.meta.asOf;
@@ -224,7 +224,7 @@ export function pivot(db: DB, caller: Caller, specIn: PivotSpec): PivotResult {
   const notes: Loc[] = [];
   const mkCells = (rowKey: string, vals: Vals | undefined): PivotNode['cells'] => {
     const out: PivotNode['cells'] = { '': {} };
-    for (const m of allMetrics) out[''][m] = naIds.has(m) ? naCell(m) : (vals?.[m] as Cell) ?? ND(L('مفيش بيانات', 'No data'));
+    for (const m of allMetrics) out[''][m] = naIds.has(m) ? naCell(m) : (vals?.[m] as Cell) ?? ND(L('لا بيانات', 'No data'));
     for (const ch of colHeads) {
       const v = main.byKey.get(rowKey + '\u0002' + ch.key);
       out[ch.key] = {};
@@ -254,10 +254,10 @@ export function pivot(db: DB, caller: Caller, specIn: PivotSpec): PivotResult {
   // ── calculated columns (from the node's own summed parts — so every subtotal is Σa / Σb)
   const calcCell = (cl: CalcDef, vals: Record<string, Cell>): Cell => {
     const a = vals[cl.a], b = vals[cl.b];
-    if (!avail(a)) return a?.availability === 'NOT_AVAILABLE' ? NA(a.reason!) : ND(L('الجزء الأول مش متاح', 'First part unavailable'));
-    if (!avail(b)) return b?.availability === 'NOT_AVAILABLE' ? NA(b.reason!) : ND(L('الجزء التاني مش متاح', 'Second part unavailable'));
+    if (!avail(a)) return a?.availability === 'NOT_AVAILABLE' ? NA(a.reason!) : ND(L('الجزء الأول غير متاح', 'First part unavailable'));
+    if (!avail(b)) return b?.availability === 'NOT_AVAILABLE' ? NA(b.reason!) : ND(L('الجزء الثاني غير متاح', 'Second part unavailable'));
     if (cl.kind === 'difference') return OK(D(a.value!).minus(b.value!), { numerator: a.value!, denominator: b.value! });
-    if (D(b.value!).isZero()) return ND(L('المقسوم عليه صفر — النسبة مش متعرفة', 'Denominator is zero — undefined'));
+    if (D(b.value!).isZero()) return ND(L('المقسوم عليه صفر — النسبة غير معرَّفة', 'Denominator is zero — undefined'));
     return OK(D(a.value!).dividedBy(b.value!).times(cl.kind === 'share' ? 100 : 1), { numerator: a.value!, denominator: b.value! });
   };
   const forEachNode = (fn: (n: PivotNode, parent: PivotNode | null) => void) => { const walk = (n: PivotNode, p: PivotNode | null) => { fn(n, p); n.children.forEach((ch) => walk(ch, n)); }; walk(root, null); };
@@ -307,15 +307,15 @@ export function pivot(db: DB, caller: Caller, specIn: PivotSpec): PivotResult {
       const why = coverageReason(prev.meta, m, dimsInScope(spec, rows.slice(0, n.level)));
       const cur = n.cells[''][m];
       const p: Cell = why ? NA(why) : (pv?.[m] as Cell) ?? zeroLike(m);
-      const none = p.availability === 'NOT_AVAILABLE' ? NA(p.reason!) : ND(L('مفيش رقمين نقارنهم', 'Nothing to compare'));
+      const none = p.availability === 'NOT_AVAILABLE' ? NA(p.reason!) : ND(L('لا يوجد رقمان للمقارنة', 'Nothing to compare'));
       n.cells[''][`${m}@cmp`] = { ...p };
       n.cells[''][`${m}@chg`] = avail(cur) && avail(p) ? OK(D(cur.value!).minus(p.value!)) : none;
-      n.cells[''][`${m}@chg%`] = avail(cur) && avail(p) ? (D(p.value!).isZero() ? ND(L('السابق صفر — النسبة مش متعرفة', 'Previous is zero — undefined')) : OK(D(cur.value!).minus(p.value!).dividedBy(D(p.value!).abs()).times(100))) : none;
+      n.cells[''][`${m}@chg%`] = avail(cur) && avail(p) ? (D(p.value!).isZero() ? ND(L('السابق صفر — النسبة غير معرَّفة', 'Previous is zero — undefined')) : OK(D(cur.value!).minus(p.value!).dividedBy(D(p.value!).abs()).times(100))) : none;
     }
   };
   const fillWindows = (n: PivotNode, get: (ev: PeriodEval, kind: ExtraKind) => Vals | undefined) => {
     for (const [kind, ev] of winEval) for (const m of extrasFor) {
-      if (!ev) { n.cells[''][`${m}@${kind}`] = ND(L('التراكمي مش منطقي والتقسيم بالأيام — شيل «اليوم» من الصفوف.', 'Running totals make no sense split by day.')); continue; }
+      if (!ev) { n.cells[''][`${m}@${kind}`] = ND(L('التراكمي غير منطقي مع التقسيم بالأيام — أزل «اليوم» من الصفوف.', 'Running totals make no sense split by day.')); continue; }
       const why = coverageReason(ev.meta, m, dimsInScope(spec, rows.slice(0, n.level)));
       n.cells[''][`${m}@${kind}`] = why ? NA(why) : ({ ...((get(ev, kind)?.[m] as Cell) ?? zeroLike(m)) });
     }
@@ -454,7 +454,7 @@ export function pivot(db: DB, caller: Caller, specIn: PivotSpec): PivotResult {
 
   function zeroLike(m: string): Cell {
     const md = metricById.get(m)!;
-    if (md.additivity === 'WEIGHTED_RATIO' || md.additivity === 'NON_ADDITIVE') return ND(L('مفيش بيانات في الخانة دي', 'No data in this cell'));
+    if (md.additivity === 'WEIGHTED_RATIO' || md.additivity === 'NON_ADDITIVE') return ND(L('لا بيانات في هذه الخانة', 'No data in this cell'));
     return OK(0, { evidenceCount: 0 });
   }
 }

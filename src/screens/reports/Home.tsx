@@ -264,7 +264,7 @@ export function CertifiedPage({ id }: { id: string }) {
       <AskDock>
       <div className="space-y-3 pb-16" data-screen-id="H1" data-fb="certified-page">
         <div className="flex items-start gap-2 flex-wrap">
-          <BackTitle title={def ? L(def.title) : '…'} onBack={() => nav('reports', {})} star={favs.includes(id)} onStar={() => toggle(id)} badge={<Pill size="sm" tone="success"><ShieldCheck className="w-3 h-3 inline me-0.5" />{t('معتمد')}</Pill>} sub={def ? L(def.purpose) : null} />
+          <BackTitle title={def ? L(def.title) : '…'} onBack={() => nav('reports', {})} star={favs.includes(id)} onStar={() => toggle(id)} badge={<Pill size="sm" tone="success" title={def ? L(def.purpose) : undefined}><ShieldCheck className="w-3 h-3 inline me-0.5" />{t('معتمد')}</Pill>} />
           <div className="flex items-center gap-1.5 flex-wrap">
             <Button size="sm" variant="ghost" onClick={saveAs} data-fb="report:save-as"><Copy className="w-4 h-4" />{t('احفظ نسخة وعدّل')}</Button>
             <Button size="sm" variant="outline" disabled={!r} onClick={() => setPrint(true)} data-fb="report:print"><Printer className="w-4 h-4" />{t('معاينة الطباعة')}</Button>

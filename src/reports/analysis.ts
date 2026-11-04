@@ -51,7 +51,7 @@ export function decompose(db: DB, caller: Caller, spec: { from: string; to?: str
   const totC = query(db, caller, { metrics: ['item_net_sales', 'net_item_sales', 'return_sales_adjustment'], from: spec.from, to, branchIds: spec.branchIds, filters: spec.filters });
   const totO = query(db, caller, { metrics: ['item_net_sales', 'net_item_sales', 'return_sales_adjustment'], from: base.from, to: base.to, branchIds: spec.branchIds, filters: spec.filters });
   const avail = [totC, totO].every((t) => t.totals.item_net_sales.availability === 'AVAILABLE') && cur.rows.length + old.rows.length > 0;
-  if (!avail) return { available: false as const, reason: L('محتاج بيانات تفصيلية (شيكات) في الفترتين — الأيام قبل التشغيل عندها إجماليات بس.', 'Needs event-level data in both periods.'), current: { from: spec.from, to }, base };
+  if (!avail) return { available: false as const, reason: L('يحتاج إلى بيانات تفصيلية (شيكات) في الفترتين — للأيام قبل التشغيل إجماليات فقط.', 'Needs event-level data in both periods.'), current: { from: spec.from, to }, base };
   const map = (r: typeof cur) => new Map(r.rows.map((x) => [x.dims.product!, { q: D(x.values.sold_quantity?.value ?? 0), r: D(x.values.item_net_sales?.value ?? 0), label: x.labels.product }]));
   const A = map(old), B = map(cur);
   const Q0 = [...A.values()].reduce((a, x) => a.plus(x.q), D(0)), Q1 = [...B.values()].reduce((a, x) => a.plus(x.q), D(0));
@@ -84,13 +84,13 @@ export function decompose(db: DB, caller: Caller, spec: { from: string; to?: str
       { id: 'volume', label: L('حجم البيع (عدد القطع)', 'Volume (units)'), amount: m4(volume), note: L(`القطع ${QA} ← ${QB} بمتوسط سعر الفترة الأولى ${m4(P0)}`, `Units ${QA} → ${QB} at base average price`) },
       { id: 'mix', label: L('التشكيلة (الناس اشترت أصناف أغلى/أرخص)', 'Mix'), amount: m4(mix), note: L('نصيب كل صنف من القطع اتغير', 'Each item\'s share of units changed') },
       { id: 'price', label: L('السعر الفعلي للقطعة (بعد الخصم)', 'Realised price per unit'), amount: m4(price), note: L('سعر الصنف أو الخصم عليه اتغير', 'Item price or discount changed') },
-      { id: 'new', label: L('أصناف جديدة في الفترة دي', 'New items'), amount: m4(newItems), note: L('اتباعت دلوقتي ومااتباعتش قبل كده', 'Sold now, not before') },
-      { id: 'dropped', label: L('أصناف ما اتباعتش المرة دي', 'Dropped items'), amount: m4(dropped.negated()), note: L('اتباعت قبل كده ومش دلوقتي', 'Sold before, not now') },
+      { id: 'new', label: L('أصناف جديدة في هذه الفترة', 'New items'), amount: m4(newItems), note: L('بِيعت الآن ولم تُبع قبل ذلك', 'Sold now, not before') },
+      { id: 'dropped', label: L('أصناف لم تُبع هذه المرة', 'Dropped items'), amount: m4(dropped.negated()), note: L('بِيعت قبل ذلك وليس الآن', 'Sold before, not now') },
       { id: 'unexplained', label: L('غير مفسَّر', 'Unexplained'), amount: m4(unexplained), note: L('الباقي بعد الحساب — بيبان دايمًا حتى لو صفر', 'The residual — always shown, even when zero') },
     ],
     returns: { amount: m4(returnsDelta), label: L('فرق المرتجعات (على صافي المبيعات)', 'Returns difference (on net sales)') },
     items: items.sort((a, b) => D(b.delta).abs().comparedTo(D(a.delta).abs())).slice(0, 12),
-    caveat: L('ده تقسيم حسابي للفرق، مش سبب. «ليه الزباين عملوا كده» محتاج سؤال للناس في المطعم.', 'An arithmetic split, not a cause.'),
+    caveat: L('هذا تقسيم حسابي للفرق، وليس سببًا. معرفة سبب سلوك العملاء تحتاج إلى سؤال فريق المطعم.', 'An arithmetic split, not a cause.'),
   };
 }
 
@@ -116,10 +116,10 @@ export function menuMatrix(db: DB, caller: Caller, spec: { from: string; to?: st
   return { items, thresholds: { popularityPct: m4(popThreshold), contributionPerUnit: cmThreshold ? m4(cmThreshold) : null }, meta: r.meta, classes: CLASS_LABEL };
 }
 export const CLASS_LABEL: Record<string, Loc & { advice: Loc }> = {
-  STAR: { ar: 'نجم', en: 'Star', advice: L('بيتباع كتير وبيكسب — حافظ عليه.', 'Popular and profitable — keep.') },
-  PLOWHORSE: { ar: 'حصان', en: 'Plowhorse', advice: L('بيتباع كتير بس هامشه قليل — راجع التكلفة أو السعر.', 'Popular, low margin — review cost/price.') },
-  PUZZLE: { ar: 'لغز', en: 'Puzzle', advice: L('هامشه عالي بس بيتباع قليل — اعرضه أحسن.', 'Profitable, unpopular — promote.') },
+  STAR: { ar: 'نجم', en: 'Star', advice: L('مبيعاته عالية وهامشه جيد — حافظ عليه.', 'Popular and profitable — keep.') },
+  PLOWHORSE: { ar: 'حصان', en: 'Plowhorse', advice: L('مبيعاته عالية وهامشه منخفض — راجع التكلفة أو السعر.', 'Popular, low margin — review cost/price.') },
+  PUZZLE: { ar: 'لغز', en: 'Puzzle', advice: L('هامشه عالٍ ومبيعاته قليلة — حسِّن عرضه.', 'Profitable, unpopular — promote.') },
   DOG: { ar: 'كلب', en: 'Dog', advice: L('قليل في الاتنين — فكر تشيله.', 'Low on both — consider removing.') },
-  COST_UNAVAILABLE: { ar: 'التكلفة غير متاحة', en: 'Cost unavailable', advice: L('مفيش وصفة تكلفة — بنعرض الشعبية بس، الهامش مش صفر.', 'No recipe cost — popularity only, margin not zero.') },
+  COST_UNAVAILABLE: { ar: 'التكلفة غير متاحة', en: 'Cost unavailable', advice: L('لا وصفة تكلفة — نعرض الشعبية فقط، والهامش ليس صفرًا.', 'No recipe cost — popularity only, margin not zero.') },
 };
 export { dimLabel };

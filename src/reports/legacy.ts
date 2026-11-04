@@ -49,15 +49,15 @@ export function runLegacyReport(ctx: Ctx, id: string, from: string, to: string, 
           ['refunds_paid', refunded], ['net_sales_after_refunds', m4(D(net).minus(refunded))], ['average_order_value', completed.length ? m4(D(net).dividedBy(completed.length)) : '0.0000'], ['guest_count', guests || 'CAPABILITY_NOT_AVAILABLE'], ['staff_meals', staffMeals.length],
         ] },
         { id: 'by_channel', title: { ar: 'حسب القناة', en: 'By channel' }, rows: Object.entries(byChannel).map(([k, v]) => [k, v.orders, v.net]) },
-        { id: 'outstanding_checks', title: { ar: 'شيكات مفتوحة (مأكدة ومش مدفوعة)', en: 'Outstanding checks' }, rows: outstanding.map((o) => [o.number, o.table ?? '—', o.remaining]) },
-      ], note: { ar: 'الخدمة مقياس لوحده ومش جوه صافي المبيعات. المرتجعات بتتحسب يوم صرفها.', en: 'Service charge is its own measure, never inside net sales. Refunds count on their payout date.' } };
+        { id: 'outstanding_checks', title: { ar: 'شيكات مفتوحة (مؤكدة وغير مدفوعة)', en: 'Outstanding checks' }, rows: outstanding.map((o) => [o.number, o.table ?? '—', o.remaining]) },
+      ], note: { ar: 'الخدمة مقياس مستقل وليست ضمن صافي المبيعات. وتُحتسب المرتجعات في يوم صرفها.', en: 'Service charge is its own measure, never inside net sales. Refunds count on their payout date.' } };
     }
     case 'tenders': {
       const methods = [...new Set([...caps.map((c) => c.method + (c.walletProvider ? ':' + c.walletProvider : '')), ...refunds.map((r) => r.method)])];
       return { ...base, sections: [
         { id: 'by_method', title: { ar: 'حسب وسيلة الدفع', en: 'By method' }, columns: ['method', 'gross_tender', 'refunded_tender', 'net_tender'], rows: methods.map((m) => { const g = sum(caps.filter((c) => c.method + (c.walletProvider ? ':' + c.walletProvider : '') === m).map((c) => c.amount)); const r = sum(refunds.filter((x) => x.method === m).map((x) => x.amount)); return [m, g, r, m4(D(g).minus(r))]; }) },
         { id: 'corrections', title: { ar: 'تصحيحات وسيلة الدفع', en: 'Tender corrections' }, rows: caps.filter((c) => c.correctionOf && D(c.amount).gt(0)).map((c) => [c.correctionOf, c.method, c.amount]) },
-        { id: 'tips', title: { ar: 'البقشيش (مش مبيعات)', en: 'Tips (not sales)' }, rows: [['tips', sum(db.tips.filter((t) => inRange(t.businessDate, from, to)).map((t) => t.amount))]] },
+        { id: 'tips', title: { ar: 'البقشيش (ليس مبيعات)', en: 'Tips (not sales)' }, rows: [['tips', sum(db.tips.filter((t) => inRange(t.businessDate, from, to)).map((t) => t.amount))]] },
         { id: 'deposits', title: { ar: 'العربون (التزام)', en: 'Deposits (liability)' }, rows: db.deposits.filter((d) => branchIds.includes(d.branchId)).map((d) => [d.customer, d.state, d.amount]) },
       ], note: { ar: 'وسائل الدفع عمرها ما بتتسمى "مبيعات".', en: 'Tenders are never called sales.' } };
     }
@@ -70,7 +70,7 @@ export function runLegacyReport(ctx: Ctx, id: string, from: string, to: string, 
       return { ...base, sections: [
         { id: 'top', title: { ar: 'أعلى 50 صنف', en: 'Top 50 products' }, columns: ['product', 'item_quantity', 'item_net_sales'], rows: rows.map((r) => [r.name, r.qty.toString(), m4(r.net)]) },
         { id: 'by_category', title: { ar: 'حسب القسم (المسجل على السطر)', en: 'By category (captured)' }, rows: [...byCat.entries()].map(([c, n]) => [db.categories.find((x) => x.id === c)?.name.ar ?? c, m4(n)]) },
-        { id: 'staff_meals', title: { ar: 'وجبات الموظفين (مش بيع)', en: 'Staff meals (not sales)' }, rows: staffMeals.flatMap((o) => o.lines.map((l) => [l.name.ar, l.quantity, o.customerName ?? ''])) },
+        { id: 'staff_meals', title: { ar: 'وجبات الموظفين (ليست بيعًا)', en: 'Staff meals (not sales)' }, rows: staffMeals.flatMap((o) => o.lines.map((l) => [l.name.ar, l.quantity, o.customerName ?? ''])) },
       ] };
     }
     case 'staff': {
@@ -101,8 +101,8 @@ export function runLegacyReport(ctx: Ctx, id: string, from: string, to: string, 
       const grants = db.grants.filter((g) => g.consumedAt && inRange(bdOf(Date.parse(g.issuedAt)), from, to)).map((g) => [g.action, userName(db, g.requesterUserId), userName(db, g.approverUserId), g.targetId]);
       const drafts = db.orders.filter((o) => branchIds.includes(o.branchId) && o.status === 'DRAFT').map((o) => [o.number, Math.floor((ctx.now - o.createdAtMs) / 60000) + ' دقيقة']);
       return { ...base, sections: [
-        { id: 'line_voids', title: { ar: 'أصناف اتلغت بعد الإرسال', en: 'Line voids' }, columns: ['check', 'item', 'amount', 'reason', 'disposition', 'approver'], rows: voidLines },
-        { id: 'order_ends', title: { ar: 'شيكات اتلغت', en: 'Voids and cancels' }, rows: ends },
+        { id: 'line_voids', title: { ar: 'أصناف أُلغيت بعد الإرسال', en: 'Line voids' }, columns: ['check', 'item', 'amount', 'reason', 'disposition', 'approver'], rows: voidLines },
+        { id: 'order_ends', title: { ar: 'شيكات أُلغيت', en: 'Voids and cancels' }, rows: ends },
         { id: 'discounts', title: { ar: 'الخصومات حسب السبب', en: 'Discounts by reason' }, rows: disc },
         { id: 'comps', title: { ar: 'الضيافة', en: 'Comps' }, rows: comps },
         { id: 'refunds', title: { ar: 'المرتجعات حسب الوسيلة', en: 'Refunds by method' }, rows: refunds.map((r) => [db.orders.find((o) => o.id === r.orderId)?.number, r.method, r.amount, r.reasonCode]) },
@@ -117,7 +117,7 @@ export function runLegacyReport(ctx: Ctx, id: string, from: string, to: string, 
       return { ...base, sections: [
         { id: 'drawers', title: { ar: 'أدراج اليوم', en: 'Drawers of the day' }, columns: ['terminal', 'cashier', 'state', 'expected_cash', 'counted', 'variance'], rows: sessions.map((s) => [db.terminals.find((t) => t.id === s.terminalId)?.code, userName(db, s.userId), s.state, s.close?.expectedCash ?? expectedCash(ctx, s.id), s.close?.countedCash ?? '—', s.close?.variance ?? '—']) },
         { id: 'tenders_per_drawer', title: { ar: 'وسائل الدفع لكل درج', en: 'Tenders per drawer' }, rows: sessions.flatMap((s) => { const by: Record<string, string> = {}; for (const c of db.captures.filter((x) => x.sessionId === s.id)) by[c.method] = add(by[c.method] ?? '0', c.amount); return Object.entries(by).map(([m, a]) => [db.terminals.find((t) => t.id === s.terminalId)?.code, userName(db, s.userId), m, a]); }) },
-      ], note: { ar: 'تقرير Z بتاع الوردية هو المرجع.', en: 'The Z stays the shift authority.' } };
+      ], note: { ar: 'تقرير Z للوردية هو المرجع.', en: 'The Z stays the shift authority.' } };
     }
     case 'peak_hours': {
       const hours = Array.from({ length: 24 }, (_, h) => ({ h, orders: 0, net: D(0), guests: 0 }));
