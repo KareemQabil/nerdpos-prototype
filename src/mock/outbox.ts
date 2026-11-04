@@ -9,6 +9,7 @@ import type { DB, KitchenDelivery, KitchenTicket, Order, PrintJob, FiscalDocumen
 import { hashOf } from './kernel';
 import { runOpsBackground } from './handlers/ops';
 import { comboRoute, kitchenItem, type ComboPart } from './menu-kitchen';
+import { resolvePrinter, simState, raiseDeviceAlert, devOf } from './devices'; // ux-14: registered printers, kitchen printers
 
 const BACKOFF = [5, 15, 45, 120, 300]; // seconds, printing.maxAttempts = 5
 
@@ -61,6 +62,10 @@ function deliverRound(db: DB, d: KitchenDelivery) {
     };
     db.tickets.push(t);
     d.ticketIds.push(t.id);
+    // ux-14: a kitchen printer assigned to the station prints its ticket (a side effect; the ticket is the truth)
+    for (const p of devOf(db).devices.filter((x) => x.kind === 'PRINTER' && (x.printer?.roles ?? []).includes('KITCHEN') && (x.printer?.stationIds ?? []).includes(stationId) && x.branchId === order.branchId)) {
+      enqueuePrint(db, { documentType: 'KITCHEN_TICKET', documentId: t.id, copyKind: 'ORIGINAL', terminalId: order.terminalId ?? '', createdBy: 'system', label: `تذكرة مطبخ ${order.number} · جولة ${d.round}`, printerId: p.id, pinned: true });
+    }
   }
   d.state = 'DELIVERED';
   d.deliveredAt = clock.iso();
@@ -80,11 +85,22 @@ export function enqueuePrint(db: DB, job: Omit<PrintJob, 'id' | 'state' | 'attem
   return j;
 }
 
-function dispatchPrint(j: PrintJob) {
-  const st = sim.printer(j.terminalId);
+/** ux-14: the job goes to a registered device (resolvePrinter); no printer, a disabled one, an offline host or the
+ *  device's own fault is a failed attempt — retried with backoff, then DEAD, and an alert is raised. Never swallowed. */
+function dispatchPrint(db: DB, j: PrintJob) {
   const at = clock.iso();
-  if (st === 'UP') { j.attempts.push({ at, error: null }); j.state = 'SUCCEEDED'; return; }
-  j.attempts.push({ at, error: st === 'PAPER_OUT' ? 'PAPER_OUT' : 'PRINTER_UNREACHABLE' });
+  const { device, error: routeError } = resolvePrinter(db, j);
+  if (device) j.printerId = device.id;
+  let error: string | null = routeError;
+  if (!error && device) {
+    const st = simState(device);
+    const hostDown = !!device.terminalId && sim.isOffline(device.terminalId);
+    error = hostDown || st === 'DOWN' ? 'PRINTER_UNREACHABLE' : st === 'PAPER_OUT' ? 'PAPER_OUT' : st === 'ERROR' ? 'DEVICE_ERROR' : null;
+  }
+  if (!error) { j.attempts.push({ at, error: null, printerId: device?.id ?? null }); j.state = 'SUCCEEDED'; if (device) device.lastSeenAt = at; return; }
+  j.attempts.push({ at, error, printerId: device?.id ?? null });
+  if (device) raiseDeviceAlert(db, device, error, j.label);
+  else if (!db.alerts.some((a) => a.ref === `noprn-${j.terminalId}` && !a.ack)) db.alerts.unshift({ id: nextId('al'), at, kind: 'DEVICE_FAILURE', severity: 'error', text: { ar: `لا توجد طابعة متاحة — ${j.label}`, en: `No printer available — ${j.label}` }, ref: `noprn-${j.terminalId}`, ack: false });
   const n = j.attempts.slice((j as any).retryFrom ?? 0).filter((a) => a.error).length;
   if (n >= BACKOFF.length) { j.state = 'DEAD'; return; }
   j.state = 'FAILED';
@@ -153,7 +169,7 @@ export function runOutbox(): boolean {
   }
   const now = clock.now();
   for (const j of db.printJobs) {
-    if ((j.state === 'PENDING' || j.state === 'FAILED') && j.nextAtMs <= now) { dispatchPrint(j); changed = true; }
+    if ((j.state === 'PENDING' || j.state === 'FAILED') && j.nextAtMs <= now) { dispatchPrint(db, j); changed = true; }
   }
   for (const doc of db.fiscalDocuments) {
     if ((doc.nextTryAtMs ?? 0) > now) continue;

@@ -13,6 +13,7 @@ import { checkTenderReference, prepaidAllowed, referenceRule } from '../r3b'; //
 import { depositBalances, depositView, depVersion, pushResEvent, refundBlock } from '../reservation-rules'; // ux-12: deposits applied in parts and refunded
 import { policyFields } from '../policies';
 import { assertCountLock, handoversOf, handoverView, keepWrites, liveCount, liveSessionOn, pushCount, reasonText } from '../drawer-count'; // ux-10b: count lock, handover, reason length
+import { kickDrawer } from '../devices'; // ux-14: the registered cash drawer
 
 export function cashEntry(ctx: Ctx, sessionId: string, kind: CashEntry['kind'], amount: string, extra: Partial<CashEntry> = {}) {
   const e: CashEntry = { id: nextId('ce'), sessionId, kind, amount: m4(amount), at: ctx.nowIso, by: ctx.user!.id, ...extra };
@@ -144,6 +145,9 @@ export const moneyHandlers: Record<string, Handler> = {
       changeTotal = changeTotal.plus(change);
       if (remaining.lte(0)) break;
     }
+    // ux-14: cash went into the drawer of the collecting session's terminal — its drawer is kicked (a job: a failure is
+    // visible and retryable, the capture stays committed)
+    if (created.some((c) => c.method === 'CASH')) kickDrawer(db, enqueuePrint, session.terminalId, o.id, `فتح الدرج ${o.number}`, ctx.user!.id);
     o.version++;
     o.history.push({ at: ctx.nowIso, by: ctx.user!.id, byName: ctx.user!.displayName, terminal: ctx.terminal?.code, kind: 'CAPTURED', text: { ar: `دُفع ${created.map((c) => `${c.method === 'CASH' ? 'نقدًا' : c.method === 'CARD' ? 'ببطاقة' : c.method} ${c.amount} ج.م${c.reference ? ' (' + c.reference + ')' : ''}`).join(' + ')}${changeTotal.gt(0) ? ` — الباقي للعميل ${m4(changeTotal)} ج.م` : ''}`, en: `captured ${created.map((c) => `${c.method} ${c.amount}`).join(' + ')}` } });
     event('PaymentCaptured', o.id, `${o.number} ${created.map((c) => `${c.method} ${c.amount}`).join(' + ')}`);
@@ -286,7 +290,8 @@ export const moneyHandlers: Record<string, Handler> = {
     const g = ctx.requireApproval({ action: 'DRAWER_NO_SALE', targetType: 'sessions.Session', targetId: s!.id, context: { reasonCode: ctx.body.reasonCode }, grantId: ctx.body.approvalGrantId });
     const e = cashEntry(ctx, s!.id, 'NO_SALE', '0', { reasonCode: ctx.body.reasonCode, reason: ctx.body.reason, approvalGrantId: g?.id });
     ctx.audit('drawer no-sale open', s!.id, true, g?.id);
-    return { status: 201, body: { ...e, drawerKick: 'queued' } };
+    const kick = kickDrawer(ctx.db, enqueuePrint, s!.terminalId, e.id, `فتح الدرج بلا بيع ${e.id}`, ctx.user!.id); // ux-14: the registered drawer, as a visible job
+    return { status: 201, body: { ...e, drawerKick: kick ? 'queued' : 'NO_DRAWER', drawerJobId: kick?.id ?? null } };
   },
   'Session.Handover': () => { throw new ApiError('CAPABILITY_NOT_AVAILABLE', { reason: 'PD-held single command; ux-10b proposes Session.HandoverStart / HandoverAccept / HandoverCancel (ShiftHandoverPolicy)' }); },
 

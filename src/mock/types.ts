@@ -188,7 +188,10 @@ export interface PolicyValue { id: string; policyId: string; scopeType: ScopeTyp
 export interface PolicyHistory { id: string; policyId: string; scopeType: ScopeType; scopeId: string; oldValue: unknown; newValue: unknown; at: string; by: string; via: 'PANEL' | 'SETTINGS' | 'SEED' | 'PROFILE'; note?: string }
 
 export type PrintState = 'PENDING' | 'SUCCEEDED' | 'FAILED' | 'DEAD';
-export interface PrintJob { id: string; documentType: 'RECEIPT' | 'KITCHEN_TICKET' | 'PRE_BILL' | 'X_REPORT' | 'Z_REPORT' | 'FISCAL_DOCUMENT'; documentId: string; copyKind: 'ORIGINAL' | 'REPRINT'; terminalId: string; state: PrintState; attempts: { at: string; error: string | null }[]; nextAtMs: number; createdAt: string; createdBy: string; label: string; reason?: string }
+export interface PrintJob { id: string; documentType: 'RECEIPT' | 'KITCHEN_TICKET' | 'PRE_BILL' | 'X_REPORT' | 'Z_REPORT' | 'FISCAL_DOCUMENT' | 'TEST_PAGE' | 'DRAWER_KICK'; documentId: string; copyKind: 'ORIGINAL' | 'REPRINT'; terminalId: string; state: PrintState; attempts: { at: string; error: string | null; printerId?: string | null }[]; nextAtMs: number; createdAt: string; createdBy: string; label: string; reason?: string;
+  /** ux-14: the device it goes to — pinned for a test page, a kitchen ticket and a drawer kick, else resolved from the
+   *  terminal's printers at each attempt (the last one tried) */
+  printerId?: string | null; pinned?: boolean }
 
 export interface FiscalProfile { branchId: string; adapter: 'EG_ETA'; issuerId: string; issuerName: string; issuerBranchCode: string; activityCode: string; receiptType: string; address: { governate: string; city: string; street: string; buildingNumber: string }; version: number }
 export interface FiscalDevice { id: string; terminalId: string; adapter: 'EG_ETA'; deviceSerial: string; credentialRef: string; state: 'ACTIVE' | 'SUSPENDED'; lastSequence: number; lastDocumentHash: string | null; version: number }
@@ -302,4 +305,6 @@ export interface DB extends CrmCollections {
   r3b?: import('./types-r3b').R3BState;
   // r3A: removal / refund trace at every stage (types-control.ts)
   reversals?: import('./types-control').ReversalRec[];
+  // ux-14: printers, drawers, scanners and display screens, the display content, the terminals' keyboard changes — read through devOf(db)
+  dev?: import('./types-devices').DevState;
 }

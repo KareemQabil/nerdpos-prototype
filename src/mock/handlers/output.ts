@@ -6,6 +6,7 @@ import { enqueuePrint, buildFiscal, issueFiscal, runOutbox } from '../outbox';
 import { getOrder, need, page, requireFields, settlementOf, userName } from './util';
 import type { Order, DB } from '../types';
 import { docTemplateOf, secondLangOf, secondName } from '../r3b'; // round 3 r3B: receipt template, second language
+import { devOf } from '../devices'; // ux-14
 
 function receiptView(ctx: Ctx, o: Order) {
   const db = ctx.db;
@@ -59,7 +60,10 @@ export const outputHandlers: Record<string, Handler> = {
     const j = enqueuePrint(ctx.db, { documentType: ctx.body.documentType, documentId: ctx.body.documentId, copyKind: prior ? 'REPRINT' : 'ORIGINAL', terminalId: ctx.body.terminalId ?? ctx.terminal!.id, createdBy: ctx.user!.id, label: ctx.body.label ?? `${ctx.body.documentType} ${ctx.body.documentId}` });
     return { status: 201, body: j };
   },
-  'PrintJob.Find': (ctx) => page(ctx.db.printJobs.filter((j) => (!ctx.query.state || ctx.query.state.split(',').includes(j.state)) && (!ctx.query.terminalId || j.terminalId === ctx.query.terminalId) && (!ctx.query.documentType || j.documentType === ctx.query.documentType)).map((j) => ({ ...j, terminalCode: ctx.db.terminals.find((t) => t.id === j.terminalId)?.code })), ctx.query),
+  'PrintJob.Find': (ctx) => {
+    const devs = devOf(ctx.db).devices; // ux-14: the device each job went to
+    return page(ctx.db.printJobs.filter((j) => (!ctx.query.state || ctx.query.state.split(',').includes(j.state)) && (!ctx.query.terminalId || j.terminalId === ctx.query.terminalId) && (!ctx.query.documentType || j.documentType === ctx.query.documentType) && (!ctx.query.printerId || j.printerId === ctx.query.printerId)).map((j) => { const d = j.printerId ? devs.find((x) => x.id === j.printerId) : null; return { ...j, terminalCode: ctx.db.terminals.find((t) => t.id === j.terminalId)?.code, printerCode: d?.code ?? null, printerName: d?.name ?? null }; }), ctx.query);
+  },
   'PrintJob.Get': (ctx) => {
     const j = ctx.db.printJobs.find((x) => x.id === ctx.params.printJobId);
     need(j, 'PRINT_JOB_NOT_FOUND');

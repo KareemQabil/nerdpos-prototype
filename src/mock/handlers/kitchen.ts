@@ -10,6 +10,7 @@ import { userName } from './util';
 import { clock } from '../clock';
 import type { Ctx } from '../kernel';
 import { r3bOf, kdsScreenOf, branchHasDispatch, secondLangOf, secondName } from '../r3b'; // round 3: kitchen screens subscribe to stations
+import { displayFor } from './devices'; // ux-14: the call board's own settings from the registry
 
 const NEXT: Record<KitchenState, KitchenState[]> = { NEW: ['IN_PROGRESS', 'READY'], IN_PROGRESS: ['READY'], READY: ['DONE', 'IN_PROGRESS'], DONE: [] };
 
@@ -400,6 +401,9 @@ function callBoardHandlers(): Record<string, Handler> {
      *  off or CallBoardPolicy.readyMinutes after the call. Only orders collected by number are shown. */
     'CallBoard.View': (ctx) => {
       const pol = callBoardPolicy(ctx.branchId);
+      // ux-14: a registered call board reads its own settings (look, branding) from the server; a disabled one shows nothing
+      const display = ctx.query.displayId ? displayFor(ctx, ctx.query.displayId, 'CALL_BOARD') : null;
+      if (display && !display.enabled) return { preparing: [], ready: [], readyMinutes: pol.readyMinutes, auto: pol.call === 'AUTO', delivery: pol.delivery, display: { ...display, playlist: undefined }, at: ctx.nowIso };
       const auto = pol.call === 'AUTO';
       const orderIds = new Set(ctx.db.tickets.filter((t) => t.state !== 'DONE' && ctx.db.stations.find((s) => s.id === t.stationId)?.branchId === ctx.branchId).map((t) => t.orderId));
       const preparing: any[] = [], ready: any[] = [];
@@ -423,7 +427,7 @@ function callBoardHandlers(): Record<string, Handler> {
       }
       preparing.sort((a, b) => a.since.localeCompare(b.since));
       ready.sort((a, b) => b.calledAt.localeCompare(a.calledAt));
-      return { preparing, ready, readyMinutes: pol.readyMinutes, auto, delivery: pol.delivery, at: ctx.nowIso };
+      return { preparing, ready, readyMinutes: pol.readyMinutes, auto, delivery: pol.delivery, display: display ? { ...display, playlist: undefined } : null, at: ctx.nowIso };
     },
   };
 }

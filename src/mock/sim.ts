@@ -2,7 +2,7 @@
 export type Mode = 'UP' | 'DOWN' | 'SLOW';
 export interface SimState {
   latencyMs: number;
-  printers: Record<string, 'UP' | 'DOWN' | 'PAPER_OUT'>; // per terminal id
+  printers: Record<string, 'UP' | 'DOWN' | 'PAPER_OUT' | 'ERROR'>; // ux-14: per device id (printers, drawers, scanners, displays); a printer also by its terminal id (the former switch)
   kds: Mode; // kitchen delivery worker / kitchen screen
   eta: 'UP' | 'DOWN' | 'REJECT' | 'TIMEOUT'; // e-receipt platform
   cardTerminal: 'UP' | 'DECLINE' | 'TIMEOUT'; // there is no provider call: the card result is typed by the cashier; this only drives the helper

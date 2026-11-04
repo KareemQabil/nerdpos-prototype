@@ -17,6 +17,7 @@ import { seedProfiles } from './seed-profiles'; // ux-09: a demo user for every 
 import { seedRiders } from './seed-riders'; // ux-11: rider phone, سعيد linked to demo-driver, shift log, owed ledger
 import { seedReservations } from './seed-reservations'; // ux-12: reservation permissions, today's book (linked + one legacy)
 import { seedPrivacy } from './seed-privacy'; // ux-13: customer:viewphone (manager)
+import { seedDevicesAndRoles } from './seed-devices'; // ux-14: device registry, display content, device permissions
 export const DEMO_PIN = '123456';
 export const DEMO_PASSWORD = 'demo-password-1';
 
@@ -174,6 +175,7 @@ export function buildSeed(nowMs: number): DB {
   seedRiders(db, nowMs); // ux-11: the riders system (seed-riders.ts)
   seedReservations(db, nowMs); // ux-12: reservations complete (seed-reservations.ts)
   seedPrivacy(db); // ux-13: who sees a customer's full number (seed-privacy.ts)
+  seedDevicesAndRoles(db); // ux-14: printers, drawers, scanner, display screens, display content; who manages devices (seed-devices.ts)
   seedReports(db, nowMs); // reports engine: two event-level closed days with the expert edge cases (seed-reports.ts)
   db.events.push({ id: 'ev_0', at: nowIso, type: 'Provisioned', ref: 'biz', text: 'demo-provisioning 1.2.0 + EG.profile 1.4.0 applied' });
   return db;
@@ -257,6 +259,7 @@ export function buildEmpty(nowMs: number): DB {
     menu: undefined, // menu area: no dayparts/menus on a fresh install (nothing restricted)
     inv: undefined, // inventory area: a fresh install starts with no warehouses or stock
     r3b: undefined, // round 3 r3B: no kitchen-screen config, no receipt template on a fresh install
+    dev: undefined, // ux-14: no devices or display content on a fresh install
     salesChannels: undefined, permOverrides: undefined, // r3C: the three default channels are created on first read
     events: [{ id: 'ev_0', at: nowIso, type: 'Installed', ref: 'biz', text: 'dedicated deployment ready — bootstrap administrator only' }],
   };

@@ -55,7 +55,7 @@ export function tv(v: string | null | undefined): string {
 
 // Server-made one-line labels ("إيصال #1042", "#1042 · جولة 2", "إقفال يوم 2026-10-25") → English fragments.
 const LABEL_FRAGMENTS: [RegExp, string][] = [
-  [/إقفال يوم /g, 'Day close '], [/إيصال مرتجع /g, 'Refund receipt '], [/شيك مبدئي /g, 'Pre-bill '], [/إيصال /g, 'Receipt '], [/^نسخة /g, 'Copy '],
+  [/إقفال يوم /g, 'Day close '], [/^صفحة تجربة /g, 'Test page '], [/^فتح الدرج بلا بيع /g, 'Drawer open, no sale '], [/^فتح الدرج /g, 'Drawer open '], [/^تذكرة مطبخ /g, 'Kitchen ticket '] /* ux-14 */, [/إيصال مرتجع /g, 'Refund receipt '], [/شيك مبدئي /g, 'Pre-bill '], [/إيصال /g, 'Receipt '], [/^نسخة /g, 'Copy '],
   [/ · جولة /g, ' · round '], [/ · ترابيزة /g, ' · table '], [/ · تيك أواي/g, ' · takeaway'], [/ · دليفري/g, ' · delivery'], [/من غير إيصال/g, 'no receipt'],
   [/^تسوية /g, 'Settlement '], [/ عملية\)/g, ' transactions)'], [/^درج /g, 'Drawer '], [/^من /g, 'from '], [/(\d) م$/g, '$1 PM'], [/(\d) ص$/g, '$1 AM'],
   [/^مبيعات يوم (\S+) \(بيانات العرض\)$/g, 'Sales on $1 (demo data)'], [/^خبز-/g, 'BREAD-'], [/\u2068?ج\.م\u2069?/g, 'EGP'],

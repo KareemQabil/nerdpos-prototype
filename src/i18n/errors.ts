@@ -315,6 +315,16 @@ export const errorsAr: Record<string, string> = {
   RECONCILIATION_RESULT_NOT_FOUND: 'هذه النتيجة غير موجودة.',
   // ux-13: customer phone privacy
   CUSTOMER_PHONE_REVEAL_NOT_ALLOWED: 'إظهار رقم العميل غير مسموح في إعدادات المطعم.',
+  // ux-14: devices and display screens
+  DEVICE_NOT_FOUND: 'هذا الجهاز غير مسجل في الفرع.',
+  DEVICE_CODE_TAKEN: 'يوجد جهاز بالكود نفسه. اختر كودًا آخر.',
+  DEVICE_HOST_INVALID: 'لا يُربط هذا الجهاز بهذا الجهاز المضيف. الدرج والماسح وشاشة العميل على جهاز كاشير، وشاشة النداء على شاشة مطبخ.',
+  DEVICE_HOST_TAKEN: 'لهذا الجهاز درج أو شاشة عميل مسجلة بالفعل.',
+  DEVICE_DISABLED: 'هذا الجهاز متوقف. شغّله أولًا من «الأجهزة».',
+  DISPLAY_NOT_ATTACHED: 'هذه الشاشة ليست مربوطة بهذا الجهاز.',
+  DISPLAY_CONTENT_NOT_FOUND: 'هذا المحتوى غير موجود.',
+  DISPLAY_CONTENT_RETIRED: 'هذا المحتوى موقوف ولا يُعرض.',
+  KEYMAP_CHANGE_NOT_ALLOWED: 'يغيّر المدير مفاتيح الاختصار حسب إعدادات المطعم.',
 };
 
 export const errorsEn: Record<string, string> = {
@@ -628,4 +638,14 @@ export const errorsEn: Record<string, string> = {
   RECONCILIATION_RESULT_NOT_FOUND: 'Result not found.',
   // ux-13: customer phone privacy
   CUSTOMER_PHONE_REVEAL_NOT_ALLOWED: 'Showing a customer\'s number is off in the restaurant settings.',
+  // ux-14: devices and display screens
+  DEVICE_NOT_FOUND: 'This device is not registered in the branch.',
+  DEVICE_CODE_TAKEN: 'A device with this code exists. Choose another code.',
+  DEVICE_HOST_INVALID: 'This device cannot be attached to that terminal. A drawer, a scanner and a customer display go on a cashier terminal; a call board on a kitchen screen.',
+  DEVICE_HOST_TAKEN: 'This terminal already has a drawer or a customer display.',
+  DEVICE_DISABLED: 'This device is disabled. Enable it first in «Devices».',
+  DISPLAY_NOT_ATTACHED: 'This display is not attached to this terminal.',
+  DISPLAY_CONTENT_NOT_FOUND: 'This content does not exist.',
+  DISPLAY_CONTENT_RETIRED: 'This content is retired and is not shown.',
+  KEYMAP_CHANGE_NOT_ALLOWED: 'A manager changes the shortcut keys, per the restaurant settings.',
 };

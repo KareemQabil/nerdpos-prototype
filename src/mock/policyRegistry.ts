@@ -110,6 +110,7 @@ export const POLICY_GROUPS = [
   { id: 'kitchen', title: 'المطبخ والطباعة والأسباب', titleEn: 'Kitchen, printing & reasons' },
   { id: 'fiscal', title: 'الإيصال الإلكتروني', titleEn: 'E-receipt' },
   { id: 'access', title: 'الدخول والأمان', titleEn: 'Access & security' },
+  { id: 'devices', title: 'الأجهزة والشاشات', titleEn: 'Devices & displays' }, // ux-14
   { id: 'inventory', title: 'المخزن والمشتريات', titleEn: 'Inventory & purchasing' },
   { id: 'direction', title: 'إعدادات إضافية', titleEn: 'More settings' }, // ux-07: was «إمكانيات الاتجاه (مقترح)»
 ];
@@ -216,6 +217,14 @@ POLICIES.push(
 );
 
 POLICIES.push(...R3B_POLICIES); // r3B (round 3): tender reference, short display number, second language
+
+// ux-14 (proposed): devices, print routing and the customer display. Strictest workable defaults (PROTOTYPE_GAPS §15k).
+POLICIES.push(
+  { id: 'CustomerDisplayPolicy', group: 'devices', title: 'محتوى شاشة العميل', titleEn: 'Customer display content', description: 'ما تعرضه شاشة العميل وهي خاملة: المحتوى المخصص لها فقط، أو معه العروض النشطة وأصناف القائمة. ومدة كل شريحة ومدة شاشة الشكر.', state: 'DIRECTION', scopes: ['TENANT', 'BRANCH'], appliesTo: 'NEW_ACTIONS', editor: { kind: 'object', fields: [{ key: 'idleContent', label: 'المحتوى وهي خاملة', kind: 'enum', options: ['ASSIGNED_ONLY', 'ASSIGNED_AND_PROMOTIONS'] }, { key: 'slideSeconds', label: 'مدة الشريحة (ثانية)', kind: 'number', min: 3, max: 60 }, { key: 'thanksSeconds', label: 'مدة شاشة الشكر (ثانية)', kind: 'number', min: 10, max: 300 }] }, canonicalDefault: { idleContent: 'ASSIGNED_ONLY', slideSeconds: 8, thanksSeconds: 60 }, reacts: 'شاشة العميل وهي خاملة وبعد الدفع' },
+  { id: 'PrintRoutingPolicy', group: 'devices', title: 'الطابعة البديلة', titleEn: 'Backup printer', description: 'إذا لم تتوفر طابعة الجهاز: تبقى المهمة فاشلة ظاهرة حتى إعادة المحاولة، أو تذهب إلى الطابعة البديلة للفرع.', state: 'DIRECTION', scopes: ['TENANT', 'BRANCH'], appliesTo: 'NEW_ACTIONS', editor: { kind: 'object', fields: [{ key: 'fallback', label: 'عند تعذّر طابعة الجهاز', kind: 'enum', options: ['NONE', 'BRANCH_BACKUP'] }] }, canonicalDefault: { fallback: 'NONE' }, reacts: 'طابور الطباعة' },
+  { id: 'DeviceHealthPolicy', group: 'devices', title: 'انقطاع الشاشات', titleEn: 'Display offline', description: 'بعد كم ثانية بلا اتصال تُعد شاشة العرض غير متصلة.', state: 'DIRECTION', scopes: ['TENANT', 'BRANCH'], appliesTo: 'NEW_ACTIONS', editor: { kind: 'object', fields: [{ key: 'offlineAfterSeconds', label: 'غير متصلة بعد (ثانية)', kind: 'number', min: 30, max: 900 }] }, canonicalDefault: { offlineAfterSeconds: 120 }, reacts: 'حالة الشاشات في «الأجهزة»' },
+  { id: 'KeyMapPolicy', group: 'devices', title: 'تغيير مفاتيح الاختصار', titleEn: 'Changing shortcut keys', description: 'من يغيّر مفاتيح الاختصار لجهاز: المدير فقط، أو أيضًا من يعمل على الجهاز نفسه.', state: 'DIRECTION', scopes: ['TENANT', 'BRANCH'], appliesTo: 'NEW_ACTIONS', editor: { kind: 'object', fields: [{ key: 'changeBy', label: 'من يغيّر المفاتيح', kind: 'enum', options: ['MANAGERS', 'ANY_SIGNED_IN'] }] }, canonicalDefault: { changeBy: 'MANAGERS' }, reacts: 'نافذة مفاتيح الاختصار' },
+);
 
 export const policyMeta = new Map(POLICIES.map((p) => [p.id, p]));
 

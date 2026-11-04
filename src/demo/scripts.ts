@@ -17,6 +17,7 @@ import { RIDERS_JOURNEY } from './journey-riders'; // ux-11: the riders system
 import { RESERVATIONS_JOURNEY } from './journey-reservations'; // ux-12: reservations complete
 import { HANDOVER_JOURNEY } from './journey-handover'; // ux-10b: shift handover and the remaining settings
 import { CUSTOMERS_JOURNEY } from './journey-customers'; // ux-13: customers, loyalty and phone masking
+import { DEVICES_JOURNEY } from './journey-devices'; // ux-14: devices, printers and display screens
 
 export interface StepText { who: string; do_ar: string; do_en: string; expect_ar: string; expect_en: string; note?: string; operations: { op: string; http: string; actor: string; expected: string }[] }
 export interface StepDef { before?: () => void; id: string; device: string; user: string; screen?: string | (() => [string, Record<string, any>]); run: (log: Logger) => Promise<void>; text?: StepText }
@@ -403,7 +404,11 @@ const A1: StepDef[] = [
   } },
   { id: 'J-A1-12', device: 'BO', user: 'implementation-engineer', screen: 'prints', run: async (log) => {
     const e = await as('BO', 'implementation-engineer', log);
-    await api(e, 'Print.Document', { body: { documentType: 'X_REPORT', documentId: 'TEST-PAGE', terminalId: term('CASH-1'), label: 'Test page CASH-1' } }, log, 'test page on CASH-1');
+    // ux-14: printers and the cash drawer are registered devices attached to the terminal; the test page is a job on that printer
+    const reg = (await import('../mock/devices')).devOf(store.db).devices;
+    if (!reg.some((d) => d.code === 'PRN-CASH-1')) await api(e, 'Device.Register', { body: { kind: 'PRINTER', code: 'PRN-CASH-1', name: 'Cashier printer 1', terminalId: term('CASH-1'), printer: { roles: ['RECEIPT', 'REPORT'], paper: '80MM', connection: 'USB' } } }, log, 'receipt printer on CASH-1');
+    if (!reg.some((d) => d.code === 'DRW-CASH-1')) await api(e, 'Device.Register', { body: { kind: 'CASH_DRAWER', code: 'DRW-CASH-1', name: 'Cash drawer 1', terminalId: term('CASH-1') } }, log, 'cash drawer on CASH-1');
+    await api(e, 'Device.TestPrint', { params: { deviceId: reg.find((d) => d.code === 'PRN-CASH-1')!.id } }, log, 'test page on the CASH-1 printer');
     log({ ok: null, text: 'a print failure never blocks a sale (try the printer simulator: DOWN)', plain: t('عطل الطابعة عمره ما يوقف البيع (جرّبه من «محاكاة الأعطال»)') });
   } },
   { id: 'J-A1-13', device: 'BO', user: 'implementation-engineer', screen: 'fiscal', run: async (log) => {
@@ -568,4 +573,5 @@ export const JOURNEYS: Journey[] = [
   RESERVATIONS_JOURNEY, // ux-12
   HANDOVER_JOURNEY, // ux-10b
   CUSTOMERS_JOURNEY, // ux-13
+  DEVICES_JOURNEY, // ux-14
 ];

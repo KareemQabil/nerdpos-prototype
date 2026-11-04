@@ -165,7 +165,7 @@ export const orgHandlers: Record<string, Handler> = {
   },
 };
 
-const FIELD_CHECKED = new Set(['ShiftHandoverPolicy', 'OpeningFloatPolicy', 'BlindRecountPolicy', 'RefundCancelPolicy', 'ReasonTextPolicy', 'DriverPayPolicy', 'CustomerPrivacyPolicy', 'LoyaltyProgramPolicy' /* ux-13 */]);
+const FIELD_CHECKED = new Set(['ShiftHandoverPolicy', 'OpeningFloatPolicy', 'BlindRecountPolicy', 'RefundCancelPolicy', 'ReasonTextPolicy', 'DriverPayPolicy', 'CustomerPrivacyPolicy', 'LoyaltyProgramPolicy' /* ux-13 */, 'CustomerDisplayPolicy', 'PrintRoutingPolicy', 'DeviceHealthPolicy', 'KeyMapPolicy' /* ux-14 */]);
 export function validatePolicyValue(id: string, value: unknown) {
   const meta = policyMeta.get(id)!;
   if (value === undefined) return;

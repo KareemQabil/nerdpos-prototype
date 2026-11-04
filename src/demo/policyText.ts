@@ -91,6 +91,11 @@ const PLAIN: Record<string, Plain> = {
   CustomerPrivacyPolicy: { title: 'إخفاء رقم هاتف العميل', explain: 'يظهر رقم العميل مخفيًا لمن لا يملك صلاحية عرض الرقم في كل الشاشات والتقارير والإيصالات. صاحب الصلاحية يُظهر الرقم بسبب مكتوب.', reacts: 'رقم العميل في الشاشات، وزر «إظهار الرقم» في ملف العميل.' },
   LoyaltyProgramPolicy: { title: 'برنامج نقاط الولاء', explain: 'كيف يكسب العميل النقاط وقيمتها عند الصرف، وأقصى نسبة من الشيك تُدفع بالنقاط، ومتى تنتهي.', reacts: 'النقاط عند إكمال الشيك، وزر «ادفع بالنقاط» في التحصيل.' },
   ReasonTextPolicy: { title: 'طول السبب المكتوب', explain: 'أقل عدد حروف للسبب في إلغاء الحجز ورد العربون وتسوية عجز الطيار وإيقافه وسحب طلب المرتجع وتسليم الوردية وإعادة العد.' },
+  // ux-14 — devices and the customer display
+  CustomerDisplayPolicy: { title: 'محتوى شاشة العميل', explain: 'ما تعرضه شاشة العميل وهي خاملة، ومدة كل شريحة، ومدة شاشة الشكر بعد الدفع.', reacts: 'شاشة العميل.' },
+  PrintRoutingPolicy: { title: 'الطابعة البديلة', explain: 'ما يحدث للورقة إذا لم تتوفر طابعة الجهاز.', reacts: 'طابور الطباعة.' },
+  DeviceHealthPolicy: { title: 'انقطاع الشاشات', explain: 'متى تُعد شاشة العرض غير متصلة.', reacts: 'حالة الشاشات في «الأجهزة».' },
+  KeyMapPolicy: { title: 'تغيير مفاتيح الاختصار', explain: 'من يغيّر مفاتيح الاختصار لجهاز.', reacts: 'نافذة مفاتيح الاختصار.' },
   SplitLimitPolicy: { title: 'عدد الشيكات مايزيدش عن عدد الأفراد', explain: 'على الترابيزة، الشيك الجديد أو التقسيم مايخليش عدد الشيكات أكتر من عدد الأفراد القاعدين (3 أفراد = 3 شيكات بالكتير).', reacts: 'زرار «شيك جديد» والتقسيم على الترابيزة.' },
 };
 
@@ -216,6 +221,10 @@ const OPTIONS: Record<string, Record<string, OptText>> = {
   'CustomerPrivacyPolicy.riderAccess': { OUT_FOR_DELIVERY: O('بعد استلام الطلب حتى التسليم'), ACTIVE_DELIVERY: O('من تعيين الطلب حتى التسليم'), NONE: O('لا يرى الرقم') },
   'CustomerPrivacyPolicy.partialSearch': { PERMITTED_ONLY: O('لصاحب الصلاحية فقط', 'غيره يكتب الرقم كاملًا.'), ALL: O('للجميع') },
   'LoyaltyProgramPolicy.earnBase': { ITEMS_AFTER_DISCOUNT: O('قيمة الأصناف بعد الخصم'), CHECK_TOTAL: O('إجمالي الشيك') },
+  // ux-14
+  'CustomerDisplayPolicy.idleContent': { ASSIGNED_ONLY: O('المحتوى المخصص للشاشة فقط'), ASSIGNED_AND_PROMOTIONS: O('المحتوى المخصص مع العروض النشطة وأصناف القائمة') },
+  'PrintRoutingPolicy.fallback': { NONE: O('تبقى المهمة فاشلة حتى إعادة المحاولة'), BRANCH_BACKUP: O('تذهب إلى الطابعة البديلة للفرع') },
+  'KeyMapPolicy.changeBy': { MANAGERS: O('المدير فقط'), ANY_SIGNED_IN: O('المدير ومن يعمل على الجهاز') },
   'StaffMealAllowancePolicy.basis': { SALE_PRICE: O('بسعر البيع', 'الوجبة بتتحسب من الحد بسعرها في المنيو.'), COST: O('بالتكلفة', 'الوجبة بتتحسب بتكلفة خاماتها من الوصفة.') },
 };
 // Generic fallbacks for policies added later by other screens.
@@ -271,6 +280,7 @@ const FIELD_LABEL: Record<string, string> = {
   'CustomerPrivacyPolicy.phoneDisplay': 'عرض الرقم', 'CustomerPrivacyPolicy.revealMode': 'صاحب صلاحية عرض الرقم', 'CustomerPrivacyPolicy.riderAccess': 'الطيار يرى رقم طلبه', 'CustomerPrivacyPolicy.partialSearch': 'البحث بجزء من الرقم', // ux-13
   'LoyaltyProgramPolicy.enabled': 'البرنامج مفعّل', 'LoyaltyProgramPolicy.egpPerPoint': 'المبلغ المقابل لنقطة واحدة', 'LoyaltyProgramPolicy.earnBase': 'تُحسب النقاط على', 'LoyaltyProgramPolicy.pointValue': 'قيمة النقطة عند الصرف', 'LoyaltyProgramPolicy.minRedeemPoints': 'أقل عدد نقاط للصرف', 'LoyaltyProgramPolicy.maxRedeemPercent': 'أقصى نسبة من الشيك تُدفع بالنقاط', 'LoyaltyProgramPolicy.expiryMonths': 'تنتهي النقاط بعد',
   'RefundCancelPolicy.cancelBy': 'من يسحب الطلب', 'ReasonTextPolicy.minLength': 'أقل عدد حروف', 'DriverPayPolicy.payoutDrawer': 'من يصرف ومن أي درج',
+  'CustomerDisplayPolicy.idleContent': 'المحتوى وهي خاملة', 'CustomerDisplayPolicy.slideSeconds': 'مدة الشريحة', 'CustomerDisplayPolicy.thanksSeconds': 'مدة شاشة الشكر', 'PrintRoutingPolicy.fallback': 'عند تعذّر طابعة الجهاز', 'DeviceHealthPolicy.offlineAfterSeconds': 'غير متصلة بعد', 'KeyMapPolicy.changeBy': 'من يغيّر المفاتيح', // ux-14
   'ApprovalCredentialPolicy.methods': 'الطرق المسموحة', 'StaffMealAllowancePolicy.enabled': 'فيه حد في اليوم', 'StaffMealAllowancePolicy.basis': 'بيتحسب', 'StaffMealAllowancePolicy.dailyLimit': 'الحد لكل موظف في اليوم',
 };
 const REASON_KIND: Record<string, string> = {
@@ -285,6 +295,7 @@ const UNITS: Record<string, Unit> = {
   'SessionDurationPolicy.maxHours': 'hour', 'SessionDurationPolicy.warningHours': 'hour', 'ApprovalTtlPolicy.seconds': 'sec',
   'KitchenTimingPolicy.targetMinutes': 'min', 'KitchenTimingPolicy.alertMinutes': 'min', 'LoginLockoutPolicy.maxFailedAttempts': 'try', 'LoginLockoutPolicy.lockMinutes': 'min',
   'TableTurnPolicy.alertMinutes': 'min', 'ReasonTextPolicy.minLength': 'char', 'ShiftHandoverPolicy.mismatchRecounts': 'none', 'LoyaltyProgramPolicy.maxRedeemPercent': 'pct', 'LoyaltyProgramPolicy.expiryMonths': 'month', 'LoyaltyProgramPolicy.egpPerPoint': 'egp', 'LoyaltyProgramPolicy.pointValue': 'egp', 'LoyaltyProgramPolicy.minRedeemPoints': 'none', // ux-13
+  'CustomerDisplayPolicy.slideSeconds': 'sec', 'CustomerDisplayPolicy.thanksSeconds': 'sec', 'DeviceHealthPolicy.offlineAfterSeconds': 'sec', // ux-14
   'AuthSessionPolicy.maxHours': 'hour', 'AuthSessionPolicy.pinSessionMaxHours': 'hour', 'CredentialPolicy.passwordMinLength': 'char', 'CredentialPolicy.pinLength': 'digit',
 };
 export function fieldLabel(policyId: string, f: { key: string; label: string }): string {
