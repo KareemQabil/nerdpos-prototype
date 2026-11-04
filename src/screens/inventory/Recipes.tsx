@@ -99,10 +99,10 @@ function RecipeView({ id, onClose, onEdit }: { id: string; onClose: () => void; 
           <div className="flex items-center gap-2"><span className="text-xs text-soft">{t('النسخة')}</span><Sel className="w-64" value={ver} onChange={(e) => setVer(e.target.value)} options={[{ value: '', label: t('الشغالة دلوقتي (نسخة {n})', { n: r.activeVersion.version }) }, ...r.versions.map((v: any) => ({ value: v.id, label: `${t('نسخة {n}', { n: v.version })} — ${dateTime(v.effectiveFrom)}` }))]} /></div>
           <Table head={[t('المكوّن'), t('الكمية'), t('هالك التحضير'), t('الكمية الفعلية'), t('سعر الوحدة'), t('التكلفة'), t('من التكلفة')]} rows={cost.lines.map((l: any) => [
             <span className="font-bold">{L(l.name)}</span>,
-            <span className="num">{fmtQty(l.enteredQuantity)} {unitIdLabel(l.enteredUnit)}</span>,
+            <span className="num whitespace-nowrap">{fmtQty(l.enteredQuantity)} {unitIdLabel(l.enteredUnit)}</span>,
             Number(l.wastePercent) > 0 ? <span className="num">{l.wastePercent}%</span> : <span className="text-dim">—</span>,
-            <span className="num text-xs">{fmtQty(l.grossQuantity, 4)} {unitIdLabel(l.stockUnitId)}</span>,
-            <span className="num text-xs">{money(l.unitCost)}</span>,
+            <span className="num text-xs whitespace-nowrap">{fmtQty(l.grossQuantity, 4)} {unitIdLabel(l.stockUnitId)}</span>,
+            <span className="num text-xs whitespace-nowrap">{money(l.unitCost)}</span>,
             <Money v={l.cost} className="text-sm" />,
             <Share part={l.cost} total={cost.total} />,
           ])} />
