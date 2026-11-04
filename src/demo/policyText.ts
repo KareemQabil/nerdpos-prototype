@@ -87,6 +87,9 @@ const PLAIN: Record<string, Plain> = {
   OpeningFloatPolicy: { title: 'الرصيد الافتتاحي', explain: 'المبلغ المعتاد في الدرج عند فتح الوردية، وهل يفتح الكاشير بمبلغ آخر.', reacts: 'نافذة «فتح وردية»: المبلغ المعتاد مكتوب مسبقًا.', question: 'كم الرصيد الافتتاحي المعتاد؟' },
   BlindRecountPolicy: { title: 'إعادة العد الأعمى', explain: 'بعد تأكيد عدّ الدرج يُقفل المبلغ. يمكن السماح بإعادة العد بموافقة المدير مع سبب، ويُحفظ العدّان.', reacts: 'زر «إعادة العد» بعد تأكيد العد.' },
   RefundCancelPolicy: { title: 'سحب طلب المرتجع', explain: 'من يسحب طلب مرتجع لم يُعتمد بعد.', reacts: 'زر «إلغاء الطلب» في المرتجعات.' },
+  // ux-13 — customers and loyalty
+  CustomerPrivacyPolicy: { title: 'إخفاء رقم هاتف العميل', explain: 'يظهر رقم العميل مخفيًا لمن لا يملك صلاحية عرض الرقم في كل الشاشات والتقارير والإيصالات. صاحب الصلاحية يُظهر الرقم بسبب مكتوب.', reacts: 'رقم العميل في الشاشات، وزر «إظهار الرقم» في ملف العميل.' },
+  LoyaltyProgramPolicy: { title: 'برنامج نقاط الولاء', explain: 'كيف يكسب العميل النقاط وقيمتها عند الصرف، وأقصى نسبة من الشيك تُدفع بالنقاط، ومتى تنتهي.', reacts: 'النقاط عند إكمال الشيك، وزر «ادفع بالنقاط» في التحصيل.' },
   ReasonTextPolicy: { title: 'طول السبب المكتوب', explain: 'أقل عدد حروف للسبب في إلغاء الحجز ورد العربون وتسوية عجز الطيار وإيقافه وسحب طلب المرتجع وتسليم الوردية وإعادة العد.' },
   SplitLimitPolicy: { title: 'عدد الشيكات مايزيدش عن عدد الأفراد', explain: 'على الترابيزة، الشيك الجديد أو التقسيم مايخليش عدد الشيكات أكتر من عدد الأفراد القاعدين (3 أفراد = 3 شيكات بالكتير).', reacts: 'زرار «شيك جديد» والتقسيم على الترابيزة.' },
 };
@@ -207,6 +210,12 @@ const OPTIONS: Record<string, Record<string, OptText>> = {
   'DriverPayPolicy.mode': { PER_TRIP: O('مبلغ لكل مشوار مُسلَّم'), FIXED_SHIFT: O('مبلغ ثابت لكل وردية'), PERCENT_OF_FEE: O('نسبة من رسوم التوصيل') }, // ux-11
   'ReservationPolicy.cancelDepositMode': { REFUND_WITH_APPROVAL: O('يُرد بموافقة المدير'), FORFEIT_IF_LATE: O('يُصادر عند الإلغاء المتأخر، ويُرد قبله بموافقة المدير'), ALWAYS_FORFEIT: O('يُصادر دائمًا') }, // ux-12
   'DeliveryPolicy.cashLimitMode': { APPROVAL: O('بموافقة المدير'), BLOCK: O('ممنوع'), WARN: O('تنبيه فقط') }, // ux-11
+  // ux-13
+  'CustomerPrivacyPolicy.phoneDisplay': { MASKED_UNLESS_PERMITTED: O('مخفي لمن لا يملك الصلاحية', 'يظهر أول ثلاثة وآخر ثلاثة أرقام فقط.'), FULL_FOR_ALL: O('كاملًا للجميع') },
+  'CustomerPrivacyPolicy.revealMode': { WITH_REASON: O('يُظهر الرقم بسبب مكتوب', 'رقم عميل واحد في كل مرة، ويُسجل في المراجعة.'), FULL_IN_VIEWS: O('يرى الرقم كاملًا في كل الشاشات'), NOT_ALLOWED: O('لا يُظهر الرقم') },
+  'CustomerPrivacyPolicy.riderAccess': { OUT_FOR_DELIVERY: O('بعد استلام الطلب حتى التسليم'), ACTIVE_DELIVERY: O('من تعيين الطلب حتى التسليم'), NONE: O('لا يرى الرقم') },
+  'CustomerPrivacyPolicy.partialSearch': { PERMITTED_ONLY: O('لصاحب الصلاحية فقط', 'غيره يكتب الرقم كاملًا.'), ALL: O('للجميع') },
+  'LoyaltyProgramPolicy.earnBase': { ITEMS_AFTER_DISCOUNT: O('قيمة الأصناف بعد الخصم'), CHECK_TOTAL: O('إجمالي الشيك') },
   'StaffMealAllowancePolicy.basis': { SALE_PRICE: O('بسعر البيع', 'الوجبة بتتحسب من الحد بسعرها في المنيو.'), COST: O('بالتكلفة', 'الوجبة بتتحسب بتكلفة خاماتها من الوصفة.') },
 };
 // Generic fallbacks for policies added later by other screens.
@@ -259,6 +268,8 @@ const FIELD_LABEL: Record<string, string> = {
   'OfflineModePolicy.maxQueued': 'أقصى عمليات مستنية على الجهاز', 'OfflineModePolicy.cashOnly': 'التحصيل من غير نت كاش بس',
   'ShiftHandoverPolicy.mode': 'طريقة التسليم', 'ShiftHandoverPolicy.countMismatchTolerance': 'الفرق المسموح بين العدّين', 'ShiftHandoverPolicy.mismatchRecounts': 'مرات إعادة العد عند عدم التطابق',
   'OpeningFloatPolicy.standardFloat': 'الرصيد المعتاد', 'OpeningFloatPolicy.change': 'تغيير الرصيد عند الفتح', 'BlindRecountPolicy.mode': 'إعادة العد بعد التأكيد',
+  'CustomerPrivacyPolicy.phoneDisplay': 'عرض الرقم', 'CustomerPrivacyPolicy.revealMode': 'صاحب صلاحية عرض الرقم', 'CustomerPrivacyPolicy.riderAccess': 'الطيار يرى رقم طلبه', 'CustomerPrivacyPolicy.partialSearch': 'البحث بجزء من الرقم', // ux-13
+  'LoyaltyProgramPolicy.enabled': 'البرنامج مفعّل', 'LoyaltyProgramPolicy.egpPerPoint': 'المبلغ المقابل لنقطة واحدة', 'LoyaltyProgramPolicy.earnBase': 'تُحسب النقاط على', 'LoyaltyProgramPolicy.pointValue': 'قيمة النقطة عند الصرف', 'LoyaltyProgramPolicy.minRedeemPoints': 'أقل عدد نقاط للصرف', 'LoyaltyProgramPolicy.maxRedeemPercent': 'أقصى نسبة من الشيك تُدفع بالنقاط', 'LoyaltyProgramPolicy.expiryMonths': 'تنتهي النقاط بعد',
   'RefundCancelPolicy.cancelBy': 'من يسحب الطلب', 'ReasonTextPolicy.minLength': 'أقل عدد حروف', 'DriverPayPolicy.payoutDrawer': 'من يصرف ومن أي درج',
   'ApprovalCredentialPolicy.methods': 'الطرق المسموحة', 'StaffMealAllowancePolicy.enabled': 'فيه حد في اليوم', 'StaffMealAllowancePolicy.basis': 'بيتحسب', 'StaffMealAllowancePolicy.dailyLimit': 'الحد لكل موظف في اليوم',
 };
@@ -268,12 +279,12 @@ const REASON_KIND: Record<string, string> = {
 };
 export const reasonKindText = (k: string) => t(REASON_KIND[k] ?? k);
 
-type Unit = 'min' | 'hour' | 'sec' | 'try' | 'digit' | 'char' | 'egp' | 'pct' | 'none';
+type Unit = 'min' | 'hour' | 'sec' | 'try' | 'digit' | 'char' | 'egp' | 'pct' | 'month' | 'none';
 const UNITS: Record<string, Unit> = {
   'OrderNumberPolicy.width': 'digit', 'RoundingPolicy.scale': 'digit', 'SkuGenerationPolicy.width': 'digit',
   'SessionDurationPolicy.maxHours': 'hour', 'SessionDurationPolicy.warningHours': 'hour', 'ApprovalTtlPolicy.seconds': 'sec',
   'KitchenTimingPolicy.targetMinutes': 'min', 'KitchenTimingPolicy.alertMinutes': 'min', 'LoginLockoutPolicy.maxFailedAttempts': 'try', 'LoginLockoutPolicy.lockMinutes': 'min',
-  'TableTurnPolicy.alertMinutes': 'min', 'ReasonTextPolicy.minLength': 'char', 'ShiftHandoverPolicy.mismatchRecounts': 'none',
+  'TableTurnPolicy.alertMinutes': 'min', 'ReasonTextPolicy.minLength': 'char', 'ShiftHandoverPolicy.mismatchRecounts': 'none', 'LoyaltyProgramPolicy.maxRedeemPercent': 'pct', 'LoyaltyProgramPolicy.expiryMonths': 'month', 'LoyaltyProgramPolicy.egpPerPoint': 'egp', 'LoyaltyProgramPolicy.pointValue': 'egp', 'LoyaltyProgramPolicy.minRedeemPoints': 'none', // ux-13
   'AuthSessionPolicy.maxHours': 'hour', 'AuthSessionPolicy.pinSessionMaxHours': 'hour', 'CredentialPolicy.passwordMinLength': 'char', 'CredentialPolicy.pinLength': 'digit',
 };
 export function fieldLabel(policyId: string, f: { key: string; label: string }): string {
@@ -301,6 +312,7 @@ export function withUnit(v: unknown, u: Unit): string {
     case 'char': return t('{n} حروف', { n });
     case 'egp': return egp(v);
     case 'pct': return pct(v);
+    case 'month': return n === 0 ? t('لا تنتهي') : n === 1 ? t('شهر') : t('{n} شهر', { n }); // ux-13
     default: return String(v);
   }
 }

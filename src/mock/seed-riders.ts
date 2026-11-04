@@ -28,7 +28,7 @@ export function seedRiders(db: DB, nowMs: number) {
 
   const drivers = (db.drivers ??= []);
   if (!drivers.some((d) => d.id === 'drv_5')) {
-    const saeed: Driver = { id: 'drv_5', branchId: 'branch_main', name: 'سعيد منصور', phone: '01001234567', vehicle: 'MOTORCYCLE', plate: 'ص ع د 7310', onShift: false, active: true, location: null, version: 1, createdAt: iso(nowMs - 40 * DAY), owed: '0.0000', userId: 'u_driver', shiftId: null };
+    const saeed: Driver = { id: 'drv_5', branchId: 'branch_main', name: 'سعيد منصور', phone: '01001237310' /* ux-13: was a customer's number (masking would hide the rider's own number) */, vehicle: 'MOTORCYCLE', plate: 'ص ع د 7310', onShift: false, active: true, location: null, version: 1, createdAt: iso(nowMs - 40 * DAY), owed: '0.0000', userId: 'u_driver', shiftId: null };
     drivers.push(saeed);
   }
 

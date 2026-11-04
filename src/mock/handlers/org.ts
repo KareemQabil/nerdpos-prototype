@@ -165,7 +165,7 @@ export const orgHandlers: Record<string, Handler> = {
   },
 };
 
-const FIELD_CHECKED = new Set(['ShiftHandoverPolicy', 'OpeningFloatPolicy', 'BlindRecountPolicy', 'RefundCancelPolicy', 'ReasonTextPolicy', 'DriverPayPolicy']);
+const FIELD_CHECKED = new Set(['ShiftHandoverPolicy', 'OpeningFloatPolicy', 'BlindRecountPolicy', 'RefundCancelPolicy', 'ReasonTextPolicy', 'DriverPayPolicy', 'CustomerPrivacyPolicy', 'LoyaltyProgramPolicy' /* ux-13 */]);
 export function validatePolicyValue(id: string, value: unknown) {
   const meta = policyMeta.get(id)!;
   if (value === undefined) return;
@@ -181,6 +181,8 @@ export function validatePolicyValue(id: string, value: unknown) {
       if (f.kind === 'number' && !(Number.isInteger(v) && (f.min === undefined || (v as number) >= f.min) && (f.max === undefined || (v as number) <= f.max))) throw new ApiError('VALIDATION_FAILED', { policyId: id, field: f.key, rule: `whole number ${f.min ?? ''}..${f.max ?? ''}` });
     }
   }
+  // ux-13: one point needs a positive amount (the earn rule divides by it)
+  if (id === 'LoyaltyProgramPolicy' && value && typeof value === 'object' && (value as any).egpPerPoint !== undefined && !(isMoney((value as any).egpPerPoint) && D((value as any).egpPerPoint).gt(0))) throw new ApiError('VALIDATION_FAILED', { policyId: id, field: 'egpPerPoint', rule: 'an amount > 0' });
   if (id === 'ServiceChargePolicy') {
     const v = value as any;
     const positive = Object.values(v?.byChannel ?? {}).some((r) => Number(r) > 0);

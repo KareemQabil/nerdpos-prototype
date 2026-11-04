@@ -5,6 +5,8 @@
 //    requests, checks, customers and people; every kind only for users who may read it.
 //  • Search.Status — the live status of the things a user follows (PO waiting for receipt, item below minimum, …).
 import { ApiError } from '../errors';
+import { phoneSearchAllowed } from './customers'; // ux-13
+import { phoneViewer } from '../privacy'; // ux-13
 import type { Ctx, Handler } from '../kernel';
 import { D, m4, Decimal } from '../money';
 import { userName, settlementOf } from './util';
@@ -362,8 +364,10 @@ function search(ctx: Ctx) {
   if (want('receipt')) for (const r of inv.receipts) { const sn = inv.suppliers.find((s) => s.id === r.supplierId)?.name; if (hit(r.number, sn, r.supplierInvoiceNo, 'استلام', 'grn') || (digits.length >= 3 && r.number.replace(/\D/g, '').endsWith(digits))) add('receipt', r.id, 6); }
   if (want('invoice')) for (const x of invoices(inv)) { const sn = inv.suppliers.find((s) => s.id === x.supplierId)?.name; if (hit(x.number, sn, x.supplierInvoiceNo, 'فاتوره')) add('invoice', x.id, 6); }
   if (want('storeRequest')) for (const s of srs(inv)) if (hit(s.number, 'طلبيه مخزن', inv.warehouses.find((w) => w.id === s.warehouseId)?.name)) add('storeRequest', s.id, 6);
-  if (want('order')) for (const o of db.orders) { if (branchOf(ctx) && o.branchId !== branchOf(ctx) && ctx.query.branchId !== 'ALL') continue; if ((digits.length >= 1 && (o.number === digits || o.number.replace(/^0+/, '') === digits.replace(/^0+/, ''))) || hit(`#${o.number}`, o.customerName, o.customerPhone)) add('order', o.id, 5 + (o.number.replace(/^0+/, '') === digits.replace(/^0+/, '') ? 4 : 0)); }
-  if (want('customer')) for (const c of db.customers ?? []) { if (c.mergedInto) continue; if (hit(c.name, c.code) || (digits.length >= 4 && (c.phone.replace(/\D/g, '').includes(digits) || (c.altPhone ?? '').replace(/\D/g, '').includes(digits)))) add('customer', c.id, 7); }
+  // ux-13: a number matches in part only for a viewer who may see full numbers (CustomerPrivacyPolicy.partialSearch)
+  const phoneHit = (p: string) => (phoneViewer(ctx).partial ? p.includes(digits) : p === digits);
+  if (want('order')) for (const o of db.orders) { if (branchOf(ctx) && o.branchId !== branchOf(ctx) && ctx.query.branchId !== 'ALL') continue; if ((digits.length >= 1 && (o.number === digits || o.number.replace(/^0+/, '') === digits.replace(/^0+/, ''))) || hit(`#${o.number}`, o.customerName) || (!!o.customerPhone && digits.length >= 7 && phoneHit(o.customerPhone))) add('order', o.id, 5 + (o.number.replace(/^0+/, '') === digits.replace(/^0+/, '') ? 4 : 0)); }
+  if (want('customer')) for (const c of db.customers ?? []) { if (c.mergedInto) continue; if (hit(c.name, c.code) || (digits.length >= 4 && phoneSearchAllowed(ctx, digits, c))) add('customer', c.id, 7); }
   if (want('person')) for (const u of db.users) if (u.active && hit(userName(db, u.id), u.displayName)) add('person', u.id, 4);
   const counts: Record<string, number> = {};
   for (const r of out) counts[r.type] = (counts[r.type] ?? 0) + 1;

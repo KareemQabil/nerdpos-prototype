@@ -195,11 +195,11 @@ export function seedInventory(db: DB, nowMs: number) {
     { id: WH.k2, branchId: 'branch_second', name: 'مطبخ الفرع الثاني', kind: 'KITCHEN', active: true, salesDefault: true, version: 1, createdAt: created, history: [{ at: created, by: 'provisioning', text: 'created — sales warehouse of the branch' }] },
   ];
   base.suppliers = [
-    { id: 'sup_ahram', name: 'مخازن الأهرام للمواد الغذائية', taxId: '512-334-871', phone: '01001234567', contactName: 'أ. مجدي عبد الحميد', paymentTerms: 'آجل 15 يوم', address: 'العبور — المنطقة الصناعية', notes: 'بقالة وزيوت وألبان وبقوليات. التوريد يوم الأحد والأربع.', active: true, version: 1, createdAt: created },
-    { id: 'sup_nile', name: 'مزارع النيل', taxId: '498-221-063', phone: '01112345678', contactName: 'الحاج سعيد', paymentTerms: 'كاش عند الاستلام', address: 'سوق العبور — عنبر 12', notes: 'خضار وفاكهة وفراخ وبيض — توريد يومي الصبح بدري.', active: true, version: 1, createdAt: created },
-    { id: 'sup_butcher', name: 'جزارة الأمانة', taxId: null, phone: '01223456789', contactName: 'المعلم رضا', paymentTerms: 'أسبوعي', address: 'مدينة نصر — شارع مكرم عبيد', notes: 'لحمة مفرومة وكندوز — طازة كل يومين.', active: true, version: 1, createdAt: created },
+    { id: 'sup_ahram', name: 'مخازن الأهرام للمواد الغذائية', taxId: '512-334-871', phone: '01009876501', contactName: 'أ. مجدي عبد الحميد', paymentTerms: 'آجل 15 يوم', address: 'العبور — المنطقة الصناعية', notes: 'بقالة وزيوت وألبان وبقوليات. التوريد يوم الأحد والأربع.', active: true, version: 1, createdAt: created },
+    { id: 'sup_nile', name: 'مزارع النيل', taxId: '498-221-063', phone: '01118765402', contactName: 'الحاج سعيد', paymentTerms: 'كاش عند الاستلام', address: 'سوق العبور — عنبر 12', notes: 'خضار وفاكهة وفراخ وبيض — توريد يومي الصبح بدري.', active: true, version: 1, createdAt: created },
+    { id: 'sup_butcher', name: 'جزارة الأمانة', taxId: null, phone: '01227654303', contactName: 'المعلم رضا', paymentTerms: 'أسبوعي', address: 'مدينة نصر — شارع مكرم عبيد', notes: 'لحمة مفرومة وكندوز — طازة كل يومين.', active: true, version: 1, createdAt: created },
     { id: 'sup_metro', name: 'مترو للجملة', taxId: '611-208-447', phone: '01155566677', contactName: 'أ. هاني', paymentTerms: 'آجل 30 يوم', address: 'التجمع الخامس — طريق السويس', notes: 'جملة: زيوت وبقالة بعبوات كبيرة — أسعار أقل للعبوات الكبيرة.', active: true, version: 1, createdAt: created },
-    { id: 'sup_bakery', name: 'مخبز الشروق', taxId: null, phone: '01098765432', contactName: 'أم محمد', paymentTerms: 'كاش', address: 'مدينة نصر', notes: 'عيش بلدي وشامي وبرجر وكنافة ورقاق — كل يوم الساعة 7.', active: true, version: 1, createdAt: created },
+    { id: 'sup_bakery', name: 'مخبز الشروق', taxId: null, phone: '01094567804', contactName: 'أم محمد', paymentTerms: 'كاش', address: 'مدينة نصر', notes: 'عيش بلدي وشامي وبرجر وكنافة ورقاق — كل يوم الساعة 7.', active: true, version: 1, createdAt: created },
   ];
   base.items = ITEMS.map((d): InvItem => {
     const levels: InvItem['levels'] = {};

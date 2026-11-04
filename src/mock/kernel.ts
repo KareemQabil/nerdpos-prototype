@@ -13,6 +13,7 @@ import { DELEGABLE_OPS } from './control-registry'; // r3A: supervisor override
 import { runOutbox } from './outbox';
 import { applyUserOverrides } from './user-perms'; // P1-041 per-user overrides
 import { hasPermission } from './types-channels'; // '*' excludes vendor-only permissions
+import { applyPhonePrivacy, maskAll } from './privacy'; // ux-13: customer phones leave the server masked unless permitted
 
 export interface Ctx {
   op: OperationDef;
@@ -35,7 +36,7 @@ export interface Ctx {
   /** r3A: set when the actor lacks the operation's permission and a supervisor must authorise it in place */
   override: { permission: string } | null;
 }
-export interface HandlerResult { status?: number; body?: unknown; headers?: Record<string, string> }
+export interface HandlerResult { status?: number; body?: unknown; headers?: Record<string, string>; /** ux-13: kept for a replay and the request log instead of `body` (a revealed number is shown once) */ keep?: unknown }
 export type Handler = (ctx: Ctx) => HandlerResult | unknown;
 
 export interface LogEntry {
@@ -97,7 +98,7 @@ export const hashOf = (v: unknown) => {
 };
 
 export interface MockRequest { method: string; url: string; headers: Record<string, string>; body: unknown; deviceLabel?: string }
-export interface MockResponse { status: number; body: unknown; headers: Record<string, string>; dropped?: boolean }
+export interface MockResponse { status: number; body: unknown; headers: Record<string, string>; dropped?: boolean; /** ux-13: what the request log keeps (a revealed number is not kept) */ logBody?: unknown }
 
 export async function handleRequest(req: MockRequest): Promise<MockResponse> {
   const started = performance.now();
@@ -135,7 +136,7 @@ export async function handleRequest(req: MockRequest): Promise<MockResponse> {
     res = { status: err.status, body: err.toBody(), headers: {} };
   }
   const code = (res.body as any)?.error?.code ?? null;
-  pushLog(req, match?.op ?? null, path, res.status, commandId, res.headers['idempotent-replayed'] === 'true', code, performance.now() - started, dropped, res.body);
+  pushLog(req, match?.op ?? null, path, res.status, commandId, res.headers['idempotent-replayed'] === 'true', code, performance.now() - started, dropped, res.logBody !== undefined ? res.logBody : res.body);
   if (dropped) throw new TypeError('Failed to fetch (simulated lost response)');
   return res;
 }
@@ -174,6 +175,8 @@ function execute(op: OperationDef, params: Record<string, string>, query: Record
   }
   const perms = user ? permsOf(db, user, branchId) : new Set<string>();
   const can = (p: string) => hasPermission(perms, p); // '*' = all but vendor-only; '-p' = revoked for this user (P1-041)
+  // ux-13: every answer (also a replayed one) is masked for this viewer — CustomerPrivacyPolicy + customer:viewphone
+  const privacy = (b: unknown) => applyPhonePrivacy({ db: store.db, user, branchId, can }, b);
 
   // 3. permission (authorization precedes every read and write)
   const required = effectivePermission(op);
@@ -193,7 +196,7 @@ function execute(op: OperationDef, params: Record<string, string>, query: Record
     const prior = db.idem[commandId];
     if (prior) {
       if (prior.hash === reqHash) {
-        return { status: prior.status, body: prior.body, headers: { 'idempotent-replayed': 'true' } };
+        return { status: prior.status, body: privacy(prior.body), headers: { 'idempotent-replayed': 'true' } };
       }
       throw new ApiError('IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST', { commandId, firstOperation: prior.opId });
     }
@@ -255,17 +258,18 @@ function execute(op: OperationDef, params: Record<string, string>, query: Record
     const out = handler(ctx) as HandlerResult | undefined;
     // r3A: an operation run on someone else's authority must have consumed a grant (fail closed)
     if (override && !consumed.length) throw new ApiError('PERMISSION_DENIED', { required: override.permission });
-    const isWrapped = !!out && typeof out === 'object' && typeof (out as any).status === 'number' && Object.keys(out).every((k) => k === 'status' || k === 'body' || k === 'headers');
+    const isWrapped = !!out && typeof out === 'object' && typeof (out as any).status === 'number' && Object.keys(out).every((k) => k === 'status' || k === 'body' || k === 'headers' || k === 'keep');
     const result: HandlerResult = isWrapped ? out! : { body: out };
     const status = result.status ?? (isCmd ? (op.method === 'POST' && /Create|Open|Register|Request|Grant|Login/.test(op.id) ? 201 : 200) : 200);
     if (isCmd) {
       // the grant is consumed last, in the same transaction
       for (const g of consumed) { g.consumedAt = ctx.nowIso; g.consumedBy = commandId; }
-      if (commandId) db.idem[commandId] = { opId: op.id, hash: reqHash, status, body: result.body ?? null, at: ctx.nowIso, userId: user?.id ?? null };
+      if (commandId) db.idem[commandId] = { opId: op.id, hash: reqHash, status, body: (result.keep !== undefined ? result.keep : result.body) ?? null, at: ctx.nowIso, userId: user?.id ?? null };
       store.commit();
       queueMicrotask(() => runOutbox());
     }
-    return { status, body: result.body ?? null, headers: result.headers ?? {} };
+    const shown = result.keep !== undefined ? result.body ?? null : privacy(result.body ?? null);
+    return { status, body: shown, headers: result.headers ?? {}, logBody: result.keep !== undefined ? maskAll(store.db, result.keep) : undefined };
   } catch (e) {
     if (snapshot && !(e as any)?.keepWrites) store.db = snapshot; // nothing written
     else if ((e as any)?.keepWrites) store.commit(); // e.g. a failed-attempt counter

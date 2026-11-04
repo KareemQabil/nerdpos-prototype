@@ -5,7 +5,9 @@ import { nextId, event } from '../store';
 import { computeTotals } from '../pricing';
 import { D, m4 } from '../money';
 import { checkVersion, need, page, requireFields } from './util';
-import { loyaltySummary, addLoyaltyEntry, balanceOf } from './loyalty';
+import { loyaltySummary, addLoyaltyEntry, balanceOf, settleExpiry } from './loyalty';
+import { phoneViewer, maskPhone, isMasked } from '../privacy';
+import { reasonMinLength } from '../policies';
 import type { DB, Order } from '../types';
 import type { Customer, CustomerAddress, AddressSnapshot } from '../types-crm';
 
@@ -136,17 +138,25 @@ export const customerHandlers: Record<string, Handler> = {
     const c = createCustomer(ctx, ctx.body);
     return { status: 201, body: customerView(ctx.db, c, true) };
   },
-  'Customer.Get': (ctx) => customerView(ctx.db, getCustomer(ctx, ctx.params.customerId), true),
+  // ux-13: the view leaves the server masked (kernel); phoneReveal tells the screen whether «إظهار الرقم» is offered
+  'Customer.Get': (ctx) => { const v = phoneViewer(ctx); return { ...customerView(ctx.db, getCustomer(ctx, ctx.params.customerId), true), phoneMasked: !v.full, phoneReveal: v.canReveal }; },
   'Customer.Search': (ctx) => {
     const q = ctx.query;
     let list = custs(ctx.db).filter((c) => (q.includeMerged === 'true' ? true : c.active));
+    // ux-13 CustomerPrivacyPolicy.partialSearch: without customer:viewphone a number is found only when typed whole (part of
+    // a number would let a masked number be guessed digit by digit); the answer stays masked either way
+    const viewer = phoneViewer(ctx);
+    let phoneSearch: 'PARTIAL' | 'WHOLE_NUMBER' | 'FULL_NUMBER_REQUIRED' = viewer.partial ? 'PARTIAL' : 'WHOLE_NUMBER';
     if (q.phone) {
       const p = normPhone(q.phone);
-      if (p) list = list.filter((c) => c.phone.includes(p) || (c.altPhone ?? '').includes(p));
+      if (p && viewer.partial) list = list.filter((c) => c.phone.includes(p) || (c.altPhone ?? '').includes(p));
+      else if (p && (PHONE_RE.test(p) || LANDLINE_RE.test(p))) list = list.filter((c) => c.phone === p || c.altPhone === p);
+      else if (p) { list = []; phoneSearch = 'FULL_NUMBER_REQUIRED'; }
     }
     if (q.text) {
       const s = arNorm(q.text);
-      list = list.filter((c) => arNorm([c.name, c.code, c.notes, c.email, ...c.tags, ...c.addresses.map((a) => `${a.area} ${a.street} ${a.landmark ?? ''}`)].join(' ')).includes(s) || c.phone.includes(s));
+      const digits = normPhone(q.text);
+      list = list.filter((c) => arNorm([c.name, c.code, c.notes, c.email, ...c.tags, ...c.addresses.map((a) => `${a.area} ${a.street} ${a.landmark ?? ''}`)].join(' ')).includes(s) || (viewer.partial ? c.phone.includes(s) : !!digits && (c.phone === digits || c.altPhone === digits)));
     }
     if (q.tag) list = list.filter((c) => c.tags.includes(q.tag));
     const views = list.map((c) => customerView(ctx.db, c));
@@ -156,7 +166,7 @@ export const customerHandlers: Record<string, Handler> = {
       sort === 'SPENT' ? D(b.stats.spent).comparedTo(D(a.stats.spent)) :
       sort === 'POINTS' ? b.loyalty.balance - a.loyalty.balance :
       (b.stats.lastOrderAt ?? b.createdAt).localeCompare(a.stats.lastOrderAt ?? a.createdAt));
-    return page(views, q);
+    return { ...page(views, q), phoneSearch };
   },
   'Customer.Update': (ctx) => {
     const c = getCustomer(ctx, ctx.params.customerId);
@@ -166,19 +176,23 @@ export const customerHandlers: Record<string, Handler> = {
     const b = ctx.body;
     const name = String(b.name).trim();
     need(name.length <= 80, 'VALIDATION_FAILED', { field: 'name', rule: 'at most 80 characters' });
-    if (b.phone !== undefined && b.phone !== c.phone) {
+    // ux-13: the masked number the form was given back means «unchanged» (the browser never had the full one)
+    const same = (v: unknown, cur: string | null | undefined) => v === cur || (isMasked(v) && !!cur && v === maskPhone(cur));
+    const oldPhones = `${c.phone}|${c.altPhone ?? ''}`;
+    if (b.phone !== undefined && !same(b.phone, c.phone)) {
       const p = b.phone ? validatePhone(b.phone) : '';
       if (p) assertPhoneFree(ctx.db, p, c.id);
       c.phone = p;
     }
-    if (b.altPhone !== undefined) c.altPhone = b.altPhone ? validatePhone(b.altPhone, 'altPhone', true) : null;
+    if (b.altPhone !== undefined && !same(b.altPhone, c.altPhone)) c.altPhone = b.altPhone ? validatePhone(b.altPhone, 'altPhone', true) : null;
+    const phoneChanged = oldPhones !== `${c.phone}|${c.altPhone ?? ''}`;
     c.name = name;
     if (b.email !== undefined) c.email = b.email ? String(b.email).trim() : null;
     if (b.notes !== undefined) c.notes = b.notes ? String(b.notes).slice(0, 300) : null;
     if (Array.isArray(b.allergies)) c.allergies = b.allergies.map(String);
     if (Array.isArray(b.tags)) c.tags = [...new Set(b.tags.map(String))] as string[];
     c.version++;
-    ctx.audit(`customer ${c.code} updated`, c.id, true);
+    ctx.audit(`customer ${c.code} updated${phoneChanged ? ' (phone changed)' : ''}`, c.id, true);
     return customerView(ctx.db, c, true);
   },
   'CustomerAddress.Upsert': (ctx) => {
@@ -227,11 +241,12 @@ export const customerHandlers: Record<string, Handler> = {
     for (const o of db.orders) if (o.customerId === src.id) { o.customerId = target.id; o.customerName = target.name; movedOrders++; }
     for (const d of db.deliveries ?? []) if (d.customerId === src.id) d.customerId = target.id;
     for (const e of db.externalOrders ?? []) if (e.customerId === src.id) e.customerId = target.id;
-    // loyalty: the source balance moves as one pair of entries
+    // loyalty: the source balance moves as one pair of entries (expired points are written first — ux-13)
+    settleExpiry(ctx, src.id); settleExpiry(ctx, target.id);
     const pts = balanceOf(db, src.id);
     if (pts !== 0) {
-      addLoyaltyEntry(ctx, src.id, 'MERGE_OUT', -pts, { reason: `اتنقلت لـ ${target.name} (${target.code})` });
-      addLoyaltyEntry(ctx, target.id, 'MERGE_IN', pts, { reason: `من ${src.name} (${src.code}) بعد الدمج` });
+      addLoyaltyEntry(ctx, src.id, 'MERGE_OUT', -pts, { reason: 'نُقل الرصيد إلى العميل الأساسي بعد الدمج', orderNumber: target.code });
+      addLoyaltyEntry(ctx, target.id, 'MERGE_IN', pts, { reason: 'رصيد عميل مكرر بعد الدمج', orderNumber: src.code });
     }
     src.active = false; src.mergedInto = target.id; src.version++;
     target.version++;
@@ -239,4 +254,26 @@ export const customerHandlers: Record<string, Handler> = {
     event('CustomerMerged', target.id, `${src.code} → ${target.code}`);
     return { ...customerView(db, target, true), merge: { sourceId: src.id, movedOrders, movedPoints: pts } };
   },
+  // ux-13 PROPOSED: POST /customers/{customerId}/phone/reveal {reason, expectedVersion} — a holder of customer:viewphone sees
+  // one customer's full numbers once, with a written reason (CustomerPrivacyPolicy.revealMode WITH_REASON). Audited (who,
+  // which customer, why — never the number); the answer is not kept for a replay or in the request log.
+  'Customer.RevealPhone': (ctx) => {
+    const c = getCustomer(ctx, ctx.params.customerId);
+    const v = phoneViewer(ctx);
+    if (v.policy.revealMode === 'NOT_ALLOWED') throw new ApiError('CUSTOMER_PHONE_REVEAL_NOT_ALLOWED', { revealMode: 'NOT_ALLOWED' }, 403);
+    const min = reasonMinLength({ branchId: ctx.branchId });
+    const reason = String(ctx.body?.reason ?? '').trim();
+    need(reason.length >= min && reason.length <= 200, 'VALIDATION_FAILED', { field: 'reason', rule: `${min}..200 characters`, minLength: min });
+    checkVersion(c, ctx.body?.expectedVersion);
+    ctx.audit(`customer ${c.code} phone revealed: ${reason}`, c.id, true);
+    event('CustomerPhoneRevealed', c.id, c.code);
+    const shown = { customerId: c.id, code: c.code, phone: c.phone, altPhone: c.altPhone ?? null, revealedAt: ctx.nowIso, reason };
+    return { status: 200, body: shown, keep: { ...shown, phone: maskPhone(c.phone), altPhone: c.altPhone ? maskPhone(c.altPhone) : null, replayed: true } };
+  },
 };
+/** ux-13: a number search that may not see full numbers needs the whole number (used by the 360 search too). */
+export function phoneSearchAllowed(ctx: Ctx, digits: string, c: Customer): boolean {
+  const v = phoneViewer(ctx);
+  if (v.partial) return c.phone.replace(/\D/g, '').includes(digits) || (c.altPhone ?? '').includes(digits);
+  return c.phone === digits || c.altPhone === digits;
+}

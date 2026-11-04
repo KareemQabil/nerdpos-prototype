@@ -3,17 +3,21 @@
 import { ApiError } from '../errors';
 import type { Handler, Ctx } from '../kernel';
 import { nextId, event, hist } from '../store';
-import { policy } from '../policies';
+import { policyFields, reasonMinLength } from '../policies';
+import { clock } from '../clock';
 import { computeTotals } from '../pricing';
 import { D, m4, round } from '../money';
 import { checkVersion, getOrder, need, openSessionOn, page, requireFields, settlementOf, userName } from './util';
 import type { DB, Order } from '../types';
 import type { LoyaltyEntry, LoyaltyEntryKind, LoyaltyTier } from '../types-crm';
 
-export interface LoyaltyProgram { enabled: boolean; egpPerPoint: string; pointValue: string; minRedeemPoints: number; maxRedeemPercent: number }
+export interface LoyaltyProgram { enabled: boolean; egpPerPoint: string; pointValue: string; minRedeemPoints: number; maxRedeemPercent: number; earnBase: 'ITEMS_AFTER_DISCOUNT' | 'CHECK_TOTAL'; expiryMonths: number }
+/** LoyaltyProgramPolicy with every field (ux-13: a value stored before a field existed gets the field's default). */
 export function program(): LoyaltyProgram {
-  const v = policy<Partial<LoyaltyProgram>>('LoyaltyProgramPolicy') ?? {};
-  return { enabled: v.enabled !== false, egpPerPoint: String(v.egpPerPoint ?? '10'), pointValue: String(v.pointValue ?? '0.25'), minRedeemPoints: Number(v.minRedeemPoints ?? 100), maxRedeemPercent: Number(v.maxRedeemPercent ?? 50) };
+  const v = policyFields<Partial<LoyaltyProgram>>('LoyaltyProgramPolicy');
+  const months = Number(v.expiryMonths ?? 0);
+  return { enabled: v.enabled !== false, egpPerPoint: String(v.egpPerPoint ?? '10'), pointValue: String(v.pointValue ?? '0.25'), minRedeemPoints: Number(v.minRedeemPoints ?? 100), maxRedeemPercent: Number(v.maxRedeemPercent ?? 50),
+    earnBase: v.earnBase === 'CHECK_TOTAL' ? 'CHECK_TOTAL' : 'ITEMS_AFTER_DISCOUNT', expiryMonths: Number.isInteger(months) && months > 0 ? months : 0 };
 }
 const entriesOf = (db: DB) => (db.loyaltyEntries ??= []);
 const tiersOf = (db: DB) => (db.loyaltyTiers ??= []);
@@ -26,8 +30,34 @@ export function tierFor(db: DB, lifetime: number): LoyaltyTier | null {
   return list.find((t) => lifetime >= t.minPoints) ?? null;
 }
 
+/** ux-13 expiry (LoyaltyProgramPolicy.expiryMonths, 0 = never): points are spent oldest first; what is left of a lot older
+ *  than the period has expired. Returns the points expired but not yet written as an EXPIRE entry (append-only ledger:
+ *  the next loyalty command of the customer writes it; reads already show the balance without them). */
+export function dueExpiry(db: DB, customerId: string, nowMs = clock.now()): number {
+  const months = program().expiryMonths;
+  if (!months) return 0;
+  const mine = entriesOf(db).filter((e) => e.customerId === customerId).sort((a, b) => a.at.localeCompare(b.at));
+  let spent = mine.filter((e) => e.points < 0).reduce((a, e) => a - e.points, 0);
+  let due = 0;
+  for (const lot of mine.filter((e) => e.points > 0)) {
+    const left = Math.max(0, lot.points - spent);
+    spent = Math.max(0, spent - lot.points);
+    const end = new Date(lot.at); end.setUTCMonth(end.getUTCMonth() + months);
+    if (left > 0 && end.getTime() <= nowMs) due += left;
+  }
+  return due;
+}
+/** Write the expired points (one EXPIRE entry) inside the command that touches the customer's points. */
+export function settleExpiry(ctx: { db: DB; nowIso: string; now: number; user: { id: string } | null }, customerId: string) {
+  const due = dueExpiry(ctx.db, customerId, ctx.now);
+  if (due > 0) addLoyaltyEntry(ctx, customerId, 'EXPIRE', -due, { reason: 'انتهت صلاحية النقاط' });
+  return due;
+}
+/** The points the customer can use now (the ledger sum less the points already expired). */
+export const spendableOf = (db: DB, customerId: string, nowMs = clock.now()) => balanceOf(db, customerId) - dueExpiry(db, customerId, nowMs);
+
 export function loyaltySummary(db: DB, customerId: string) {
-  const balance = balanceOf(db, customerId);
+  const balance = spendableOf(db, customerId);
   const lifetime = lifetimeOf(db, customerId);
   const tier = tierFor(db, lifetime);
   const next = tiersOf(db).filter((t) => t.active && t.minPoints > lifetime).sort((a, b) => a.minPoints - b.minPoints)[0] ?? null;
@@ -51,14 +81,15 @@ export function earnQuote(db: DB, o: Order) {
   if (!p.enabled || !o.customerId || o.kind === 'STAFF_MEAL') return null;
   const tt = computeTotals(o);
   if (tt.comp) return null;
-  const netItems = D(tt.itemsSubtotal).minus(D(tt.itemDiscount));
+  // ux-13 LoyaltyProgramPolicy.earnBase: item value after discount (default) or the whole check (tax, service, fees)
+  const gross = p.earnBase === 'CHECK_TOTAL' ? D(tt.payable) : D(tt.itemsSubtotal).minus(D(tt.itemDiscount));
   const paidByPoints = db.captures.filter((c) => c.orderId === o.id && c.method === 'LOYALTY').reduce((a, c) => a.plus(D(c.amount)), D(0));
-  const base = netItems.minus(paidByPoints);
-  if (base.lte(0)) return { points: 0, base: '0.0000', multiplier: '1' };
+  const base = gross.minus(paidByPoints);
+  if (base.lte(0)) return { points: 0, base: '0.0000', multiplier: '1', earnBase: p.earnBase };
   const tier = tierFor(db, lifetimeOf(db, o.customerId));
   const mult = D(tier?.multiplier ?? '1');
   const points = base.dividedBy(D(p.egpPerPoint)).times(mult).floor().toNumber();
-  return { points, base: m4(base), multiplier: mult.toString(), tierName: tier?.name ?? null };
+  return { points, base: m4(base), multiplier: mult.toString(), tierName: tier?.name ?? null, earnBase: p.earnBase };
 }
 
 /** Hook called when a check completes (Order.Complete). Idempotent per order. */
@@ -67,7 +98,8 @@ export function onOrderCompleted(ctx: Ctx, o: Order) {
   if (entriesOf(ctx.db).some((e) => e.orderId === o.id && e.kind === 'EARN')) return;
   const q = earnQuote(ctx.db, o);
   if (!q || q.points <= 0) return;
-  addLoyaltyEntry(ctx, o.customerId, 'EARN', q.points, { orderId: o.id, orderNumber: o.number, amount: q.base, reason: q.multiplier !== '1' ? `مضاعف المستوى ×${q.multiplier}` : null });
+  settleExpiry(ctx, o.customerId);
+  addLoyaltyEntry(ctx, o.customerId, 'EARN', q.points, { orderId: o.id, orderNumber: o.number, amount: q.base, reason: q.multiplier !== '1' ? 'مضاعف المستوى' : null, multiplier: q.multiplier !== '1' ? q.multiplier : null });
   o.history.push(hist(ctx.user?.id ?? 'system', 'LOYALTY_EARNED', { ar: `كسب العميل ${q.points} نقطة على هذا الطلب`, en: `customer earned ${q.points} points` }));
   event('LoyaltyEarned', o.customerId, `${o.number} +${q.points}`);
 }
@@ -75,7 +107,7 @@ export function onOrderCompleted(ctx: Ctx, o: Order) {
 function redeemQuote(db: DB, o: Order) {
   const p = program();
   const st = settlementOf(db, o);
-  const balance = o.customerId ? balanceOf(db, o.customerId) : 0;
+  const balance = o.customerId ? spendableOf(db, o.customerId) : 0;
   const alreadyPoints = db.captures.filter((c) => c.orderId === o.id && c.method === 'LOYALTY').reduce((a, c) => a.plus(D(c.amount)), D(0));
   const capByPercent = D(computeTotals(o).payable).times(p.maxRedeemPercent).dividedBy(100).minus(alreadyPoints);
   const capValue = capByPercent.lt(D(st.remaining)) ? capByPercent : D(st.remaining);
@@ -97,6 +129,9 @@ export const loyaltyHandlers: Record<string, Handler> = {
     }
     return out;
   },
+  // ux-13: reason (ReasonTextPolicy.minLength), CAS on the balance the operator saw (expectedBalance), the LOYALTY_ADJUST
+  // approval by ApprovalRequirementPolicy (default ALWAYS; SelfApprovalPolicy: not the requester), an append-only entry and
+  // an audit line with the balance before → after.
   'Loyalty.Adjust': (ctx) => {
     requireFields(ctx, 'points', 'reason');
     const c = (ctx.db.customers ?? []).find((x) => x.id === ctx.params.customerId);
@@ -105,12 +140,18 @@ export const loyaltyHandlers: Record<string, Handler> = {
     const points = Number(ctx.body.points);
     need(Number.isInteger(points) && points !== 0 && Math.abs(points) <= 100000, 'VALIDATION_FAILED', { field: 'points', rule: 'whole number, not zero' });
     const reason = String(ctx.body.reason).trim();
-    need(reason.length >= 3 && reason.length <= 200, 'VALIDATION_FAILED', { field: 'reason', rule: '3..200 characters' });
-    if (balanceOf(ctx.db, c.id) + points < 0) throw new ApiError('LOYALTY_INSUFFICIENT_POINTS', { balance: balanceOf(ctx.db, c.id), points });
+    const min = reasonMinLength({ branchId: ctx.branchId });
+    need(reason.length >= min && reason.length <= 200, 'VALIDATION_FAILED', { field: 'reason', rule: `${min}..200 characters`, minLength: min });
+    need(ctx.body.expectedBalance !== undefined && ctx.body.expectedBalance !== null && Number.isInteger(Number(ctx.body.expectedBalance)), 'VALIDATION_FAILED', { field: 'expectedBalance', rule: 'required: the balance shown when the adjustment was entered' });
+    const before = spendableOf(ctx.db, c.id, ctx.now);
+    if (Number(ctx.body.expectedBalance) !== before) throw new ApiError('CONCURRENCY_CONFLICT', { field: 'expectedBalance', expected: Number(ctx.body.expectedBalance), current: before });
+    if (before + points < 0) throw new ApiError('LOYALTY_INSUFFICIENT_POINTS', { balance: before, points });
     const g = ctx.requireApproval({ action: 'LOYALTY_ADJUST', targetType: 'customers.Customer', targetId: c.id, context: { customerId: c.id, points: String(points), absPoints: String(Math.abs(points)), reason }, grantId: ctx.body.approvalGrantId });
-    addLoyaltyEntry(ctx, c.id, 'ADJUST', points, { reason, approvalGrantId: g?.id ?? null });
-    ctx.audit(`loyalty adjust ${points} for ${c.code}: ${reason}`, c.id, true, g?.id);
-    return { customerId: c.id, ...loyaltySummary(ctx.db, c.id) };
+    settleExpiry(ctx, c.id);
+    const e = addLoyaltyEntry(ctx, c.id, 'ADJUST', points, { reason, approvalGrantId: g?.id ?? null });
+    ctx.audit(`loyalty adjust ${points > 0 ? '+' : ''}${points} for ${c.code} (${before} → ${e.balanceAfter}): ${reason}`, c.id, true, g?.id);
+    event('LoyaltyAdjusted', c.id, `${c.code} ${points > 0 ? '+' : ''}${points}`);
+    return { customerId: c.id, entry: e, ...loyaltySummary(ctx.db, c.id) };
   },
   // POST /loyalty/redemptions {orderId, points}: points pay part of a confirmed check (proposed LOYALTY tender).
   'Loyalty.Redeem': (ctx) => {
@@ -124,6 +165,7 @@ export const loyaltyHandlers: Record<string, Handler> = {
     if (!p.enabled) throw new ApiError('LOYALTY_DISABLED');
     const points = Number(ctx.body.points);
     need(Number.isInteger(points) && points > 0, 'VALIDATION_FAILED', { field: 'points', rule: 'whole number > 0' });
+    settleExpiry(ctx, o.customerId);
     const q = redeemQuote(db, o);
     if (points > q.balance) throw new ApiError('LOYALTY_INSUFFICIENT_POINTS', { balance: q.balance, points });
     if (points < p.minRedeemPoints) throw new ApiError('LOYALTY_BELOW_MINIMUM', { minRedeemPoints: p.minRedeemPoints, points });
@@ -134,7 +176,7 @@ export const loyaltyHandlers: Record<string, Handler> = {
     const entryId = nextId('le');
     const cap = { id: nextId('cap'), orderId: o.id, method: 'LOYALTY' as const, amount: m4(value), tendered: null, change: '0.0000', reference: `${points} نقطة`, walletProvider: null, sessionId: session.id, terminalId: ctx.terminal?.id ?? '', branchId: o.branchId, at: ctx.nowIso, atMs: ctx.now, businessDate: ctx.businessDate(o.branchId), by: ctx.user!.id, commandId: ctx.commandId ?? '', tip: '0.0000', rounding: '0.0000' };
     db.captures.push(cap);
-    const e: LoyaltyEntry = { id: entryId, customerId: o.customerId, kind: 'REDEEM', points: -points, balanceAfter: balanceOf(db, o.customerId) - points, orderId: o.id, orderNumber: o.number, amount: m4(value), reason: 'اتصرفت كدفع في التحصيل', at: ctx.nowIso, by: ctx.user!.id, captureId: cap.id };
+    const e: LoyaltyEntry = { id: entryId, customerId: o.customerId, kind: 'REDEEM', points: -points, balanceAfter: balanceOf(db, o.customerId) - points, orderId: o.id, orderNumber: o.number, amount: m4(value), reason: 'صُرفت دفعًا في التحصيل', at: ctx.nowIso, by: ctx.user!.id, captureId: cap.id };
     entriesOf(db).push(e);
     o.version++;
     o.history.push(hist(ctx.user!.id, 'LOYALTY_REDEEMED', { ar: `دُفع ${m4(value)} ج.م بالنقاط (${points} نقطة)`, en: `paid ${value} with ${points} points` }, null, ctx.terminal?.code));
@@ -159,6 +201,7 @@ export const loyaltyHandlers: Record<string, Handler> = {
     let t = tiersOf(db).find((x) => x.id === ctx.params.tierId);
     const active = b.active !== false;
     if (active && tiersOf(db).some((x) => x.active && x.id !== t?.id && x.minPoints === minPoints)) throw new ApiError('LOYALTY_TIER_INVALID', { field: 'minPoints', rule: 'two active tiers cannot start at the same points' });
+    const before = t ? `${t.minPoints} ×${t.multiplier}${t.active ? '' : ' (off)'}` : null;
     if (t) {
       checkVersion(t, b.expectedVersion);
       Object.assign(t, { name: { ar: String(b.name.ar).trim(), en: String(b.name.en ?? b.name.ar).trim() }, minPoints, multiplier: mult, color: b.color ?? t.color, perks: b.perks ?? t.perks, active });
@@ -168,7 +211,7 @@ export const loyaltyHandlers: Record<string, Handler> = {
       tiersOf(db).push(t);
     }
     if (!tiersOf(db).some((x) => x.active && x.minPoints === 0)) throw new ApiError('LOYALTY_TIER_INVALID', { rule: 'an active starting tier (0 points) must exist' });
-    ctx.audit(`loyalty tier ${t.name.en} saved`, t.id);
+    ctx.audit(`loyalty tier ${t.name.en} saved: ${before ?? 'new'} → ${t.minPoints} ×${t.multiplier}${t.active ? '' : ' (off)'}`, t.id, true); // ux-13: thresholds / multipliers change earning — sensitive, old → new
     return t;
   },
   'Loyalty.Ledger': (ctx) => {
@@ -179,7 +222,9 @@ export const loyaltyHandlers: Record<string, Handler> = {
     if (q.kind) list = list.filter((e) => q.kind.split(',').includes(e.kind));
     const name = new Map((db.customers ?? []).map((c) => [c.id, c]));
     const items = [...list].sort((a, b) => b.at.localeCompare(a.at)).map((e) => ({ ...e, customerName: name.get(e.customerId)?.name ?? e.customerId, customerCode: name.get(e.customerId)?.code ?? '', byName: e.by === 'seed' || e.by === 'system' ? null : userName(db, e.by) }));
-    const totals = { earned: list.filter((e) => e.kind === 'EARN').reduce((a, e) => a + e.points, 0), redeemed: -list.filter((e) => e.kind === 'REDEEM').reduce((a, e) => a + e.points, 0), adjusted: list.filter((e) => e.kind === 'ADJUST').reduce((a, e) => a + e.points, 0), outstanding: list.reduce((a, e) => a + e.points, 0) };
+    const totals = { earned: list.filter((e) => e.kind === 'EARN').reduce((a, e) => a + e.points, 0), redeemed: -list.filter((e) => e.kind === 'REDEEM').reduce((a, e) => a + e.points, 0), adjusted: list.filter((e) => e.kind === 'ADJUST').reduce((a, e) => a + e.points, 0), expired: -list.filter((e) => e.kind === 'EXPIRE').reduce((a, e) => a + e.points, 0), outstanding: list.reduce((a, e) => a + e.points, 0) };
+    // ux-13: points already expired but not written yet are not owed any more
+    if (program().expiryMonths) { const ids = [...new Set(list.map((e) => e.customerId))]; const due = ids.reduce((a, id) => a + dueExpiry(db, id, ctx.now), 0); totals.expired += due; totals.outstanding -= due; }
     return { ...page(items, q), totals, liabilityEgp: round(D(totals.outstanding).times(D(program().pointValue)), 2) };
   },
 };

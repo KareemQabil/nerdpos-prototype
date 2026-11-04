@@ -20,11 +20,12 @@ export interface Customer {
   history?: { orders: number; spent: Money; lastOrderAt: string | null; favourite?: string };
 }
 
-export type LoyaltyEntryKind = 'EARN' | 'REDEEM' | 'ADJUST' | 'MERGE_IN' | 'MERGE_OUT' | 'REVERSE';
+export type LoyaltyEntryKind = 'EARN' | 'REDEEM' | 'ADJUST' | 'MERGE_IN' | 'MERGE_OUT' | 'REVERSE' | 'EXPIRE' /* ux-13 LoyaltyProgramPolicy.expiryMonths */;
 export interface LoyaltyEntry {
   id: string; customerId: string; kind: LoyaltyEntryKind; points: number; balanceAfter: number;
   orderId?: string | null; orderNumber?: string | null; amount?: Money | null; reason?: string | null;
   at: string; by: string; approvalGrantId?: string | null; captureId?: string | null;
+  /** ux-13: the tier multiplier an EARN used (reason «مضاعف المستوى») */ multiplier?: string | null;
 }
 export interface LoyaltyTier {
   id: string; name: Loc; minPoints: number; multiplier: string; color: string; perks: Loc; active: boolean; sortOrder: number; version: number;

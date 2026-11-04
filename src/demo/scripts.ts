@@ -16,6 +16,7 @@ import { CONTROL_JOURNEY } from './journey-control'; // r3A: who did it vs who a
 import { RIDERS_JOURNEY } from './journey-riders'; // ux-11: the riders system
 import { RESERVATIONS_JOURNEY } from './journey-reservations'; // ux-12: reservations complete
 import { HANDOVER_JOURNEY } from './journey-handover'; // ux-10b: shift handover and the remaining settings
+import { CUSTOMERS_JOURNEY } from './journey-customers'; // ux-13: customers, loyalty and phone masking
 
 export interface StepText { who: string; do_ar: string; do_en: string; expect_ar: string; expect_en: string; note?: string; operations: { op: string; http: string; actor: string; expected: string }[] }
 export interface StepDef { before?: () => void; id: string; device: string; user: string; screen?: string | (() => [string, Record<string, any>]); run: (log: Logger) => Promise<void>; text?: StepText }
@@ -566,4 +567,5 @@ export const JOURNEYS: Journey[] = [
   RIDERS_JOURNEY, // ux-11
   RESERVATIONS_JOURNEY, // ux-12
   HANDOVER_JOURNEY, // ux-10b
+  CUSTOMERS_JOURNEY, // ux-13
 ];

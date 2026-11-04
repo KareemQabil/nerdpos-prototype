@@ -200,3 +200,45 @@ export function applyUx10bExtensions(ops: OperationDef[]) {
     op.note = `${op.note ? op.note + ' · ' : ''}${ext.note}`;
   }
 }
+
+// ux-13 (customers and loyalty + phone masking). Owner decision: «ايوة، وكدة كدة الحاجات دي فيها إعداد» — the phone is
+// masked, and every default is a setting with its strictest workable value (PROTOTYPE_GAPS §15j): CustomerPrivacyPolicy
+// {phoneDisplay MASKED_UNLESS_PERMITTED, revealMode WITH_REASON, riderAccess OUT_FOR_DELIVERY, partialSearch PERMITTED_ONLY};
+// new permission customer:viewphone (manager; the owner holds '*'; not the cashier, waiter, host, captain, call center,
+// dispatcher or rider). The masking is applied by the server to EVERY answer (kernel), so each read below returns
+// 010•••••678 for a viewer who may not see the number. LoyaltyProgramPolicy gains earnBase (ITEMS_AFTER_DISCOUNT) and
+// expiryMonths (0 = never); LOYALTY_ADJUST defaults to ALWAYS.
+export const UX13_PROPOSED_OPERATIONS: OperationDef[] = [
+  { id: 'Customer.RevealPhone', module: 'customers', kind: 'CMD', method: 'POST', path: '/customers/{customerId}/phone/reveal', permission: 'customer:viewphone', input: { customerId: { type: 'Ref<customers.Customer>', required: true }, reason: { type: 'Text', required: true }, expectedVersion: V }, output: 'CustomerPhoneRevealView', errors: ['CUSTOMER_NOT_FOUND', 'CUSTOMER_PHONE_REVEAL_NOT_ALLOWED', 'CONCURRENCY_CONFLICT', 'VALIDATION_FAILED', 'PERMISSION_DENIED'], approval: null, backend_state: 'PROPOSED', note: 'ux-13: one customer\'s full phone and second number, once, for a holder of customer:viewphone under CustomerPrivacyPolicy.revealMode WITH_REASON; reason required (ReasonTextPolicy.minLength..200); CAS on the customer version; audited (who, which customer, the reason — never the number) and a CustomerPhoneRevealed event; NOT_ALLOWED → CUSTOMER_PHONE_REVEAL_NOT_ALLOWED 403 (not in errors.json yet); the replay copy and the request log keep the masked number only' },
+];
+const MASKED = 'ux-13: customer phones in the answer are masked (010•••••678) unless the viewer may see them (CustomerPrivacyPolicy + customer:viewphone; the rider: his own delivery once picked up)';
+/** Rules added to existing operations by ux-13. */
+export const UX13_RULE_EXTENSIONS: Record<string, { errors: string[]; note: string; input?: Record<string, { type: string; required: boolean }> }> = {
+  'Customer.Search': { errors: [], note: `${MASKED}; without customer:viewphone a number is found only when typed whole (partialSearch PERMITTED_ONLY) — phoneSearch: PARTIAL | WHOLE_NUMBER | FULL_NUMBER_REQUIRED` },
+  'Customer.Get': { errors: [], note: `${MASKED}; also duplicates and mergedFrom; phoneMasked and phoneReveal (whether Customer.RevealPhone is offered)` },
+  'Customer.Create': { errors: [], note: MASKED },
+  'Customer.Update': { errors: [], note: `${MASKED}; a phone / altPhone equal to the masked value means unchanged; a changed number is audited` },
+  'Customer.Merge': { errors: [], note: `${MASKED}; the moved points are written after any expired points (EXPIRE)` },
+  'Order.SetCustomer': { errors: [], note: `${MASKED} (customerPhone, history)` },
+  'Order.Get': { errors: [], note: `${MASKED} (customerPhone, history)` },
+  'Delivery.Board': { errors: [], note: MASKED },
+  'Delivery.Get': { errors: [], note: MASKED },
+  'Reservation.Find': { errors: [], note: MASKED },
+  'Deposit.Find': { errors: [], note: MASKED },
+  'Audit.Find': { errors: [], note: MASKED },
+  'Search.Global': { errors: [], note: `${MASKED}; a number matches in part only for a viewer who may see full numbers` },
+  'Loyalty.Adjust': { errors: ['CONCURRENCY_CONFLICT', 'APPROVAL_REQUIRED', 'APPROVAL_GRANT_INVALID', 'SELF_APPROVAL_DENIED'], input: { expectedBalance: { type: 'Integer', required: true }, approvalGrantId: GRANT }, note: 'ux-13: reason ReasonTextPolicy.minLength..200; CAS on expectedBalance (the balance shown); LOYALTY_ADJUST approval by ApprovalRequirementPolicy (default ALWAYS) and SelfApprovalPolicy; append-only ADJUST entry; audit with balance before → after' },
+  'Loyalty.Redeem': { errors: [], note: 'ux-13: expired points (LoyaltyProgramPolicy.expiryMonths) are written first as an EXPIRE entry' },
+  'Loyalty.Balance': { errors: [], note: 'ux-13: balance excludes expired points; program carries earnBase and expiryMonths; earnPreview carries earnBase' },
+  'Loyalty.Ledger': { errors: [], note: 'ux-13: EXPIRE entries; totals.expired' },
+  'LoyaltyTier.Upsert': { errors: [], note: 'ux-13: audited as sensitive with the old → new start points and multiplier' },
+};
+export function applyUx13Extensions(ops: OperationDef[]) {
+  for (const op of ops) {
+    const ext = UX13_RULE_EXTENSIONS[op.id];
+    if (!ext) continue;
+    op.errors = [...new Set([...(op.errors ?? []), ...ext.errors])];
+    if (ext.input) op.input = { ...(op.input ?? {}), ...ext.input };
+    op.note = `${op.note ? op.note + ' · ' : ''}${ext.note}`;
+  }
+}

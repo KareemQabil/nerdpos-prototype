@@ -313,6 +313,8 @@ export const errorsAr: Record<string, string> = {
   CONSUMER_DELIVERY_NOT_FOUND: 'هذه العملية غير موجودة.',
   RECONCILIATION_NOT_ACKNOWLEDGEABLE: 'لا فرق في هذه النتيجة يحتاج تفسيرًا.',
   RECONCILIATION_RESULT_NOT_FOUND: 'هذه النتيجة غير موجودة.',
+  // ux-13: customer phone privacy
+  CUSTOMER_PHONE_REVEAL_NOT_ALLOWED: 'إظهار رقم العميل غير مسموح في إعدادات المطعم.',
 };
 
 export const errorsEn: Record<string, string> = {
@@ -624,4 +626,6 @@ export const errorsEn: Record<string, string> = {
   CONSUMER_DELIVERY_NOT_FOUND: 'Delivery not found.',
   RECONCILIATION_NOT_ACKNOWLEDGEABLE: 'This result has no difference to explain.',
   RECONCILIATION_RESULT_NOT_FOUND: 'Result not found.',
+  // ux-13: customer phone privacy
+  CUSTOMER_PHONE_REVEAL_NOT_ALLOWED: 'Showing a customer\'s number is off in the restaurant settings.',
 };
