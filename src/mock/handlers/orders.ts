@@ -7,10 +7,10 @@ import { enqueueRound, enqueuePrint, issueFiscal } from '../outbox';
 import { D, m4, allocate, q6, isMoney } from '../money';
 import { checkVersion, getOrder, need, openSessionOn, orderView, page, reasonCheck, requireBranch, requireFields, settlementOf, userName } from './util';
 import { openVisitOn, closeVisit } from './floor';
-import { promotionActive } from './catalog';
 import { setOrderCustomer } from './customers'; // crm area
 import { onOrderCompleted } from './loyalty'; // crm area
-import { autoApplyPromotions, findByCode, promotionForOrder } from './promotions';
+import { autoApplyPromotions, findByCode, promotionForOrder, promotionRules } from './promotions';
+import { reasonText } from '../drawer-count';
 import type { Channel, Order, OrderLine } from '../types';
 import { inventoryOnOrderChange } from './inventory'; // inventory area: sales consumption
 import { lineStage, STAGE_ACTION, recordReversal, approvedText, voidDisposition, checkDisposition, legacyDisposition, DISP_AR, allowanceOf, allowancePolicy, mealValue, staffOf } from './reversals'; // r3A: who did it vs who allowed it
@@ -475,47 +475,57 @@ export const orderHandlers: Record<string, Handler> = {
     if (o.status !== 'DRAFT') throw new ApiError('ORDER_NOT_EDITABLE', { status: o.status });
     checkVersion(o, ctx.body.expectedVersion);
     if (!activeLines(o).length) throw new ApiError('ORDER_EMPTY');
-    let d = ctx.body.discount ?? {};
+    const d = ctx.body.discount ?? {};
     if (d.promotionCode || d.promotionId) {
-      // promotions.ts: the full promotion model (codes, item scope, buy X get Y, limits, stacking)
-      const pr = d.promotionId ? (ctx.db.promotions.find((p) => p.id === d.promotionId) as any) : findByCode(ctx.db, d.promotionCode);
-      if (!pr || (pr.kind === 'CODED' && !d.promotionCode)) throw new ApiError('PROMOTION_CODE_INVALID');
-      o.discounts.push(promotionForOrder(ctx, o, pr, ctx.user!.id));
-      bump(ctx, o, 'DISCOUNT', { ar: `عرض: ${pr.name.ar}`, en: `promotion: ${pr.name.en}` });
+      // promotions.ts: the full promotion model (codes, item scope, buy X get Y, bundles, customer / tier, limits, stacking).
+      // A coded promotion needs its code (never applied by id); the code typed is kept on the discount line.
+      const pr = d.promotionCode ? findByCode(ctx.db, d.promotionCode) : (ctx.db.promotions.find((p) => p.id === d.promotionId) as any);
+      if (!pr || (pr.kind === 'CODED' && !d.promotionCode) || (d.promotionId && d.promotionCode && pr.id !== d.promotionId)) throw new ApiError('PROMOTION_CODE_INVALID');
+      const line = promotionForOrder(ctx, o, pr, ctx.user!.id, { code: d.promotionCode ? String(d.promotionCode).trim().toUpperCase() : null });
+      o.discounts.push(line);
+      bump(ctx, o, 'DISCOUNT', { ar: `عرض: ${pr.name.ar}${line.code ? ` (${line.code})` : ''}`, en: `promotion: ${pr.name.en}${line.code ? ` (${line.code})` : ''}` }, { discountId: line.id, promotionId: pr.id, promotionVersion: pr.version });
+      ctx.audit(`promotion ${pr.id} v${pr.version}${line.code ? ` code ${line.code}` : ''} on ${o.number ?? o.id}`, o.id);
       return orderView(ctx.db, o);
     }
-    let promo = null as any;
-    if (d.promotionCode) {
-      promo = ctx.db.promotions.find((p) => p.kind === 'CODED' && p.code === d.promotionCode);
-      if (!promo) throw new ApiError('PROMOTION_CODE_INVALID');
-      if (!promotionActive(ctx, promo, o.channel)) throw new ApiError('PROMOTION_NOT_APPLICABLE');
-      d = { type: promo.benefitType, value: promo.benefitValue };
-    } else {
-      reasonCheck(ctx, 'DISCOUNT', ctx.body.reasonCode, ctx.body.reason);
-    }
+    reasonCheck(ctx, 'DISCOUNT', ctx.body.reasonCode, ctx.body.reason);
     need(['PERCENTAGE', 'FIXED_AMOUNT'].includes(d.type), 'VALIDATION_FAILED', { field: 'discount.type' });
     need(isMoney(d.value) && D(d.value).gt(0), 'VALIDATION_FAILED', { field: 'discount.value' });
     if (d.type === 'PERCENTAGE' && D(d.value).gt(100)) throw new ApiError('DISCOUNT_EXCEEDS_ELIGIBLE_BASE');
     const st = policy<{ mode: string }>('DiscountStackingPolicy') ?? { mode: 'NO_STACKING' };
-    if (st.mode === 'NO_STACKING' && o.discounts.some((x) => x.active)) throw new ApiError('DISCOUNT_STACKING_NOT_ALLOWED');
+    const others = o.discounts.filter((x) => x.active);
+    if (st.mode === 'NO_STACKING' && others.length) throw new ApiError('DISCOUNT_STACKING_NOT_ALLOWED', { rule: 'NO_STACKING' });
+    // ux-15: a manager discount on a check with a promotion follows PromotionPolicy.manualWithPromotion (DENY by default);
+    // an exclusive promotion never combines with anything
+    const rules = promotionRules(o.branchId);
+    const promos = others.filter((x) => x.promotionId);
+    if (promos.length && rules.manualWithPromotion === 'DENY') throw new ApiError('DISCOUNT_STACKING_NOT_ALLOWED', { rule: 'MANUAL_WITH_PROMOTION' });
+    if (promos.some((x) => ((ctx.db.promotions.find((p) => p.id === x.promotionId) as any)?.stacking ?? 'EXCLUSIVE') === 'EXCLUSIVE')) throw new ApiError('DISCOUNT_STACKING_NOT_ALLOWED', { rule: 'EXCLUSIVE' });
     const pre = computeLiveTotals(o);
     const eligible = D(pre.itemsSubtotal).plus(pre.serviceCharge);
-    if (promo?.minSubtotal && eligible.lt(promo.minSubtotal)) throw new ApiError('PROMOTION_NOT_APPLICABLE', { minSubtotal: promo.minSubtotal });
     const amount = d.type === 'PERCENTAGE' ? eligible.times(d.value).dividedBy(100) : D(d.value);
     if (amount.gt(eligible)) throw new ApiError('DISCOUNT_EXCEEDS_ELIGIBLE_BASE', { eligible: m4(eligible), amount: m4(amount) });
     const percent = eligible.isZero() ? '100' : amount.dividedBy(eligible).times(100).toDecimalPlaces(2).toString();
-    const g = promo ? null : ctx.requireApproval({ action: 'ORDER_DISCOUNT', targetType: 'orders.Order', targetId: o.id, context: { amount: m4(amount), discountPercent: percent, kind: d.type }, grantId: ctx.body.approvalGrantId });
-    o.discounts.push({ id: nextId('disc'), type: d.type, value: String(d.value), reasonCode: promo ? 'PROMOTION' : ctx.body.reasonCode, reason: ctx.body.reason, approvalGrantId: g?.id, appliedAt: ctx.nowIso, appliedBy: ctx.user!.id, active: true, promotionId: promo?.id, label: promo?.name });
-    bump(ctx, o, 'DISCOUNT', { ar: `خصم ${d.type === 'PERCENTAGE' ? d.value + '%' : d.value + ' ج.م'}${promo ? ` (عرض ${promo.name.ar})` : ` (${ctx.body.reasonCode})`}${g ? ' بموافقة مدير' : ''}`, en: `discount ${d.type} ${d.value}` });
+    const g = ctx.requireApproval({ action: 'ORDER_DISCOUNT', targetType: 'orders.Order', targetId: o.id, context: { amount: m4(amount), discountPercent: percent, kind: d.type }, grantId: ctx.body.approvalGrantId });
+    const line = { id: nextId('disc'), type: d.type, value: String(d.value), reasonCode: ctx.body.reasonCode, reason: ctx.body.reason, approvalGrantId: g?.id, appliedAt: ctx.nowIso, appliedBy: ctx.user!.id, active: true, stackBase: rules.stackBase };
+    o.discounts.push(line);
+    bump(ctx, o, 'DISCOUNT', { ar: `خصم ${d.type === 'PERCENTAGE' ? d.value + '%' : d.value + ' ج.م'} (${ctx.body.reasonCode})${g ? ' بموافقة مدير' : ''}`, en: `discount ${d.type} ${d.value}` }, { discountId: line.id });
+    ctx.audit(`discount ${d.type} ${d.value} (${ctx.body.reasonCode}) on ${o.number ?? o.id}`, o.id, true, g?.id);
     return orderView(ctx.db, o);
   },
   'Order.RemoveDiscount': (ctx) => {
     const o = getOrder(ctx, ctx.params.orderId);
     if (o.status !== 'DRAFT') throw new ApiError('ORDER_NOT_EDITABLE');
+    if (ctx.body?.expectedVersion !== undefined) checkVersion(o, ctx.body.expectedVersion); // ux-15: CAS when the caller sends it
     const d = o.discounts.find((x) => x.id === ctx.params.discountId && x.active);
     need(d, 'ORDER_DISCOUNT_NOT_FOUND');
-    d!.active = false;
-    bump(ctx, o, 'DISCOUNT_REMOVED', { ar: 'أُزيل الخصم', en: 'discount removed' });
+    // ux-15: the line stays on the check (append-only) with who / when / why; PromotionPolicy.removeReason REQUIRED by default
+    const rules = promotionRules(o.branchId);
+    const raw = typeof ctx.body?.reason === 'string' ? ctx.body.reason.trim() : '';
+    const reason = rules.removeReason === 'REQUIRED' || raw ? reasonText(ctx, raw, 'REASON_REQUIRED') : null;
+    Object.assign(d!, { active: false, removedAt: ctx.nowIso, removedBy: ctx.user!.id, removeReason: reason });
+    const name = d!.label ? d!.label : { ar: 'الخصم', en: 'discount' };
+    bump(ctx, o, 'DISCOUNT_REMOVED', { ar: `أُزيل ${d!.promotionId ? 'العرض' : 'الخصم'}: ${name.ar}${reason ? ` — ${reason}` : ''}`, en: `removed: ${name.en}${reason ? ` — ${reason}` : ''}` }, { discountId: d!.id, promotionId: d!.promotionId ?? null });
+    ctx.audit(`${d!.promotionId ? `promotion ${d!.promotionId}` : 'discount'} removed from ${o.number ?? o.id}${reason ? `: ${reason}` : ''}`, o.id, true);
     return orderView(ctx.db, o);
   },
   'Order.Comp': (ctx) => {

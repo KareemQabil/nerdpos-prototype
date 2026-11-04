@@ -74,15 +74,29 @@ export interface CapabilityState { id: string; scopeType: 'TENANT' | 'BRANCH'; s
 
 /** The full promotion model (Promotion.Upsert). Stored on the same record; older records lack the extra fields. */
 export interface PromotionRule {
-  mechanic: 'ORDER' | 'ITEMS' | 'BUY_X_GET_Y';
+  mechanic: 'ORDER' | 'ITEMS' | 'BUY_X_GET_Y' | 'BUNDLE';
   benefitType: 'PERCENTAGE' | 'FIXED_AMOUNT'; benefitValue: string;
   productIds: string[]; categoryIds: string[];
   buyQty: number; getQty: number; getPercent: string; getProductIds: string[]; getCategoryIds: string[];
   maxDiscount: Money | null;
+  /** ux-15: BUNDLE — the parts of one set (each part: qty units out of its items / categories) and the set price */
+  bundleParts?: { productIds: string[]; categoryIds: string[]; qty: number }[]; bundlePrice?: Money | null;
+  /** ux-15: at most this many units (ITEMS) / groups (BUY_X_GET_Y) / sets (BUNDLE) per check; null = no limit */
+  maxPerCheck?: number | null;
+  /** ux-15: amounts rounded DOWN (never more than computed) or with the check's rounding (PromotionPolicy.rounding, captured when applied) */
+  rounding?: 'DOWN' | 'CHECK';
 }
+/** ux-15: one append-only revision of a promotion (who changed what, when, why). */
+export interface PromotionRevision { version: number; at: string; by: string; change: 'CREATED' | 'EDITED' | 'ACTIVATED' | 'DEACTIVATED'; reason: string | null; summary: Loc }
 export type PromotionX = Promotion & Partial<PromotionRule> & {
   dayparts?: { days: number[]; start: string; end: string }[] | null;
   codes?: string[]; maxUses?: number | null; maxUsesPerDay?: number | null; stacking?: 'EXCLUSIVE' | 'STACKABLE'; priority?: number;
   description?: Loc | null; updatedAt?: string; updatedBy?: string;
+  /** ux-15: who may get it — anyone, an identified customer on the check, or customers of the given loyalty tiers */
+  customerScope?: 'ANY' | 'IDENTIFIED' | 'TIERS'; tierIds?: string[];
+  /** ux-15: checks per customer (counted over the customer's open and completed checks); null = no limit */
+  maxUsesPerCustomer?: number | null;
+  /** ux-15: append-only history of the promotion (a promotion is never deleted) */
+  revisions?: PromotionRevision[];
 };
 export type { Channel };

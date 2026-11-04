@@ -5,11 +5,12 @@ import { nextId } from '../store';
 import { policy } from '../policies';
 import { quoteItem, availabilityOf } from '../pricing';
 import { D, m4, isMoney } from '../money';
-import { checkVersion, need, page, requireFields } from './util';
+import { checkVersion, getOrder, need, page, requireFields } from './util';
 import type { Channel, Product, PriceRule, DB } from '../types';
 import { zonedParts } from '../clock';
 import { promotionLive } from '../promo-engine';
-import { upsertPromotion, promotionView, findByCode } from './promotions';
+import { upsertPromotion, promotionView, findByCode, promotionRefusal, promotionPreview } from './promotions';
+import type { PromotionX } from '../types-ops';
 import { effectiveAvailability, menuCheck, menuState, optionSoldOut, branchBusinessDate, activeVariants } from '../menu-engine';
 import { planPriceWindow, applyPriceWindow } from '../menu-prices';
 import { resolveSalesChannel, salesChannelById, priceKeyOf } from '../sales-channels'; // sales channels (E13)
@@ -245,6 +246,8 @@ export const catalogHandlers: Record<string, Handler> = {
     checkVersion(p!, ctx.body.expectedVersion);
     if (ctx.body.name) checkName(db, ctx.body.name, p!.id);
     if (ctx.body.unitId && ctx.body.unitId !== p!.unitId) throw new ApiError('VALIDATION_FAILED', { field: 'unitId', rule: "a product's unit is fixed" });
+    // ux-15: retiring and reinstating go through Product.Retire / Product.Reinstate (reason, audit, meals checked)
+    if (ctx.body.active !== undefined && ctx.body.active !== p!.active) throw new ApiError('VALIDATION_FAILED', { field: 'active', rule: 'use Product.Retire / Product.Reinstate' });
     if (ctx.body.sku && ctx.body.sku !== p!.sku) need(!db.products.some((x) => x.sku === ctx.body.sku), 'CATALOG_SKU_TAKEN');
     checkImage(ctx.body.imageUrl); checkCalories(ctx.body.calories);
     if (ctx.body.calories !== undefined) p!.calories = ctx.body.calories === '' || ctx.body.calories === null ? null : Number(ctx.body.calories);
@@ -470,13 +473,27 @@ export const catalogHandlers: Record<string, Handler> = {
       validTo: ctx.body.validTo !== undefined ? (ctx.body.validTo ? Date.parse(ctx.body.validTo) : null) : pr!.validTo,
     });
     pr!.version++;
+    // ux-15: the same append-only revision line and audit as Promotion.Upsert
+    const px = pr as PromotionX;
+    px.revisions = [...(px.revisions ?? []), { version: px.version, at: ctx.nowIso, by: ctx.user!.id, change: ctx.body.active === false ? 'DEACTIVATED' : ctx.body.active === true ? 'ACTIVATED' : 'EDITED', reason: ctx.body.changeReason ? String(ctx.body.changeReason).trim().slice(0, 200) : null, summary: { ar: px.name.ar, en: px.name.en } }];
+    ctx.audit(`promotion ${px.id} v${px.version} configured`, px.id);
     return pr;
   },
   'Promotion.ValidateCode': (ctx) => {
     const pr = findByCode(ctx.db, ctx.body.code);
     if (!pr) throw new ApiError('PROMOTION_CODE_INVALID');
-    if (!promotionActive(ctx, pr, ctx.body.channel ?? 'DINE_IN')) throw new ApiError('PROMOTION_NOT_APPLICABLE');
-    return pr;
+    // ux-15: with orderId the code is checked against that check by the full rule set (live, limits, customer, stacking,
+    // minimum, qualifying items) and the answer carries the server's amount; without it: live now and within its limits
+    if (ctx.body.orderId) {
+      const o = getOrder(ctx, ctx.body.orderId);
+      const r = promotionRefusal(ctx, o, pr, { code: String(ctx.body.code).trim().toUpperCase() });
+      if (r) throw new ApiError(r.code, { rule: r.rule, reason: r.rule, ...(r.details ?? {}) }, r.status);
+      return { ...promotionView(ctx, pr), preview: promotionPreview(ctx, o, pr, String(ctx.body.code).trim().toUpperCase()) };
+    }
+    if (!promotionActive(ctx, pr, ctx.body.channel ?? 'DINE_IN')) throw new ApiError('PROMOTION_NOT_APPLICABLE', { rule: 'NOT_LIVE' });
+    const v = promotionView(ctx, pr);
+    if (v.exhausted) throw new ApiError('PROMOTION_LIMIT_REACHED', { rule: pr.maxUses && v.usage.total >= pr.maxUses ? 'TOTAL' : 'PER_DAY' }, 409);
+    return v;
   },
 
   // ───────── import (dry run then all-or-nothing)

@@ -88,6 +88,10 @@ export interface OrderLine {
 export interface OrderDiscount {
   id: string; type: 'PERCENTAGE' | 'FIXED_AMOUNT'; value: string; reasonCode: string; reason?: string; approvalGrantId?: string;
   appliedAt: string; appliedBy: string; active: boolean; promotionId?: string; label?: Loc;
+  /** ux-15: the promotion's version and code captured when applied; how a stacked discount is based (PromotionPolicy.stackBase) */
+  promotionVersion?: number; code?: string | null; stackBase?: 'REMAINDER' | 'ORIGINAL'; rounding?: 'DOWN' | 'CHECK';
+  /** ux-15: removal keeps the line (append-only): who, when and why */
+  removedAt?: string; removedBy?: string; removeReason?: string | null;
 }
 export interface FireRound { round: number; firedAt: string; firedBy: string; lineIds: string[]; via: 'FIRE' | 'CONFIRM'; commandId: string }
 export interface PolicySnapshot {
@@ -103,6 +107,8 @@ export interface Totals {
   charges: { id: string; label: Loc; amount: Money; taxable: boolean }[]; tableTax: Money;
   taxBase: Money; tax: Money; taxLines: { rate: string; base: Money; amount: Money; name: Loc; mode?: string }[];
   discountTotal: Money; discountAfterTax: Money; payable: Money; netSales: Money; comp: boolean;
+  /** ux-15: what each active discount takes off (server-computed, in application order) */
+  discountLines?: { discountId: string; amount: Money }[];
 }
 export type OrderStatus = 'DRAFT' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'VOIDED' | 'MERGED';
 export interface Order {

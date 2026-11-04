@@ -226,6 +226,12 @@ POLICIES.push(
   { id: 'KeyMapPolicy', group: 'devices', title: 'تغيير مفاتيح الاختصار', titleEn: 'Changing shortcut keys', description: 'من يغيّر مفاتيح الاختصار لجهاز: المدير فقط، أو أيضًا من يعمل على الجهاز نفسه.', state: 'DIRECTION', scopes: ['TENANT', 'BRANCH'], appliesTo: 'NEW_ACTIONS', editor: { kind: 'object', fields: [{ key: 'changeBy', label: 'من يغيّر المفاتيح', kind: 'enum', options: ['MANAGERS', 'ANY_SIGNED_IN'] }] }, canonicalDefault: { changeBy: 'MANAGERS' }, reacts: 'نافذة مفاتيح الاختصار' },
 );
 
+// ux-15 (proposed): promotions and the life of a product. Strictest workable defaults (PROTOTYPE_GAPS §15l).
+POLICIES.push(
+  { id: 'PromotionPolicy', group: 'pricing', title: 'قواعد العروض على الشيك', titleEn: 'Promotion rules on a check', description: 'عدد العروض على الشيك الواحد عند السماح بالتجميع، وأساس حساب العرض التالي، وخصم المدير مع العرض، وتقريب مبالغ العروض، وسبب إزالة العرض أو الخصم.', state: 'DIRECTION', scopes: ['TENANT', 'BRANCH'], appliesTo: 'NEW_ACTIONS', editor: { kind: 'object', fields: [{ key: 'maxPromotionsPerCheck', label: 'أقصى عدد عروض على الشيك', kind: 'number', min: 1, max: 5 }, { key: 'stackBase', label: 'العرض التالي يُحسب على', kind: 'enum', options: ['REMAINDER', 'ORIGINAL'] }, { key: 'manualWithPromotion', label: 'خصم المدير مع العرض', kind: 'enum', options: ['DENY', 'ALLOW'] }, { key: 'rounding', label: 'تقريب مبلغ العرض', kind: 'enum', options: ['DOWN', 'CHECK'] }, { key: 'removeReason', label: 'سبب الإزالة', kind: 'enum', options: ['REQUIRED', 'OPTIONAL'] }] }, canonicalDefault: { maxPromotionsPerCheck: 2, stackBase: 'REMAINDER', manualWithPromotion: 'DENY', rounding: 'DOWN', removeReason: 'REQUIRED' }, reacts: 'نافذة الخصم والعروض على الكاشير' },
+  { id: 'ProductRemovalPolicy', group: 'catalog', title: 'حذف الأصناف', titleEn: 'Removing products', description: 'الصنف الذي بيع مرة لا يُحذف أبدًا بل يُوقف. هل يُسمح بحذف صنف أُضيف بالخطأ ولم يُبع ولم يُستخدم؟', state: 'DIRECTION', scopes: ['TENANT'], appliesTo: 'NEW_ACTIONS', editor: { kind: 'object', fields: [{ key: 'mode', label: 'إزالة الصنف', kind: 'enum', options: ['RETIRE_ONLY', 'DELETE_UNSOLD'] }] }, canonicalDefault: { mode: 'RETIRE_ONLY' }, reacts: 'صفحة الصنف: «إيقاف الصنف» و«حذف الصنف»' },
+);
+
 export const policyMeta = new Map(POLICIES.map((p) => [p.id, p]));
 
 /** The value the demo starts with: EG profile where it exists, else the canonical default. */

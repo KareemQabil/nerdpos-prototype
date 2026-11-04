@@ -325,6 +325,13 @@ export const errorsAr: Record<string, string> = {
   DISPLAY_CONTENT_NOT_FOUND: 'هذا المحتوى غير موجود.',
   DISPLAY_CONTENT_RETIRED: 'هذا المحتوى موقوف ولا يُعرض.',
   KEYMAP_CHANGE_NOT_ALLOWED: 'يغيّر المدير مفاتيح الاختصار حسب إعدادات المطعم.',
+  // ux-15: promotions and the life of a product
+  PROMOTION_LIMIT_REACHED: 'بلغ هذا العرض الحد المسموح لاستخدامه.',
+  PROMOTION_CUSTOMER_REQUIRED: 'هذا العرض للعملاء المسجلين. أضف العميل إلى الشيك أولًا.',
+  PRODUCT_ALREADY_RETIRED: 'هذا الصنف موقوف بالفعل.',
+  PRODUCT_IN_USE: 'هذا الصنف ضمن وجبة نشطة. أزله من الوجبة أولًا.',
+  PRODUCT_DELETE_NOT_ALLOWED: 'حذف الأصناف غير مسموح في إعدادات المطعم. أوقف الصنف بدلًا من ذلك.',
+  PRODUCT_HAS_HISTORY: 'لهذا الصنف مبيعات أو استخدامات مسجلة، فلا يُحذف. أوقفه بدلًا من ذلك.',
 };
 
 export const errorsEn: Record<string, string> = {
@@ -648,4 +655,11 @@ export const errorsEn: Record<string, string> = {
   DISPLAY_CONTENT_NOT_FOUND: 'This content does not exist.',
   DISPLAY_CONTENT_RETIRED: 'This content is retired and is not shown.',
   KEYMAP_CHANGE_NOT_ALLOWED: 'A manager changes the shortcut keys, per the restaurant settings.',
+  // ux-15: promotions and the life of a product
+  PROMOTION_LIMIT_REACHED: 'This promotion has reached its usage limit.',
+  PROMOTION_CUSTOMER_REQUIRED: 'This promotion is for registered customers. Add the customer to the check first.',
+  PRODUCT_ALREADY_RETIRED: 'This item is already retired.',
+  PRODUCT_IN_USE: 'This item is part of an active meal. Remove it from the meal first.',
+  PRODUCT_DELETE_NOT_ALLOWED: 'Deleting items is off in the restaurant settings. Retire the item instead.',
+  PRODUCT_HAS_HISTORY: 'This item has sales or uses on record, so it cannot be deleted. Retire it instead.',
 };

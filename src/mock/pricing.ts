@@ -316,10 +316,26 @@ export function computeLiveTotals(order: Order): Totals {
   const comp = !!order.comp;
   const disc = order.discounts.filter((d) => d.active);
   const eligible = D(itemsSubtotal).plus(D(serviceCharge));
+  // ux-15: discounts apply in a fixed order — promotions by priority (lower first), then manager discounts, each by the
+  // time it was applied. A line captured with stackBase REMAINDER is based on what is left after the ones before it
+  // (PromotionPolicy.stackBase) and never takes more than that; older lines keep the original base. Decimal only.
+  const ordered = [...disc].sort((a, b) => (a.promotionId ? 0 : 1) - (b.promotionId ? 0 : 1) || (Number((a as any).priority ?? 100) - Number((b as any).priority ?? 100)) || a.appliedAt.localeCompare(b.appliedAt) || a.id.localeCompare(b.id));
+  let discountLines: { discountId: string; amount: string }[] = [];
   const discountOn = (base: any) => {
     let t = D(0);
-    for (const d of disc) t = t.plus((d as any).rule ? promoAmount(order, (d as any).rule, scale, mode) : d.type === 'PERCENTAGE' ? D(round(pct(base, d.value), scale, mode)) : D(d.value)); // item / buy-X-get-Y promotions: promo-engine.ts
-    return t.greaterThan(base) ? D(base) : t;
+    const out: { discountId: string; amount: string }[] = [];
+    for (const d of ordered) {
+      const remainder = D(base).minus(t).greaterThan(0) ? D(base).minus(t) : D(0);
+      const b = d.stackBase === 'REMAINDER' ? remainder : D(base);
+      const dm = d.rounding === 'DOWN' ? 'DOWN' : mode;
+      let a = (d as any).rule ? promoAmount(order, (d as any).rule, scale, mode) : d.type === 'PERCENTAGE' ? D(round(pct(b, d.value), scale, dm)) : D(d.value); // item / buy-X-get-Y / bundle promotions: promo-engine.ts
+      if (d.stackBase === 'REMAINDER' && a.greaterThan(remainder)) a = remainder;
+      t = t.plus(a);
+      out.push({ discountId: d.id, amount: m4(a) });
+    }
+    const total = t.greaterThan(base) ? D(base) : t;
+    discountLines = out;
+    return total;
   };
   const totalDiscount = discountOn(eligible);
 
@@ -392,7 +408,7 @@ export function computeLiveTotals(order: Order): Totals {
   return {
     itemsSubtotal, itemDiscount, serviceCharge, serviceDiscount, serviceRate, charges, tableTax,
     taxBase: m4(taxBase), tax: m4(tax), taxLines, discountTotal: comp ? add(itemsSubtotal, serviceCharge) : add(itemDiscount, serviceDiscount, discountAfterTax),
-    discountAfterTax, payable: m4(payable), netSales, comp,
+    discountAfterTax, payable: m4(payable), netSales, comp, ...(discountLines.length && !comp ? { discountLines } : {}),
   };
 }
 
