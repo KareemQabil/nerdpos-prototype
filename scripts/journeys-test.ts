@@ -20,7 +20,7 @@ const runJourney = async (id: string) => {
   }
 };
 demo.reset('DEMO'); devices.resetAll(); sim.set({ latencyMs: 0 });
-for (const id of ['J-R1', 'J-R2', 'J-R3', 'J-R4', 'J-C1', 'J-F1', 'J-P1']) await runJourney(id);
+for (const id of ['J-R1', 'J-R2', 'J-R3', 'J-R4', 'J-C1', 'J-F1', 'J-P1', 'J-D1']) await runJourney(id); // ux-11: J-D1 riders
 sim.set({ dropNextResponse: null, kds: 'UP', eta: 'UP', printers: {} });
 console.log('\n=== NEGATIVE CONTROLS (fresh demo data)');
 demo.reset('DEMO'); devices.resetAll(); sim.set({ latencyMs: 0 });
