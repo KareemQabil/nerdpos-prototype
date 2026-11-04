@@ -204,7 +204,7 @@ export function MovementTable({ items, showItem = true, showWarehouse = true, em
           ...(showItem ? [<span className="font-bold">{L(m.item?.name)}</span>] : []),
           ...(showWarehouse ? [<span className="text-xs">{tv(m.warehouse?.name)}</span>] : []),
           <Qty v={m.quantity} unit={m.item?.unit} signed />,
-          ...(compact ? [] : [<span className="num text-xs">{money(m.unitCost)}</span>]),
+          ...(compact ? [] : [<Money v={m.unitCost} className="text-xs" plain />]),
           <Money v={m.value} className="text-xs" tone={Number(m.value) < 0 ? 'error' : undefined} />,
           <Qty v={m.balanceAfter} unit={m.item?.unit} hint={false} />,
           <span className="text-xs">{sourceText(m)}{m.reason ? <span className="text-dim"> · {reasonText(m.reason)}</span> : null}{personText(m.userName) ? <span className="text-dim"> · {personText(m.userName)}</span> : null}</span>,

@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { useCommand } from '../../app/hooks';
-import { Banner, Button, Field, Input, Modal, Select, StateBadge, Textarea } from '../../ui';
+import { Banner, Button, Field, Input, Modal, Select, StateBadge, Textarea, Money } from '../../ui';
 import { t, L } from '../../i18n';
 import { money } from '../../lib/format';
 import { cn } from '../../lib/format';
@@ -59,7 +59,7 @@ export function WasteDialog({ open, onClose, presetItemId, presetWarehouseId, pr
               {mode === 'DISH' && <span className="self-center text-sm text-dim">{t('طبق')}</span>}
             </div>
           </Field>
-          <div className="flex items-end text-sm">{estimate !== null && <span>{t('القيمة التقريبية')}: <b className="num">{money(estimate.toFixed(4))}</b></span>}</div>
+          <div className="flex items-end text-sm">{estimate !== null && <span>{t('القيمة التقريبية')}: <Money v={estimate.toFixed(4)} /></span>}</div>
         </div>
         <div>
           <div className="text-xs font-bold text-soft mb-1.5">{t('حصل إيه؟')}</div>

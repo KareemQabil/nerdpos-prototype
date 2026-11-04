@@ -2,9 +2,9 @@
 // the report header (business date, timezone, asOf, provisional/closed, definitions + versions, reconciliation).
 import React, { createContext, useContext, useState } from 'react';
 import { ShieldCheck, ShieldAlert, Clock, Info, CheckCircle2, AlertTriangle, BookOpen, ChevronDown } from 'lucide-react';
-import { Pill, Card, Button } from '../../ui';
+import { Pill, Card, Button, Money } from '../../ui';
 import { t, L, getLang } from '../../i18n';
-import { cn, dateTime } from '../../lib/format';
+import { cn, dateTime, CURRENCY } from '../../lib/format';
 import { Tech } from '../../app/tech';
 
 export type Loc = { ar: string; en: string };
@@ -23,7 +23,14 @@ export function fmt(v: string | null | undefined, unit?: string): string {
   if (unit === '%') return `${n.toFixed(1)}%`;
   if (unit === 'minutes') return `${n.toFixed(1)} ${t('دقيقة')}`;
   if (unit === 'hours') return `${n.toFixed(1)} ${t('ساعة')}`;
-  return `${n.toLocaleString(loc, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${getLang() === 'ar' ? 'ج.م' : 'EGP'}`;
+  return `${n.toLocaleString(loc, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${CURRENCY}`;
+}
+/** A report number for the screen: money as <Money> (number in `.num`, «ج.م» after it in reading order), any other unit as
+ *  a `.num` span. fmt() keeps the currency for running text and titles only (scripts/check-money.mjs). */
+export function Amt({ v, unit, className }: { v: string | number | null | undefined; unit?: string; className?: string }) {
+  const txt = fmt(v === null || v === undefined ? v : String(v), unit);
+  const suffix = ' ' + CURRENCY;
+  return txt.endsWith(suffix) ? <Money text={txt.slice(0, -suffix.length)} className={cn('font-bold', className)} /> : <span className={cn('num', className)}>{txt}</span>;
 }
 
 /** One metric value: number (clickable → evidence), or a plain «مش متاح» / «اترفض» / «—» with the reason on hover. */
@@ -34,7 +41,7 @@ export function Val({ v, unit, spec, big, className }: { v: any; unit?: string; 
   if (v.availability === 'REFUSED') return <Pill tone="warning" size="sm" title={L(v.reason)}>{t('اترفض')}</Pill>;
   if (v.availability === 'NOT_DEFINED') return <span className="text-dim" title={L(v.reason)}>—</span>;
   const neg = Number(v.value) < 0;
-  const txt = <span className={cn('num', big ? 'text-2xl font-extrabold' : 'font-bold', neg && 'text-[var(--error)]', className)}>{fmt(v.value, unit)}</span>;
+  const txt = <Amt v={v.value} unit={unit} className={cn(big ? 'text-2xl font-extrabold' : 'font-bold', neg && 'text-[var(--error)]', className)} />;
   if (!spec) return txt;
   return (
     <button type="button" onClick={() => open(spec)} data-fb={`evidence:${spec.metric}`} title={t('اعرض الشيكات والسجلات اللي ورا الرقم ده')}
@@ -94,11 +101,11 @@ export function ReconList({ checks }: { checks: any[] }) {
             {c.status === 'MATCHED' ? <CheckCircle2 className="w-4 h-4 text-[var(--success)]" /> : c.status === 'EXPLAINED' ? <Info className="w-4 h-4 text-[var(--info)]" /> : <ShieldAlert className="w-4 h-4 text-[var(--error)]" />}
             <span className="font-bold">{L(c.title)}</span>
             <Pill size="sm" tone={STATUS_TONE[c.status]}>{statusText(c.status)}</Pill>
-            {Number(c.difference) !== 0 && <span className="num text-xs">{t('الفرق')} {fmt(c.difference)}</span>}
+            {Number(c.difference) !== 0 && <span className="text-xs">{t('الفرق')} <Amt v={c.difference} /></span>}
             <Tech><span className="num text-[10px] text-dim" dir="ltr">{c.id}: {c.equation}</span></Tech>
           </div>
           {c.explanations?.map((e: any, i: number) => (
-            <div key={i} className="text-xs text-soft ms-6 mt-1 flex items-center gap-2 flex-wrap">• {L(e.label)} <span className="num">{fmt(e.amount)}</span>
+            <div key={i} className="text-xs text-soft ms-6 mt-1 flex items-center gap-2 flex-wrap">• {L(e.label)} <Amt v={e.amount} />
               {e.evidence?.length > 0 && <button type="button" className="text-[var(--primary)] underline" onClick={() => open({ metric: '__list', label: L(e.label), from: '', filters: { __evidence: e.evidence } })}>{t('{n} سجل', { n: e.evidence.length })}</button>}
             </div>
           ))}

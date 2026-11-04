@@ -9,7 +9,7 @@ import { t, L, getLang } from '../../i18n';
 import { rangeText } from '../../reports/format';
 import { dateTime } from '../../lib/format';
 import { Tech } from '../../app/tech';
-import { fmt, type EvidenceSpec } from './parts';
+import { fmt, Amt, type EvidenceSpec } from './parts';
 
 const KIND: Record<string, string> = { CHECK: 'شيك', LINE: 'سطر', PAYMENT: 'دفعة', REFUND: 'مرتجع', CASH_ENTRY: 'حركة درج', SESSION: 'وردية', REMOVAL: 'إلغاء', DISCOUNT: 'خصم', STAFF_MEAL: 'وجبة موظف', TICKET: 'تذكرة مطبخ', FISCAL: 'إيصال', APPROVAL: 'موافقة', STOCK: 'مخزن', WASTE: 'هالك', PO: 'أمر شراء', GRN: 'استلام', VISIT: 'قعدة', DELIVERY: 'دليفري', HISTORY: 'إجمالي يوم', RESERVATION: 'حجز', RECON: 'قاعدة مطابقة' };
 const NOTE: Record<string, string> = { 'stage-derived': 'المرحلة مستنتجة من الأحداث', 'no-recipe': 'من غير وصفة — التكلفة مش متاحة', 'cost-current': 'تكلفة حالية (مفيش تاريخ)', 'aggregate-only': 'إجمالي مستورد — من غير شيكات', 'in-flight': 'لسه في المطبخ', 'same-order (counted once)': 'نفس الأوردر — اتعد مرة واحدة' };
@@ -21,7 +21,7 @@ function Rows({ rows, unit, onOpen }: { rows: any[]; unit?: string; onOpen: (ord
         <div className="min-w-0"><div className="truncate">{e.label}</div>{e.note && <div className="text-[10px] text-dim">{t(NOTE[e.note] ?? e.note)}</div>}<Tech><span className="num text-[10px] text-dim">{e.id}</span></Tech></div>,
         <Pill size="sm" tone="neutral">{t(KIND[e.kind] ?? e.kind)}</Pill>,
         <span className="num text-xs whitespace-nowrap">{e.businessDate ?? (e.at ? dateTime(e.at) : '—')}</span>,
-        <span className="num whitespace-nowrap">{e.amount === null || e.amount === undefined ? '—' : unit === 'EGP' || !unit ? fmt(e.amount) : fmt(e.amount, unit)}</span>,
+        <Amt v={e.amount} unit={unit === 'EGP' ? undefined : unit} className="whitespace-nowrap" />,
         e.orderId ? <Button size="icon" variant="ghost" onClick={() => onOpen(e.orderId)} data-fb={`evidence-open:${e.orderId}`} title={t('افتح الشيك')} aria-label={t('افتح الشيك')}><Receipt className="w-4 h-4" /></Button> : null,
       ])} />
   );
@@ -38,7 +38,7 @@ export function EvidencePopup({ spec, onClose }: { spec: EvidenceSpec | null; on
       {list ? <Rows rows={spec!.filters!.__evidence} onOpen={open} /> : q.loading && !r ? <Spinner /> : q.error ? <Banner tone="error">{errorText(q.error)}</Banner> : r && (
         <div className="space-y-3" data-fb="evidence-body">
           <div className="rounded-xl surface-1 p-3 space-y-1">
-            <div className="text-2xl font-extrabold num">{r.value.availability === 'AVAILABLE' ? fmt(r.value.value, r.metric.unit) : <span className="text-base">{L(r.value.reason) || t('مش متاح')}</span>}</div>
+            <div className="text-2xl font-extrabold">{r.value.availability === 'AVAILABLE' ? <Amt v={r.value.value} unit={r.metric.unit} className="font-extrabold" /> : <span className="text-base">{L(r.value.reason) || t('مش متاح')}</span>}</div>
             <div className="text-sm text-soft">{L(r.metric.definition)}</div>
             {spec?.where && <div className="text-sm font-medium" data-fb="evidence-where">{spec.where}</div>}
             {Object.keys(r.cell ?? {}).length > 0 && <Tech><div className="text-[10px] text-dim num" dir="ltr">{Object.entries(r.cell).map(([k, v]) => `${k}=${v}`).join(' · ')}</div></Tech>}
@@ -49,7 +49,7 @@ export function EvidencePopup({ spec, onClose }: { spec: EvidenceSpec | null; on
           </div>
           {r.parts.map((p: any, i: number) => (
             <div key={i} className="space-y-1">
-              {r.parts.length > 1 && <div className="text-sm font-bold flex items-center gap-2">{p.sign < 0 ? '−' : p.role === 'denominator' ? '÷' : '+'} {L(p.label)} <span className="num text-xs text-dim">{p.sum !== null ? fmt(p.sum, p.role === 'denominator' ? 'count' : undefined) : ''}</span></div>}
+              {r.parts.length > 1 && <div className="text-sm font-bold flex items-center gap-2">{p.sign < 0 ? '−' : p.role === 'denominator' ? '÷' : '+'} {L(p.label)} {p.sum !== null ? <Amt v={p.sum} unit={p.role === 'denominator' ? 'count' : undefined} className="text-xs text-dim" /> : null}</div>}
               {p.evidence.length === 0 ? <div className="text-sm text-dim">{t('مفيش سجلات في النطاق ده.')}</div> : <Rows rows={p.evidence} unit={['count', 'unit', 'minutes'].includes(r.metric.unit) || p.role === 'denominator' ? 'count' : 'EGP'} onOpen={open} />}
             </div>
           ))}

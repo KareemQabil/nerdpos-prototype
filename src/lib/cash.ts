@@ -85,3 +85,19 @@ export function pctChange(now: string | null | undefined, before: string | null 
 export function sumDecimals(xs: (string | null | undefined)[]): string {
   return xs.filter((x) => isNum(x ?? '')).reduce((a, x) => a.plus(D(x!)), D(0)).toString();
 }
+
+// ux-08: amounts shown in words («عجز 30.00 ج.م») keep the sign apart from the value — in Decimal.
+/** Absolute value of a decimal amount string, at scale 4 ("-30.0000" → "30.0000"); '' when not a number. */
+export function absAmount(v: string | null | undefined): string {
+  return isNum(v ?? '') ? D(v!).abs().toFixed(4) : '';
+}
+/** Σ quantity × price (+ extra) for a typed preview total, in Decimal at scale 4; blanks / non-numbers count as 0. */
+export function sumLines(pairs: [string | number | null | undefined, string | number | null | undefined][], extra?: string | number | null): string {
+  const d = (x: string | number | null | undefined) => (isNum(x == null ? '' : String(x)) ? D(String(x)) : D(0));
+  return pairs.reduce((a, [q, p]) => a.plus(d(q).times(d(p))), d(extra ?? null)).toFixed(4);
+}
+/** Share of `part` in `total` as a Decimal percent string (2 places), '0' when the total is 0. */
+export function sharePct(part: string | null | undefined, total: string | null | undefined, places = 2): string {
+  if (!isNum(part ?? '') || !isNum(total ?? '') || D(total!).isZero()) return (0).toFixed(places);
+  return D(part!).div(D(total!)).times(100).toDecimalPlaces(places).toFixed(places);
+}

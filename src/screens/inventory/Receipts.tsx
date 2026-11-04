@@ -8,6 +8,7 @@ import { Banner, Button, DetailPane, Empty, Field, Input, KV, MasterDetail, Mone
 import { FullPage } from './purchasingLayout';
 import { t, L, tv, tLabel } from '../../i18n';
 import { dateTime, money } from '../../lib/format';
+import { sumLines } from '../../lib/cash';
 import { BranchScope, ItemPicker, Qty, WarehouseSelect, fmtQty, unitLabel, useBranchScope, useItemsCatalog, useList, useWarehouses, Inp, Sel } from './common';
 import { personText } from '../../demo/people';
 import { ChainView } from './Chain';
@@ -85,7 +86,7 @@ export function ReceiveDialog({ po, onClose, onDone, presetItemId, presetSupplie
     const p = item.packs?.find((x: any) => x.id === item.purchasePackId) ?? item.packs?.[0];
     setLines([{ itemId: item.id, poLineId: null, packId: p?.id ?? '', quantity: '', unitCost: (Number(item.lastCost || item.avgCost) * Number(p?.factor ?? 1)).toFixed(2), lotCode: '', expiryDate: '' }]);
   }, [items.items, presetItemId]); // eslint-disable-line react-hooks/exhaustive-deps
-  const total = lines.reduce((a, l) => a + Number(l.quantity || 0) * Number(l.unitCost || 0), 0);
+  const total = sumLines(lines.map((l) => [l.quantity, l.unitCost])); // Decimal
   const post = async () => {
     const body = { supplierId, warehouseId: wh, purchaseOrderId: selPo?.id, supplierInvoiceNo: invoice || undefined, note: note || undefined,
       lines: lines.filter((l) => l.itemId && Number(l.quantity) > 0).map((l) => ({ itemId: l.itemId, poLineId: l.poLineId ?? undefined, packId: l.packId || undefined, quantity: l.quantity, unitCost: l.unitCost || '0', lotCode: l.lotCode || undefined, expiryDate: l.expiryDate || undefined })) };
@@ -95,7 +96,7 @@ export function ReceiveDialog({ po, onClose, onDone, presetItemId, presetSupplie
   const valid = supplierId && wh && lines.some((l) => l.itemId && Number(l.quantity) > 0);
   return (
     <FullPage onBack={onClose} fb="receive-page" title={selPo ? t('استلام على أمر شراء {n}', { n: selPo.number }) : t('استلام بضاعة')} badge={<StateBadge ops={['GoodsReceipt.Post']} />}
-      footer={<><span className="text-sm me-auto">{t('قيمة الإذن')}: <b className="num">{money(total.toFixed(4))}</b></span><Button onClick={onClose}>{t('إلغاء')}</Button><Button variant="success" data-fb="receive:post" loading={busy} disabled={!valid} onClick={post}><PackageCheck className="w-4 h-4" />{t('سجّل الاستلام')}</Button></>}>
+      footer={<><span className="text-sm me-auto">{t('قيمة الإذن')}: <Money v={total} /></span><Button onClick={onClose}>{t('إلغاء')}</Button><Button variant="success" data-fb="receive:post" loading={busy} disabled={!valid} onClick={post}><PackageCheck className="w-4 h-4" />{t('سجّل الاستلام')}</Button></>}>
       <div className="space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
           {!po && <Field label={t('على أمر شراء؟')}><Select data-fb="receive:po" value={poId} onChange={(e) => setPoId(e.target.value)} options={[{ value: '', label: t('لأ — استلام من غير أمر') }, ...openPos.items.map((p) => ({ value: p.id, label: `${p.number} — ${tv(p.supplierName)}` }))]} /></Field>}
@@ -112,7 +113,7 @@ export function ReceiveDialog({ po, onClose, onDone, presetItemId, presetSupplie
             it ? <Sel className="w-36" disabled={!!l.poLineId} value={l.packId} onChange={(e) => set({ packId: e.target.value })} options={[{ value: '', label: unitLabel(it.unit) }, ...(it.packs ?? []).map((p: any) => ({ value: p.id, label: L(p.name) }))]} /> : '—',
             <div><Inp data-fb={`receive:qty:${i}`} className="w-20" inputMode="decimal" value={l.quantity} onChange={(e) => set({ quantity: e.target.value.replace(/[^\d.]/g, '') })} />{pk && Number(l.quantity) > 0 && <div className="text-[10px] text-dim mt-0.5">= {fmtQty(Number(l.quantity) * Number(pk.factor))} {unitLabel(it.unit)}</div>}</div>,
             <Inp data-fb={`receive:cost:${i}`} className="w-24" inputMode="decimal" value={l.unitCost} onChange={(e) => set({ unitCost: e.target.value.replace(/[^\d.]/g, '') })} />,
-            <span className="num text-xs">{money((Number(l.quantity || 0) * Number(l.unitCost || 0)).toFixed(4))}</span>,
+            <Money v={(Number(l.quantity || 0) * Number(l.unitCost || 0)).toFixed(4)} className="text-xs" plain />,
             <Inp className="w-24" value={l.lotCode} placeholder={t('اختياري')} onChange={(e) => set({ lotCode: e.target.value })} />,
             it?.trackLots ? <Inp data-fb={`receive:expiry:${i}`} className="w-36" type="date" value={l.expiryDate} onChange={(e) => set({ expiryDate: e.target.value })} /> : <span className="text-dim text-xs">—</span>,
             <Button size="sm" variant="ghost" onClick={() => setLines(lines.length > 1 ? lines.filter((_, j) => j !== i) : lines)}><Trash2 className="w-3.5 h-3.5" /></Button>,
@@ -150,10 +151,10 @@ function ReceiptView({ id, onClose }: { id: string | null; onClose: () => void }
           <Table head={[t('الصنف'), t('الكمية'), t('بالوحدة'), t('السعر'), t('تكلفة الوحدة'), t('القيمة'), t('الدفعة / الصلاحية')]} rows={r.lines.map((l: any) => [
             <span className="font-bold">{L(l.item?.name)}</span>,
             <span className="num">{fmtQty(l.packQuantity)} {l.packId ? L(l.item?.packs?.find((p: any) => p.id === l.packId)?.name) : unitLabel(l.item?.unit)}</span>,
-            <Qty v={l.quantity} unit={l.item?.unit} />, <span className="num text-xs">{money(l.packCost)}</span>, <span className="num text-xs">{money(l.unitCost)}</span>, <Money v={l.value} className="text-xs" />,
+            <Qty v={l.quantity} unit={l.item?.unit} />, <Money v={l.packCost} className="text-xs" plain />, <Money v={l.unitCost} className="text-xs" plain />, <Money v={l.value} className="text-xs" />,
             <span className="text-xs">{l.lotCode ?? '—'}{l.expiryDate ? ` · ${l.expiryDate}` : ''}</span>,
           ])} />
-          <div className="text-sm">{t('الإجمالي')}: <b className="num">{money(r.total)}</b>{Number(r.returnedValue) > 0 && <span className="text-dim"> · {t('اترجع منه')} <span className="num">{money(r.returnedValue)}</span></span>}</div>
+          <div className="text-sm">{t('الإجمالي')}: <Money v={r.total} />{Number(r.returnedValue) > 0 && <span className="text-dim"> · {t('اترجع منه')} <Money v={r.returnedValue} plain /></span>}</div>
           <ChainView query={{ receiptId: r.id }} title={t('المستندات المربوطة')} />
           <Tech><div className="text-[11px] num text-dim">{r.id} · movements {r.movementIds.join(', ')}</div></Tech>
         </div>
@@ -203,14 +204,14 @@ function SupplierReturnDialog({ receipt, onClose }: { receipt?: any; onClose: ()
   useEffect(() => { if (!wh && whs.items.length) setWh(whs.items.find((w) => w.branchId === auth.branchId && w.kind === 'STORE')?.id ?? whs.items[0].id); }, [whs.items, wh, auth.branchId]);
   useEffect(() => { if (rc && !receipt) setWh(rc.warehouseId); }, [receiptId]); // eslint-disable-line react-hooks/exhaustive-deps
   const choices = rc ? items.items.filter((i) => rc.lines.some((l: any) => l.itemId === i.id)) : items.items;
-  const total = lines.reduce((a, l) => a + Number(l.quantity || 0) * Number(l.unitCost || 0), 0);
+  const total = sumLines(lines.map((l) => [l.quantity, l.unitCost])); // Decimal
   const save = async () => {
     const r = await run('SupplierReturn.Post', { body: { supplierId, warehouseId: wh, receiptId: rc?.id, reason, lines: lines.filter((l) => l.itemId && Number(l.quantity) > 0).map((l) => ({ itemId: l.itemId, quantity: l.quantity, unitCost: l.unitCost || undefined })) } }, { success: t('المرتجع اتسجل والكمية خرجت من المخزن') });
     if (r) onClose();
   };
   return (
     <FullPage onBack={onClose} fb="supplier-return-page" title={t('مرتجع للمورد')} badge={<StateBadge ops={['SupplierReturn.Post']} />}
-      footer={<><span className="text-sm me-auto">{t('القيمة')}: <b className="num">{money(total.toFixed(4))}</b></span><Button onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" data-fb="supplier-return:save" loading={busy} disabled={!supplierId || !wh || !reason.trim() || !lines.some((l) => l.itemId && Number(l.quantity) > 0)} onClick={save}><Save className="w-4 h-4" />{t('سجّل المرتجع')}</Button></>}>
+      footer={<><span className="text-sm me-auto">{t('القيمة')}: <Money v={total} /></span><Button onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" data-fb="supplier-return:save" loading={busy} disabled={!supplierId || !wh || !reason.trim() || !lines.some((l) => l.itemId && Number(l.quantity) > 0)} onClick={save}><Save className="w-4 h-4" />{t('سجّل المرتجع')}</Button></>}>
       <div className="space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Field label={t('المورد')}><Select data-fb="supplier-return:supplier" disabled={!!receipt} value={supplierId} onChange={(e) => { setSupplierId(e.target.value); setReceiptId(''); }} options={[{ value: '', label: t('اختار') }, ...suppliers.items.map((s) => ({ value: s.id, label: tv(s.name) }))]} /></Field>

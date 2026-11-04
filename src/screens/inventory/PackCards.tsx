@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import { Sparkles, Tag, Plus, Save, Package, Clock3 } from 'lucide-react';
 import { useCommand, useQuery } from '../../app/hooks';
-import { Banner, Button, Field, Input, Modal, Pill, Select, Spinner, StateBadge } from '../../ui';
+import { Banner, Button, Field, Input, Modal, Pill, Select, Spinner, StateBadge, Money } from '../../ui';
 import { t, L, tv } from '../../i18n';
 import { cn, money } from '../../lib/format';
 import { fmtQty, unitLabel, useList } from './common';
@@ -29,7 +29,7 @@ export function PackCards({ itemId, compact, canEdit }: { itemId: string; compac
         <Banner tone="success" title={t('الأوفر ليك')}>
           <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1" data-fb="packs:advice">
             <Sparkles className="w-4 h-4" />
-            <span>{t('أوفر عبوة')}: <b>{L(a.cards.find((c: any) => c.id === a.bestPackId)?.name)}</b> {t('من')} <b>{tv(a.bestPackSupplierName)}</b> — <b className="num">{money(a.bestUnitCost)}</b> {t('لكل {u}', { u })}</span>
+            <span>{t('أوفر عبوة')}: <b>{L(a.cards.find((c: any) => c.id === a.bestPackId)?.name)}</b> {t('من')} <b>{tv(a.bestPackSupplierName)}</b> — <Money v={a.bestUnitCost} /> {t('لكل {u}', { u })}</span>
             {a.bestSupplierName && <span className="text-soft">· {t('أوفر مورد')}: <b>{tv(a.bestSupplierName)}</b></span>}
             {Number(a.monthlySaving) > 0 && <span className="text-soft">· {t('توفير حوالي {m} في الشهر بالاستهلاك الحالي', { m: money(a.monthlySaving) })}</span>}
           </span>

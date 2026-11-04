@@ -9,6 +9,8 @@ import { clock, businessDate } from '../../../mock/clock';
 import { resolvePeriod, type PivotResult, type PivotSpec, type PeriodPreset } from '../../../reports/pivot';
 import { specOf, type ReportDesign, type ColumnView } from '../../../reports/studio';
 import { cellText, rangeText, type Lang } from '../../../reports/format';
+import { Money } from '../../../ui';
+import { CURRENCY } from '../../../lib/format';
 import { columnFormat } from '../../../reports/export/table';
 import type { MeasureMeta } from '../../../reports/pivot';
 
@@ -89,6 +91,12 @@ export function usePivot(spec: PivotSpec | null, debounce = 350) {
 export const designSpec = (d: ReportDesign, deviceBranch: string | null, allBranches: string[]) => specOf(d, today(), deviceBranch, allBranches);
 
 export function fmtCell(v: any, m: MeasureMeta, view?: ColumnView[]) { return cellText(v, columnFormat(m, view), lang(), m.unit); }
+/** A cell on the screen: money as <Money> («ج.م» after the number in reading order), anything else as its text. */
+export function CellVal({ v, m, view }: { v: any; m: MeasureMeta; view?: ColumnView[] }) {
+  const txt = fmtCell(v, m, view);
+  const suffix = ' ' + CURRENCY;
+  return txt.endsWith(suffix) ? <Money text={txt.slice(0, -suffix.length)} plain /> : <>{txt}</>;
+}
 export const isNum = (v: any) => v?.availability === 'AVAILABLE' && v.value !== null;
 
 /** Click-outside helper for popovers. */

@@ -8,6 +8,8 @@ import { Card, Button, Pill, Modal, Field, Input, Select, Tabs, Table, Empty, St
 import { t, L, tv } from '../../i18n';
 import { Tech } from '../../app/tech';
 import { cn, money, dateTime, dayShort as fmtDayShort } from '../../lib/format';
+import { pctChange, sign, sumAmounts } from '../../lib/cash';
+import { D } from '../../mock/money';
 import { saveFile } from '../../lib/files';
 import { metricLabel, isMetricId, SECTION_COLUMNS, codeLabel } from '../admin/output/labels';
 import { METHOD_AR } from './BusinessDay';
@@ -18,10 +20,12 @@ const dayNum = (iso: string) => String(Number(iso.slice(8, 10)));
 const n = (v: unknown) => Number(v ?? 0);
 const fmt = (v: number) => Math.round(v).toLocaleString('en-US');
 
-function Delta({ now, before, label }: { now: number; before: number; label: string }) {
-  if (!before) return <span className="text-[11px] text-dim">{label}: —</span>;
-  const p = ((now - before) / before) * 100;
-  const up = p > 0.5, down = p < -0.5;
+/** Change against a baseline, in Decimal (pctChange): amounts and counts are decimal strings, never JS float arithmetic. */
+function Delta({ now, before, label }: { now: string | number | null | undefined; before: string | number | null | undefined; label: string }) {
+  const pc = pctChange(now == null ? null : String(now), before == null ? null : String(before));
+  if (pc === null) return <span className="text-[11px] text-dim">{label}: —</span>;
+  const p = Number(pc); // a whole percent for display only
+  const up = p > 0, down = p < 0;
   const Icon = up ? TrendingUp : down ? TrendingDown : Minus;
   return <span className={cn('text-[11px] inline-flex items-center gap-0.5', up ? 'text-[var(--success)]' : down ? 'text-[var(--error)]' : 'text-dim')}><Icon className="w-3 h-3" />{label} <span className="num">{p > 0 ? '+' : ''}{p.toFixed(0)}%</span></span>;
 }
@@ -33,35 +37,36 @@ export function SalesOverview() {
   const [hover, setHover] = useState<number | null>(null);
   if (!items.length) return null;
   // early in the day (no sales yet) the cards show yesterday, compared with the day before and the same day last week
-  const quiet = n(items[items.length - 1].netSales) === 0;
+  const quiet = sign(items[items.length - 1].netSales) === 0;
   const off = quiet ? 1 : 0;
   const today = items[items.length - 1 - off], yday = items[items.length - 2 - off], lastWeek = items[items.length - 8 - off];
   const last14 = items.slice(-14);
   const max = Math.max(1, ...last14.map((x) => n(x.netSales)));
   const avgHour = Array.from({ length: 24 }, (_, h) => items.slice(-8, -1).reduce((a, x) => a + n(x.byHour?.[h]), 0) / 7);
-  const hourSrc = n(today.netSales) > 0 ? today : yday;
+  const hourSrc = sign(today.netSales) > 0 ? today : yday;
   const hMax = Math.max(1, ...hourSrc.byHour, ...avgHour);
   const methods = Object.entries(hourSrc.byMethod ?? {}) as [string, string][];
-  const mTotal = methods.reduce((a, [, v]) => a + n(v), 0) || 1;
+  const mTotal = sumAmounts(methods.map(([, v]) => v)); // Decimal
+  const share = (v: string) => (sign(mTotal) > 0 ? D(v).div(D(mTotal)).times(100) : D(0)); // Decimal percent of the total
   const colors = ['#22d3ee', '#a78bfa', '#f472b6', '#34d399', '#fbbf24'];
   const top = (hourSrc.topItems ?? []).slice(0, 6);
   const topMax = Math.max(1, ...top.map((x: any) => n(x.amount)));
-  const kpi = (icon: React.ReactNode, label: string, value: string, a: number, b: number, c: number) => (
+  const kpi = (icon: React.ReactNode, label: string, value: React.ReactNode, a: string | number, b: string | number | null | undefined, c: string | number | null | undefined) => (
     <div className="glass rounded-xl p-4" data-fb="report-kpi">
       <div className="text-xs text-dim flex items-center gap-1.5">{icon}{label}</div>
-      <div className="text-2xl font-extrabold num mt-1">{value}</div>
+      <div className="text-2xl font-extrabold mt-1">{value}</div>
       <div className="flex gap-3 mt-1"><Delta now={a} before={b} label={quiet ? t('عن اليوم اللي قبله') : t('عن امبارح')} /><Delta now={a} before={c} label={t('عن نفس اليوم الأسبوع اللي فات')} /></div>
     </div>
   );
-  const avg = (x: any) => (x?.orders ? n(x.netSales) / x.orders : 0);
+  const avg = (x: any): string | null => (x?.orders ? D(x.netSales ?? 0).div(x.orders).toFixed(4) : null); // Decimal
   return (
     <div className="space-y-3" data-fb="reports:overview">
       {quiet && <div className="text-xs text-dim">{t('النهارده لسه مفيهوش بيع — الكروت دي أرقام امبارح.')}</div>}
       <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3">
-        {kpi(<TrendingUp className="w-3.5 h-3.5" />, quiet ? t('صافي مبيعات امبارح') : t('صافي مبيعات النهارده'), `${fmt(n(today.netSales))} ${t('جنيه')}`, n(today.netSales), n(yday?.netSales), n(lastWeek?.netSales))}
-        {kpi(<Receipt className="w-3.5 h-3.5" />, t('عدد الشيكات'), String(today.orders), today.orders, yday?.orders ?? 0, lastWeek?.orders ?? 0)}
-        {kpi(<Wallet className="w-3.5 h-3.5" />, t('متوسط الشيك'), `${fmt(avg(today))} ${t('جنيه')}`, avg(today), avg(yday), avg(lastWeek))}
-        {kpi(<Users className="w-3.5 h-3.5" />, t('الضيوف'), String(today.guests), today.guests, yday?.guests ?? 0, lastWeek?.guests ?? 0)}
+        {kpi(<TrendingUp className="w-3.5 h-3.5" />, quiet ? t('صافي مبيعات امبارح') : t('صافي مبيعات النهارده'), <Money v={today.netSales} className="font-extrabold" />, today.netSales, yday?.netSales, lastWeek?.netSales)}
+        {kpi(<Receipt className="w-3.5 h-3.5" />, t('عدد الشيكات'), <span className="num">{today.orders}</span>, today.orders, yday?.orders, lastWeek?.orders)}
+        {kpi(<Wallet className="w-3.5 h-3.5" />, t('متوسط الشيك'), <Money v={avg(today)} className="font-extrabold" />, avg(today) ?? '0', avg(yday), avg(lastWeek))}
+        {kpi(<Users className="w-3.5 h-3.5" />, t('الضيوف'), <span className="num">{today.guests}</span>, today.guests, yday?.guests, lastWeek?.guests)}
       </div>
       <div className="grid xl:grid-cols-[1.4fr_1fr] gap-3">
         <Card title={t('المبيعات آخر 14 يوم')}>
@@ -81,7 +86,7 @@ export function SalesOverview() {
               })}
               <defs><linearGradient id="gToday" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#f472b6" /><stop offset="1" stopColor="#fb7185" /></linearGradient></defs>
             </svg>
-            {hover !== null && last14[hover] && <div className="absolute top-0 start-2 rounded-lg glass-strong px-3 py-1.5 text-xs pointer-events-none"><b>{dayShort(last14[hover].businessDate)} {last14[hover].businessDate}</b><div><span className="num">{fmt(n(last14[hover].netSales))}</span> {t('جنيه')} · <span className="num">{last14[hover].orders}</span> {t('شيك')}</div>{last14[hover].source === 'HISTORY' && <div className="text-dim">{t('من بيانات الأيام اللي فاتت')}</div>}</div>}
+            {hover !== null && last14[hover] && <div className="absolute top-0 start-2 rounded-lg glass-strong px-3 py-1.5 text-xs pointer-events-none"><b>{dayShort(last14[hover].businessDate)} {last14[hover].businessDate}</b><div><Money v={last14[hover].netSales} plain /> · <span className="num">{last14[hover].orders}</span> {t('شيك')}</div>{last14[hover].source === 'HISTORY' && <div className="text-dim">{t('من بيانات الأيام اللي فاتت')}</div>}</div>}
           </div>
           <div className="flex gap-3 text-[11px] text-dim"><span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-cyan-400" />{t('أيام عادية')}</span><span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-violet-400" />{t('الخميس والجمعة')}</span><span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-pink-400" />{t('النهارده')}</span></div>
         </Card>
@@ -98,8 +103,8 @@ export function SalesOverview() {
         <Card title={t('الفلوس دخلت إزاي')}>
           {methods.length === 0 ? <div className="text-sm text-dim">{t('مفيش دفعات لسه')}</div> : (
             <div className="space-y-2">
-              <div className="flex h-4 rounded-full overflow-hidden">{methods.map(([k, v], i) => <div key={k} style={{ width: `${(n(v) / mTotal) * 100}%`, background: colors[i % colors.length] }} title={`${t(METHOD_AR[k] ?? k)}: ${money(v)}`} />)}</div>
-              <div className="flex flex-wrap gap-3 text-sm">{methods.map(([k, v], i) => <span key={k} className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded" style={{ background: colors[i % colors.length] }} />{t(METHOD_AR[k] ?? k)} <span className="num font-bold">{((n(v) / mTotal) * 100).toFixed(0)}%</span> <span className="text-dim text-xs">{money(v)}</span></span>)}</div>
+              <div className="flex h-4 rounded-full overflow-hidden">{methods.map(([k, v], i) => <div key={k} style={{ width: `${share(v).toFixed(2)}%`, background: colors[i % colors.length] }} title={`${t(METHOD_AR[k] ?? k)}: ${money(v)}`} />)}</div>
+              <div className="flex flex-wrap gap-3 text-sm">{methods.map(([k, v], i) => <span key={k} className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded" style={{ background: colors[i % colors.length] }} />{t(METHOD_AR[k] ?? k)} <span className="num font-bold">{share(v).toFixed(0)}%</span> <Money v={v} className="text-dim text-xs" plain /></span>)}</div>
             </div>
           )}
         </Card>
@@ -109,7 +114,7 @@ export function SalesOverview() {
               <div key={L(x.name)} className="flex items-center gap-2 text-sm">
                 <span className="w-28 truncate">{L(x.name)}</span>
                 <div className="flex-1 h-3 rounded-full surface-2 overflow-hidden"><div className="h-full rounded-full bg-gradient-to-l from-pink-400 to-violet-500" style={{ width: `${(n(x.amount) / topMax) * 100}%` }} /></div>
-                <span className="num text-xs w-12 text-end">{x.qty}×</span><span className="num text-xs w-24 text-end">{money(x.amount)}</span>
+                <span className="num text-xs w-12 text-end">{x.qty}×</span><Money v={x.amount} className="text-xs w-24 text-end" plain />
               </div>
             ))}</div>
           )}

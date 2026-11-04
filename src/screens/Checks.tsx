@@ -95,9 +95,9 @@ function CheckDrawer({ o, onClose, onOpen, onHistory, onMove, onPay }: { o: any;
         <KV rows={[[t('اليوم'), <span className="num">{o.businessDate}</span>], [t('اتفتح'), <span className="num">{time(o.createdAt)}</span>], [t('الويتر / الكاشير'), personName(null, o.serverName)], ...(d.guestCount ? [[t('الضيوف'), <span className="num">{d.guestCount}</span>] as [string, React.ReactNode]] : [])]} />
         {d.lines ? (
           <div className="rounded-xl surface-1 border line p-3 space-y-1.5 text-sm">
-            {d.lines.filter((l: any) => l.status !== 'REMOVED').map((l: any) => <div key={l.id} className={l.status === 'VOIDED' ? 'flex justify-between gap-2 line-through opacity-50' : 'flex justify-between gap-2'}><span><span className="num font-bold text-[var(--primary)]">{qty(l.quantity)}×</span> {L(l.name)}</span><span className="num">{money(l.lineTotal)}</span></div>)}
+            {d.lines.filter((l: any) => l.status !== 'REMOVED').map((l: any) => <div key={l.id} className={l.status === 'VOIDED' ? 'flex justify-between gap-2 line-through opacity-50' : 'flex justify-between gap-2'}><span><span className="num font-bold text-[var(--primary)]">{qty(l.quantity)}×</span> {L(l.name)}</span><Money v={l.lineTotal} plain /></div>)}
             <div className="border-t line pt-2 mt-2 flex justify-between font-bold"><span>{t('الإجمالي')}</span><Money v={T.payable} /></div>
-            {d.settlement && <div className="flex justify-between text-xs text-dim"><span>{t('اتدفع')} <span className="num">{money(d.settlement.paid)}</span></span><span>{t('الباقي')} <span className="num">{money(d.settlement.remaining)}</span></span></div>}
+            {d.settlement && <div className="flex justify-between text-xs text-dim"><span>{t('اتدفع')} <Money v={d.settlement.paid} plain /></span><span>{t('الباقي')} <Money v={d.settlement.remaining} plain /></span></div>}
           </div>
         ) : <EmptyState compact text={t('بنحمّل التفاصيل…')} />}
       </div>

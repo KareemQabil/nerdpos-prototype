@@ -148,11 +148,11 @@ function OrderDetail({ o, onOpen, onCollect }: { o: any; onOpen: () => void; onC
         {lines.map((l: any) => (
           <div key={l.id} className={l.status === 'VOIDED' ? 'flex justify-between gap-2 line-through opacity-50' : 'flex justify-between gap-2'}>
             <span><span className="num font-bold text-[var(--primary)]">{qty(l.quantity)}×</span> {L(l.name)}{l.fireRound === null && l.status === 'ACTIVE' ? <span className="text-[11px] text-[var(--warning-text)]"> · {t('لم يُرسل بعد')}</span> : null}</span>
-            <span className="num">{money(l.lineTotal)}</span>
+            <Money v={l.lineTotal} plain />
           </div>
         ))}
         <div className="border-t line pt-2 mt-2 flex justify-between font-bold"><span>{t('الإجمالي')}</span><Money v={d.totals?.payable} /></div>
-        {d.settlement && <div className="flex justify-between text-xs text-dim"><span>{t('المدفوع')} <span className="num">{money(d.settlement.paid)}</span></span><span>{t('المتبقي')} <span className="num">{money(d.settlement.remaining)}</span></span></div>}
+        {d.settlement && <div className="flex justify-between text-xs text-dim"><span>{t('المدفوع')} <Money v={d.settlement.paid} plain /></span><span>{t('المتبقي')} <Money v={d.settlement.remaining} plain /></span></div>}
       </div>
       {(d.rounds ?? []).length > 0 && <div className="flex flex-wrap gap-1.5">{d.rounds.map((r: any) => <Pill key={r.round} size="sm" tone={r.kitchen === 'READY' || r.kitchen === 'DONE' ? 'success' : 'warning'}><ChefHat className="w-3 h-3" />{t('جولة')} {r.round}</Pill>)}</div>}
       <div className="flex flex-wrap gap-2">

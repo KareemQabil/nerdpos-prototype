@@ -13,7 +13,7 @@ import { flatten, type PivotResult, type PivotNode, type MeasureMeta } from '../
 import { exportTable, type ExportColumn } from '../../../reports/export/table';
 import type { ColumnView, NumberFormat } from '../../../reports/studio';
 import { useEvidence } from '../parts';
-import { lang, useClickAway, fmtCell } from './common';
+import { lang, useClickAway, fmtCell, CellVal } from './common';
 
 const ROW_H = 36;
 const FIRST_W = 260;
@@ -90,7 +90,7 @@ export function PivotGrid({ result: r, view, onView, sort, onSort, expanded, onT
       <td className="pg-num p-0" style={bg ? { backgroundImage: `linear-gradient(${bg}, ${bg})` } : undefined}>
         <button type="button" onClick={() => evidence(n, c)} title={t('اعرض الشيكات والسجلات اللي ورا الرقم ده')} data-fb={`cell:${c.measure.id}`}
           className={cn('w-full h-full px-3 text-end num tabular-nums hover:text-[var(--primary)] hover:underline decoration-dotted underline-offset-4 inline-flex items-center justify-end gap-1', bold && 'font-bold', neg && 'text-[var(--error)]', st.tone === 'bad' && 'text-[var(--error)]', st.tone === 'good' && 'text-[var(--success)]')}>
-          {Icon && <Icon className="w-3.5 h-3.5 shrink-0" />}{fmtCell(v, c.measure, view)}
+          {Icon && <Icon className="w-3.5 h-3.5 shrink-0" />}<CellVal v={v} m={c.measure} view={view} />
         </button>
       </td>
     );

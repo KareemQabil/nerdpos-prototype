@@ -6,7 +6,7 @@ import { Card, Pill, Table, Banner, Button } from '../../ui';
 import { t, L } from '../../i18n';
 import { cn } from '../../lib/format';
 import { Tech } from '../../app/tech';
-import { Val, fmt, ReportHeader, ReconList, useEvidence, type EvidenceSpec } from './parts';
+import { Val, fmt, ReportHeader, ReconList, useEvidence, type EvidenceSpec, Amt } from './parts';
 import { ExpertReview } from './ExpertReview';
 
 const AUD: Record<string, string> = { owner: 'صاحب المطعم', accountant: 'المحاسب', manager: 'المدير', cashier: 'الكاشير', auditor: 'المراجع', chef: 'الشيف', stock_manager: 'أمين المخزن', buyer: 'المشتريات', floor_manager: 'مدير الصالة', delivery_manager: 'مدير الدليفري', marketing: 'التسويق' };
@@ -58,8 +58,8 @@ function Bars({ run, b }: { run: any; b: any }) {
         <button key={row.key} type="button" onClick={() => open({ metric: m, cell: row.dims, from: run.period.from, to: run.period.to, branchIds: run.branchIds })} className="w-full flex items-center gap-2 text-sm hover:surface-1 rounded-md px-1" data-fb={`bar:${row.key}`}>
           <span className="w-36 truncate text-start">{L(row.labels[d])}</span>
           <div className="flex-1 h-3 rounded-full surface-2 overflow-hidden"><div className="h-full rounded-full bg-gradient-to-l from-cyan-400 to-violet-500" style={{ width: `${(Number(row.values[m]?.value ?? 0) / max) * 100}%` }} /></div>
-          <span className="num text-xs w-28 text-end">{fmt(row.values[m]?.value, unitOf(run, m))}</span>
-          {b.metrics[1] && <span className="num text-[11px] text-dim w-20 text-end">{fmt(row.values[b.metrics[1]]?.value, unitOf(run, b.metrics[1]))}</span>}
+          <Amt v={row.values[m]?.value} unit={unitOf(run, m)} className="text-xs w-28 text-end" />
+          {b.metrics[1] && <Amt v={row.values[b.metrics[1]]?.value} unit={unitOf(run, b.metrics[1])} className="text-[11px] text-dim w-20 text-end" />}
         </button>
       ))}
       {!r.rows.length && <div className="text-sm text-dim">{t('مفيش بيانات في الفترة دي')}</div>}
@@ -107,14 +107,14 @@ export function Bridge({ run, br }: { run: any; br: any }) {
         <div className="space-y-1"><div className="text-xs font-bold text-soft flex items-center gap-1"><Wallet className="w-3.5 h-3.5" />{t('الفلوس اللي دخلت وخرجت')}</div>{br.money.map((x: any) => <Row key={x.id} x={x} />)}</div>
       </div>
       <div className={cn('rounded-xl p-3 border', g.status === 'UNEXPLAINED' ? 'border-[var(--error)]' : 'border-[var(--glass-border)]')} data-fb="bridge-gap">
-        <div className="flex items-center gap-2 flex-wrap text-sm"><Scale className="w-4 h-4" /><b>{t('الفواتير − المتحصل')}</b> = <span className="num">{fmt(g.billed)} − {fmt(g.collected)} = <b>{fmt(g.difference)}</b></span>
+        <div className="flex items-center gap-2 flex-wrap text-sm"><Scale className="w-4 h-4" /><b>{t('الفواتير − المتحصل')}</b> = <span className="inline-flex items-center gap-1 flex-wrap"><Amt v={g.billed} /> − <Amt v={g.collected} /> = <Amt v={g.difference} className="font-extrabold" /></span>
           <Pill tone={g.status === 'MATCHED' ? 'success' : g.status === 'EXPLAINED' ? 'info' : 'error'} size="sm">{g.status === 'MATCHED' ? t('متساويين') : g.status === 'EXPLAINED' ? t('الفرق متشرح بالكامل') : t('فيه فرق مش متشرح')}</Pill></div>
         <div className="mt-2 space-y-1">
           {g.explanations.map((e: any, i: number) => (
-            <div key={i} className="flex items-center gap-2 text-sm"><span className="flex-1">• {L(e.label)}</span><span className="num">{fmt(e.amount)}</span>
+            <div key={i} className="flex items-center gap-2 text-sm"><span className="flex-1">• {L(e.label)}</span><Amt v={e.amount} />
               <Button size="sm" variant="ghost" onClick={() => open({ metric: '__list', label: L(e.label), from: '', filters: { __evidence: e.evidence } })} data-fb={`gap-evidence:${i}`}>{t('{n} سجل', { n: e.evidence.length })}</Button></div>
           ))}
-          <div className="flex items-center gap-2 text-sm font-bold"><span className="flex-1">{t('غير مفسَّر')}</span><span className={cn('num', Number(g.unexplained) !== 0 && 'text-[var(--error)]')}>{fmt(g.unexplained)}</span></div>
+          <div className="flex items-center gap-2 text-sm font-bold"><span className="flex-1">{t('غير مفسَّر')}</span><Amt v={g.unexplained} className={cn(Number(g.unexplained) !== 0 && 'text-[var(--error)]')} /></div>
         </div>
         <div className="text-[11px] text-dim mt-1">{t('المبيعات والتحصيل مقاييس مختلفة — مش لازم يتساووا، بس كل فرق لازم يتشرح بحركات مربوطة.')}</div>
       </div>
@@ -136,11 +136,11 @@ export function Drawers({ run, drawers }: { run: any; drawers: any[] }) {
         <div key={d.sessionId} className="rounded-xl surface-1 p-3 space-y-1">
           <div className="font-bold text-sm flex items-center gap-2">{d.label}<Pill size="sm" tone={d.state === 'OPEN' ? 'warning' : 'neutral'}>{d.state === 'OPEN' ? t('مفتوحة') : t('مقفولة')}</Pill></div>
           {d.lines.map((l: any) => (
-            <button key={l.kind} type="button" onClick={() => open({ metric: '__list', label: l.label, from: '', filters: { __evidence: l.evidence } })} className="w-full flex justify-between text-sm hover:surface-2 rounded px-1"><span>{l.label} <span className="text-[10px] text-dim">({l.evidence.length})</span></span><span className="num">{fmt(l.amount)}</span></button>
+            <button key={l.kind} type="button" onClick={() => open({ metric: '__list', label: l.label, from: '', filters: { __evidence: l.evidence } })} className="w-full flex justify-between text-sm hover:surface-2 rounded px-1"><span>{l.label} <span className="text-[10px] text-dim">({l.evidence.length})</span></span><Amt v={l.amount} /></button>
           ))}
-          <div className="flex justify-between text-sm font-bold border-t line pt-1"><span>{t('= المتوقع')}</span><span className="num">{fmt(d.expected)}</span></div>
-          <div className="flex justify-between text-sm"><span>{t('المعدود')}</span><span className="num">{d.counted === null ? t('لسه ما اتعدش') : fmt(d.counted)}</span></div>
-          {d.variance !== null && <div className={cn('flex justify-between text-sm font-bold', Number(d.variance) < 0 && 'text-[var(--error)]', Number(d.variance) > 0 && 'text-[var(--warning-text)]')}><span>{t('الفرق')}</span><span className="num">{fmt(d.variance)}</span></div>}
+          <div className="flex justify-between text-sm font-bold border-t line pt-1"><span>{t('= المتوقع')}</span><Amt v={d.expected} /></div>
+          <div className="flex justify-between text-sm"><span>{t('المعدود')}</span>{d.counted === null ? <span>{t('لسه ما اتعدش')}</span> : <Amt v={d.counted} />}</div>
+          {d.variance !== null && <div className={cn('flex justify-between text-sm font-bold', Number(d.variance) < 0 && 'text-[var(--error)]', Number(d.variance) > 0 && 'text-[var(--warning-text)]')}><span>{t('الفرق')}</span><Amt v={d.variance} /></div>}
           {d.reason && <div className="text-xs text-soft">{t('سبب الكاشير')}: {d.reason}{d.approvedBy ? ` — ${t('بموافقة')} ${d.approvedBy}` : ''}</div>}
           <div className="flex flex-wrap gap-1 pt-1">{d.checks.map((c: any) => <Pill key={c.id} size="sm" tone={c.status === 'MATCHED' ? 'success' : c.status === 'EXPLAINED' ? 'info' : 'error'} title={c.equation}>{L(c.title)}</Pill>)}</div>
         </div>
@@ -189,7 +189,7 @@ function EvidenceList({ b }: { b: any }) {
   return (
     <Table dense head={[t('السجل'), t('اليوم'), t('المبلغ')]} align={['start', 'start', 'end']} empty={<div className="text-sm text-dim p-2">{t('مفيش سجلات في الفترة دي')}</div>}
       onRowClick={(i) => ev[i].orderId && open({ metric: '__list', label: ev[i].label, from: '', filters: { __evidence: [ev[i]] } })}
-      rows={ev.map((e: any) => [e.label, <span className="num text-xs">{e.businessDate}</span>, <span className="num">{fmt(e.amount)}</span>])} />
+      rows={ev.map((e: any) => [e.label, <span className="num text-xs">{e.businessDate}</span>, <Amt v={e.amount} />])} />
   );
 }
 

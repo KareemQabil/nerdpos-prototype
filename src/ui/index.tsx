@@ -23,8 +23,8 @@
 import React, { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Loader2, AlertTriangle, CheckCircle2, Info, XCircle, Search, Check, Inbox } from 'lucide-react';
-import { cn, money } from '../lib/format';
-import { t, L } from '../i18n';
+import { cn, money, CURRENCY } from '../lib/format';
+import { t, L, getLang } from '../i18n';
 import type { BadgeState } from '../mock/contracts';
 import { badgeOfOps, opsById } from '../mock/contracts';
 import { useTech } from '../app/tech';
@@ -380,18 +380,21 @@ export function Tabs<T extends string>({ tabs, value, onChange, className, varia
 }
 
 // ───────── values
-/** An amount from the server: number (LTR, tabular) and a smaller currency on one baseline, in reading order. */
-export function Money({ v, className, big, tone, unit = true }: { v: string | null | undefined; className?: string; big?: boolean; tone?: 'primary' | 'error' | 'success' | 'dim'; unit?: boolean }) {
+/** An amount: the number (LTR, tabular, in `.num`) then a smaller currency on one baseline, in reading order — right to
+ *  left in Arabic («30.00 ج.م», «-30.00 ج.م»), left to right in English. `v` is a server money string; `text` is a number
+ *  already formatted elsewhere (reports). The currency is never put inside `.num` (scripts/check-money.mjs). */
+export function Money({ v, text, className, big, tone, unit = true, plain, fb }: { v?: string | number | null; text?: string; className?: string; big?: boolean; tone?: 'primary' | 'error' | 'success' | 'dim'; unit?: boolean; plain?: boolean; fb?: string }) {
   const c = tone === 'primary' ? 'text-[var(--primary)]' : tone === 'error' ? 'text-[var(--error)]' : tone === 'success' ? 'text-[var(--success)]' : tone === 'dim' ? 'text-dim' : '';
-  const n = money(v, false);
+  const n = text ?? money(v, false);
+  const weight = plain || /(^|\s)font-(normal|medium|semibold|bold|extrabold|black)(\s|$)/.test(className ?? '') ? '' : 'font-bold';
   return (
-    <span className={cn('amount font-bold', big ? 'text-2xl tracking-tight' : '', c, className)} data-money>
+    <span className={cn('amount', weight, big ? 'text-2xl tracking-tight' : '', c, className)} dir={getLang() === 'ar' ? 'rtl' : 'ltr'} data-money data-fb={fb}>
       <span className="num">{n}</span>
-      {unit && n !== '—' && <span className="amount-unit">{currencyText()}</span>}
+      {unit && n !== '—' && <>{' '}<span className="amount-unit">{currencyText()}</span></>}
     </span>
   );
 }
-export const currencyText = () => L({ ar: 'ج.م', en: 'EGP' });
+export const currencyText = () => CURRENCY;
 
 export function KV({ rows, className }: { rows: [React.ReactNode, React.ReactNode][]; className?: string }) {
   return (

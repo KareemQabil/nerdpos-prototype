@@ -3,7 +3,7 @@
 import React from 'react';
 import { ClipboardList, ShoppingBag, PackageCheck, FileText } from 'lucide-react';
 import { useDev, useQuery } from '../../app/hooks';
-import { Pill, Spinner, StateBadge, Table } from '../../ui';
+import { Pill, Spinner, StateBadge, Table, Money } from '../../ui';
 import { t, L, tv } from '../../i18n';
 import { cn, dateTime, money } from '../../lib/format';
 import { Qty, fmtQty, PO_STATE } from './common';
@@ -42,8 +42,8 @@ export function ChainView({ query, title }: { query: Record<string, string>; tit
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-2 items-stretch">
         {stage(<ClipboardList className="w-3.5 h-3.5" />, t('١. طلبية المخزن'), c.storeRequest ? [{ key: c.storeRequest.id, number: c.storeRequest.number, sub: <>{t(SR_STATE[c.storeRequest.state]?.ar)} · {c.storeRequest.byName ? tv(c.storeRequest.byName) : ''}</>, onClick: () => nav('inv-purchasing', { tab: 'requests', open: c.storeRequest.id }) }] : [], t('من غير طلبية'))}
         {stage(<ShoppingBag className="w-3.5 h-3.5" />, t('٢. أمر الشراء'), c.purchaseOrders.map((p: any) => ({ key: p.id, number: p.number, sub: <>{tv(p.supplierName)} · {t(PO_STATE[p.state]?.ar)}</>, onClick: () => nav('inv-po', { open: p.id }) })), t('من غير أمر شراء'))}
-        {stage(<PackageCheck className="w-3.5 h-3.5" />, t('٣. الاستلام'), c.receipts.map((r: any) => ({ key: r.id, number: r.number, sub: <>{dateTime(r.at)} · <span className="num">{money(r.total)}</span>{r.state === 'REVERSED' ? ` · ${t('اتلغى')}` : ''}</>, onClick: () => nav('inv-receipts', { open: r.id }) })), t('لسه ما اتستلمش'))}
-        {stage(<FileText className="w-3.5 h-3.5" />, t('٤. فاتورة المورد'), c.invoices.map((x: any) => ({ key: x.id, number: x.number, sub: <>{x.kind === 'DIRECT' ? t('فاتورة مباشرة') : t('من الاستلام')} · <span className="num">{money(x.total)}</span></>, onClick: () => nav('inv-purchasing', { tab: 'invoices', open: x.id }) })), t('لسه مفيش فاتورة'))}
+        {stage(<PackageCheck className="w-3.5 h-3.5" />, t('٣. الاستلام'), c.receipts.map((r: any) => ({ key: r.id, number: r.number, sub: <>{dateTime(r.at)} · <Money v={r.total} plain />{r.state === 'REVERSED' ? ` · ${t('اتلغى')}` : ''}</>, onClick: () => nav('inv-receipts', { open: r.id }) })), t('لسه ما اتستلمش'))}
+        {stage(<FileText className="w-3.5 h-3.5" />, t('٤. فاتورة المورد'), c.invoices.map((x: any) => ({ key: x.id, number: x.number, sub: <>{x.kind === 'DIRECT' ? t('فاتورة مباشرة') : t('من الاستلام')} · <Money v={x.total} plain /></>, onClick: () => nav('inv-purchasing', { tab: 'invoices', open: x.id }) })), t('لسه مفيش فاتورة'))}
       </div>
       <Table dense head={[t('الصنف'), t('المخزن طلب'), t('المشتريات طلبت'), t('اتستلم فعلًا'), t('اتفوتر'), t('الرصيد دلوقتي')]} align={['start', 'end', 'end', 'end', 'end', 'end']}
         rows={c.items.map((i: any) => [

@@ -140,7 +140,7 @@ export default function Item360() {
                 <button className="font-bold hover:text-[var(--primary)] text-start" data-fb={`item360:ing:${l.itemId}`} onClick={() => nav('item360', { kind: 'item', id: l.itemId })}>{L(l.name)}</button>,
                 <span className="num text-xs">{fmtQty(l.enteredQuantity)} {unitLabel(l.enteredUnit?.replace?.('unit_', '').toUpperCase?.() ?? l.unit)}</span>,
                 Number(l.wastePercent) ? <span className="num text-xs">{l.wastePercent}%</span> : <span className="text-dim text-xs">—</span>,
-                <span className="num text-xs">{money(l.cost)}</span>,
+                <Money v={l.cost} className="text-xs" plain />,
                 l.state ? <LevelPill state={l.state} /> : null,
               ])} />
             </Card>
@@ -191,7 +191,7 @@ export default function Item360() {
               {d.foodCost.some((f: any) => f.band === 'HIGH') && <div className="mt-2"><BandPill band="HIGH" /> <span className="text-[11px] text-dim">{t('التكلفة أعلى من 40% من السعر في قناة واحدة على الأقل.')}</span></div>}
               {d.prices.history.length > 0 && (
                 <details className="mt-3"><summary className="text-xs text-soft cursor-pointer">{t('تاريخ الأسعار ({n})', { n: d.prices.history.length })}</summary>
-                  <div className="mt-2 space-y-1">{d.prices.history.map((h: any) => <div key={h.id} className="text-[11px] flex justify-between gap-2"><span className="text-dim">{dateTime(h.from)} · {tv(h.branchName)} · {t(CH[h.channel])}</span><span className="num">{money(h.amount)}{h.to ? <span className="text-dim"> {t('(انتهى)')}</span> : null}</span></div>)}</div>
+                  <div className="mt-2 space-y-1">{d.prices.history.map((h: any) => <div key={h.id} className="text-[11px] flex justify-between gap-2"><span className="text-dim">{dateTime(h.from)} · {tv(h.branchName)} · {t(CH[h.channel])}</span><span><Money v={h.amount} plain />{h.to ? <span className="text-dim"> {t('(انتهى)')}</span> : null}</span></div>)}</div>
                 </details>
               )}
             </Card>
@@ -222,7 +222,7 @@ export default function Item360() {
               <div className="space-y-1.5">{d.suppliers.map((s: any) => (
                 <button key={s.supplierId} onClick={() => nav('inv-suppliers', { open: s.supplierId })} className="w-full flex items-center justify-between gap-2 rounded-lg surface-1 px-2.5 py-1.5 text-start hover:surface-2">
                   <span className="min-w-0"><span className="text-sm font-bold truncate block">{tv(s.name)} {s.isDefault && <Pill size="sm" tone="primary">{t('الأساسي')}</Pill>}</span><span className="text-[11px] text-dim">{s.receipts ? t('{n} استلام · آخر مرة {d}', { n: s.receipts, d: dateTime(s.lastAt) }) : t('مفيش استلامات لسه')}</span></span>
-                  <span className="text-xs num shrink-0">{money(s.lastUnitCost)}/{unitLabel(unit)}</span>
+                  <span className="text-xs shrink-0"><Money v={s.lastUnitCost} plain /> / {unitLabel(unit)}</span>
                 </button>
               ))}</div>
             </Card>
@@ -232,7 +232,7 @@ export default function Item360() {
           )}
           {d.item?.costHistory?.length > 0 && (
             <Card title={t('تاريخ التكلفة')}>
-              <div className="space-y-1">{d.item.costHistory.map((c: any, i: number) => <div key={i} className="flex justify-between text-[11px] gap-2"><span className="text-dim">{dateTime(c.at)}</span><span className="num">{t('سعر الشراء')} {money(c.unitCost)} · {t('المتوسط')} {money(c.avgCost)}</span></div>)}</div>
+              <div className="space-y-1">{d.item.costHistory.map((c: any, i: number) => <div key={i} className="flex justify-between text-[11px] gap-2"><span className="text-dim">{dateTime(c.at)}</span><span>{t('سعر الشراء')} <Money v={c.unitCost} plain /> · {t('المتوسط')} <Money v={c.avgCost} plain /></span></div>)}</div>
             </Card>
           )}
         </div>
@@ -262,7 +262,7 @@ function DocsTabs({ d, unit }: { d: any; unit?: string }) {
       ]} />
       {tab === 'sr' && <Table dense empty={t('مفيش')} onRowClick={(i) => nav('inv-purchasing', { tab: 'requests', open: d.docs.storeRequests[i].id })} head={[t('الرقم'), t('الحالة'), t('اتطلب'), t('اتعمل أمر'), t('اتستلم')]} align={['start', 'start', 'end', 'end', 'end']} rows={d.docs.storeRequests.map((s: any) => [<span className="num font-bold">{s.number}</span>, <StatePill map={SR_STATE} state={s.state} />, <Qty v={s.requested} unit={unit} hint={false} />, <Qty v={s.ordered} unit={unit} hint={false} />, <Qty v={s.received} unit={unit} hint={false} />])} />}
       {tab === 'po' && <Table dense empty={t('مفيش')} onRowClick={(i) => nav('inv-po', { open: d.docs.purchaseOrders[i].id })} head={[t('الرقم'), t('المورد'), t('الحالة'), t('المطلوب'), t('اتستلم'), t('باقي')]} align={['start', 'start', 'start', 'end', 'end', 'end']} rows={d.docs.purchaseOrders.map((p: any) => [<span className="num font-bold">{p.number}</span>, <span className="text-xs">{tv(p.supplierName)}</span>, <StatePill map={PO_STATE} state={p.state} />, <Qty v={p.ordered} unit={unit} hint={false} />, <Qty v={p.received} unit={unit} hint={false} />, <Qty v={p.outstanding} unit={unit} hint={false} />])} />}
-      {tab === 'gr' && <Table dense empty={t('مفيش')} onRowClick={(i) => nav('inv-receipts', { open: d.docs.receipts[i].id })} head={[t('الإذن'), t('المورد'), t('إمتى'), t('الكمية'), t('سعر الوحدة'), t('الفاتورة')]} align={['start', 'start', 'start', 'end', 'end', 'start']} rows={d.docs.receipts.map((r: any) => [<span className="num font-bold">{r.number}</span>, <span className="text-xs">{tv(r.supplierName)}</span>, <span className="text-xs">{dateTime(r.at)}</span>, <Qty v={r.quantity} unit={unit} hint={false} />, <span className="num text-xs">{money(r.unitCost)}</span>, r.state === 'REVERSED' ? <Pill tone="error" size="sm">{t('اتلغى')}</Pill> : r.invoiceId ? <Pill tone="success" size="sm"><FileText className="w-3 h-3" />{t('عليه فاتورة')}</Pill> : <Pill tone="warning" size="sm">{t('من غير فاتورة')}</Pill>])} />}
+      {tab === 'gr' && <Table dense empty={t('مفيش')} onRowClick={(i) => nav('inv-receipts', { open: d.docs.receipts[i].id })} head={[t('الإذن'), t('المورد'), t('إمتى'), t('الكمية'), t('سعر الوحدة'), t('الفاتورة')]} align={['start', 'start', 'start', 'end', 'end', 'start']} rows={d.docs.receipts.map((r: any) => [<span className="num font-bold">{r.number}</span>, <span className="text-xs">{tv(r.supplierName)}</span>, <span className="text-xs">{dateTime(r.at)}</span>, <Qty v={r.quantity} unit={unit} hint={false} />, <Money v={r.unitCost} className="text-xs" plain />, r.state === 'REVERSED' ? <Pill tone="error" size="sm">{t('اتلغى')}</Pill> : r.invoiceId ? <Pill tone="success" size="sm"><FileText className="w-3 h-3" />{t('عليه فاتورة')}</Pill> : <Pill tone="warning" size="sm">{t('من غير فاتورة')}</Pill>])} />}
       {tab === 'inv' && <Table dense empty={t('مفيش')} onRowClick={(i) => nav('inv-purchasing', { tab: 'invoices', open: d.docs.invoices[i].id })} head={[t('الرقم'), t('المورد'), t('النوع'), t('الكمية'), t('الإجمالي')]} align={['start', 'start', 'start', 'end', 'end']} rows={d.docs.invoices.map((x: any) => [<span className="num font-bold">{x.number}</span>, <span className="text-xs">{tv(x.supplierName)}</span>, <Pill size="sm" tone={x.kind === 'DIRECT' ? 'violet' : 'info'}>{x.kind === 'DIRECT' ? t('مباشرة') : t('من الاستلام')}</Pill>, <Qty v={x.quantity} unit={unit} hint={false} />, <Money v={x.total} className="text-xs" />])} />}
     </div>
   );

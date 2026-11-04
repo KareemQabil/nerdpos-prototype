@@ -262,11 +262,11 @@ export function DeliveryDetailBody({ id, onClose, stacked }: { id: string; onClo
             {d.customer?.allergies?.length ? <AllergyWarning allergies={d.customer.allergies} /> : null}
             {d.order && (
               <div className="rounded-xl border line p-3 text-sm space-y-1">
-                {(d.lines ?? []).map((l: any) => <div key={l.id} className="flex justify-between gap-2"><span>{qty(l.quantity)} × {L(l.name)}{l.modifiers?.length ? <span className="text-dim text-xs"> — {l.modifiers.map((m: any) => L(m)).join(t('، '))}</span> : null}{tv(l.note) ? <span className="text-[var(--warning-text)] text-xs"> ✎ {tv(l.note)}</span> : null}</span><span className="num">{money(l.lineTotal)}</span></div>)}
+                {(d.lines ?? []).map((l: any) => <div key={l.id} className="flex justify-between gap-2"><span>{qty(l.quantity)} × {L(l.name)}{l.modifiers?.length ? <span className="text-dim text-xs"> — {l.modifiers.map((m: any) => L(m)).join(t('، '))}</span> : null}{tv(l.note) ? <span className="text-[var(--warning-text)] text-xs"> ✎ {tv(l.note)}</span> : null}</span><Money v={l.lineTotal} plain /></div>)}
                 {d.totals && <div className="border-t line pt-2 mt-2 space-y-0.5">
-                  {d.totals.charges.map((c: any) => <div key={c.id} className="flex justify-between text-dim"><span>{L(c.label)}</span><span className="num">{money(c.amount)}</span></div>)}
+                  {d.totals.charges.map((c: any) => <div key={c.id} className="flex justify-between text-dim"><span>{L(c.label)}</span><Money v={c.amount} plain /></div>)}
                   <div className="flex justify-between font-bold"><span>{t('الإجمالي')}</span><Money v={d.order.payable} /></div>
-                  <div className="flex justify-between text-xs text-dim"><span>{t('المدفوع / المتبقي')}</span><span className="num">{money(d.order.paid)} / {money(d.order.remaining)}</span></div>
+                  <div className="flex justify-between text-xs text-dim"><span>{t('المدفوع / المتبقي')}</span><span><Money v={d.order.paid} plain /> / <Money v={d.order.remaining} plain /></span></div>
                 </div>}
               </div>
             )}

@@ -1,6 +1,11 @@
 // Display formatting only. The browser formats server money; it never computes a price, total, tax or change.
 import { getLang } from '../i18n';
 
+/** The currency, in both UI languages (owner rule: always «ج.م», after the number). */
+export const CURRENCY = 'ج.م';
+
+/** «1,234.50 ج.م» for running text. Inside a number element (`.num`, left-to-right) use <Money> or money(v, false):
+ *  the currency there would read before the number in Arabic (scripts/check-money.mjs guards this). */
 export function money(v: string | number | null | undefined, withCurrency = true): string {
   if (v === null || v === undefined || v === '') return '—';
   const s = String(v);
@@ -15,7 +20,7 @@ export function money(v: string | number | null | undefined, withCurrency = true
   }
   const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   const out = `${neg ? '-' : ''}${grouped}.${fracPart}`;
-  return withCurrency ? `${out} ${getLang() === 'ar' ? 'ج.م' : 'EGP'}` : out;
+  return withCurrency ? `${out} ${CURRENCY}` : out;
 }
 
 export function qty(v: string | number): string {

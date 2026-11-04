@@ -11,6 +11,7 @@ import { Banner, Button, Card, DetailPane, EmptyState, Field, Input, KV, MasterD
 import { FullPage } from './purchasingLayout';
 import { t, L, tv } from '../../i18n';
 import { cn, dateTime, money } from '../../lib/format';
+import { sumAmounts, sumLines } from '../../lib/cash';
 import { BranchScope, ItemPicker, Qty, StatePill, WarehouseSelect, fmtQty, unitLabel, useBranchScope, useItemsCatalog, useList, useWarehouses, Inp, Sel } from './common';
 import { ChainView, SR_STATE } from './Chain';
 import { personText } from '../../demo/people';
@@ -49,8 +50,8 @@ export default function Purchasing() {
         {/* the store keeper sees requests only; purchasing also sees receipts and invoices */}
         <StatCard label={t('طلبيات مستنية المشتريات')} value={waiting.length} icon={<ClipboardList />} tone={waiting.length ? 'warning' : 'neutral'} loading={loading} onClick={() => setTab('requests')} fb="pur:kpi-waiting" />
         {canBuy && <><StatCard label={t('استلامات من غير فاتورة')} value={pending.items.length} icon={<PackageCheck />} tone={pending.items.length ? 'info' : 'neutral'} loading={pending.loading && !pending.raw} onClick={() => setTab('invoices')} fb="pur:kpi-pending" />
-        <StatCard label={t('فواتير الموردين (الكل)')} value={invs.items.length} icon={<FileText />} loading={invs.loading && !invs.raw} hint={t('بقيمة {m}', { m: money(String(invs.items.reduce((a, x) => a + Number(x.total), 0))) })} />
-        <StatCard label={t('فرق أسعار في الفواتير')} value={<Money v={String(invs.items.reduce((a, x) => a + Number(x.priceVariance), 0))} />} icon={<ShoppingBag />} hint={t('الفاتورة مقابل سعر الاستلام')} /></>}
+        <StatCard label={t('فواتير الموردين (الكل)')} value={invs.items.length} icon={<FileText />} loading={invs.loading && !invs.raw} hint={t('بقيمة {m}', { m: money(sumAmounts(invs.items.map((x) => x.total))) })} />
+        <StatCard label={t('فرق أسعار في الفواتير')} value={<Money v={sumAmounts(invs.items.map((x) => x.priceVariance))} />} icon={<ShoppingBag />} hint={t('الفاتورة مقابل سعر الاستلام')} /></>}
       </StatGrid>
       <Tabs<Tab> variant="underline" value={tab} onChange={setTab} tabs={[
         { id: 'requests', label: t('طلبيات المخزن'), count: reqs.items.length, fb: 'pur:tab-requests' },
@@ -217,10 +218,10 @@ function ToPurchaseOrders({ sr, onClose }: { sr: any; onClose: () => void }) {
     const res = await run<any>('StoreRequest.CreatePurchaseOrders', { params: { storeRequestId: sr.id }, body: { expectedVersion: sr.version, orders } }, { success: t('أوامر الشراء اتعملت من الطلبية') });
     if (res) onClose();
   };
-  const total = [...groups.values()].flat().reduce((a, { r }) => a + Number(r.qty) * Number(r.cost), 0);
+  const total = sumLines([...groups.values()].flat().map(({ r }) => [r.qty, r.cost])); // Decimal
   return (
     <FullPage onBack={onClose} title={t('أوامر شراء من طلبية {n}', { n: sr.number })} badge={<StateBadge ops={['StoreRequest.CreatePurchaseOrders']} />}
-      footer={<><span className="text-sm me-auto">{t('{n} أمر شراء', { n: groups.size })} · <b className="num">{money(total.toFixed(4))}</b></span><Switch checked={issue} onChange={setIssue} label={t('ابعتها للمورد على طول')} /><Button onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" data-fb="to-po:create" loading={busy} disabled={!groups.size} onClick={create}><ShoppingBag className="w-4 h-4" />{t('اعمل أوامر الشراء')}</Button></>}>
+      footer={<><span className="text-sm me-auto">{t('{n} أمر شراء', { n: groups.size })} · <Money v={total} /></span><Switch checked={issue} onChange={setIssue} label={t('ابعتها للمورد على طول')} /><Button onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" data-fb="to-po:create" loading={busy} disabled={!groups.size} onClick={create}><ShoppingBag className="w-4 h-4" />{t('اعمل أوامر الشراء')}</Button></>}>
       <div className="space-y-3">
         <Banner tone="info">{t('مسؤول المشتريات يقرر الكمية حسب الفلوس والمورد — ممكن تختلف عن طلبية المخزن، والفرق هيفضل باين في المستندات.')}</Banner>
         <Table dense head={[t('الصنف'), t('المخزن طلب'), t('المورد'), t('الوحدة / العبوة'), t('هتطلب'), t('السعر'), t('الفرق')]} align={['start', 'end', 'start', 'start', 'start', 'start', 'end']} rows={sr.lines.map((l: any) => {
@@ -262,14 +263,14 @@ function InvoiceFromReceiptDialog({ receipt, onClose, onDone }: { receipt: any; 
   const [tax, setTax] = useState('');
   const [due, setDue] = useState('');
   const [cost, setCost] = useState<Record<string, string>>(() => Object.fromEntries(receipt.lines.map((l: any) => [l.id, String(Number(l.packCost))])));
-  const total = receipt.lines.reduce((a: number, l: any) => a + Number(l.packQuantity) * Number(cost[l.id] || 0), 0) + Number(tax || 0);
+  const total = sumLines(receipt.lines.map((l: any) => [l.packQuantity, cost[l.id]]), tax); // Decimal
   const post = async () => {
     const r = await run<any>('SupplierInvoice.FromReceipt', { body: { receiptIds: [receipt.id], supplierInvoiceNo: no || undefined, taxAmount: tax || undefined, dueDate: due || undefined, lines: receipt.lines.map((l: any) => ({ receiptLineId: `${receipt.id}:${l.id}`, packCost: cost[l.id] || l.packCost })) } }, { success: t('فاتورة المورد اتسجلت على الكمية اللي اتستلمت') });
     if (r) onDone(r.id);
   };
   return (
     <Popup open size="lg" onClose={onClose} title={t('فاتورة المورد على إذن {n}', { n: receipt.number })}
-      footer={<><span className="text-sm me-auto">{t('الإجمالي')}: <b className="num">{money(total.toFixed(4))}</b></span><Button onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" data-fb="invoice:post" loading={busy} onClick={post}><FileText className="w-4 h-4" />{t('سجّل الفاتورة')}</Button></>}>
+      footer={<><span className="text-sm me-auto">{t('الإجمالي')}: <Money v={total} /></span><Button onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" data-fb="invoice:post" loading={busy} onClick={post}><FileText className="w-4 h-4" />{t('سجّل الفاتورة')}</Button></>}>
       <div className="space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Field label={t('رقم فاتورة المورد')}><Input data-fb="invoice:no" value={no} onChange={(e) => setNo(e.target.value)} /></Field>
@@ -279,9 +280,9 @@ function InvoiceFromReceiptDialog({ receipt, onClose, onDone }: { receipt: any; 
         <Table dense head={[t('الصنف'), t('الكمية (اللي اتستلمت)'), t('سعر الاستلام'), t('سعر الفاتورة'), t('الإجمالي')]} align={['start', 'end', 'end', 'start', 'end']} rows={receipt.lines.map((l: any) => [
           <span className="font-bold">{L(l.item?.name)}</span>,
           <span className="num" data-fb={`invoice:qty:${l.itemId}`}>{fmtQty(l.packQuantity)} {l.packId ? L(l.item?.packs?.find((p: any) => p.id === l.packId)?.name) : unitLabel(l.item?.unit)}</span>,
-          <span className="num text-xs">{money(l.packCost)}</span>,
+          <Money v={l.packCost} className="text-xs" plain />,
           <div className="flex items-center gap-1"><Inp className="w-24" inputMode="decimal" value={cost[l.id]} onChange={(e) => setCost({ ...cost, [l.id]: e.target.value.replace(/[^\d.]/g, '') })} />{Number(cost[l.id]) !== Number(l.packCost) && <Pill tone="warning" size="sm">{t('فرق سعر')}</Pill>}</div>,
-          <span className="num text-xs">{money((Number(l.packQuantity) * Number(cost[l.id] || 0)).toFixed(4))}</span>,
+          <Money v={(Number(l.packQuantity) * Number(cost[l.id] || 0)).toFixed(4)} className="text-xs" plain />,
         ])} />
         <Banner tone="info">{t('الكمية في الفاتورة = اللي اتستلم بالظبط ومينفعش تتغير. لو المورد كاتب سعر مختلف، اكتبه — الفرق بيظهر كـ«فرق سعر» والرصيد مش بيتغير.')}</Banner>
       </div>
@@ -298,10 +299,10 @@ function InvoiceView({ id, onClose }: { id: string; onClose: () => void }) {
         <div className="space-y-4">
           <KV rows={[[t('رقم فاتورة المورد'), x.supplierInvoiceNo ?? '—'], [t('المخزن'), tv(x.warehouse.name)], [t('اتسجلت'), `${dateTime(x.at)} · ${personText(x.userName)}`], [t('ميعاد الدفع'), x.dueDate ?? '—'], [t('أذون الاستلام'), x.receiptNumbers.join(t('، '))], ...(x.purchaseOrderNumber ? [[t('أمر الشراء'), x.purchaseOrderNumber] as [string, string]] : []), ...(x.storeRequestNumber ? [[t('طلبية المخزن'), x.storeRequestNumber] as [string, string]] : [])]} />
           <Table dense head={[t('الصنف'), t('الكمية'), t('سعر الاستلام'), t('سعر الفاتورة'), t('فرق السعر'), t('الإجمالي')]} align={['start', 'end', 'end', 'end', 'end', 'end']} rows={x.lines.map((l: any) => [
-            <span className="font-bold">{L(l.item?.name)}</span>, <Qty v={l.quantity} unit={l.item?.unit} hint={false} />, <span className="num text-xs">{money(l.receivedPackCost)}</span>, <span className="num text-xs">{money(l.packCost)}</span>,
+            <span className="font-bold">{L(l.item?.name)}</span>, <Qty v={l.quantity} unit={l.item?.unit} hint={false} />, <Money v={l.receivedPackCost} className="text-xs" plain />, <Money v={l.packCost} className="text-xs" plain />,
             Number(l.priceVariance) !== 0 ? <Money v={l.priceVariance} className="text-xs" tone={Number(l.priceVariance) > 0 ? 'error' : 'success'} /> : <span className="text-dim text-xs">—</span>, <Money v={l.value} className="text-xs" />,
           ])} />
-          <div className="flex flex-wrap gap-4 justify-end text-sm"><span>{t('قبل الضريبة')}: <b className="num">{money(x.subtotal)}</b></span><span>{t('الضريبة')}: <b className="num">{money(x.taxAmount)}</b></span><span>{t('الإجمالي')}: <b className="num text-[var(--primary)]">{money(x.total)}</b></span></div>
+          <div className="flex flex-wrap gap-4 justify-end text-sm"><span>{t('قبل الضريبة')}: <Money v={x.subtotal} /></span><span>{t('الضريبة')}: <Money v={x.taxAmount} /></span><span>{t('الإجمالي')}: <Money v={x.total} className="text-[var(--primary)]" /></span></div>
           <ChainView query={{ invoiceId: x.id }} title={t('المستندات المربوطة')} />
           <Tech><div className="text-[11px] num text-dim">{x.id}</div></Tech>
         </div>
@@ -325,7 +326,7 @@ function DirectInvoiceDialog({ onClose, onDone }: { onClose: () => void; onDone:
   const [due, setDue] = useState('');
   const [lines, setLines] = useState<DLine[]>([{ itemId: '', packId: '', quantity: '', unitCost: '', expiryDate: '' }]);
   useEffect(() => { if (!wh && whs.items.length) setWh(whs.items.find((w) => w.branchId === auth.branchId && w.kind === 'STORE')?.id ?? whs.items[0].id); }, [whs.items, wh, auth.branchId]);
-  const total = lines.reduce((a, l) => a + Number(l.quantity || 0) * Number(l.unitCost || 0), 0) + Number(tax || 0);
+  const total = sumLines(lines.map((l) => [l.quantity, l.unitCost]), tax); // Decimal
   const valid = supplierId && wh && lines.some((l) => l.itemId && Number(l.quantity) > 0);
   const post = async () => {
     const r = await run<any>('SupplierInvoice.PostDirect', { body: { supplierId, warehouseId: wh, supplierInvoiceNo: no || undefined, taxAmount: tax || undefined, dueDate: due || undefined, lines: lines.filter((l) => l.itemId && Number(l.quantity) > 0).map((l) => ({ itemId: l.itemId, packId: l.packId || undefined, quantity: l.quantity, unitCost: l.unitCost || '0', expiryDate: l.expiryDate || undefined })) } }, { success: t('الفاتورة اتسجلت والبضاعة دخلت المخزن') });
@@ -333,7 +334,7 @@ function DirectInvoiceDialog({ onClose, onDone }: { onClose: () => void; onDone:
   };
   return (
     <FullPage onBack={onClose} title={t('فاتورة مورد مباشرة')} badge={<StateBadge ops={['SupplierInvoice.PostDirect']} />} sub={t('البضاعة وصلت من غير أمر شراء (زي الصيدليات): مستند واحد بيدخّل البضاعة المخزن ويحدّث التكلفة ويسجل الفاتورة.')}
-      footer={<><span className="text-sm me-auto">{t('الإجمالي')}: <b className="num">{money(total.toFixed(4))}</b></span><Button onClick={onClose}>{t('إلغاء')}</Button><Button variant="success" data-fb="direct:post" loading={busy} disabled={!valid} onClick={post}><PackageCheck className="w-4 h-4" />{t('سجّل الفاتورة واستلم')}</Button></>}>
+      footer={<><span className="text-sm me-auto">{t('الإجمالي')}: <Money v={total} /></span><Button onClick={onClose}>{t('إلغاء')}</Button><Button variant="success" data-fb="direct:post" loading={busy} disabled={!valid} onClick={post}><PackageCheck className="w-4 h-4" />{t('سجّل الفاتورة واستلم')}</Button></>}>
       <div className="space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Field label={t('المورد')}><Select data-fb="direct:supplier" value={supplierId} onChange={(e) => setSupplierId(e.target.value)} options={[{ value: '', label: t('اختار') }, ...suppliers.items.map((s) => ({ value: s.id, label: tv(s.name) }))]} /></Field>
@@ -351,7 +352,7 @@ function DirectInvoiceDialog({ onClose, onDone }: { onClose: () => void; onDone:
             it ? <Sel className="w-36" value={l.packId} onChange={(e) => set({ packId: e.target.value, unitCost: offerCost(it, e.target.value) })} options={[{ value: '', label: unitLabel(it.unit) }, ...(it.packs ?? []).map((p: any) => ({ value: p.id, label: L(p.name) }))]} /> : '—',
             <Inp data-fb={`direct:qty:${i}`} className="w-20" inputMode="decimal" value={l.quantity} onChange={(e) => set({ quantity: e.target.value.replace(/[^\d.]/g, '') })} />,
             <Inp data-fb={`direct:cost:${i}`} className="w-24" inputMode="decimal" value={l.unitCost} onChange={(e) => set({ unitCost: e.target.value.replace(/[^\d.]/g, '') })} />,
-            <span className="num text-xs">{money((Number(l.quantity || 0) * Number(l.unitCost || 0)).toFixed(4))}</span>,
+            <Money v={(Number(l.quantity || 0) * Number(l.unitCost || 0)).toFixed(4)} className="text-xs" plain />,
             it?.trackLots ? <Inp className="w-36" type="date" value={l.expiryDate} onChange={(e) => set({ expiryDate: e.target.value })} /> : <span className="text-dim text-xs">—</span>,
             <Button size="sm" variant="ghost" onClick={() => setLines(lines.length > 1 ? lines.filter((_, j) => j !== i) : lines)}><Trash2 className="w-3.5 h-3.5" /></Button>,
           ];

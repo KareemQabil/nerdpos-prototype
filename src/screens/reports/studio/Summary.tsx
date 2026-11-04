@@ -9,7 +9,7 @@ import type { PivotResult, PivotNode } from '../../../reports/pivot';
 import type { ColumnView } from '../../../reports/studio';
 import { orderedMeasures, columnLabel } from '../../../reports/export/table';
 import { useEvidence } from '../parts';
-import { fmtCell, isNum, lang, useRegistry } from './common';
+import { fmtCell, CellVal, isNum, lang, useRegistry } from './common';
 import { rangeText } from '../../../reports/format';
 import { wherePath } from './PivotGrid';
 
@@ -54,7 +54,7 @@ export function Kpis({ r, view, max = 4 }: { r: PivotResult; view?: ColumnView[]
             className="text-start rounded-2xl border border-[var(--glass-border)] bg-[var(--card-raised)] px-4 py-3 hover:border-[var(--primary)]/50 transition-colors min-w-0 disabled:cursor-default" data-fb={`kpi:${m.id}`}>
             <div className="text-xs text-soft truncate">{columnLabel(m, view, lang())}</div>
             <div className={cn('mt-1 text-2xl font-extrabold num tabular-nums truncate', isNum(v) && Number(v!.value) < 0 && 'text-[var(--error)]')}>
-              {v?.availability === 'NOT_AVAILABLE' ? <span className="text-base font-bold text-dim">{t('مش متاح')}</span> : fmtCell(v, m, view)}
+              {v?.availability === 'NOT_AVAILABLE' ? <span className="text-base font-bold text-dim">{t('مش متاح')}</span> : <CellVal v={v} m={m} view={view} />}
             </div>
             {isNum(chg) ? (
               <div className={cn('mt-0.5 text-xs inline-flex items-center gap-1 num', Number(chg!.value) >= 0 ? 'text-[var(--success)]' : 'text-[var(--error)]')}>
@@ -103,7 +103,7 @@ export function MiniChart({ r, kind, view }: { r: PivotResult; kind: 'bars' | 'l
         <button key={n.id} type="button" onClick={() => ev(n)} className="w-full flex items-center gap-3 text-sm rounded-lg px-1.5 py-0.5 hover:surface-1">
           <span className="w-40 truncate text-start">{L(n.label)}</span>
           <span className="flex-1 h-2.5 rounded-full surface-2 overflow-hidden"><span className="block h-full rounded-full bg-[var(--primary)]" style={{ width: `${(Math.abs(vals[i]) / max) * 100}%`, opacity: 0.85 }} /></span>
-          <span className="w-32 text-end num tabular-nums text-xs">{fmtCell(n.cells[''][m.id], m, view)}</span>
+          <span className="w-32 text-end tabular-nums text-xs"><CellVal v={n.cells[''][m.id]} m={m} view={view} /></span>
         </button>
       ))}
     </div>

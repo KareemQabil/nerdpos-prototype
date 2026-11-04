@@ -117,7 +117,7 @@ export function DeliveryStartPopup({ onClose, onStarted, edit, customerId }: { o
             })}
             <Button size="sm" variant="ghost" onClick={() => setNewAddr({ ...EMPTY_ADDRESS })} data-fb="delivery-address-new"><Plus className="w-4 h-4" />{t('عنوان جديد')}</Button>
           </div>
-          {zone && <div className="text-xs text-dim" data-fb="delivery-fee">{t('رسوم التوصيل')}: <b className="num text-[var(--foreground)]">{money(zone.fee)}</b> · {t('الحد الأدنى')} <span className="num">{money(zone.minOrder)}</span></div>}
+          {zone && <div className="text-xs text-dim" data-fb="delivery-fee">{t('رسوم التوصيل')}: <Money v={zone.fee} className="text-[var(--foreground)]" /> · {t('الحد الأدنى')} <Money v={zone.minOrder} plain /></div>}
           <div className="grid grid-cols-3 gap-1.5">
             {PAY_OPTS.map((p) => <button key={p.id} type="button" onClick={() => setPayMode(p.id)} data-fb={`delivery-pay:${p.id}`} aria-pressed={payMode === p.id} className={cn('h-12 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 px-1', payMode === p.id ? 'border-[var(--primary)] bg-[var(--primary-container)] text-[var(--primary)]' : 'surface-1 border-[var(--glass-border)]')}>{p.icon}{t(p.label)}</button>)}
           </div>

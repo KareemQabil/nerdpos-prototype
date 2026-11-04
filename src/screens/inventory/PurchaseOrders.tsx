@@ -11,6 +11,7 @@ import { useBoardView } from '../../app/useBoardView';
 import PurchasingBoard from '../boards/PurchasingBoard';
 import { t, L, tv } from '../../i18n';
 import { dateTime, money } from '../../lib/format';
+import { sumAmounts, sumLines } from '../../lib/cash';
 import { BranchScope, ItemPicker, PO_STATE, Qty, StatePill, WarehouseSelect, fmtQty, unitLabel, useBranchScope, useItemsCatalog, useList, useWarehouses, Inp, Sel } from './common';
 import { ReceiveDialog } from './Receipts';
 import { clock } from '../../mock/clock';
@@ -49,7 +50,7 @@ function PurchaseOrderList({ onBoard }: { onBoard: () => void }) {
       <PageHeader icon={<ShoppingBag />} title={t('أوامر الشراء')} badge={<StateBadge ops={OPS} />} description={t('اطلب من المورد: مسودة ← اتبعت للمورد ← اتستلم جزء أو كله ← اتقفل. ممكن تعمل الأوامر أوتوماتيك من النواقص.')}
         actions={<><BranchScope scope={scope} /><Button data-fb="po:suggest" onClick={() => setSuggest(true)}><Wand2 className="w-4 h-4" />{t('من النواقص')}</Button><Button data-fb="po:new" variant="primary" onClick={() => setEditor({})}><Plus className="w-4 h-4" />{t('أمر شراء جديد')}</Button><BoardViewToggle value="list" onChange={(v) => v === 'board' && onBoard()} /></>} />
       <StatGrid>
-        <StatCard label={t('أوامر مفتوحة')} value={openPos.length} icon={<ShoppingBag />} loading={loading} hint={t('بقيمة {m}', { m: money(String(openPos.reduce((a, p) => a + Number(p.total), 0))) })} onClick={() => setState(state === 'DRAFT,ISSUED,PARTIALLY_RECEIVED' ? '' : 'DRAFT,ISSUED,PARTIALLY_RECEIVED')} />
+        <StatCard label={t('أوامر مفتوحة')} value={openPos.length} icon={<ShoppingBag />} loading={loading} hint={t('بقيمة {m}', { m: money(sumAmounts(openPos.map((p) => p.total))) })} onClick={() => setState(state === 'DRAFT,ISSUED,PARTIALLY_RECEIVED' ? '' : 'DRAFT,ISSUED,PARTIALLY_RECEIVED')} />
         <StatCard label={t('مسودات لسه ما اتبعتتش')} value={all.items.filter((p) => p.state === 'DRAFT').length} icon={<Pencil />} loading={loading} onClick={() => setState(state === 'DRAFT' ? '' : 'DRAFT')} />
         <StatCard label={t('مستنيين الاستلام')} value={waiting.length} icon={<PackageCheck />} tone={waiting.length ? 'info' : 'neutral'} loading={loading} onClick={() => setState(state === 'ISSUED,PARTIALLY_RECEIVED' ? '' : 'ISSUED,PARTIALLY_RECEIVED')} />
         <StatCard label={t('متأخرين عن ميعاد التوريد')} value={late.length} icon={<XCircle />} tone={late.length ? 'error' : 'neutral'} loading={loading} hint={late.length ? late.map((p) => tv(p.supplierName)).slice(0, 2).join(t('، ')) : t('كله في ميعاده')} />
@@ -105,10 +106,10 @@ export function Suggestions({ branchId, onClose, onDone }: { branchId?: string; 
     }
     onDone(last);
   };
-  const total = [...groups.values()].flat().reduce((a, { p }) => a + Number(p.packs) * Number(p.cost), 0);
+  const total = sumLines([...groups.values()].flat().map(({ p }) => [p.packs, p.cost])); // Decimal
   return (
     <FullPage onBack={onClose} fb="po-suggest-page" title={t('اطلب النواقص')} badge={<StateBadge ops={['Inventory.LowStock', 'PurchaseOrder.Create']} />}
-      footer={<><span className="text-sm me-auto">{t('{n} أمر شراء', { n: groups.size })} · <b className="num">{money(total.toFixed(4))}</b></span><Button onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" data-fb="po-suggest:create" loading={busy} disabled={!groups.size} onClick={create}><ShoppingBag className="w-4 h-4" />{t('اعمل أوامر الشراء (مسودة)')}</Button></>}>
+      footer={<><span className="text-sm me-auto">{t('{n} أمر شراء', { n: groups.size })} · <Money v={total} /></span><Button onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" data-fb="po-suggest:create" loading={busy} disabled={!groups.size} onClick={create}><ShoppingBag className="w-4 h-4" />{t('اعمل أوامر الشراء (مسودة)')}</Button></>}>
       {low.loading && !low.raw ? <Spinner /> : rows.length === 0 ? <Empty text={already.length ? t('كل النواقص عليها أوامر شراء مفتوحة بالفعل.') : t('مفيش نواقص — كله فوق الحد الأدنى.')} /> : (
         <div className="space-y-3">
           <Banner tone="info">{t('الكمية المقترحة بتكمّل لحد "المستهدف" ومتقرّبة لعبوة الشراء. هيتعمل أمر شراء لكل مورد ومخزن — راجعه وابعته بعد كده.')}</Banner>
@@ -124,7 +125,7 @@ export function Suggestions({ branchId, onClose, onDone }: { branchId?: string; 
               <Sel className="w-44" value={p.supplier} onChange={(e) => set({ supplier: e.target.value })} options={[{ value: '', label: t('اختار') }, ...suppliers.items.map((s) => ({ value: s.id, label: tv(s.name) }))]} />,
               <div className="flex items-center gap-1"><Inp className="w-20" inputMode="decimal" value={p.packs} onChange={(e) => set({ packs: e.target.value })} /><span className="text-[11px] text-dim">{r.pack ? L(r.pack.name) : unitLabel(r.item.unit)}</span></div>,
               <Inp className="w-24" inputMode="decimal" value={p.cost} onChange={(e) => set({ cost: e.target.value })} />,
-              <span className="num text-xs">{money((Number(p.packs) * Number(p.cost)).toFixed(4))}</span>,
+              <Money v={(Number(p.packs) * Number(p.cost)).toFixed(4)} className="text-xs" plain />,
             ];
           })} />
           {already.length > 0 && <div className="text-xs text-dim">{t('عليهم أوامر مفتوحة')}: {already.map((r) => `${L(r.item.name)} (${r.openPurchaseOrders.map((o: any) => o.number).join(t('، '))})`).join(' · ')}</div>}
@@ -149,7 +150,7 @@ export function PoEditor({ init, onClose, onSaved }: { init: any; onClose: () =>
   const [lines, setLines] = useState<PLine[]>(po ? po.lines.map((l: any) => ({ itemId: l.itemId, packId: l.packId ?? '', orderedQuantity: l.orderedQuantity, orderedUnitCost: l.orderedUnitCost })) : [{ itemId: '', packId: '', orderedQuantity: '', orderedUnitCost: '' }]);
   useEffect(() => { if (!wh && whs.items.length) setWh(whs.items.find((w) => w.branchId === auth.branchId && w.kind === 'STORE')?.id ?? whs.items[0].id); }, [whs.items, wh, auth.branchId]);
   const supplierItems = items.items.filter((i) => !supplierId || i.defaultSupplierId === supplierId);
-  const total = lines.reduce((a, l) => a + Number(l.orderedQuantity || 0) * Number(l.orderedUnitCost || 0), 0);
+  const total = sumLines(lines.map((l) => [l.orderedQuantity, l.orderedUnitCost])); // Decimal
   const body = () => ({ lines: lines.filter((l) => l.itemId && Number(l.orderedQuantity) > 0).map((l) => ({ itemId: l.itemId, packId: l.packId || null, orderedQuantity: l.orderedQuantity, orderedUnitCost: l.orderedUnitCost || '0' })), expectedDate: date || null, note });
   const save = async () => {
     const r = po
@@ -160,7 +161,7 @@ export function PoEditor({ init, onClose, onSaved }: { init: any; onClose: () =>
   const [showAll, setShowAll] = useState(false);
   return (
     <FullPage onBack={onClose} fb="po-editor-page" title={po ? t('تعديل أمر شراء {n}', { n: po.number }) : t('أمر شراء جديد')} badge={<StateBadge ops={[po ? 'PurchaseOrder.Update' : 'PurchaseOrder.Create']} />}
-      footer={<><span className="text-sm me-auto">{t('الإجمالي')}: <b className="num">{money(total.toFixed(4))}</b></span><Button onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" data-fb="po-edit:save" loading={busy} disabled={!supplierId || !wh || !lines.some((l) => l.itemId && Number(l.orderedQuantity) > 0)} onClick={save}><Save className="w-4 h-4" />{t('احفظ مسودة')}</Button></>}>
+      footer={<><span className="text-sm me-auto">{t('الإجمالي')}: <Money v={total} /></span><Button onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" data-fb="po-edit:save" loading={busy} disabled={!supplierId || !wh || !lines.some((l) => l.itemId && Number(l.orderedQuantity) > 0)} onClick={save}><Save className="w-4 h-4" />{t('احفظ مسودة')}</Button></>}>
       <div className="space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
           <Field label={t('المورد')}><Select data-fb="po-edit:supplier" disabled={!!po} value={supplierId} onChange={(e) => setSupplierId(e.target.value)} options={[{ value: '', label: t('اختار') }, ...suppliers.items.map((s) => ({ value: s.id, label: tv(s.name) }))]} /></Field>
@@ -177,7 +178,7 @@ export function PoEditor({ init, onClose, onSaved }: { init: any; onClose: () =>
             it ? <Sel className="w-40" value={l.packId} onChange={(e) => { const pk = it.packs.find((p: any) => p.id === e.target.value); set({ packId: e.target.value, orderedUnitCost: (Number(it.avgCost) * Number(pk?.factor ?? 1)).toFixed(2) }); }} options={[{ value: '', label: unitLabel(it.unit) }, ...(it.packs ?? []).map((p: any) => ({ value: p.id, label: L(p.name) }))]} /> : '—',
             <Inp data-fb={`po-edit:qty:${i}`} className="w-20" inputMode="decimal" value={l.orderedQuantity} onChange={(e) => set({ orderedQuantity: e.target.value.replace(/[^\d.]/g, '') })} />,
             <Inp data-fb={`po-edit:cost:${i}`} className="w-24" inputMode="decimal" value={l.orderedUnitCost} onChange={(e) => set({ orderedUnitCost: e.target.value.replace(/[^\d.]/g, '') })} />,
-            <span className="num text-xs">{money((Number(l.orderedQuantity || 0) * Number(l.orderedUnitCost || 0)).toFixed(4))}</span>,
+            <Money v={(Number(l.orderedQuantity || 0) * Number(l.orderedUnitCost || 0)).toFixed(4)} className="text-xs" plain />,
             <Button size="sm" variant="ghost" onClick={() => setLines(lines.length > 1 ? lines.filter((_, j) => j !== i) : [{ itemId: '', packId: '', orderedQuantity: '', orderedUnitCost: '' }])}><Trash2 className="w-3.5 h-3.5" /></Button>,
           ];
         })} />
@@ -222,14 +223,14 @@ export function PoView({ id, onClose, onEdit }: { id: string | null; onClose: ()
             <span className="font-bold">{L(l.item?.name)}</span>,
             ...(po.storeRequestId ? [l.requestedQuantity ? <Qty v={l.requestedQuantity} unit={l.item?.unit} hint={false} /> : <span className="text-dim">—</span>] : []),
             <span className="num">{fmtQty(l.orderedQuantity)} {l.packId ? L(l.item?.packs?.find((p: any) => p.id === l.packId)?.name) : unitLabel(l.item?.unit)}{l.packId && <span className="text-[11px] text-dim"> = {fmtQty(l.orderedStockQuantity)} {unitLabel(l.item?.unit)}</span>}</span>,
-            <span className="num text-xs">{money(l.orderedUnitCost)}</span>, <Money v={l.lineTotal} className="text-xs" />,
+            <Money v={l.orderedUnitCost} className="text-xs" plain />, <Money v={l.lineTotal} className="text-xs" />,
             Number(l.receivedQuantity) > 0 ? <Qty v={l.receivedQuantity} unit={l.item?.unit} className="text-[var(--success)]" /> : <span className="text-dim">—</span>,
             Number(l.outstandingQuantity) > 0 ? <Qty v={l.outstandingQuantity} unit={l.item?.unit} /> : <span className="text-dim">—</span>,
           ])} />
-          <div className="flex justify-between text-sm"><span>{t('الإجمالي')}: <b className="num">{money(po.total)}</b></span><span>{t('اتستلم بقيمة')}: <b className="num">{money(po.receivedValue)}</b></span></div>
+          <div className="flex justify-between text-sm"><span>{t('الإجمالي')}: <Money v={po.total} /></span><span>{t('اتستلم بقيمة')}: <Money v={po.receivedValue} /></span></div>
           {po.receipts?.length > 0 && (
             <div><div className="text-xs font-bold text-soft mb-1">{t('الاستلامات')}</div>
-              <div className="flex flex-wrap gap-1.5">{po.receipts.map((r: any) => <Pill key={r.id} tone={r.state === 'REVERSED' ? 'error' : 'success'}><span className="num">{r.number}</span> · {dateTime(r.at)} · <span className="num">{money(r.total)}</span>{r.state === 'REVERSED' ? ` · ${t('اتلغى')}` : ''}</Pill>)}</div>
+              <div className="flex flex-wrap gap-1.5">{po.receipts.map((r: any) => <Pill key={r.id} tone={r.state === 'REVERSED' ? 'error' : 'success'}><span className="num">{r.number}</span> · {dateTime(r.at)} · <Money v={r.total} plain />{r.state === 'REVERSED' ? ` · ${t('اتلغى')}` : ''}</Pill>)}</div>
             </div>
           )}
           {(po.storeRequestId || po.receipts?.length > 0) && <ChainView query={{ purchaseOrderId: po.id }} title={t('المستندات المربوطة (طلبية ← أمر ← استلام ← فاتورة)')} />}

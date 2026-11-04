@@ -6,7 +6,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Minus, Plus, AlertTriangle, Pizza, Layers, Ruler, CircleSlash, Check } from 'lucide-react';
 import { useDev, useQuery, errorText } from '../../app/hooks';
 import { call, ApiFailure } from '../../api/client';
-import { Modal, Button, Pill, StateBadge, Input, Textarea, Spinner, Banner } from '../../ui';
+import { Modal, Button, Pill, StateBadge, Input, Textarea, Spinner, Banner, Money } from '../../ui';
 import { Tech } from '../../app/tech';
 import { t, L, tv } from '../../i18n';
 import { cn, money } from '../../lib/format';
@@ -130,7 +130,7 @@ export function ProductDialog({ product, channel, onClose, onAdd, seatsEnabled, 
         <div className="me-auto flex items-center gap-2 text-sm min-w-0">
           <span className="text-dim shrink-0">{t('سعر السطر')}:</span>
           {quote.loading ? <Spinner className="w-4 h-4" /> : q ? (
-            <span className="flex items-baseline gap-1.5"><span className="num font-bold text-lg text-[var(--primary)]">{money(q.display?.lineTotal ?? q.lineTotal)}</span><span className="text-[11px] text-dim">{L(q.display?.label)}</span></span>
+            <span className="flex items-baseline gap-1.5"><Money v={q.display?.lineTotal ?? q.lineTotal} className="font-bold text-lg text-[var(--primary)]" /><span className="text-[11px] text-dim">{L(q.display?.label)}</span></span>
           ) : <span className="text-[var(--error)] text-xs truncate">{reasonAr ?? (quote.error ? errorText(quote.error) : '—')}</span>}
         </div>
         <Button variant="ghost" onClick={onClose}>{t('إلغاء')}</Button>

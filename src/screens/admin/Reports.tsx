@@ -5,7 +5,7 @@
 import React from 'react';
 import { ArrowRight, ArrowLeft } from 'lucide-react';
 import { useDev, useQuery, errorText } from '../../app/hooks';
-import { Banner, Button, Pill, Card, Spinner, Field, Input } from '../../ui';
+import { Banner, Button, Pill, Card, Spinner, Field, Input, Money } from '../../ui';
 import { t, L, getLang } from '../../i18n';
 import { money } from '../../lib/format';
 import { clock, businessDate } from '../../mock/clock';
@@ -18,7 +18,7 @@ function LegacyCell({ v }: { v: unknown }) {
   if (v === null || v === undefined || v === '') return <span className="text-dim">—</span>;
   if (typeof v === 'number') return <span className="num">{v}</span>;
   const s = String(v);
-  if (MONEY_RE.test(s)) return <span className="num font-bold">{money(s)}</span>;
+  if (MONEY_RE.test(s)) return <Money v={s} className="font-bold" />;
   if (isMetricId(s)) return <span>{metricLabel(s)}</span>;
   if (/^[A-Z][A-Z_:]+$/.test(s)) return <span title={s}>{codeLabel(s)}</span>;
   return <span>{s}</span>;

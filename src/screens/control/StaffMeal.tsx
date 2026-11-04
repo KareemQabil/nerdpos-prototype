@@ -11,6 +11,7 @@ import { needsDialog } from '../OrderScreen';
 import { Modal, StateBadge, Banner, Button, Pill, Field, Money, EmptyState, Skeleton, Switch, Avatar, SearchInput } from '../../ui';
 import { t, L } from '../../i18n';
 import { cn, money, time } from '../../lib/format';
+import { D } from '../../mock/money';
 import { Tech } from '../../app/tech';
 import { personName, personRole } from '../../demo/people';
 import { ReasonDialog, DispositionPicker } from '../order/CheckPanel';
@@ -31,7 +32,7 @@ export function StaffMealDialog({ onClose }: { onClose: () => void }) {
   const people: any[] = (a?.people ?? []).filter((p: any) => !find || (personName(p.username, p.displayName) + ' ' + personRole(p.username, p.displayName)).includes(find));
   const me = a?.people?.find((p: any) => p.userId === emp);
   const value = a?.quote?.value ?? '0.0000';
-  const over = !!(a?.enabled && me && lines.length && Number(value) > Number(me.remaining));
+  const over = !!(a?.enabled && me && lines.length && D(value).gt(D(me.remaining ?? '0'))); // Decimal
   const submit = async () => {
     const r = await run<any>('Order.CreateStaffMeal', { body: { employeeUserId: emp, lines: lines.map(({ name, ...l }) => l), sendToKitchen: sendNow } }, { success: sendNow ? t('وجبة الموظف اتسجلت بموافقة المدير واتبعتت للمطبخ') : t('وجبة الموظف اتسجلت بموافقة المدير — هتتبعت للمطبخ لما تدوس «ابعت»') });
     if (r) onClose();
@@ -41,7 +42,7 @@ export function StaffMealDialog({ onClose }: { onClose: () => void }) {
       footer={<>
         <div className="me-auto text-sm min-w-0">
           {lines.length ? <span className="text-dim truncate">{lines.map((l) => `${l.name} ×${l.quantity}`).join(t('، '))}</span> : <span className="text-dim">{t('اختار الأصناف من المنيو')}</span>}
-          {lines.length > 0 && <div className="text-xs mt-0.5" data-fb="staff-meal-value">{t('قيمة الوجبة')} <b className="num">{money(value)}</b> {a?.basis === 'COST' ? t('بالتكلفة') : t('بسعر البيع')}{a?.quote?.costUnknownLines ? <span className="text-[var(--warning-text)]"> · {t('{n} صنف من غير وصفة — اتحسب بسعر البيع', { n: a.quote.costUnknownLines })}</span> : null}</div>}
+          {lines.length > 0 && <div className="text-xs mt-0.5" data-fb="staff-meal-value">{t('قيمة الوجبة')} <Money v={value} /> {a?.basis === 'COST' ? t('بالتكلفة') : t('بسعر البيع')}{a?.quote?.costUnknownLines ? <span className="text-[var(--warning-text)]"> · {t('{n} صنف من غير وصفة — اتحسب بسعر البيع', { n: a.quote.costUnknownLines })}</span> : null}</div>}
         </div>
         <Button variant="primary" loading={busy} disabled={!lines.length || !emp || over} onClick={submit} data-fb="staff-meal-save">{t('سجّل (موافقة مدير)')}</Button>
       </>}>
@@ -64,9 +65,9 @@ export function StaffMealDialog({ onClose }: { onClose: () => void }) {
           </Field>
           {me && a?.enabled && (
             <div className={cn('rounded-xl p-3 text-sm border', over ? 'border-[var(--error)] bg-[color-mix(in_srgb,var(--error)_8%,transparent)]' : 'line surface-1')} data-fb="staff-meal-remaining">
-              <div className="flex justify-between"><span className="text-dim">{t('استهلك النهارده')}</span><b className="num">{money(me.used)}</b></div>
-              <div className="flex justify-between"><span className="text-dim">{t('الباقي من الحد')}</span><b className="num">{money(me.remaining)}</b></div>
-              {lines.length > 0 && <div className="flex justify-between"><span className="text-dim">{t('بعد الوجبة دي')}</span><b className={cn('num', over && 'text-[var(--error)]')}>{money(String(Number(me.remaining) - Number(value)))}</b></div>}
+              <div className="flex justify-between"><span className="text-dim">{t('استهلك النهارده')}</span><Money v={me.used} /></div>
+              <div className="flex justify-between"><span className="text-dim">{t('الباقي من الحد')}</span><Money v={me.remaining} /></div>
+              {lines.length > 0 && <div className="flex justify-between"><span className="text-dim">{t('بعد الوجبة دي')}</span><Money v={D(me.remaining ?? '0').minus(D(value)).toFixed(4)} className={cn(over && 'text-[var(--error)]')} /></div>}
               {over && <div className="text-[var(--error)] text-xs font-bold mt-1 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" />{t('الوجبة أكتر من الباقي — شيل صنف أو اختار أرخص')}</div>}
             </div>
           )}

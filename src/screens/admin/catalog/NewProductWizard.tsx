@@ -8,10 +8,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Check as CheckIcon, ChevronLeft, ChevronRight, CookingPot, Package, CircleSlash, Plus, Trash2, Loader2, XCircle, ShoppingCart, ScanSearch, UtensilsCrossed, Sparkles } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../../app/hooks';
-import { Banner, Button, DetailPane, Field, Input, KV, Pill, Select, StateBadge, Stepper, Table } from '../../../ui';
+import { Banner, Button, DetailPane, Field, Input, KV, Pill, Select, StateBadge, Stepper, Table, Money } from '../../../ui';
 import { Tech } from '../../../app/tech';
 import { t, L, tv } from '../../../i18n';
 import { cn, money } from '../../../lib/format';
+import { D } from '../../../mock/money';
 import { LocInputs, useItems, usePolicy } from './common';
 import { NameCheckHint } from './ProductEditor';
 import { ItemPicker, unitOptions, unitLabel, useItemsCatalog, useList, useWarehouses, newKey, Inp, Sel, fmtQty } from '../../inventory/common';
@@ -60,11 +61,14 @@ export function NewProductWizard({ open, onClose, onCreated }: { open: boolean; 
   useEffect(() => { if (open && !taxDefault?.taxPolicyId && !taxPolicyId) { const f = taxes.items.find((x) => x.active); if (f) setTax(f.id); } }, [open, taxes.items, taxDefault, taxPolicyId]);
 
   // recipe cost estimate (display only — the server computes the real cost on save)
-  const recipeCost = lines.reduce((a, l) => { const it = items.items.find((i) => i.id === l.itemId); if (!it || !(Number(l.quantity) > 0)) return a; const f = unitOptions(it).find((o) => o.value === l.unit)?.factor ?? 1; return a + Number(l.quantity) * f * (1 + Number(l.wastePercent || 0) / 100) * Number(it.avgCost); }, 0);
-  const unitCost = stocking === 'RECIPE' ? recipeCost : stocking === 'STOCK_ITEM' ? Number(stock.cost || 0) : 0;
-  const taxRate = Number(taxes.items.find((x) => x.id === (taxPolicyId || taxDefault?.taxPolicyId))?.rate ?? 0);
+  // typed amounts → Decimal (blank / partial input counts as 0); never JS float arithmetic for money
+  const dec = (x: unknown) => (/^\d+(\.\d*)?$/.test(String(x ?? '').trim()) ? D(String(x).trim()) : D(0));
+  const recipeCost = lines.reduce((a, l) => { const it = items.items.find((i) => i.id === l.itemId); if (!it || !dec(l.quantity).gt(0)) return a; const f = unitOptions(it).find((o) => o.value === l.unit)?.factor ?? 1; return a.plus(dec(l.quantity).times(f).times(D(1).plus(dec(l.wastePercent).div(100))).times(dec(it.avgCost))); }, D(0));
+  const unitCost = stocking === 'RECIPE' ? recipeCost : stocking === 'STOCK_ITEM' ? dec(stock.cost) : D(0);
+  const taxRate = dec(taxes.items.find((x) => x.id === (taxPolicyId || taxDefault?.taxPolicyId))?.rate ?? 0);
   const inclusive = taxes.items.find((x) => x.id === (taxPolicyId || taxDefault?.taxPolicyId))?.calculationMode === 'INCLUSIVE';
-  const foodCost = (ch: string) => { const p = Number(prices[ch] || 0); if (!p || !unitCost) return null; const net = inclusive ? p / (1 + taxRate / 100) : p; return (unitCost / net) * 100; };
+  /** Food cost % of a channel price (net of an inclusive tax), in Decimal; a number only for display and thresholds. */
+  const foodCost = (ch: string) => { const p = dec(prices[ch]); if (p.isZero() || unitCost.isZero()) return null; const net = inclusive ? p.div(D(1).plus(taxRate.div(100))) : p; return Number(unitCost.div(net).times(100).toFixed(1)); };
 
   const steps = [{ label: t('الاسم والقسم') }, { label: t('الأسعار والضريبة') }, { label: t('التخزين') }, { label: t('الحد والاستلام') }, { label: t('مراجعة وحفظ') }];
   const valid = [
@@ -209,7 +213,7 @@ export function NewProductWizard({ open, onClose, onCreated }: { open: boolean; 
                 })} />
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <Button size="sm" data-fb="np:ing-add" onClick={() => setLines([...lines, { itemId: '', quantity: '', unit: '', wastePercent: '' }])}><Plus className="w-3.5 h-3.5" />{t('خامة كمان')}</Button>
-                  <span className="text-sm">{t('تكلفة الطبق تقريبًا')}: <b className="num">{money(recipeCost.toFixed(4))}</b></span>
+                  <span className="text-sm">{t('تكلفة الطبق تقريبًا')}: <Money v={recipeCost.toFixed(4)} /></span>
                 </div>
               </div>
             )}
@@ -264,7 +268,7 @@ export function NewProductWizard({ open, onClose, onCreated }: { open: boolean; 
               [t('الضريبة'), taxPolicyId ? `${L(taxes.items.find((x) => x.id === taxPolicyId)?.name)} · ${taxRate}%` : t('الافتراضية')],
               [t('التخزين'), stocking === 'RECIPE' ? t('من وصفة ({n} خامة) — تكلفة تقريبًا {c}', { n: lines.filter((l) => l.itemId).length, c: money(recipeCost.toFixed(4)) }) : stocking === 'STOCK_ITEM' ? t('بيتباع زي ما هو — {u}{p}', { u: unitLabel(stock.unitId.replace('unit_', '').toUpperCase()), p: stock.packName ? ` · ${stock.packName} = ${fmtQty(stock.packFactor)}` : '' }) : t('مش متتبع')],
               ...(stocking === 'STOCK_ITEM' ? [[t('أول استلام'), first.on ? `${first.quantity} · ${tv(suppliers.items.find((s) => s.id === first.supplierId)?.name)}` : t('بعدين')] as [string, React.ReactNode]] : []),
-              ...(unitCost ? [[t('تكلفة الأكل'), <span className="flex flex-wrap gap-1.5">{CHANNELS.filter((c) => prices[c.id]).map((c) => { const fc = foodCost(c.id); return <Pill key={c.id} tone={fc === null ? 'neutral' : fc > 40 ? 'error' : fc > 30 ? 'warning' : 'success'}>{t(c.ar)}: {fc === null ? '—' : `${fc.toFixed(1)}%`}</Pill>; })}</span>] as [string, React.ReactNode]] : []),
+              ...(!unitCost.isZero() ? [[t('تكلفة الأكل'), <span className="flex flex-wrap gap-1.5">{CHANNELS.filter((c) => prices[c.id]).map((c) => { const fc = foodCost(c.id); return <Pill key={c.id} tone={fc === null ? 'neutral' : fc > 40 ? 'error' : fc > 30 ? 'warning' : 'success'}>{t(c.ar)}: {fc === null ? '—' : `${fc.toFixed(1)}%`}</Pill>; })}</span>] as [string, React.ReactNode]] : []),
             ]} />
             {progress.length > 0 && (
               <div className="rounded-xl surface-1 border border-[var(--glass-border)] p-3 space-y-1.5" data-fb="np:progress">

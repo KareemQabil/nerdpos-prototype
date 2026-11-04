@@ -1,5 +1,5 @@
 // Pure value formatting shared by the screen, the print layout and the files (no React): numbers are Western digits,
-// tabular, with thousands separators; money in EGP with 2 decimals; NOT_AVAILABLE is never shown as 0.
+// tabular, with thousands separators; money with 2 decimals and «ج.م» after the number; NOT_AVAILABLE is never shown as 0.
 import type { Loc } from '../mock/types';
 import type { MetricValue, Unit } from './types';
 import type { NumberFormat } from './studio';
@@ -20,7 +20,7 @@ export function fmtNumber(v: string | number | null | undefined, format: NumberF
   const n = Number(v);
   if (!Number.isFinite(n)) return String(v);
   const f = format === 'auto' ? autoFormat(unit) : format;
-  const cur = lang === 'ar' ? 'ج.م' : 'EGP';
+  const cur = 'ج.م'; // owner rule: always «ج.م», after the number (both UI languages)
   if (f === 'money') return `${NUM(n, 2, 2)} ${cur}`;
   if (f === 'money0') return `${NUM(Math.round(n), 0, 0)} ${cur}`;
   if (f === 'pct') return `${NUM(n, 1, 1)}%`;
@@ -40,7 +40,7 @@ export function cellText(v: MetricValue | undefined, format: NumberFormat, lang:
 }
 /** Excel number formats per column format (the value stays a number in the file). */
 export function excelFormat(format: NumberFormat, lang: Lang): string {
-  const cur = lang === 'ar' ? 'ج.م' : 'EGP';
+  const cur = 'ج.م';
   if (format === 'money') return `#,##0.00 "${cur}";-#,##0.00 "${cur}"`;
   if (format === 'money0') return `#,##0 "${cur}";-#,##0 "${cur}"`;
   if (format === 'pct') return '0.0"%"';

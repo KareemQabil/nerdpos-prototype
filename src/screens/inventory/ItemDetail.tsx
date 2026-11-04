@@ -48,8 +48,8 @@ export function ItemDetail({ itemId, onClose, backLabel }: { itemId: string; onC
         <div className="space-y-4">
           <div className="grid gap-2 grid-cols-[repeat(auto-fit,minmax(120px,1fr))]">
             <Box label={t('الرصيد في كل المخازن')} value={<Qty v={it.totalQuantity} unit={it.unit} />} />
-            <Box label={t('متوسط التكلفة')} value={<span className="num">{money(it.avgCost)}</span>} sub={t('لكل {u}', { u: unitLabel(it.unit) })} />
-            <Box label={t('آخر سعر شراء')} value={<span className="num">{money(it.lastCost)}</span>} />
+            <Box label={t('متوسط التكلفة')} value={<Money v={it.avgCost} plain />} sub={t('لكل {u}', { u: unitLabel(it.unit) })} />
+            <Box label={t('آخر سعر شراء')} value={<Money v={it.lastCost} plain />} />
             <Box label={t('قيمة المخزون')} value={<Money v={D(it.totalQuantity).times(D(it.avgCost)).toFixed(4)} />} />
           </div>
           <Tabs<ItemTab> value={tab} onChange={setTab} tabs={[
@@ -70,7 +70,7 @@ export function ItemDetail({ itemId, onClose, backLabel }: { itemId: string; onC
           {tab === 'cost' && (
             <div className="space-y-3">
               {it.kind === 'PREP' && <KV rows={[[t('تكلفة الوصفة دلوقتي (نظري)'), money(it.theoreticalCost)]]} />}
-              <Table empty={t('لسه مفيش تغيير في التكلفة')} head={[t('إمتى'), t('السبب'), t('سعر الحركة'), t('المتوسط بعدها')]} align={['start', 'start', 'end', 'end']} rows={it.costHistory.map((h: any) => [<span className="text-xs">{dateTime(h.at)}</span>, <span className="text-xs">{({ RECEIPT: t('استلام'), OPENING: t('رصيد أول المدة'), PRODUCTION_IN: t('تحضير'), ADJUSTMENT: t('تسوية بسعر'), RECEIPT_REVERSAL: t('إلغاء استلام'), SUPPLIER_RETURN: t('مرتجع مورد') } as Record<string, string>)[h.source] ?? h.source} <span className="num text-dim">{h.ref}</span></span>, <span className="num">{money(h.unitCost)}</span>, <span className="num font-bold">{money(h.avgCost)}</span>])} />
+              <Table empty={t('لسه مفيش تغيير في التكلفة')} head={[t('إمتى'), t('السبب'), t('سعر الحركة'), t('المتوسط بعدها')]} align={['start', 'start', 'end', 'end']} rows={it.costHistory.map((h: any) => [<span className="text-xs">{dateTime(h.at)}</span>, <span className="text-xs">{({ RECEIPT: t('استلام'), OPENING: t('رصيد أول المدة'), PRODUCTION_IN: t('تحضير'), ADJUSTMENT: t('تسوية بسعر'), RECEIPT_REVERSAL: t('إلغاء استلام'), SUPPLIER_RETURN: t('مرتجع مورد') } as Record<string, string>)[h.source] ?? h.source} <span className="num text-dim">{h.ref}</span></span>, <Money v={h.unitCost} plain />, <Money v={h.avgCost} className="font-bold" />])} />
             </div>
           )}
           {tab === 'recipes' && (
@@ -139,7 +139,7 @@ export function AdjustDialog({ item, balance, onClose }: { item: any; balance: a
           {dir === 'IN' && <Field label={t('سعر الوحدة (اختياري)')} className="col-span-2"><Input data-fb="adjust:cost" inputMode="decimal" value={cost} onChange={(e) => setCost(e.target.value)} placeholder={money(item.avgCost, false)} /></Field>}
         </div>
         <Field label={t('ملاحظة')} required={reason === 'OTHER'}><Textarea data-fb="adjust:note" value={note} onChange={(e) => setNote(e.target.value)} /></Field>
-        {after && <Banner tone={after.lt(0) ? 'error' : 'info'}>{t('الرصيد هيبقى')} <b className="num">{fmtQty(after.toFixed(6))} {unitLabel(item.unit)}</b> · {t('القيمة')} <b className="num">{money(delta!.times(D(cost || item.avgCost)).toFixed(4))}</b></Banner>}
+        {after && <Banner tone={after.lt(0) ? 'error' : 'info'}>{t('الرصيد هيبقى')} <b className="num">{fmtQty(after.toFixed(6))} {unitLabel(item.unit)}</b> · {t('القيمة')} <Money v={delta!.times(D(cost || item.avgCost)).toFixed(4)} /></Banner>}
       </div>
     </Popup>
   );

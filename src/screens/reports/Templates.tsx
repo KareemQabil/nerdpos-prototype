@@ -8,7 +8,7 @@ import { Printer, X, FileText, ReceiptText } from 'lucide-react';
 import { Button, SegmentedControl } from '../../ui';
 import { t, L } from '../../i18n';
 import { dateTime } from '../../lib/format';
-import { fmt, statusText } from './parts';
+import { fmt, statusText, Amt } from './parts';
 
 type Paper = 'A4' | 'RECEIPT';
 export function TemplatePreview({ run, onClose }: { run: any; onClose: () => void }) {
@@ -47,7 +47,7 @@ export function TemplatePreview({ run, onClose }: { run: any; onClose: () => voi
             <table className="w-full border-collapse">
               {!receipt && <thead><tr>{s.columns.map((c: string, i: number) => <th key={i} className="text-start border-b border-black py-1 px-1 font-bold">{c}</th>)}</tr></thead>}
               <tbody>{s.rows.slice(0, receipt ? 20 : 40).map((r: any[], i: number) => (
-                <tr key={i} className={receipt ? '' : 'border-b border-gray-300'}>{r.map((c, j) => <td key={j} className={receipt ? (j === r.length - 1 ? 'text-end num' : '') : `py-0.5 px-1 ${j > 0 ? 'num' : ''}`}>{c === 'CAPABILITY_NOT_AVAILABLE' ? t('مش متاح') : typeof c === 'string' && /^-?\d+\.\d{4}$/.test(c) ? fmt(c) : String(c ?? '')}</td>)}</tr>
+                <tr key={i} className={receipt ? '' : 'border-b border-gray-300'}>{r.map((c, j) => <td key={j} className={receipt ? (j === r.length - 1 ? 'text-end num' : '') : `py-0.5 px-1 ${j > 0 ? 'num' : ''}`}>{c === 'CAPABILITY_NOT_AVAILABLE' ? t('مش متاح') : typeof c === 'string' && /^-?\d+\.\d{4}$/.test(c) ? <Amt v={c} /> : String(c ?? '')}</td>)}</tr>
               ))}</tbody>
             </table>
           </div>
