@@ -406,7 +406,7 @@ function TemplatesPanel() {
   const items: any[] = tq.data?.items ?? [];
   return (
     <div className="space-y-3" data-fb="templates-panel">
-      <div className="flex items-center gap-2"><LayoutTemplate className="w-4 h-4 text-[var(--primary)]" /><div className="min-w-0 flex-1"><div className="font-bold">{t('قوالب الطباعة')}<StateBadge ops={['ReportTemplate.Find', 'ReportTemplate.Save']} /></div><div className="text-xs text-dim">{t('شكل الورقة اللي التقرير بيطلع عليها: A4 أو إيصال، اللوجو، التوقيعات، علامة «مبدئي». أي قالب ينفع مع أي تقرير.')}</div></div></div>
+      <div className="flex items-center gap-2"><LayoutTemplate className="w-4 h-4 text-[var(--primary)]" /><div className="min-w-0 flex-1"><div className="font-bold">{t('قوالب الطباعة')}<StateBadge ops={['ReportTemplate.Find', 'ReportTemplate.Save']} /></div></div></div>
       {tq.loading && !items.length ? <SkeletonCard /> : (
         <div className="grid @3xl/main:grid-cols-2 @6xl/main:grid-cols-3 gap-3">
           {items.map((x) => (
@@ -446,7 +446,7 @@ function ActivityPanel() {
   const AC = cols<any>();
   return (
     <div className="space-y-3" data-fb="activity-panel">
-      <div className="flex items-center gap-2 flex-wrap"><Activity className="w-4 h-4 text-[var(--primary)]" /><div className="min-w-0 flex-1"><div className="font-bold">{t('مين فتح ونزّل وعدّل إيه')}<StateBadge ops={['ReportAudit.Find']} /></div><div className="text-xs text-dim">{q.data?.scope === 'MINE' ? t('بتشوف حركاتك انت بس.') : t('كل حركات التقارير في المطعم: الفترة والفروع وعدد السطور.')}</div></div>
+      <div className="flex items-center gap-2 flex-wrap"><Activity className="w-4 h-4 text-[var(--primary)]" /><div className="min-w-0 flex-1"><div className="font-bold">{t('مين فتح ونزّل وعدّل إيه')}<StateBadge ops={['ReportAudit.Find']} /></div>{q.data?.scope === 'MINE' && <div className="text-xs text-dim">{t('بتشوف حركاتك انت بس.')}</div>}</div>
         <FilterChips value={f} onChange={setF} options={[{ id: 'all', label: t('الكل'), count: items.length }, { id: 'RUN', label: t('فتح') }, { id: 'EXPORT', label: t('تنزيل') }, { id: 'EDIT', label: t('تعديل') }, { id: 'SCHEDULE_RUN', label: t('إرسال') }]} />
       </div>
       <DataTable dense loading={q.loading && !q.data} rows={shown} rowKey={(a: any, i) => a.id ?? i} label={t('مين فتح ونزّل وعدّل إيه')} defaultSort={{ id: 'at', dir: 'desc' }}

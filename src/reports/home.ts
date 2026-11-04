@@ -72,7 +72,7 @@ export function homeSummary(db: DB, caller: Caller, o: { businessDate: string; b
   let compare: HomeSummary['compare'] = null, hourly: HomeSummary['hourly'] = null, days: HomeSummary['days'] = null;
   if (may('hourly_daypart')) {
     // the hours of the business day up to now; the same hours of yesterday and of the same day last week
-    const soFar = DAY_HOURS.slice(0, DAY_HOURS.indexOf(hour) + 1).map(String);
+    const soFar = DAY_HOURS.slice(0, DAY_HOURS.indexOf(hour) + 1).map((h) => String(h).padStart(2, '0')); // the hour dimension's values are «00»…«23»
     const q = (d: string) => query(db, caller, { metrics: ['item_net_sales', 'check_count'], filters: { hour: soFar }, from: d, to: d, branchIds: o.branchIds }).totals;
     const t0 = q(bd), t1 = q(yd), t7 = q(lw);
     const whole = (d: string) => query(db, caller, { metrics: ['avg_check', 'check_count'], from: d, to: d, branchIds: o.branchIds }).totals;

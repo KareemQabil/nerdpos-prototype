@@ -80,7 +80,7 @@ const homeEqualsReports = async (who: string, A: any, branchIds?: string) => {
   ok(JSON.stringify(h.topItems.rows.map((x: any) => [x.product, x.net, x.qty])) === JSON.stringify(top.rows.slice(0, 5).map((x: any) => [x.dims.product, v(x.values.item_net_sales), v(x.values.sold_quantity)])), `${who}: top items = «أعلى وأقل الأصناف» for the day (${h.topItems.rows.length})`);
   const hr = await run(h.hourly.source); const byH = hr.blocks.find((x: any) => x.id === 'by_hour').result;
   const sumRows = byH.rows.reduce((a: any, x: any) => a.plus(D(v(x.values.item_net_sales) ?? 0)), D(0));
-  ok(D(h.hourly.today.at(-1)).equals(sumRows) && D(h.compare.netSoFar.today).equals(sumRows) && D(h.compare.netSoFar.today).equals(D(v(byH.totals.item_net_sales))), `${who}: «so far» today = the hourly report's total (${m4(sumRows)}) = the chart's last point`);
+  ok(D(h.hourly.today.at(-1)).equals(sumRows) && D(h.compare.netSoFar.today).equals(sumRows) && D(h.compare.netSoFar.today).equals(D(v(byH.totals.item_net_sales))), `${who}: «so far» today = the hourly report's total (${m4(sumRows)}) = the chart's last point`, `chart ${h.hourly.today.at(-1)} (${h.hourly.today.length} h, hour ${h.hour}), so far ${h.compare.netSoFar.today}, rows ${byH.rows.map((x: any) => x.dims.hour).join(',')}`);
   const dr = await run(h.days.source); const byD = dr.blocks.find((x: any) => x.id === 'by_day').result;
   ok(h.days.rows.length === 14 && h.days.rows.every((x: any) => (v(byD.rows.find((y: any) => y.dims.business_date === x.date)?.values.net_item_sales) ?? '0.0000') === x.value) && h.days.rows.at(-1).value === v(h.cards.net_sales.value), `${who}: the 14 days = «المبيعات حسب الساعة والفترة» by day, and today's bar = today's net sales`);
   return h;
@@ -104,6 +104,11 @@ try { await api(waiter, 'Report.Home'); ok(false, 'waiter'); } catch (e: any) { 
   const none: any = { userId: 'u_x', perms: (p: string) => p === 'report:run' && false, accessibleBranchIds: ['branch_main'], nowMs, defaultBranchId: 'branch_main' };
   const h = R.homeSummary(db, none, { businessDate: today });
   ok(h.refused.length === 4 && !Object.keys(h.cards).length && !h.hourly && !h.paymentMix && !h.topItems, 'a caller who may run none of the reports gets no cards (refused, never zeros)', h.refused.join(','));
+  // a whole past day seen at 03:30 (the last hour of its business day): «so far» covers all 24 hours, 04 … 03
+  const late: any = { userId: 'u_owner', perms: () => true, accessibleBranchIds: ['branch_main'], nowMs: Date.parse(`${add(y1, 1)}T01:30:00Z`), defaultBranchId: 'branch_main' };
+  const hl = R.homeSummary(db, late, { businessDate: y1 });
+  const full = R.query(db, late, { metrics: ['item_net_sales', 'check_count'], from: y1 }).totals;
+  ok(hl.hour === 3 && D(hl.compare!.netSoFar.today!).equals(D(full.item_net_sales.value!)) && D(hl.compare!.checksSoFar.today!).equals(D(full.check_count.value!)) && D(hl.hourly!.today.at(-1)!).equals(D(full.item_net_sales.value!)), `«so far» at 03:30 = the whole business day (${full.item_net_sales.value}, ${full.check_count.value} checks): every hour 04…03 is counted`, `${hl.compare!.netSoFar.today}`);
   const partial: any = { userId: 'u_owner', perms: (p: string) => p !== 'session:zreport', accessibleBranchIds: ['branch_main'], nowMs, defaultBranchId: 'branch_main' };
   const lp = R.MANIFESTS.filter((m: any) => partial.perms(m.permission)).map((m: any) => m.id);
   ok(!lp.includes('staff_sales') && !lp.includes('delivery_riders') && Object.keys(R.homeSummary(db, partial, { businessDate: today }).cards).length === R.HOME_CARDS.length, 'without the manager permission the staff and delivery reports are hidden, Home keeps its report:run cards');
