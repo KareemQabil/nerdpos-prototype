@@ -5,7 +5,7 @@ import { useDev, useQuery, useCommand } from '../../app/hooks';
 import { Modal, Button, Field, Input, Select, Textarea, Pill, Banner, KV, Money, StateBadge, Spinner, confirmDialog, Popover, Popup, Numpad, applyNumpadKey, useNumpadKeys, type NumpadKey } from '../../ui';
 import { sumAmounts, changePreview, sign, plainAmount } from '../../lib/cash';
 import { Tech } from '../../app/tech';
-import { t, L, tv } from '../../i18n';
+import { t, L, tv, getLang } from '../../i18n';
 import { cn, money, time, dateTime, qty } from '../../lib/format';
 import { clock } from '../../mock/clock';
 import { addressText, AllergyWarning, TierBadge } from '../customers/common';
@@ -59,6 +59,7 @@ export function Eta({ d, className }: { d: any; className?: string }) {
 export function MiniMap({ zones, drivers = [], deliveries = [], restaurant, height = 340, onZone, selectedZone }: { zones: any[]; drivers?: any[]; deliveries?: any[]; restaurant?: { x: number; y: number }; height?: number; onZone?: (z: any) => void; selectedZone?: string | null }) {
   const R = restaurant ?? { x: 63, y: 55 };
   const zoneCenter = (z: any) => ({ x: z.map.x + z.map.w / 2, y: z.map.y + z.map.h / 2 });
+  const rtl = getLang() === 'ar'; // zone labels follow the reading direction (amount then «ج.م» in both languages)
   return (
     <div className="rounded-xl border line overflow-hidden" style={{ background: 'radial-gradient(circle at 70% 60%, rgba(34,211,238,.06), transparent 60%), var(--surface-1, rgba(255,255,255,.03))' }}>
       <svg viewBox="0 0 100 70" style={{ width: '100%', height }} preserveAspectRatio="xMidYMid meet" role="img" aria-label={t('خريطة مناطق التوصيل')}>
@@ -70,8 +71,8 @@ export function MiniMap({ zones, drivers = [], deliveries = [], restaurant, heig
         {zones.map((z) => (
           <g key={z.id} onClick={() => onZone?.(z)} style={{ cursor: onZone ? 'pointer' : 'default', opacity: z.active ? 1 : 0.35 }}>
             <rect x={z.map.x} y={z.map.y} width={z.map.w} height={z.map.h} rx="2" fill={`${z.color}22`} stroke={z.color} strokeWidth={selectedZone === z.id ? 0.8 : 0.35} strokeDasharray={z.active ? undefined : '1 1'} />
-            <text x={z.map.x + z.map.w - 1.5} y={z.map.y + 3.6} fontSize="2.6" fontWeight="700" fill={z.color} direction="rtl" textAnchor="start">{L(z.name)}</text>
-            <text x={z.map.x + z.map.w - 1.5} y={z.map.y + 6.6} fontSize="1.9" style={{ fill: 'var(--text-soft)' }} direction="rtl" textAnchor="start">{money(z.fee)} · {z.etaMinutes} {t('د')}</text>
+            <text x={rtl ? z.map.x + z.map.w - 1.5 : z.map.x + 1.5} y={z.map.y + 3.6} fontSize="2.6" fontWeight="700" fill={z.color} direction={rtl ? 'rtl' : 'ltr'} textAnchor="start">{L(z.name)}</text>
+            <text x={rtl ? z.map.x + z.map.w - 1.5 : z.map.x + 1.5} y={z.map.y + 6.6} fontSize="1.9" style={{ fill: 'var(--text-soft)' }} direction={rtl ? 'rtl' : 'ltr'} textAnchor="start">{money(z.fee)} · {z.etaMinutes} {t('د')}</text>
           </g>
         ))}
         {deliveries.filter((d) => d.zoneId && d.state !== 'DELIVERED' && d.state !== 'CANCELLED').map((d, i) => {
