@@ -93,8 +93,24 @@ export const emptyDesign = (): ReportDesign => ({ metrics: ['item_net_sales'], r
 export const REPORT_CATEGORIES: Record<string, Loc> = {
   sales: L('المبيعات', 'Sales'), menu: L('قائمة الطعام والأصناف', 'Menu & items'), payments: L('النقدية والدرج', 'Money & drawer'), controls: L('الرقابة', 'Controls'),
   service: L('الصالة والشيكات', 'Floor & checks'), kitchen: L('المطبخ', 'Kitchen'), inventory: L('المخزن', 'Inventory'), purchasing: L('المشتريات', 'Purchasing'),
-  fiscal: L('الضرائب', 'Tax'), channels: L('القنوات', 'Channels'), multi_branch: L('الفروع', 'Branches'), other: L('أخرى', 'Other'),
+  fiscal: L('الضرائب', 'Tax'), channels: L('القنوات', 'Channels'), multi_branch: L('الفروع', 'Branches'),
+  staff: L('الموظفون', 'Staff'), customers: L('العملاء والولاء', 'Customers & loyalty'), delivery: L('الدليفري والطيارون', 'Delivery & riders'), other: L('أخرى', 'Other'), // ux-17
 };
+/** ux-17: the catalog groups for the accountant, in this order. Every category above (certified families and saved
+ *  reports' categories, old and new) maps to one group; a few reports move by id. */
+export const REPORT_GROUPS: Record<string, Loc> = {
+  sales: L('المبيعات', 'Sales'), payments: L('المدفوعات والنقدية', 'Payments & cash'), fiscal: L('الضرائب', 'Tax'), menu: L('الأصناف وقائمة الطعام', 'Items & menu'),
+  kitchen: L('المطبخ والأوقات', 'Kitchen & times'), staff: L('الموظفون', 'Staff'), customers: L('العملاء والولاء', 'Customers & loyalty'), delivery: L('الدليفري والطيارون', 'Delivery & riders'),
+  inventory: L('المخزون والمشتريات', 'Inventory & purchasing'), controls: L('الرقابة والمراجعة', 'Audit & controls'), other: L('أخرى', 'Other'),
+};
+const GROUP_OF_CATEGORY: Record<string, string> = { service: 'controls', channels: 'sales', multi_branch: 'sales', purchasing: 'inventory' };
+const GROUP_OF_REPORT: Record<string, string> = { staff_meals: 'staff', drawer_xz: 'payments', cash_rounding: 'payments' };
+export function reportGroup(category: string | null | undefined, reportId?: string): string {
+  if (reportId && GROUP_OF_REPORT[reportId]) return GROUP_OF_REPORT[reportId];
+  const c = category ?? 'other';
+  const g = GROUP_OF_CATEGORY[c] ?? c;
+  return REPORT_GROUPS[g] ? g : 'other';
+}
 
 // ───────── seeds (round 4): three ready templates and four useful custom reports
 const ACC_SIGN: Signature[] = [{ label: 'أعده', name: 'نادر', role: 'المحاسب' }, { label: 'راجعه', name: 'أحمد', role: 'مدير الفرع' }, { label: 'اعتمده', name: 'الحاج سامي', role: 'صاحب المطعم' }];

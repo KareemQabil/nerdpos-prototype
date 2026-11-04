@@ -27,7 +27,7 @@ type Ev =
   | { t: 'distinct'; fact: FactKind; key: string }
   | { t: 'distinct_sum'; fact: FactKind; key: string; field: string }
   | { t: 'sum_requires'; fact: FactKind; field: string }
-  | { t: 'diff_requires'; fact: FactKind; a: string; b: string }
+  | { t: 'diff_requires'; fact: FactKind; a: string; b: string; why?: 'recipe' | 'rider' }
   | { t: 'share'; fact: FactKind; field: string }
   | { t: 'snapshot'; fact: FactKind; field: string }
   | { t: 'requires_dim'; dim: string; inner: Ev }
@@ -113,6 +113,8 @@ export const EVAL: Record<string, Ev> = {
   delivered_count: { t: 'sum', fact: 'delivery', field: 'delivered' },
   delivery_failed_count: { t: 'sum', fact: 'delivery', field: 'failed' },
   delivery_avg_minutes: { t: 'registry' },
+  // ux-17: delivered trips' fees minus their rider pay (unknown pay → not available, never 0)
+  delivery_fee_net: { t: 'diff_requires', fact: 'delivery', a: 'fee', b: 'rider_cost', why: 'rider' },
 };
 /** Metrics that can read the pre-launch daily aggregates (no evidence below the day) and the dimensions they allow. */
 const HISTORY: Record<string, { field: string; dims: string[]; byMethod?: boolean }> = {
@@ -125,11 +127,19 @@ const HISTORY: Record<string, { field: string; dims: string[]; byMethod?: boolea
 };
 const CAPABILITY_OF: Partial<Record<FactKind, string>> = { stock: 'INVENTORY', waste: 'INVENTORY', count: 'INVENTORY', po: 'INVENTORY', grn: 'INVENTORY', fiscal: 'E_RECEIPT', delivery: 'DELIVERY', reservation: 'RESERVATIONS', visit: 'TABLE_SERVICE' };
 const SPECIAL_REFUSAL: Record<string, Loc> = {
-  'payment_method': { ar: 'طريقة الدفع بُعد للفلوس اللي دخلت، مش للمبيعات. استخدم «المتحصل» أو جسر نهاية اليوم.', en: 'Payment method applies to collections, not sales. Use collected or the EOD bridge.' },
-  'business_date@SEMI': { ar: 'الرصيد لقطة في لحظة واحدة — ما بيتجمعش على الأيام. اختار لحظة (asOf).', en: 'Stock is a snapshot — never summed over days. Pick an asOf instant.' },
+  'payment_method': { ar: 'طريقة الدفع بُعد للمبالغ المحصلة، لا للمبيعات. استخدم «المتحصل» أو جسر نهاية اليوم.', en: 'Payment method applies to collections, not sales. Use collected or the EOD bridge.' },
+  'business_date@SEMI': { ar: 'الرصيد لقطة في لحظة واحدة — لا يُجمع على الأيام. اختر لحظة (asOf).', en: 'Stock is a snapshot — never summed over days. Pick an asOf instant.' },
 };
 
 const NOT_AVAIL = (reason: Loc): MetricValue => ({ value: null, availability: 'NOT_AVAILABLE', reason });
+/** ux-17: why delivered trips have no rider cost — counted by cause, in MSA and English. */
+function riderCostReason(missing: Fact[]): Loc {
+  const shift = missing.filter((f) => f.key?.cost_basis === 'FIXED_SHIFT').length, partner = missing.filter((f) => f.key?.cost_basis === 'PARTNER').length;
+  const ar: string[] = [], en: string[] = [];
+  if (shift) { ar.push(`${shift} مشوار لطيار أجره بالوردية، فلا تكلفة للمشوار الواحد`); en.push(`${shift} trip(s) by a rider paid per shift, so no per-trip cost`); }
+  if (partner) { ar.push(`${partner} طلب من تطبيق توصيل عمولته غير مسجلة`); en.push(`${partner} order(s) from a delivery app whose commission is not recorded`); }
+  return { ar: `صافي إيراد التوصيل غير متاح: ${ar.join('، و')}.`, en: `Delivery fee net is not available: ${en.join('; ')}.` };
+}
 const LAUNCH_CACHE = new WeakMap<DB, string>();
 /** First business date with event-level facts. Earlier days only have imported daily aggregates. */
 export function launchDate(db: DB): string {
@@ -153,11 +163,11 @@ export function datesOf(from: string, to: string) { const out: string[] = []; fo
 // ───────── labels
 const CH: Record<string, Loc> = { DINE_IN: { ar: 'صالة', en: 'Dine-in' }, TAKEAWAY: { ar: 'تيك أواي', en: 'Takeaway' }, DELIVERY: { ar: 'دليفري', en: 'Delivery' } };
 export const TENDER_LABEL: Record<string, Loc> = { CASH: { ar: 'نقدي', en: 'Cash' }, CARD: { ar: 'بطاقة', en: 'Card' }, WALLET: { ar: 'محفظة (إنستاباي/فودافون كاش)', en: 'Wallet' }, PREPAID: { ar: 'مدفوع مسبقًا', en: 'Prepaid' }, POINTS: { ar: 'نقاط', en: 'Points' } };
-export const STAGE_LABEL: Record<string, Loc> = { S0: { ar: 'S0 قبل ما يظهر (لسه ما اتبعتش)', en: 'S0 unsent' }, S1: { ar: 'S1 ظاهر (شيك مبدئي/المطبخ) ومش مدفوع', en: 'S1 visible, unpaid' }, S2: { ar: 'S2 مدفوع واليوم مفتوح', en: 'S2 paid, day open' }, S3: { ar: 'S3 مدفوع بعد قفل اليوم', en: 'S3 paid, day closed' } };
-export const DISP_LABEL: Record<string, Loc> = { NOT_PREPARED: { ar: 'ما اتعملش', en: 'Not prepared' }, RETURN_TO_STOCK: { ar: 'رجع المخزن', en: 'Back to stock' }, WASTE_HELD: { ar: 'هالك محجوز للمراجعة', en: 'Waste held' } };
-const FISCAL_LABEL: Record<string, Loc> = { PENDING_DATA: { ar: 'ناقصه بيانات', en: 'Pending data' }, BUILT: { ar: 'اتجهز', en: 'Built' }, SUBMITTED: { ar: 'اتبعت', en: 'Submitted' }, ACCEPTED: { ar: 'اتقبل', en: 'Accepted' }, REJECTED: { ar: 'اترفض', en: 'Rejected' }, SUPERSEDED: { ar: 'اتصحح بإيصال جديد', en: 'Superseded' } };
+export const STAGE_LABEL: Record<string, Loc> = { S0: { ar: 'S0 قبل الظهور (لم يُرسل بعد)', en: 'S0 unsent' }, S1: { ar: 'S1 ظاهر (شيك مبدئي/المطبخ) وغير مدفوع', en: 'S1 visible, unpaid' }, S2: { ar: 'S2 مدفوع واليوم مفتوح', en: 'S2 paid, day open' }, S3: { ar: 'S3 مدفوع بعد قفل اليوم', en: 'S3 paid, day closed' } };
+export const DISP_LABEL: Record<string, Loc> = { NOT_PREPARED: { ar: 'لم يُحضَّر', en: 'Not prepared' }, RETURN_TO_STOCK: { ar: 'عاد إلى المخزن', en: 'Back to stock' }, WASTE_HELD: { ar: 'هالك محجوز للمراجعة', en: 'Waste held' } };
+const FISCAL_LABEL: Record<string, Loc> = { PENDING_DATA: { ar: 'تنقصه بيانات', en: 'Pending data' }, BUILT: { ar: 'جاهز', en: 'Built' }, SUBMITTED: { ar: 'مُرسل', en: 'Submitted' }, ACCEPTED: { ar: 'مقبول', en: 'Accepted' }, REJECTED: { ar: 'مرفوض', en: 'Rejected' }, SUPERSEDED: { ar: 'صُحِّح بإيصال جديد', en: 'Superseded' } };
 const same = (s: string): Loc => ({ ar: s, en: s });
-export const WEEKDAY_LABEL: Record<string, Loc> = { '6': { ar: 'السبت', en: 'Saturday' }, '0': { ar: 'الحد', en: 'Sunday' }, '1': { ar: 'الاتنين', en: 'Monday' }, '2': { ar: 'التلات', en: 'Tuesday' }, '3': { ar: 'الأربع', en: 'Wednesday' }, '4': { ar: 'الخميس', en: 'Thursday' }, '5': { ar: 'الجمعة', en: 'Friday' } };
+export const WEEKDAY_LABEL: Record<string, Loc> = { '6': { ar: 'السبت', en: 'Saturday' }, '0': { ar: 'الأحد', en: 'Sunday' }, '1': { ar: 'الاثنين', en: 'Monday' }, '2': { ar: 'الثلاثاء', en: 'Tuesday' }, '3': { ar: 'الأربعاء', en: 'Wednesday' }, '4': { ar: 'الخميس', en: 'Thursday' }, '5': { ar: 'الجمعة', en: 'Friday' } };
 export function dimLabel(db: DB, dim: string, v: string | null): Loc {
   if (v === null || v === undefined || v === '') return { ar: '—', en: '—' };
   const u = () => { const x = db.users.find((y) => y.id === v); return same(x ? userLabel(x.username, x.displayName) : v); };
@@ -173,8 +183,8 @@ export function dimLabel(db: DB, dim: string, v: string | null): Loc {
     case 'device': { const t = db.terminals.find((x) => x.id === v); return same(t?.name ?? v); }
     case 'table': { const t = db.tables.find((x) => x.id === v); return { ar: `ترابيزة ${t?.name ?? v}`, en: `Table ${t?.name ?? v}` }; }
     case 'check': { const o = db.orders.find((x) => x.id === v); return same(o ? `#${o.number}` : v); }
-    case 'order': { if (v.startsWith('visit:')) { const vi = db.visits.find((x) => x.id === v.slice(6)); const t = db.tables.find((x) => x.id === vi?.tableId); return { ar: `قعدة ترابيزة ${t?.name ?? ''}`, en: `Visit table ${t?.name ?? ''}` }; } const o = db.orders.find((x) => x.id === v.slice(6)); return same(o ? `#${o.number}` : v); }
-    case 'table_visit': { const vi = db.visits.find((x) => x.id === v); const t = db.tables.find((x) => x.id === vi?.tableId); return { ar: `قعدة ترابيزة ${t?.name ?? ''}`, en: `Visit table ${t?.name ?? ''}` }; }
+    case 'order': { if (v.startsWith('visit:')) { const vi = db.visits.find((x) => x.id === v.slice(6)); const t = db.tables.find((x) => x.id === vi?.tableId); return { ar: `جلسة ترابيزة ${t?.name ?? ''}`, en: `Visit table ${t?.name ?? ''}` }; } const o = db.orders.find((x) => x.id === v.slice(6)); return same(o ? `#${o.number}` : v); }
+    case 'table_visit': { const vi = db.visits.find((x) => x.id === v); const t = db.tables.find((x) => x.id === vi?.tableId); return { ar: `جلسة ترابيزة ${t?.name ?? ''}`, en: `Visit table ${t?.name ?? ''}` }; }
     case 'product': { const p = db.products.find((x) => x.id === v); return p ? p.name : same(v); }
     case 'category': { const c = db.categories.find((x) => x.id === v); return c ? c.name : same(v); }
     case 'size': { for (const p of db.products) { const vv = p.variants?.find((x) => x.id === v); if (vv) return vv.name; } return same(v); }
@@ -235,31 +245,32 @@ function evaluate(c: Ctx, m: MetricDef, e: Ev): Groups {
     case 'distinct_sum': return group(c, filterFacts(c, factsOf(c.db, e.fact, c.scope, c.cache)), (fs) => {
       const seen = new Map<string, string>();
       for (const f of fs) { const k = f.key?.[e.key]; if (k && f.n[e.field] !== '') seen.set(k, f.n[e.field]); }
-      if (!seen.size) return NOT_AVAIL({ ar: 'مفيش عدد ضيوف متسجل (تيك أواي/كاونتر) — مش هنقول صفر.', en: 'No guest count recorded — not zero.' });
+      if (!seen.size) return NOT_AVAIL({ ar: 'لا يوجد عدد ضيوف مسجل (تيك أواي/كاونتر) — ولن نقول صفرًا.', en: 'No guest count recorded — not zero.' });
       return val([...seen.values()].reduce((a, x) => a.plus(D(x)), D(0)), seen.size);
     });
     case 'sum_requires': return group(c, filterFacts(c, factsOf(c.db, e.fact, c.scope, c.cache)), (fs) => {
       const missing = fs.filter((f) => f.n[e.field] === undefined);
-      if (missing.length) return NOT_AVAIL({ ar: `التكلفة مش متاحة: ${missing.length} سطر لأصناف من غير وصفة تكلفة.`, en: `Cost unavailable: ${missing.length} line(s) without a recipe.` });
+      if (missing.length) return NOT_AVAIL({ ar: `التكلفة غير متاحة: ${missing.length} سطر لأصناف بلا وصفة تكلفة.`, en: `Cost unavailable: ${missing.length} line(s) without a recipe.` });
       return val(sumField(fs, e.field), fs.length);
     });
     case 'diff_requires': return group(c, filterFacts(c, factsOf(c.db, e.fact, c.scope, c.cache)), (fs) => {
       const missing = fs.filter((f) => f.n[e.b] === undefined);
-      if (missing.length) return NOT_AVAIL({ ar: `الهامش مش متاح: ${missing.length} سطر من غير وصفة تكلفة (عمره ما بيتحسب صفر).`, en: `Margin unavailable: ${missing.length} line(s) without recipe cost (never zero).` });
+      if (missing.length && e.why === 'rider') return NOT_AVAIL(riderCostReason(missing));
+      if (missing.length) return NOT_AVAIL({ ar: `الهامش غير متاح: ${missing.length} سطر بلا وصفة تكلفة (لا يُحسب صفرًا أبدًا).`, en: `Margin unavailable: ${missing.length} line(s) without recipe cost (never zero).` });
       return val(sumField(fs, e.a).minus(sumField(fs, e.b)), fs.length);
     });
     case 'share': {
       const facts = filterFacts(c, factsOf(c.db, e.fact, c.scope, c.cache));
       const total = sumField(facts, e.field);
-      return group(c, facts, (fs) => total.isZero() ? { value: null, availability: 'NOT_DEFINED', reason: { ar: 'مفيش كميات في النطاق', en: 'No quantity in scope' } } : { ...val(sumField(fs, e.field).dividedBy(total).times(100), fs.length), numerator: m4(sumField(fs, e.field)), denominator: m4(total) });
+      return group(c, facts, (fs) => total.isZero() ? { value: null, availability: 'NOT_DEFINED', reason: { ar: 'لا توجد كميات في النطاق', en: 'No quantity in scope' } } : { ...val(sumField(fs, e.field).dividedBy(total).times(100), fs.length), numerator: m4(sumField(fs, e.field)), denominator: m4(total) });
     }
     case 'snapshot': return group(c, filterFacts(c, factsOf(c.db, e.fact, c.scope, c.cache)), (fs) => ({ ...val(sumField(fs, e.field), fs.length), snapshotAt: new Date(c.scope.asOfMs).toISOString() }));
     case 'requires_dim': {
-      if (!c.dims.includes(e.dim) && !(c.filters[e.dim]?.length === 1)) { const g: Groups = new Map(); g.set('*', { dims: {}, value: { value: null, availability: 'NOT_DEFINED', reason: { ar: 'اختار الخامة: ما ينفعش نجمع كميات بوحدات مختلفة (كيلو + لتر + قطعة).', en: 'Pick the ingredient: quantities in different units cannot be added.' } }, facts: [] }); return g; }
+      if (!c.dims.includes(e.dim) && !(c.filters[e.dim]?.length === 1)) { const g: Groups = new Map(); g.set('*', { dims: {}, value: { value: null, availability: 'NOT_DEFINED', reason: { ar: 'اختر الخامة: لا يمكن جمع كميات بوحدات مختلفة (كيلو + لتر + قطعة).', en: 'Pick the ingredient: quantities in different units cannot be added.' } }, facts: [] }); return g; }
       return evaluate(c, m, e.inner);
     }
     case 'trace': {
-      if (!((c.db as any).reversals?.length)) { const g: Groups = new Map(); g.set('*', { dims: {}, value: NOT_AVAIL({ ar: 'طابور مراجعة الهالك لسه ما اتسجلش فيه حاجة (سجل الإلغاءات بالمراحل مش موجود).', en: 'No reversal trace recorded yet.' }), facts: [] }); return g; }
+      if (!((c.db as any).reversals?.length)) { const g: Groups = new Map(); g.set('*', { dims: {}, value: NOT_AVAIL({ ar: 'لم يُسجَّل شيء في طابور مراجعة الهالك بعد (سجل الإلغاءات بالمراحل غير موجود).', en: 'No reversal trace recorded yet.' }), facts: [] }); return g; }
       return evaluate(c, m, e.inner);
     }
     case 'price_change': return group(c, filterFacts(c, factsOf(c.db, 'grn', c.scope, c.cache)), (fs) => {
@@ -267,7 +278,7 @@ function evaluate(c: Ctx, m: MetricDef, e: Ev): Groups {
       for (const f of fs) (byItem.get(f.dims.inventory_item!) ?? byItem.set(f.dims.inventory_item!, []).get(f.dims.inventory_item!)!).push(f);
       let num = D(0), den = D(0);
       for (const list of byItem.values()) { const s = list.sort((a, b) => a.recordedMs - b.recordedMs); if (s.length < 2) continue; const last = D(s.at(-1)!.n.unit_cost), prev = D(s.at(-2)!.n.unit_cost); num = num.plus(last.minus(prev)); den = den.plus(prev); }
-      if (den.isZero()) return { value: null, availability: 'NOT_DEFINED', reason: { ar: 'محتاج استلامين على الأقل لنفس الخامة في الفترة.', en: 'Needs two receipts of the same item.' } };
+      if (den.isZero()) return { value: null, availability: 'NOT_DEFINED', reason: { ar: 'يحتاج إلى استلامين على الأقل للخامة نفسها في الفترة.', en: 'Needs two receipts of the same item.' } };
       return { ...val(num.dividedBy(den).times(100), fs.length), numerator: m4(num), denominator: m4(den) };
     });
     case 'freshness': {
@@ -277,7 +288,7 @@ function evaluate(c: Ctx, m: MetricDef, e: Ev): Groups {
     }
     case 'recon': {
       const facts = filterFacts(c, factsOf(c.db, 'recon', c.scope, c.cache));
-      if (!facts.length) { const g: Groups = new Map(); g.set('*', { dims: {}, value: NOT_AVAIL({ ar: 'المطابقة ما اتشغلتش على الفترة دي.', en: 'Reconciliation not run for this period.' }), facts: [] }); return g; }
+      if (!facts.length) { const g: Groups = new Map(); g.set('*', { dims: {}, value: NOT_AVAIL({ ar: 'لم تُنفَّذ المطابقة على هذه الفترة.', en: 'Reconciliation not run for this period.' }), facts: [] }); return g; }
       return group(c, facts, (fs) => val(sumField(fs, 'failed'), fs.length));
     }
     case 'registry': {
@@ -302,7 +313,7 @@ function evaluate(c: Ctx, m: MetricDef, e: Ev): Groups {
           if (a && a.value.availability !== 'AVAILABLE') { out.set(k, { dims, value: a.value, facts: [] }); continue; }
           if (b && b.value.availability !== 'AVAILABLE') { out.set(k, { dims, value: b.value, facts: [] }); continue; }
           const num = D(a?.value.value ?? 0), den = D(b?.value.value ?? 0);
-          out.set(k, { dims, facts: [...(a?.facts ?? []), ...(b?.facts ?? [])], source: a?.source ?? b?.source, value: den.isZero() ? { value: null, availability: 'NOT_DEFINED', reason: { ar: `مفيش ${dm.label.ar} — النسبة مش متعرفة`, en: `No ${dm.label.en} — ratio undefined` }, numerator: m4(num), denominator: '0.0000' } : { value: m4(num.dividedBy(den).times(m.scale ?? 1)), availability: 'AVAILABLE', numerator: m4(num), denominator: m4(den) } });
+          out.set(k, { dims, facts: [...(a?.facts ?? []), ...(b?.facts ?? [])], source: a?.source ?? b?.source, value: den.isZero() ? { value: null, availability: 'NOT_DEFINED', reason: { ar: `لا يوجد ${dm.label.ar} — النسبة غير معرَّفة`, en: `No ${dm.label.en} — ratio undefined` }, numerator: m4(num), denominator: '0.0000' } : { value: m4(num.dividedBy(den).times(m.scale ?? 1)), availability: 'AVAILABLE', numerator: m4(num), denominator: m4(den) } });
         }
         return out;
       }
@@ -332,7 +343,7 @@ function pmRefusal(m: MetricDef, dim: string): Loc {
   if (dim === 'payment_method' && ['line', 'check', 'composite', 'discount'].includes(m.fact) && !m.id.startsWith('net_tender')) return SPECIAL_REFUSAL.payment_method;
   if (m.additivity === 'SEMI_ADDITIVE' && (dim === 'business_date' || dim === 'business_week')) return SPECIAL_REFUSAL['business_date@SEMI'];
   const dd = dimensionById.get(dim);
-  return { ar: `«${m.label.ar}» ما بيتقسمش حسب «${dd?.label.ar ?? dim}» — الرقم ده مش متسجل بالتفصيل ده، والتقسيم كان هيكرر أرقام.`, en: `${m.label.en} cannot be broken down by ${dd?.label.en ?? dim}: its grain (${m.grain}) does not carry it; the join would duplicate measures.` };
+  return { ar: `«${m.label.ar}» لا يُقسَّم حسب «${dd?.label.ar ?? dim}» — هذا الرقم غير مسجل بهذا التفصيل، والتقسيم كان سيكرر أرقامًا.`, en: `${m.label.en} cannot be broken down by ${dd?.label.en ?? dim}: its grain (${m.grain}) does not carry it; the join would duplicate measures.` };
 }
 
 /** Branches the caller may read in reports. */
@@ -365,15 +376,15 @@ export function query(db: DB, caller: Caller, q: QuerySpec, opts: QueryOpts = {}
   for (const id of q.metrics) {
     const m = metricById.get(id);
     if (!m) throw new ReportRefusal('METRIC_NOT_FOUND', { metric: id });
-    if (m.status === 'NOT_AVAILABLE' || !EVAL[id]) { notAvailable.push({ metric: id, reason: m.reason ?? { ar: 'المصدر مش موجود', en: 'No source' } }); continue; }
+    if (m.status === 'NOT_AVAILABLE' || !EVAL[id]) { notAvailable.push({ metric: id, reason: m.reason ?? { ar: 'المصدر غير موجود', en: 'No source' } }); continue; }
     const fk = evFact(EVAL[id]) ?? (m.numerator ? evFact(EVAL[m.numerator]) : m.terms ? evFact(EVAL[m.terms[0].metric]) : null);
     const cap = fk ? CAPABILITY_OF[fk] : undefined;
-    if (cap && !branchIds.some((b) => capabilityOn(db, cap, b))) { notAvailable.push({ metric: id, reason: { ar: 'الموديول ده مقفول للفرع — الرقم مش متاح (مش صفر).', en: 'Module switched off for this branch — not available (not zero).' } }); continue; }
-    if (m.permission && !caller.perms(m.permission)) { refused.push({ metric: id, reason: { ar: 'الرقم ده للمدير والمحاسب بس.', en: 'Managers and accountants only.' } }); continue; }
+    if (cap && !branchIds.some((b) => capabilityOn(db, cap, b))) { notAvailable.push({ metric: id, reason: { ar: 'هذه الوحدة مغلقة للفرع — الرقم غير متاح (وليس صفرًا).', en: 'Module switched off for this branch — not available (not zero).' } }); continue; }
+    if (m.permission && !caller.perms(m.permission)) { refused.push({ metric: id, reason: { ar: 'هذا الرقم للمدير والمحاسب فقط.', en: 'Managers and accountants only.' } }); continue; }
     const badDim = [...dims, ...Object.keys(filters), ...Object.keys(exclude)].find((d) => !m.dimensions.includes(d));
     if (badDim) { refused.push({ metric: id, dimension: badDim, reason: pmRefusal(m, badDim) }); continue; }
     const permDim = dims.find((d) => dimensionById.get(d)?.permission && !caller.perms(dimensionById.get(d)!.permission!));
-    if (permDim) { refused.push({ metric: id, dimension: permDim, reason: { ar: `التقسيم حسب «${dimensionById.get(permDim)!.label.ar}» للمدير بس.`, en: `Breakdown by ${dimensionById.get(permDim)!.label.en} is for managers.` } }); continue; }
+    if (permDim) { refused.push({ metric: id, dimension: permDim, reason: { ar: `التقسيم حسب «${dimensionById.get(permDim)!.label.ar}» للمدير فقط.`, en: `Breakdown by ${dimensionById.get(permDim)!.label.en} is for managers.` } }); continue; }
     ok.push(m);
   }
   const groups = new Map(ok.map((m) => [m.id, evalMetric(c, m)]));
@@ -384,7 +395,7 @@ export function query(db: DB, caller: Caller, q: QuerySpec, opts: QueryOpts = {}
     const g = evalMetric(totalsCtx, m).get('') ?? evalMetric(totalsCtx, m).get('*');
     totals[m.id] = g?.value ?? zeroOrNA(m, c);
     if (preLaunchDays.length && !hasHistory(m) && totals[m.id].availability === 'AVAILABLE') totals[m.id] = { ...totals[m.id], reason: { ar: `الأيام قبل ${c.launch} بلا بيانات تفصيلية — غير داخلة في الرقم.`, en: `Days before ${c.launch} have no event-level data — excluded.` } };
-    if (preLaunchDays.length === datesOf(from, to).length && !hasHistory(m)) totals[m.id] = NOT_AVAIL({ ar: `الفترة كلها قبل تشغيل السيستم (${c.launch}) — عندنا إجماليات يومية بس.`, en: `Whole period precedes launch (${c.launch}) — daily aggregates only.` });
+    if (preLaunchDays.length === datesOf(from, to).length && !hasHistory(m)) totals[m.id] = NOT_AVAIL({ ar: `الفترة كلها قبل تشغيل النظام (${c.launch}) — لدينا إجماليات يومية فقط.`, en: `Whole period precedes launch (${c.launch}) — daily aggregates only.` });
   }
   for (const id of notAvailable.map((x) => x.metric)) totals[id] = NOT_AVAIL(notAvailable.find((x) => x.metric === id)!.reason);
   for (const r of refused) totals[r.metric] = { value: null, availability: 'REFUSED', reason: r.reason };
@@ -402,7 +413,7 @@ export function query(db: DB, caller: Caller, q: QuerySpec, opts: QueryOpts = {}
     const star = groups.get(m.id)?.get('*'); // the metric is undefined / not available for this whole grouping — never fill 0
     if (star && star.value.availability !== 'AVAILABLE') { r.values[m.id] = star.value; continue; }
     const pre = r.dims.business_date && r.dims.business_date < c.launch;
-    r.values[m.id] = pre && !hasHistory(m) ? NOT_AVAIL({ ar: 'يوم قبل تشغيل السيستم — مفيش بيانات تفصيلية.', en: 'Pre-launch day — no event-level data.' }) : zeroOrNA(m, c);
+    r.values[m.id] = pre && !hasHistory(m) ? NOT_AVAIL({ ar: 'يوم قبل تشغيل النظام — لا بيانات تفصيلية.', en: 'Pre-launch day — no event-level data.' }) : zeroOrNA(m, c);
   }
   const sortM = q.sort?.metric ?? ok[0]?.id;
   if (dims.includes('business_date') || dims.includes('hour') || dims.includes('business_week') || dims.includes('weekday')) rows.sort((a, b) => a.key.localeCompare(b.key));
@@ -412,9 +423,9 @@ export function query(db: DB, caller: Caller, q: QuerySpec, opts: QueryOpts = {}
   const openSessions = db.sessions.filter((s) => branchIds.includes(s.branchId) && s.state !== 'CLOSED' && inRange(s.businessDate, from, to));
   const provisionalReasons: Loc[] = [];
   if (days.some((d) => d.status === 'OPEN')) provisionalReasons.push({ ar: 'لم ينتهِ اليوم التجاري بعد (ينتهي الساعة 4 فجرًا).', en: 'The business day has not ended (04:00).' });
-  if (openSessions.length) provisionalReasons.push({ ar: `فيه ${openSessions.length} وردية مفتوحة.`, en: `${openSessions.length} open session(s).` });
-  if (days.some((d) => d.status === 'ENDED_NOT_CLOSED')) provisionalReasons.push({ ar: 'فيه يوم خلص بس لسه ما اتقفلش (إقفال اليوم).', en: 'A day ended but is not closed yet.' });
-  if (asOfMs < caller.nowMs - 60_000) provisionalReasons.push({ ar: 'التقرير لقطة قديمة (asOf) — اللي اتسجل بعدها مش ظاهر.', en: 'An older asOf snapshot — later records hidden.' });
+  if (openSessions.length) provisionalReasons.push({ ar: `توجد ${openSessions.length} وردية مفتوحة.`, en: `${openSessions.length} open session(s).` });
+  if (days.some((d) => d.status === 'ENDED_NOT_CLOSED')) provisionalReasons.push({ ar: 'يوجد يوم انتهى ولم يُغلق بعد (إغلاق اليوم).', en: 'A day ended but is not closed yet.' });
+  if (asOfMs < caller.nowMs - 60_000) provisionalReasons.push({ ar: 'التقرير لقطة سابقة (asOf) — ما سُجِّل بعدها غير ظاهر.', en: 'An older asOf snapshot — later records hidden.' });
   const meta: QueryMeta = {
     from, to, branchIds, timezone: 'Africa/Cairo', cutoff: db.branches.find((b) => b.id === branchIds[0])?.businessDayCutoff ?? '04:00', asOf: new Date(asOfMs).toISOString(), days,
     provisional: provisionalReasons.length > 0, provisionalReasons, refused, notAvailable, weekStart: 'SATURDAY', filters: q.filters ?? {},
@@ -438,10 +449,10 @@ const SALES_FACTS = new Set<string>(['check', 'line', 'payment', 'refund', 'draw
 const preLaunchApplies = (m: MetricDef) => SALES_FACTS.has(m.fact) && !(m.fact === 'composite' && [m.numerator, m.terms?.[0]?.metric].some((x) => x && !SALES_FACTS.has(metricById.get(x)?.fact ?? '')));
 const hasHistory = (m: MetricDef) => !preLaunchApplies(m) || !!HISTORY[m.id] || !!m.terms?.every((t) => HISTORY[t.metric]) || (!!m.numerator && !!HISTORY[m.numerator] && !!HISTORY[m.denominator!]);
 function zeroOrNA(m: MetricDef, c: Ctx): MetricValue {
-  if (m.additivity === 'WEIGHTED_RATIO') return { value: null, availability: 'NOT_DEFINED', reason: { ar: 'مفيش بيانات في النطاق — النسبة مش متعرفة.', en: 'No data in scope — ratio undefined.' } };
-  if (m.id === 'guest_count') return { value: '0.0000', availability: 'AVAILABLE', evidenceCount: 0, reason: { ar: 'مفيش قعدات صالة في الفترة دي.', en: 'No dine-in visits in this period.' } };
-  if (m.id === 'data_freshness_minutes') return NOT_AVAIL({ ar: 'مفيش أي حركة اتسجلت في النطاق — مش عارفين آخر تحديث.', en: 'No event in scope.' });
-  return { value: '0.0000', availability: 'AVAILABLE', evidenceCount: 0, reason: { ar: 'المصدر شغال ومفيش حركات في الفترة دي.', en: 'Source live; no events in this period.' } };
+  if (m.additivity === 'WEIGHTED_RATIO') return { value: null, availability: 'NOT_DEFINED', reason: { ar: 'لا بيانات في النطاق — النسبة غير معرَّفة.', en: 'No data in scope — ratio undefined.' } };
+  if (m.id === 'guest_count') return { value: '0.0000', availability: 'AVAILABLE', evidenceCount: 0, reason: { ar: 'لا جلسات صالة في هذه الفترة.', en: 'No dine-in visits in this period.' } };
+  if (m.id === 'data_freshness_minutes') return NOT_AVAIL({ ar: 'لم تُسجَّل أي حركة في النطاق — آخر تحديث غير معروف.', en: 'No event in scope.' });
+  return { value: '0.0000', availability: 'AVAILABLE', evidenceCount: 0, reason: { ar: 'المصدر يعمل ولا حركات في هذه الفترة.', en: 'Source live; no events in this period.' } };
 }
 
 /** L4: the exact source records behind one cell. Their amounts add up to the cell (the proof is returned too). */
@@ -471,9 +482,10 @@ export function explain(db: DB, caller: Caller, spec: { metric: string; cell?: R
     const seenKeys = new Set<string>();
     const evidence = facts.map((f) => {
       let amt: string | null = field ? (f.n[field] ?? null) : f.ref.amount ?? null;
-      if (inner?.t === 'diff_requires') amt = f.n.cost !== undefined ? m4(D(f.n.net).minus(f.n.cost)) : null;
+      if (inner?.t === 'diff_requires') amt = f.n[inner.b] !== undefined ? m4(D(f.n[inner.a]).minus(f.n[inner.b])) : null;
       if (f.kind === 'history' && inner && 'field' in inner && HISTORY[mm.id]) amt = f.n[HISTORY[mm.id].field] ?? f.ref.amount ?? null;
       if (distinct) { const k = f.key?.[(inner as any).key] ?? f.id; const dup = seenKeys.has(k); seenKeys.add(k); return { ...f.ref, amount: dup ? '0' : inner!.t === 'distinct_sum' ? f.n[(inner as any).field] || '0' : '1', note: dup ? 'same-order (counted once)' : f.ref.note }; }
+      if (inner?.t === 'diff_requires' && inner.why === 'rider') return { ...f.ref, amount: amt, note: f.key?.cost_basis === 'FIXED_SHIFT' ? 'rider-shift-pay' : f.key?.cost_basis === 'PARTNER' ? 'partner-commission' : null };
       if ((field === 'cost' || inner?.t === 'diff_requires') && f.key?.cost_basis) return { ...f.ref, amount: amt, note: f.key.cost_basis === 'NO_RECIPE' ? 'no-recipe' : f.key.cost_basis === 'CURRENT_FALLBACK' ? 'cost-current' : null };
       return { ...f.ref, amount: amt };
     }).filter((x) => x.amount === null || !D(x.amount).isZero() || distinct || (field !== 'positive' && field !== 'rounded' && field !== 'line' && field !== 'order' && field !== 'pending' && field !== 'missing' && field !== 'no_sale' && field !== 'withdrawal' && field !== 'correction' && field !== 'dine_in_net' && field !== 'late' && field !== 'done' && field !== 'accepted' && field !== 'rejected' && field !== 'granted' && field !== 'denied' && field !== 'self' && field !== 'no_show' && field !== 'delivered' && field !== 'failed'));

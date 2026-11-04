@@ -24,7 +24,7 @@ const CORE = ['definition', 'example', 'business_date', 'provisional', 'not_avai
 export const MANIFESTS: Manifest[] = [
   M({ id: 'eod_bridge', family: 'sales', pilot: true, title: L('مبيعات اليوم وجسر نهاية اليوم', 'Daily sales & EOD money bridge'), purpose: L('يشرح كل قرش: من المبيعات قبل الخصم حتى الفواتير، ومن الفواتير إلى المتحصل والدرج.', 'Explains every piaster: from gross to billed, from billed to money collected and the drawer.'), decision: L('هل أُغلق اليوم بشكل صحيح؟ وأين الفرق إن وُجد؟', 'Is the day right? Where is any gap?'), audience: ['owner', 'accountant'], researchIds: ['R-001', 'R-033', 'R-074', 'R-006'], permission: 'report:run', period: 'DAY', defaultPeriod: 'YESTERDAY', filters: ['branch'], visual: 'KPI + waterfall bridge', drilldown: L('اليوم ← الشيكات ← السطور والدفعات', 'Day → checks → lines and payments'),
     blocks: [
-      B('kpis', 'الأرقام الأساسية', 'Key numbers', 'kpis', ['net_item_sales', 'recognized_sales_total', 'tender_collected', 'tender_refunded', 'order_count', 'check_count', 'guest_count', 'avg_check', 'outstanding_checks']),
+      B('kpis', 'الأرقام الأساسية', 'Key numbers', 'kpis', ['net_item_sales', 'recognized_sales_total', 'tender_collected', 'tender_refunded', 'order_count', 'check_count', 'guest_count', 'avg_check', 'outstanding_checks', 'outstanding_amount']),
       B('bridge', 'جسر النقدية', 'Money bridge', 'bridge', ['gross_item_sales', 'discount_amount', 'item_net_sales', 'service_charge', 'tax_amount', 'recognized_sales_total', 'tender_collected', 'tender_refunded']),
       B('drawers', 'الأدراج: المتوقع مقابل المعدود', 'Drawers: expected vs counted', 'drawers', ['cash_expected', 'cash_counted', 'cash_variance']),
       B('by_channel', 'حسب قناة البيع', 'By channel', 'table', ['item_net_sales', 'service_charge', 'tax_amount', 'recognized_sales_total', 'check_count'], ['channel']),
@@ -78,11 +78,12 @@ export const MANIFESTS: Manifest[] = [
     blocks: [
       B('by_hour', 'حسب الساعة', 'By hour', 'line', ['item_net_sales', 'check_count'], ['hour']),
       B('by_daypart', 'حسب الفترة', 'By daypart', 'table', ['item_net_sales', 'check_count', 'avg_check'], ['daypart']),
+      B('by_day', 'حسب اليوم', 'By day', 'line', ['net_item_sales'], ['business_date']), // ux-17: Home's «آخر 14 يومًا»
     ], checklist: [...CORE] }),
   M({ id: 'channel_economics', family: 'channels', pilot: true, title: L('قنوات البيع واقتصاديات التطبيقات', 'Channels & aggregator economics'), purpose: L('صالة مقابل تيك أواي مقابل دليفري — وعمولة التطبيقات إن توفرت.', 'Dine-in vs takeaway vs delivery — and app commission if available.'), decision: L('أي قناة تحقق ربحًا؟', 'Which channel pays?'), audience: ['owner', 'accountant'], researchIds: ['R-003', 'R-023', 'R-024', 'R-028'], permission: 'report:run', period: 'RANGE', defaultPeriod: 'LAST_7', filters: ['branch'], visual: 'stacked bars', drilldown: L('القناة ← الطلبات', 'Channel → orders'),
     blocks: [
       B('by_channel', 'حسب القناة', 'By channel', 'bars', ['item_net_sales', 'order_count', 'avg_check'], ['channel']),
-      B('economics', 'بعد العمولة', 'After commission', 'kpis', ['aggregator_commission', 'delivery_fee_net', 'delivery_avg_minutes'], [], { note: L('العمولة وصافي التوصيل غير متاحين حتى تُسجَّل كشوف التسوية والعقود — وليسا صفرًا.', 'Commission and fee net are not available until statements and contracts are recorded — not zero.') }),
+      B('economics', 'بعد العمولة', 'After commission', 'kpis', ['aggregator_commission', 'delivery_fee_net', 'delivery_avg_minutes'], [], { note: L('العمولة غير متاحة حتى تُسجَّل كشوف التسوية والعقود — وليست صفرًا.', 'Commission is not available until statements and contracts are recorded — not zero.') }),
     ], checklist: [...CORE, 'delivery_fees'] }),
   M({ id: 'staff_meals', family: 'controls', pilot: true, title: L('وجبات الموظفين', 'Staff meals'), purpose: L('من تناول ماذا، وبموافقة من، بقيمته وتكلفته — خارج المبيعات والخصومات.', 'Who ate what, approved by whom, value and cost — outside sales and discounts.'), decision: L('هل الوجبات ضمن حدود السياسة؟', 'Within policy?'), audience: ['manager', 'accountant'], researchIds: ['R-041'], permission: 'report:run', period: 'RANGE', defaultPeriod: 'LAST_7', filters: ['branch', 'staff'], visual: 'table', drilldown: L('الموظف ← الوجبة ← الأصناف', 'Employee → meal → items'),
     blocks: [
@@ -135,5 +136,17 @@ export const MANIFESTS: Manifest[] = [
     ], checklist: [...CORE, 'void_after_kitchen'] }),
   M({ id: 'menu_matrix', family: 'menu', pilot: false, title: L('مصفوفة هندسة قائمة الطعام', 'Menu engineering matrix'), purpose: L('نجوم، خيول، ألغاز، كلاب — بالتكلفة وقت البيع، ونوضح ذلك إن لم تتوفر التكلفة.', 'Stars, horses, puzzles, dogs — cost at sale time; unavailable cost is said so.'), decision: L('كيف نسعّر قائمة الطعام ونرتبها؟', 'How to price and place items?'), audience: ['owner', 'chef'], researchIds: ['R-010', 'R-013'], permission: 'report:run', period: 'RANGE', defaultPeriod: 'LAST_7', filters: ['branch', 'category'], visual: 'scatter', drilldown: L('الصنف ← الوصفة ← السطور', 'Item → recipe → lines'),
     blocks: [B('matrix', 'المصفوفة', 'Matrix', 'matrix', ['sold_quantity', 'item_net_sales', 'food_theoretical_cost', 'menu_contribution'], ['product'])], checklist: [...CORE] }),
+  // ux-17: the delivery & riders and staff groups of the catalog
+  M({ id: 'delivery_riders', family: 'delivery', pilot: false, title: L('الدليفري والطيارون', 'Delivery & riders'), purpose: L('المشاوير المُسلَّمة والمتعثرة، ومدة التوصيل، وصافي إيراد التوصيل بعد أجر الطيار — لكل طيار ومنطقة.', 'Delivered and failed trips, delivery time and delivery fee net of rider pay — per rider and zone.'), decision: L('هل يغطي رسم التوصيل أجر الطيار؟ ومن يتأخر؟', 'Does the fee cover rider pay? Who is late?'), audience: ['owner', 'manager', 'accountant'], researchIds: ['R-023', 'ux-11'], permission: 'session:zreport', period: 'RANGE', defaultPeriod: 'LAST_7', filters: ['branch', 'zone'], visual: 'table', drilldown: L('الطيار ← المشاوير', 'Rider → trips'),
+    blocks: [
+      B('kpis', 'الملخص', 'Summary', 'kpis', ['delivered_count', 'delivery_failed_count', 'delivery_avg_minutes', 'delivery_fee_net']),
+      B('by_driver', 'حسب الطيار', 'By rider', 'table', ['delivered_count', 'delivery_failed_count', 'delivery_avg_minutes', 'delivery_fee_net'], ['driver']),
+      B('by_zone', 'حسب المنطقة', 'By zone', 'table', ['delivered_count', 'delivery_avg_minutes', 'delivery_fee_net'], ['zone']),
+    ], checklist: [...CORE, 'delivery_fees'] }),
+  M({ id: 'staff_sales', family: 'staff', pilot: false, title: L('مبيعات الموظفين', 'Sales by staff'), purpose: L('صافي المبيعات وعدد الشيكات ومتوسط الشيك لكل موظف، والخصومات التي نفّذها.', 'Net sales, checks and average check per employee, and the discounts each applied.'), decision: L('من يبيع أكثر؟ ومن يخصم أكثر؟', 'Who sells most? Who discounts most?'), audience: ['owner', 'manager'], researchIds: ['R-038'], permission: 'session:zreport', period: 'RANGE', defaultPeriod: 'LAST_7', filters: ['branch', 'channel'], visual: 'table', drilldown: L('الموظف ← الشيكات', 'Employee → checks'),
+    blocks: [
+      B('by_staff', 'حسب الموظف', 'By employee', 'table', ['item_net_sales', 'check_count', 'avg_check'], ['staff'], { sort: { metric: 'item_net_sales', dir: 'desc' } }),
+      B('discounts', 'الخصومات حسب الموظف', 'Discounts by employee', 'table', ['discount_amount', 'discount_count'], ['staff']),
+    ], checklist: [...CORE] }),
 ];
 export const manifestById = new Map(MANIFESTS.map((x) => [x.id, x]));

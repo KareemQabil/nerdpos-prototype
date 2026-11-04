@@ -7,7 +7,7 @@ import { useQuery, useCommand } from '../../../app/hooks';
 import { Modal, Button, Field, Input, Textarea, Select, SegmentedControl, Switch, Popup, Timeline, Pill, Spinner, Banner } from '../../../ui';
 import { t, L } from '../../../i18n';
 import { dateTime } from '../../../lib/format';
-import { REPORT_CATEGORIES, type ReportDesign, type Audience } from '../../../reports/studio';
+import { REPORT_CATEGORIES, REPORT_GROUPS, type ReportDesign, type Audience } from '../../../reports/studio';
 import { useRegistry, periodText, lang, type Registry } from './common';
 import { rangeText } from '../../../reports/format';
 
@@ -44,7 +44,7 @@ export function SaveDialog({ open, onClose, initial, existing, design, templateI
       <div className="space-y-3" data-fb="save-dialog">
         <Field label={t('اسم التقرير')} required><Input value={name} onChange={(e) => setName(e.target.value)} autoFocus maxLength={80} data-fb="save:name" /></Field>
         <Field label={t('وصف قصير (اختياري)')}><Textarea rows={2} value={desc} onChange={(e) => setDesc(e.target.value)} placeholder={t('مثلاً: بيوريني مبيعات كل فرع حسب القناة كل أسبوع')} data-fb="save:desc" /></Field>
-        <Field label={t('الموضوع')}><Select value={cat} onChange={(e) => setCat(e.target.value)} options={Object.entries(REPORT_CATEGORIES).map(([k, v]) => ({ value: k, label: L(v) }))} data-fb="save:category" /></Field>
+        <Field label={t('الموضوع')}><Select value={cat} onChange={(e) => setCat(e.target.value)} options={[...Object.entries(REPORT_GROUPS), ...(REPORT_GROUPS[cat] ? [] : [[cat, REPORT_CATEGORIES[cat] ?? REPORT_GROUPS.other] as const])].map(([k, v]) => ({ value: k, label: L(v) }))} data-fb="save:category" /></Field>
         <Field label={t('مين يشوفه؟')} hint={!canShare ? t('صاحب التقرير بس هو اللي يغيّر مين يشوفه.') : undefined}>
           <SegmentedControl full size="sm" value={share} onChange={(v) => canShare && setShare(v)} options={[{ id: 'ME', label: t('أنا بس'), icon: <Lock className="w-3.5 h-3.5" />, fb: 'save:share-me', disabled: !canShare }, { id: 'MANAGERS', label: t('المديرين والمحاسب'), icon: <Users className="w-3.5 h-3.5" />, fb: 'save:share-managers', disabled: !canShare }, { id: 'EVERYONE', label: t('الكل'), icon: <Globe2 className="w-3.5 h-3.5" />, fb: 'save:share-all', disabled: !canShare }]} />
         </Field>

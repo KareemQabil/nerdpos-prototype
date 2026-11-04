@@ -120,6 +120,6 @@ export const CLASS_LABEL: Record<string, Loc & { advice: Loc }> = {
   PLOWHORSE: { ar: 'حصان', en: 'Plowhorse', advice: L('بيتباع كتير بس هامشه قليل — راجع التكلفة أو السعر.', 'Popular, low margin — review cost/price.') },
   PUZZLE: { ar: 'لغز', en: 'Puzzle', advice: L('هامشه عالي بس بيتباع قليل — اعرضه أحسن.', 'Profitable, unpopular — promote.') },
   DOG: { ar: 'كلب', en: 'Dog', advice: L('قليل في الاتنين — فكر تشيله.', 'Low on both — consider removing.') },
-  COST_UNAVAILABLE: { ar: 'التكلفة مش متاحة', en: 'Cost unavailable', advice: L('مفيش وصفة تكلفة — بنعرض الشعبية بس، الهامش مش صفر.', 'No recipe cost — popularity only, margin not zero.') },
+  COST_UNAVAILABLE: { ar: 'التكلفة غير متاحة', en: 'Cost unavailable', advice: L('مفيش وصفة تكلفة — بنعرض الشعبية بس، الهامش مش صفر.', 'No recipe cost — popularity only, margin not zero.') },
 };
 export { dimLabel };

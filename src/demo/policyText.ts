@@ -74,14 +74,14 @@ const PLAIN: Record<string, Plain> = {
   OfflineModePolicy: { title: 'الشغل من غير نت', explain: 'لما النت يقطع، الجهاز بيسجل العمليات المسموحة (إضافة أصناف، إرسال للمطبخ، تحصيل كاش) ويبعتها أول ما النت يرجع. ممكن تحدد أقصى عدد ومين يتحصل كاش بس.', reacts: 'شريط «أوفلاين» فوق الشاشة وشاشة المزامنة.', question: 'لو النت قطع، تسمحوا بتحصيل الكارت يدوي ولا كاش بس؟' },
   // r3B (round 3)
   TenderReferencePolicy: { title: 'رقم العملية لكل طريقة دفع', explain: 'لكل طريقة دفع: الكاشير يكتب رقم العملية (من مكنة الكارت، رقم التحويل، أو رقم طلب التطبيق) ولا لأ — مقفول، اختياري، أو لازم. نفس الرقم مايتسجلش مرتين على نفس طريقة الدفع في نفس اليوم.', reacts: 'خانة «رقم العملية» في شاشة التحصيل بتظهر أو تختفي أو تبقى لازمة.', question: 'عندكم أنهي طريقة دفع لازم يتكتب لها رقم العملية؟ (مثلًا إنستاباي لازم، والكارت اختياري)' },
-  ShortOrderNumberPolicy: { title: 'رقم النداء القصير', explain: 'رقم صغير ينادوا بيه على الزبون ويظهر كبير على الإيصال وتذكرة المطبخ وشاشة التسليم. بيبدأ من 1 مع قفل اليوم، أو بعد عدد طلبات معين. رقم العملية الأصلي ثابت ومستحيل يتغير وبيتطبع دايمًا.', reacts: 'الإيصال، شاشة المطبخ، شاشة التسليم.', question: 'تحبوا رقم النداء يبدأ من 1 كل يوم، ولا كل 100 طلب؟' },
+  ShortOrderNumberPolicy: { title: 'رقم النداء القصير', explain: 'رقم صغير يُنادى به العميل ويظهر كبيرًا على الإيصال وتذكرة المطبخ وشاشة التسليم. يبدأ من 1 مع إغلاق اليوم، أو بعد عدد معيّن من الطلبات. ورقم العملية الأصلي ثابت لا يتغير ويُطبع دائمًا.', reacts: 'الإيصال، وشاشة المطبخ، وشاشة التسليم.', question: 'هل يبدأ رقم النداء من 1 كل يوم، أم كل 100 طلب؟' },
   CallBoardPolicy: { title: 'شاشة النداء', explain: 'متى يظهر رقم الطلب في «جاهز» على شاشة النداء، وكم دقيقة يبقى، وهل تظهر أرقام الدليفري.', reacts: 'شاشة النداء وزر «نداء» في شاشة التسليم.' }, // ux-12c
   SecondLanguagePolicy: { title: 'اللغة التانية', explain: 'يطبع الاسم الإنجليزي للصنف تحت الاسم العربي على الإيصال أو تذكرة المطبخ أو أزرار المنيو — بس لو الصنف ليه اسم تاني متسجل. مفيش ترجمة أوتوماتيك.', reacts: 'الإيصال، شاشة المطبخ، أزرار الأصناف في شاشة البيع.' },
   WalletProvidersPolicy: { title: 'المحافظ الإلكترونية', explain: 'إنستاباي وفودافون كاش وغيرهم كطرق دفع برقم العملية، وكل واحدة تظهر سطر لوحدها في تقرير قفلة الوردية.' },
   // r3A — who did it vs who allowed it
   SupervisorOverridePolicy: { title: 'المدير يوافق في مكانه بدل ما يدخل بحسابه', explain: 'لو الحركة مش من صلاحية الموظف (إلغاء، مرتجع، ضيافة، صرف من الدرج، وجبة موظف…) يكملها من جهازه لما مدير عنده الصلاحية يوافق بالرقم السري أو الكارت أو البصمة أو من موبايله. السجل بيقول مين عمل ومين وافق.', reacts: 'زراير الإلغاء والمرتجع بتظهر للكاشير وبتطلب موافقة مدير على نفس الجهاز.', question: 'الكاشير يكمّل الإلغاء والمرتجع بموافقة المدير في مكانه، ولا المدير لازم يعملها بنفسه؟' },
   ApprovalCredentialPolicy: { title: 'المدير يثبت شخصيته إزاي', explain: 'الطرق اللي المدير يوافق بيها على جهاز الكاشير: الرقم السري، تمرير كارت المدير، البصمة (لو فيه جهاز بصمة زي Digital Persona)، أو طلب يوصل على جهازه.', reacts: 'شاشة موافقة المدير.' },
-  StaffMealAllowancePolicy: { title: 'حد وجبة الموظف في اليوم', explain: 'كل موظف ليه حد في اليوم لوجباته، بسعر البيع أو بالتكلفة حسب تشغيل المكان. الوجبة اللي تعدّي الباقي بتترفض قبل ما تتسجل، والوجبة دايمًا محتاجة موافقة مدير.', reacts: 'شاشة وجبة الموظف: الباقي لكل موظف والرفض لو عدّى.', question: 'حد وجبة الموظف في اليوم كام، ومحسوب بسعر البيع ولا بالتكلفة؟' },
+  StaffMealAllowancePolicy: { title: 'الحد اليومي لوجبة الموظف', explain: 'لكل موظف حد يومي لوجباته، بسعر البيع أو بالتكلفة حسب تشغيل المكان. تُرفض الوجبة التي تتجاوز المتبقي قبل تسجيلها، وتحتاج الوجبة دائمًا إلى موافقة مدير.', reacts: 'شاشة وجبة الموظف: المتبقي لكل موظف والرفض عند التجاوز.', question: 'كم الحد اليومي لوجبة الموظف، وهل يُحسب بسعر البيع أم بالتكلفة؟' },
   // ux-10b — shift handover and the remaining defaults
   ShiftHandoverPolicy: { title: 'تسليم الوردية', explain: 'كيف يستلم الكاشير التالي الدرج: إغلاق كامل ثم فتح جديد، أو عدّ أعمى من الكاشيرين على الجهاز نفسه، أو استلام بعدّ الكاشير السابق. الفرق على الكاشير المُسلِّم.', reacts: 'زر «تسليم الوردية» في نافذة الوردية والدرج، وشاشة انتظار الاستلام.', question: 'هل يعدّ الكاشير المستلم الدرج بنفسه عند تسليم الوردية؟' },
   OpeningFloatPolicy: { title: 'الرصيد الافتتاحي', explain: 'المبلغ المعتاد في الدرج عند فتح الوردية، وهل يفتح الكاشير بمبلغ آخر.', reacts: 'نافذة «فتح وردية»: المبلغ المعتاد مكتوب مسبقًا.', question: 'كم الرصيد الافتتاحي المعتاد؟' },
@@ -99,7 +99,7 @@ const PLAIN: Record<string, Plain> = {
   // ux-15 — promotions and the life of a product
   PromotionPolicy: { title: 'قواعد العروض على الشيك', explain: 'كيف تجتمع العروض على الشيك، وكيف تُقرَّب مبالغها، ومتى يلزم سبب لإزالتها.', reacts: 'نافذة الخصم والعروض على الكاشير.' },
   ProductRemovalPolicy: { title: 'حذف الأصناف', explain: 'الصنف الذي بيع لا يُحذف بل يُوقف. هل يُحذف صنف أُضيف بالخطأ ولم يُستخدم؟', reacts: 'صفحة الصنف.' },
-  SplitLimitPolicy: { title: 'عدد الشيكات مايزيدش عن عدد الأفراد', explain: 'على الترابيزة، الشيك الجديد أو التقسيم مايخليش عدد الشيكات أكتر من عدد الأفراد القاعدين (3 أفراد = 3 شيكات بالكتير).', reacts: 'زرار «شيك جديد» والتقسيم على الترابيزة.' },
+  SplitLimitPolicy: { title: 'عدد الشيكات لا يتجاوز عدد الأفراد', explain: 'على الترابيزة، لا يجعل الشيك الجديد أو التقسيم عدد الشيكات أكبر من عدد الأفراد الجالسين (3 أفراد = 3 شيكات على الأكثر).', reacts: 'زر «شيك جديد» والتقسيم على الترابيزة.' },
 };
 
 export const policyTitle = (p: PolicyMeta) => t(PLAIN[p.id]?.title ?? p.title);
@@ -180,7 +180,7 @@ const OPTIONS: Record<string, Record<string, OptText>> = {
   },
   'TenderMethodPolicy.enabled': ON_SALE,
   'TenderReferencePolicy.*': { OFF: O('مقفول', 'مفيش خانة لرقم العملية.'), OPTIONAL: O('اختياري', 'الخانة موجودة والكاشير يكتبه لو موجود.'), REQUIRED: O('لازم', 'مفيش دفع من غير رقم العملية.') },
-  'ShortOrderNumberPolicy.mode': { OFF: O('مقفول', 'رقم العملية بس.'), DAILY: O('يبدأ من 1 مع قفل اليوم'), EVERY_N: O('يرجع لـ 1 بعد عدد طلبات', 'وبيبدأ من 1 برضه مع كل يوم جديد.') },
+  'ShortOrderNumberPolicy.mode': { OFF: O('مغلق', 'رقم العملية فقط.'), DAILY: O('يبدأ من 1 مع إغلاق اليوم'), EVERY_N: O('يعود إلى 1 بعد عدد من الطلبات', 'ويبدأ من 1 أيضًا مع كل يوم جديد.') },
   'CallBoardPolicy.call': { MANUAL: O('من شاشة التسليم بزر «نداء»'), AUTO: O('تلقائيًا عند جاهزية كل المحطات') }, // ux-12c
   'CollectionScopePolicy.DINE_IN': {
     BRANCH_COLLECTING_DRAWER: O('أي كاشير مفتوح في الفرع يحصّل', 'والشيك يفضل محسوب على الويتر اللي فتحه.'),
@@ -234,7 +234,7 @@ const OPTIONS: Record<string, Record<string, OptText>> = {
   'PromotionPolicy.rounding': { DOWN: O('للأدنى دائمًا'), CHECK: O('بتقريب الشيك') },
   'PromotionPolicy.removeReason': { REQUIRED: O('مطلوب'), OPTIONAL: O('اختياري') },
   'ProductRemovalPolicy.mode': { RETIRE_ONLY: O('الإيقاف فقط'), DELETE_UNSOLD: O('حذف الصنف غير المستخدم') },
-  'StaffMealAllowancePolicy.basis': { SALE_PRICE: O('بسعر البيع', 'الوجبة بتتحسب من الحد بسعرها في المنيو.'), COST: O('بالتكلفة', 'الوجبة بتتحسب بتكلفة خاماتها من الوصفة.') },
+  'StaffMealAllowancePolicy.basis': { SALE_PRICE: O('بسعر البيع', 'تُحسب الوجبة من الحد بسعرها في قائمة الطعام.'), COST: O('بالتكلفة', 'تُحسب الوجبة بتكلفة خاماتها من الوصفة.') },
 };
 // Generic fallbacks for policies added later by other screens.
 const GENERIC: Record<string, OptText> = {
@@ -279,7 +279,7 @@ const FIELD_LABEL: Record<string, string> = {
   'ChargeComponentsPolicy.cover.enabled': 'رسوم دخول للفرد (صالة)', 'ChargeComponentsPolicy.cover.amount': 'مبلغ الدخول', 'ChargeComponentsPolicy.taxable': 'الرسوم عليها ضريبة',
   'WalletProvidersPolicy.providers': 'المحافظ',
   'TenderReferencePolicy.CARD': 'كارت (مكنة الكارت)', 'TenderReferencePolicy.DIGITAL_WALLET': 'محفظة / تحويل', 'TenderReferencePolicy.ONLINE': 'مدفوع قبل كده (تطبيق / لينك)',
-  'ShortOrderNumberPolicy.mode': 'رقم النداء', 'ShortOrderNumberPolicy.every': 'يرجع لـ 1 بعد',
+  'ShortOrderNumberPolicy.mode': 'رقم النداء', 'ShortOrderNumberPolicy.every': 'يعود إلى 1 بعد',
   'CallBoardPolicy.call': 'النداء', 'CallBoardPolicy.readyMinutes': 'مدة بقاء الرقم في «جاهز» (دقيقة)', 'CallBoardPolicy.delivery': 'أرقام الدليفري على شاشة النداء', // ux-12c
   'SecondLanguagePolicy.receipt': 'على إيصال الزبون', 'SecondLanguagePolicy.kitchen': 'على تذكرة المطبخ', 'SecondLanguagePolicy.menu': 'في أزرار المنيو',
   'TableTurnPolicy.markDirty': 'تتعلم «محتاجة تنضيف» بعد القعدة', 'TableTurnPolicy.blockSeating': 'ممنوع حد يقعد عليها قبل التنضيف', 'TableTurnPolicy.alertMinutes': 'ينبّه لو فضلت مش نضيفة بعد',
@@ -291,7 +291,7 @@ const FIELD_LABEL: Record<string, string> = {
   'RefundCancelPolicy.cancelBy': 'من يسحب الطلب', 'ReasonTextPolicy.minLength': 'أقل عدد حروف', 'DriverPayPolicy.payoutDrawer': 'من يصرف ومن أي درج',
   'PromotionPolicy.maxPromotionsPerCheck': 'أقصى عدد عروض على الشيك', 'PromotionPolicy.stackBase': 'العرض التالي يُحسب', 'PromotionPolicy.manualWithPromotion': 'خصم المدير مع العرض', 'PromotionPolicy.rounding': 'تقريب مبلغ العرض', 'PromotionPolicy.removeReason': 'سبب الإزالة', 'ProductRemovalPolicy.mode': 'إزالة الصنف', // ux-15
   'CustomerDisplayPolicy.idleContent': 'المحتوى وهي خاملة', 'CustomerDisplayPolicy.slideSeconds': 'مدة الشريحة', 'CustomerDisplayPolicy.thanksSeconds': 'مدة شاشة الشكر', 'PrintRoutingPolicy.fallback': 'عند تعذّر طابعة الجهاز', 'DeviceHealthPolicy.offlineAfterSeconds': 'غير متصلة بعد', 'KeyMapPolicy.changeBy': 'من يغيّر المفاتيح', // ux-14
-  'ApprovalCredentialPolicy.methods': 'الطرق المسموحة', 'StaffMealAllowancePolicy.enabled': 'فيه حد في اليوم', 'StaffMealAllowancePolicy.basis': 'بيتحسب', 'StaffMealAllowancePolicy.dailyLimit': 'الحد لكل موظف في اليوم',
+  'ApprovalCredentialPolicy.methods': 'الطرق المسموحة', 'StaffMealAllowancePolicy.enabled': 'يوجد حد يومي', 'StaffMealAllowancePolicy.basis': 'طريقة الحساب', 'StaffMealAllowancePolicy.dailyLimit': 'الحد اليومي لكل موظف',
 };
 const REASON_KIND: Record<string, string> = {
   ORDER_CANCEL: 'إلغاء شيك ما اتبعتش', ORDER_VOID: 'إلغاء شيك كامل', LINE_VOID: 'إلغاء صنف', DISCOUNT: 'خصم', COMP: 'ضيافة', REFUND: 'مرتجع',
@@ -349,7 +349,7 @@ const BOOL_POLICY: Record<string, [string, string]> = {
   DirectionCatalogDemo: ['ظاهرة في المنيو', 'مخفية'],
   SeatsPolicy: ['شغالة: الأصناف بتتحدد لكل كرسي', 'مقفولة'],
   SupervisorOverridePolicy: ['الموظف يكمّل الحركة بموافقة المدير في مكانه', 'المدير لازم يعملها بنفسه بحسابه'],
-  SplitLimitPolicy: ['شغال: الشيكات على قد الأفراد', 'مقفول: شيكات من غير حد'],
+  SplitLimitPolicy: ['مفعّل: الشيكات بعدد الأفراد', 'معطّل: شيكات بلا حد'],
 };
 export function boolPolicyText(policyId: string, v: unknown): string {
   const b = BOOL_POLICY[policyId];

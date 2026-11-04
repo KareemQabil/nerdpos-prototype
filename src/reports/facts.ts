@@ -407,12 +407,39 @@ const buildVisit: Builder = (db, s) => db.visits.filter((v) => v.state === 'CLOS
   const tb = db.tables.find((t) => t.id === v.tableId);
   return [{ kind: 'visit' as FactKind, id: v.id, branchId: v.branchId, businessDate: bd, recordedMs: ms, dims: { ...dayDims(db, bd), branch: v.branchId, daypart: daypartOf(v.openedAtMs), table: v.tableId, revenue_center: tb?.area ?? null, staff: v.serverUserId, table_visit: v.id }, n: { one: '1', minutes: m4((ms - v.openedAtMs) / 60000), guests: String(v.guestCount) }, ref: { kind: 'VISIT' as const, id: v.id, label: `قعدة ترابيزة ${tb?.name ?? v.tableId} — ${v.guestCount} ضيوف`, businessDate: bd, at: v.openedAt, amount: m4((ms - v.openedAtMs) / 60000) } }];
 });
+/** ux-17: the rider pay rule in force for a branch (DriverPayPolicy: BRANCH value, else TENANT, else the default) — read
+ *  from the db passed in (no global store), the same precedence as the delivery handlers. */
+function riderPayRule(db: DB, branchId: string): { mode: string; perTripAmount: string; feePercent: string } {
+  const vals = (db.policyValues ?? []).filter((v: any) => v.policyId === 'DriverPayPolicy');
+  const v: any = (vals.find((x: any) => x.scopeType === 'BRANCH' && x.scopeId === branchId) ?? vals.find((x: any) => x.scopeType === 'TENANT'))?.value ?? {};
+  const mode = ['PER_TRIP', 'FIXED_SHIFT', 'PERCENT_OF_FEE'].includes(v.mode) ? v.mode : 'PER_TRIP';
+  const ok = (x: unknown) => typeof x === 'string' || typeof x === 'number' ? /^\d+(\.\d+)?$/.test(String(x)) : false;
+  return { mode, perTripAmount: ok(v.perTripAmount) ? String(v.perTripAmount) : '15', feePercent: ok(v.feePercent) && D(v.feePercent).lte(100) ? String(v.feePercent) : '30' };
+}
+/** ux-17: what a delivered trip cost in rider pay, or why it is not known. A trip already paid uses the payout's own
+ *  immutable rule and rate; an unpaid trip the rule in force. A shift-paid rider has no per-trip cost, and an order from
+ *  a delivery app has a partner commission that is not recorded — both stay unknown (never 0). */
+export type TripCost = { cost: string } | { unknown: 'FIXED_SHIFT' | 'PARTNER' };
+export function tripRiderCost(db: DB, d: any): TripCost {
+  const ext = d.externalOrderId ? ((db as any).externalOrders ?? []).find((x: any) => x.id === d.externalOrderId) : null;
+  if (ext && /^APP_/.test(ext.source)) return { unknown: 'PARTNER' };
+  const paid = ((db as any).driverPayouts ?? []).find((p: any) => (p.tripIds ?? []).includes(d.id));
+  const rule = paid ? { mode: paid.mode, rate: String(paid.rate) } : (() => { const r = riderPayRule(db, d.branchId); return { mode: r.mode, rate: r.mode === 'PERCENT_OF_FEE' ? r.feePercent : r.perTripAmount }; })();
+  if (rule.mode === 'FIXED_SHIFT') return { unknown: 'FIXED_SHIFT' };
+  if (rule.mode === 'PERCENT_OF_FEE') return { cost: m4(D(d.fee || 0).times(rule.rate).dividedBy(100)) };
+  return { cost: m4(rule.rate) };
+}
 const buildDelivery: Builder = (db, s) => ((db as any).deliveries ?? []).flatMap((d: any) => {
   if (!branchOk(s, d.branchId) || d.createdAtMs > s.asOfMs) return [];
   const bd = bdAt(db, d.branchId, d.createdAtMs);
   if (!inRange(bd, s.from, s.to)) return [];
   const done = d.deliveredAt && d.pickedUpAt;
-  return [{ kind: 'delivery' as FactKind, id: d.id, branchId: d.branchId, businessDate: bd, recordedMs: d.createdAtMs, dims: { ...dayDims(db, bd), branch: d.branchId, zone: d.zoneId, driver: d.driverId, channel: 'DELIVERY' }, n: { minutes: done ? m4((isoMs(d.deliveredAt) - isoMs(d.pickedUpAt)) / 60000) : '0', delivered: d.deliveredAt ? '1' : '0', failed: String(d.attempts?.length ?? 0) }, ref: { kind: 'DELIVERY' as const, id: d.id, orderId: d.orderId, label: `دليفري ${d.number} — ${d.zoneName}`, businessDate: bd, at: d.createdAt, amount: d.amount } }];
+  // ux-17: delivery_fee_net — only a delivered trip (recorded by asOf) earns its fee and costs its rider pay
+  const delivered = !!d.deliveredAt && isoMs(d.deliveredAt) <= s.asOfMs;
+  const tc = delivered ? tripRiderCost(db, d) : { cost: '0' };
+  const n: Record<string, string> = { minutes: done ? m4((isoMs(d.deliveredAt) - isoMs(d.pickedUpAt)) / 60000) : '0', delivered: d.deliveredAt ? '1' : '0', failed: String(d.attempts?.length ?? 0), fee: delivered ? m4(d.fee || 0) : '0' };
+  if ('cost' in tc) n.rider_cost = tc.cost;
+  return [{ kind: 'delivery' as FactKind, id: d.id, branchId: d.branchId, businessDate: bd, recordedMs: d.createdAtMs, dims: { ...dayDims(db, bd), branch: d.branchId, zone: d.zoneId, driver: d.driverId, channel: 'DELIVERY' }, n, key: 'unknown' in tc ? { cost_basis: tc.unknown } : undefined, ref: { kind: 'DELIVERY' as const, id: d.id, orderId: d.orderId, label: `دليفري ${d.number} — ${d.zoneName}`, businessDate: bd, at: d.createdAt, amount: d.amount } }];
 });
 const buildReservation: Builder = (db, s) => db.reservations.flatMap((r) => {
   if (!branchOk(s, r.branchId)) return [];
