@@ -1,4 +1,4 @@
-// Loyalty program: the earning and redeeming rule, the tiers (فضي / دهبي / بلاتيني) and the points ledger.
+// Loyalty program: the earning and redeeming rule, the tiers (فضي / ذهبي / بلاتيني) and the points ledger.
 import React, { useState } from 'react';
 import { Award, Crown, Plus, Pencil, Star, Search } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';

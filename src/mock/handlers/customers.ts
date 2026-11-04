@@ -245,8 +245,8 @@ export const customerHandlers: Record<string, Handler> = {
     settleExpiry(ctx, src.id); settleExpiry(ctx, target.id);
     const pts = balanceOf(db, src.id);
     if (pts !== 0) {
-      addLoyaltyEntry(ctx, src.id, 'MERGE_OUT', -pts, { reason: 'نُقل الرصيد إلى العميل الأساسي بعد الدمج', orderNumber: target.code });
-      addLoyaltyEntry(ctx, target.id, 'MERGE_IN', pts, { reason: 'رصيد عميل مكرر بعد الدمج', orderNumber: src.code });
+      addLoyaltyEntry(ctx, src.id, 'MERGE_OUT', -pts, { reason: 'نُقل الرصيد إلى العميل الأساسي بعد الدمج' }); // which customers: the merge audit line
+      addLoyaltyEntry(ctx, target.id, 'MERGE_IN', pts, { reason: 'رصيد عميل مكرر بعد الدمج' });
     }
     src.active = false; src.mergedInto = target.id; src.version++;
     target.version++;

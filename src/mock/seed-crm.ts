@@ -16,9 +16,9 @@ export const ZONE_SEED: Omit<DeliveryZone, 'version' | 'branchId'>[] = [
 export const RESTAURANT_XY = { x: 63, y: 55 };
 
 export const TIER_SEED: Omit<LoyaltyTier, 'version'>[] = [
-  { id: 'tier_silver', name: { ar: 'فضي', en: 'Silver' }, minPoints: 0, multiplier: '1', color: '#94a3b8', perks: { ar: 'نقطة على كل 10 جنيه', en: '1 point per 10 EGP' }, active: true, sortOrder: 10 },
-  { id: 'tier_gold', name: { ar: 'دهبي', en: 'Gold' }, minPoints: 500, multiplier: '1.25', color: '#f59e0b', perks: { ar: 'نقاط أكتر بـ 25% + مشروب هدية في عيد ميلاده', en: '+25% points, birthday drink' }, active: true, sortOrder: 20 },
-  { id: 'tier_platinum', name: { ar: 'بلاتيني', en: 'Platinum' }, minPoints: 1500, multiplier: '1.5', color: '#22d3ee', perks: { ar: 'نقاط أكتر بـ 50% + أولوية في التوصيل', en: '+50% points, delivery priority' }, active: true, sortOrder: 30 },
+  { id: 'tier_silver', name: { ar: 'فضي', en: 'Silver' }, minPoints: 0, multiplier: '1', color: '#94a3b8', perks: { ar: 'نقطة على كل 10 ج.م', en: '1 point per 10 EGP' }, active: true, sortOrder: 10 },
+  { id: 'tier_gold', name: { ar: 'ذهبي', en: 'Gold' }, minPoints: 500, multiplier: '1.25', color: '#f59e0b', perks: { ar: 'نقاط أكثر بنسبة 25% ومشروب هدية في عيد الميلاد', en: '+25% points, birthday drink' }, active: true, sortOrder: 20 },
+  { id: 'tier_platinum', name: { ar: 'بلاتيني', en: 'Platinum' }, minPoints: 1500, multiplier: '1.5', color: '#22d3ee', perks: { ar: 'نقاط أكثر بنسبة 50% وأولوية في التوصيل', en: '+50% points, delivery priority' }, active: true, sortOrder: 30 },
 ];
 
 type C = [name: string, phone: string, area: string, street: string, building: string, floor: string, apt: string, landmark: string, tags: string[], allergies: string[], notes: string, orders: number, spent: number, fav: string, daysAgo: number];
