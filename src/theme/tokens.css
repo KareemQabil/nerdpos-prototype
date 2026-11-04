@@ -330,3 +330,9 @@ input, select, textarea { font: inherit; color: inherit; }
 @media (prefers-reduced-motion: reduce) { .kds-arrive, .cb-in, .cb-new, .cd-pop, .cd-float, .cd-fade { animation: none; } }
 /* ux-06: no page scroll behind an open popup (the popup body scrolls on its own) */
 html.overlay-open, html.overlay-open body { overflow: hidden; overscroll-behavior: none; }
+/* ux-05: boards — a refused / reverted card snaps back with a short shake; a late card carries a faint red wash */
+@keyframes board-snap { 0%, 100% { transform: none; } 20% { transform: translateX(-6px); } 40% { transform: translateX(5px); } 60% { transform: translateX(-3px); } 80% { transform: translateX(2px); } }
+.board-snap { animation: board-snap .45s ease-out; box-shadow: 0 0 0 2px color-mix(in srgb, var(--error) 60%, transparent); }
+.board-late { background-image: linear-gradient(color-mix(in srgb, var(--error) 7%, transparent), color-mix(in srgb, var(--error) 7%, transparent)); }
+[data-board-ghost] { cursor: grabbing; }
+@media (prefers-reduced-motion: reduce) { .board-snap { animation: none; } }
