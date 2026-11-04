@@ -55,7 +55,9 @@ function ChecksList({ onBoard }: { onBoard: () => void }) {
     C.actions('act', (o) => <>
       {live(o) && <Button size="sm" onClick={() => open(o)} data-fb={`check-open:${o.number}`}><ClipboardList className="w-3.5 h-3.5" />{t('افتح')}</Button>}
       {live(o) && can('payment:capture') && kind !== 'FLOOR' && <Button size="sm" variant="success" onClick={() => pay.collect(o)} title={t('تحصيل')} aria-label={t('تحصيل')} data-fb={`check-pay:${o.number}`}><Wallet className="w-3.5 h-3.5" /></Button>}
-      {o.status !== 'DRAFT' && <Button size="sm" variant="ghost" onClick={() => nav('receipt', { orderId: o.id })} title={t('الإيصال')} aria-label={t('الإيصال')}><Receipt className="w-3.5 h-3.5" /></Button>}
+      {o.status !== 'DRAFT'
+        ? <Button size="sm" variant="ghost" onClick={() => nav('receipt', { orderId: o.id })} title={t('الإيصال')} aria-label={t('الإيصال')}><Receipt className="w-3.5 h-3.5" /></Button>
+        : <Button size="sm" variant="ghost" className="invisible" tabIndex={-1} aria-hidden disabled><Receipt className="w-3.5 h-3.5" /></Button>}
     </>),
   ];
   return (
