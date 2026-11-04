@@ -18,6 +18,7 @@ import { RESERVATIONS_JOURNEY } from './journey-reservations'; // ux-12: reserva
 import { HANDOVER_JOURNEY } from './journey-handover'; // ux-10b: shift handover and the remaining settings
 import { CUSTOMERS_JOURNEY } from './journey-customers'; // ux-13: customers, loyalty and phone masking
 import { DEVICES_JOURNEY } from './journey-devices'; // ux-14: devices, printers and display screens
+import { MENU_PROMOS_JOURNEY } from './journey-menu-promos'; // ux-15: menu and promotions
 
 export interface StepText { who: string; do_ar: string; do_en: string; expect_ar: string; expect_en: string; note?: string; operations: { op: string; http: string; actor: string; expected: string }[] }
 export interface StepDef { before?: () => void; id: string; device: string; user: string; screen?: string | (() => [string, Record<string, any>]); run: (log: Logger) => Promise<void>; text?: StepText }
@@ -574,4 +575,5 @@ export const JOURNEYS: Journey[] = [
   HANDOVER_JOURNEY, // ux-10b
   CUSTOMERS_JOURNEY, // ux-13
   DEVICES_JOURNEY, // ux-14
+  MENU_PROMOS_JOURNEY, // ux-15
 ];
