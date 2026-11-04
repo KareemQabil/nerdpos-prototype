@@ -21,6 +21,20 @@ export const PERSONAS: Record<string, Persona> = {
   'demo-accountant': { name: 'نادر', role: 'المحاسب', en: 'Nader', roleEn: 'Accountant' },
   'implementation-engineer': { name: 'كريم', role: 'مهندس التركيب', en: 'Karim', roleEn: 'Setup engineer' },
   'nerdpos-support': { name: 'دعم NerdPOS', role: 'فريق NerdPOS (من خارج المطعم)', en: 'NerdPOS support', roleEn: 'NerdPOS team (not the restaurant)' }, // r3C: vendor-only licensed modules
+  // ux-09: one demo user per work profile that had nobody (seed-profiles.ts)
+  'demo-host': { name: 'ريم', role: 'الاستقبال والحجوزات', f: true, en: 'Reem', roleEn: 'Host & reservations' },
+  'demo-captain': { name: 'شريف', role: 'كابتن الصالة', en: 'Sherif', roleEn: 'Floor captain' },
+  'demo-runner': { name: 'عمرو', role: 'رانر', en: 'Amr', roleEn: 'Runner' },
+  'demo-barista': { name: 'ندى', role: 'باريستا', f: true, en: 'Nada', roleEn: 'Barista' },
+  'demo-bartender': { name: 'مصطفى', role: 'بارتندر', en: 'Mostafa', roleEn: 'Bartender' },
+  'demo-expediter': { name: 'الشيف وليد', role: 'منسق التسليم', en: 'Chef Walid', roleEn: 'Expediter' },
+  'demo-area-manager': { name: 'هشام', role: 'مدير المنطقة', en: 'Hesham', roleEn: 'Area manager' },
+  'demo-auditor': { name: 'دينا', role: 'المراجعة الداخلية', f: true, en: 'Dina', roleEn: 'Internal auditor' },
+  'demo-storekeeper': { name: 'عبد الرحمن', role: 'أمين المخزن', en: 'Abdelrahman', roleEn: 'Storekeeper' },
+  'demo-purchasing': { name: 'رانيا', role: 'مسؤولة المشتريات', f: true, en: 'Rania', roleEn: 'Purchasing officer' },
+  'demo-driver': { name: 'سعيد', role: 'طيار', en: 'Saeed', roleEn: 'Driver' },
+  'demo-dispatcher': { name: 'إسلام', role: 'موزع الدليفري', en: 'Eslam', roleEn: 'Delivery dispatcher' },
+  'demo-callcenter': { name: 'مروة', role: 'مركز الاتصال', f: true, en: 'Marwa', roleEn: 'Call center' },
   // users created by the "setup from zero" journey (J-A1)
   'owner-1': { name: 'عم سيد', role: 'صاحب المطعم', en: 'Uncle Sayed', roleEn: 'Owner' },
   'manager-1': { name: 'طارق', role: 'المدير', en: 'Tarek', roleEn: 'Manager' },
@@ -141,10 +155,17 @@ const ROLE_NAMES: Record<string, string> = {
   bootstrap: 'تركيب السيستم', 'bootstrap admin': 'تركيب السيستم', 'implementation': 'تركيب السيستم',
   'waiter without fire (n8)': 'ويتر من غير إرسال للمطبخ',
   'nerdpos support': 'دعم NerdPOS',
+  // ux-09: the demo roles of the work profiles
+  'demo host': 'الاستقبال والحجوزات', 'demo floor captain': 'كابتن الصالة', 'demo runner': 'رانر', 'demo barista': 'باريستا', 'demo bartender': 'بارتندر',
+  'demo expediter': 'منسق التسليم', 'demo area manager': 'مدير المنطقة', 'demo internal auditor': 'المراجعة الداخلية', 'demo storekeeper': 'أمين المخزن',
+  'demo purchasing officer': 'المشتريات', 'demo driver': 'طيار', 'demo delivery dispatcher': 'موزع الدليفري', 'demo call center': 'مركز الاتصال', 'demo accountant': 'المحاسب',
 };
 const ROLE_EN: Record<string, string> = {
   'ويتر': 'Waiter', 'كاشير': 'Cashier', 'مدير': 'Manager', 'المطبخ': 'Kitchen', 'صاحب المطعم': 'Owner',
   'تركيب السيستم': 'System setup', 'ويتر من غير إرسال للمطبخ': 'Waiter without sending to the kitchen', 'دعم NerdPOS': 'NerdPOS support',
+  'الاستقبال والحجوزات': 'Host & reservations', 'كابتن الصالة': 'Floor captain', 'رانر': 'Runner', 'باريستا': 'Barista', 'بارتندر': 'Bartender', 'منسق التسليم': 'Expediter',
+  'مدير المنطقة': 'Area manager', 'المراجعة الداخلية': 'Internal auditor', 'أمين المخزن': 'Storekeeper', 'المشتريات': 'Purchasing', 'طيار': 'Driver',
+  'موزع الدليفري': 'Delivery dispatcher', 'مركز الاتصال': 'Call center', 'المحاسب': 'Accountant',
 };
 /** Role name from the server ("Demo Waiter", "owner"…) → plain words in the UI language. Unknown names are shown as they are. */
 export function roleLabel(name: string | null | undefined): string {

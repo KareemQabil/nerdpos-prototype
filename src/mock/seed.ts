@@ -13,6 +13,7 @@ import { seedInventory } from './seed-inventory';
 import { seedR3B } from './seed-r3b';
 import { seedControl } from './seed-control'; // r3A: who did it vs who allowed it
 import { seedReports } from './seed-reports'; // reports engine fixtures
+import { seedProfiles } from './seed-profiles'; // ux-09: a demo user for every work profile
 export const DEMO_PIN = '123456';
 export const DEMO_PASSWORD = 'demo-password-1';
 
@@ -162,6 +163,7 @@ export function buildSeed(nowMs: number): DB {
   seedR3C(db, nowMs, DEMO_PIN, DEMO_PASSWORD, personaDisplayName('nerdpos-support')); // sales channels (طلبات), vendor support persona (sales-channels.ts)
   seedR3B(db, nowMs); // round 3 r3B: grill + dispatch kitchen screens, receipt template (seed-r3b.ts)
   seedControl(db, nowMs, DEMO_PIN, DEMO_PASSWORD, personaDisplayName); // r3A: accountant, manager cards/fingerprints, yesterday's closed-day check (seed-control.ts)
+  seedProfiles(db, DEMO_PIN, DEMO_PASSWORD, personaDisplayName); // ux-09: host, captain, runner, barista, bartender, expediter, area manager, auditor, storekeeper, purchasing, driver, dispatcher, call center
   seedReports(db, nowMs); // reports engine: two event-level closed days with the expert edge cases (seed-reports.ts)
   db.events.push({ id: 'ev_0', at: nowIso, type: 'Provisioned', ref: 'biz', text: 'demo-provisioning 1.2.0 + EG.profile 1.4.0 applied' });
   return db;
