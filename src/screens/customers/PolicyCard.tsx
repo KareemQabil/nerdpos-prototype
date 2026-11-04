@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Pencil, Settings2 } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';
-import { Card, Button, Modal, Field, Input, Switch, StateBadge, Banner, Spinner } from '../../ui';
+import { Card, Button, Modal, Field, Input, Switch, StateBadge, Banner, Spinner, Money } from '../../ui';
 import { Tech } from '../../app/tech';
 import { t } from '../../i18n';
 import { money } from '../../lib/format';
@@ -22,19 +22,17 @@ export function PolicyCard({ policyId, title, explain }: { policyId: string; tit
   const show = (f: any) => {
     const v = value?.[f.key];
     if (f.kind === 'bool') return v ? t('أيوه') : t('لأ');
-    if (f.kind === 'money') return money(v);
-    return v ?? '—';
+    if (f.kind === 'money') return <Money v={v} />;
+    return <span className="num">{v ?? '—'}</span>;
   };
   return (
     <Card title={<span className="flex items-center gap-2"><Settings2 className="w-4 h-4" />{title}</span>} badge={<StateBadge state="PROPOSED" />}
       actions={can('settings:updatepolicy') && <Button size="sm" variant="ghost" onClick={() => setEdit(true)} data-fb={`edit-policy:${policyId}`}><Pencil className="w-3.5 h-3.5" />{t('تعديل')}</Button>}>
       {!q.data ? <Spinner /> : (
         <div className="space-y-3">
-          {meta?.description && <div className="text-xs text-dim">{t(meta.description)}</div>}
           <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
-            {fields.map((f) => <div key={f.key} className="flex justify-between gap-3 border-b line py-1"><span className="text-dim">{t(f.label)}</span><b className="num">{show(f)}</b></div>)}
+            {fields.map((f) => <div key={f.key} className="flex justify-between gap-3 border-b line py-1"><span className="text-dim">{t(f.label)}</span><b>{show(f)}</b></div>)}
           </div>
-          {explain && <div className="text-xs rounded-lg surface-1 px-3 py-2">{explain(value)}</div>}
           <Tech><div className="text-[10px] text-dim num">{policyId} · {JSON.stringify(value)}</div></Tech>
         </div>
       )}

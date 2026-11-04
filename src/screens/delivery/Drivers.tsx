@@ -6,6 +6,7 @@ import { useDev, useQuery, useCommand } from '../../app/hooks';
 import { Section, StateBadge, Button, Card, Pill, Money, Modal, Field, Input, Select, Banner, Empty, Table, Switch, Spinner } from '../../ui';
 import { t } from '../../i18n';
 import { cn, money, time, dateTime } from '../../lib/format';
+import { sign } from '../../lib/cash';
 import { DRIVER_STATUS, STATE, VEHICLE, VehicleIcon, RiderCashPopup } from './common';
 import { personText } from '../../demo/people';
 
@@ -21,14 +22,13 @@ export default function Drivers() {
   return (
     <div data-screen="DL4" className="space-y-4">
       <Section title={t('الطيارين')} badge={<StateBadge ops={['Driver.List', 'Driver.Upsert', 'Driver.SettleCash', 'Driver.UpdateLocation']} />}
-        sub={t('مين في الوردية، مين معاه طلبات، ومعاه كام كاش من طلبات الدفع عند الاستلام. الفلوس بتتسلّم للكاشير في آخر المشوار وتدخل الدرج.')}
         actions={can('delivery:configure') && <Button variant="primary" onClick={() => setEdit({})} data-fb="driver-new"><UserPlus className="w-4 h-4" />{t('طيار جديد')}</Button>} />
       {s && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           <Tile label={t('في الوردية')} v={String(s.onShift)} />
           <Tile label={t('متاحين دلوقتي')} v={String(s.available)} />
           <Tile label={t('في مشوار')} v={String(s.onTrip)} />
-          <Tile label={t('كاش مع الطيارين')} v={money(s.cashInHand)} tone={Number(s.cashInHand) > 0 ? 'warning' : undefined} />
+          <Tile label={t('كاش مع الطيارين')} v={<Money v={s.cashInHand} />} tone={sign(s.cashInHand) > 0 ? 'warning' : undefined} />
         </div>
       )}
       {q.loading && !list.length && <Spinner />}
@@ -47,10 +47,10 @@ export default function Drivers() {
               <div className="grid grid-cols-3 gap-1.5 text-center">
                 <div className="rounded-lg surface-1 py-1.5"><div className="text-[10px] text-dim">{t('معاه دلوقتي')}</div><div className="font-bold num">{d.activeCount}</div></div>
                 <div className="rounded-lg surface-1 py-1.5"><div className="text-[10px] text-dim">{t('وصّل النهارده')}</div><div className="font-bold num">{d.deliveredToday}</div></div>
-                <div className={cn('rounded-lg py-1.5', d.overCashLimit ? 'bg-red-500/15 border border-red-500/40' : 'surface-1')}><div className="text-[10px] text-dim">{t('معاه كاش')}</div><div className={cn('font-bold num text-sm', Number(d.cashInHand) > 0 && 'text-[var(--warning)]', d.overCashLimit && 'text-[var(--error)]')}>{money(d.cashInHand, false)}</div></div>
+                <div className={cn('rounded-lg py-1.5', d.overCashLimit ? 'bg-red-500/15 border border-red-500/40' : 'surface-1')}><div className="text-[10px] text-dim">{t('معاه كاش')}</div><div className={cn('font-bold num text-sm', sign(d.cashInHand) > 0 && 'text-[var(--warning)]', d.overCashLimit && 'text-[var(--error)]')}>{money(d.cashInHand, false)}</div></div>
               </div>
               {d.overCashLimit && <Banner tone="error">{t('الطيار معاه كاش أكتر من الحد ({l}) — خليه يسلّم قبل المشوار الجاي.', { l: money(d.cashLimit) })}</Banner>}
-              {Number(d.owed) > 0 && <div className="text-xs text-[var(--warning)] flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" />{t('عليه عجز قديم')} {money(d.owed)}</div>}
+              {sign(d.owed) > 0 && <div className="text-xs text-[var(--warning)] flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" />{t('عليه عجز قديم')} {money(d.owed)}</div>}
               {d.active.length > 0 && <div className="space-y-1">{d.active.map((a: any) => <div key={a.id} className="text-xs flex justify-between gap-2 rounded-lg surface-1 px-2 py-1"><span className="truncate">{a.number} · {a.customerName} · {a.zoneName}</span><span className={cn('font-bold shrink-0', a.late && 'text-[var(--error)]')}>{t(STATE[a.state]?.ar)}{a.late ? ` · ${t('متأخر')}` : ''}</span></div>)}</div>}
               {d.lastSettlement && <div className="text-[11px] text-dim">{t('آخر تسليم فلوس')}: {time(d.lastSettlement.at)} · {money(d.lastSettlement.counted)}</div>}
               <div className="flex gap-2">
@@ -72,8 +72,8 @@ export default function Drivers() {
   );
 }
 
-function Tile({ label, v, tone }: { label: string; v: string; tone?: 'warning' }) {
-  return <div className="glass rounded-xl px-3 py-2"><div className="text-[11px] text-dim">{label}</div><div className={cn('text-xl font-bold num', tone === 'warning' && 'text-[var(--warning)]')}>{v}</div></div>;
+function Tile({ label, v, tone }: { label: string; v: React.ReactNode; tone?: 'warning' }) {
+  return <div className="glass rounded-xl px-3 py-2"><div className="text-[11px] text-dim">{label}</div><div className={cn('text-xl font-bold', tone === 'warning' && 'text-[var(--warning)]')}>{typeof v === 'string' ? <span className="num">{v}</span> : v}</div></div>;
 }
 
 function DriverDialog({ d, onClose }: { d: any; onClose: () => void }) {

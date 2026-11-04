@@ -4,6 +4,7 @@ import { Building2, GitBranch, MonitorSmartphone, Plus, Pencil, Power, Wrench, L
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Banner, Button, Card, EmptyState, Field, Input, KV, PageHeader, Pill, Select, StatCard, StatGrid, StateBadge, Switch, Table, Textarea, toast } from '../../ui';
 import { t, getLang } from '../../i18n';
+import { CURRENCY } from '../../lib/format';
 import { Tech, useTech } from '../../app/tech';
 import { demo } from '../../mock/demo';
 import { egProfile } from '../../mock/contracts';
@@ -26,7 +27,6 @@ export default function Org() {
         icon={<Building2 />}
         title={t('المطعم والفروع والأجهزة')}
         badge={<StateBadge ops={['Business.Get', 'Business.Configure', 'Branch.List', 'Branch.Create', 'Terminal.List', 'Terminal.Register', 'Terminal.Decommission']} />}
-        description={t('أول خطوة في التجهيز: اسم المطعم، الفروع ومواعيد اليوم التجاري، والأجهزة اللي في كل فرع.')}
       />
       <StatGrid>
         <StatCard label={t('اسم المطعم')} value={<span className="text-lg">{(getLang() === 'en' ? biz.data?.name || biz.data?.nameAr : biz.data?.nameAr || biz.data?.name) || '—'}</span>} icon={<Building2 />} loading={biz.loading && !biz.data} />
@@ -61,12 +61,9 @@ function BusinessCard() {
             [t('الاسم (إنجليزي)'), b.name || <span className="text-dim">{t('لسه متكتبش')}</span>],
             [t('الاسم (عربي)'), <span className="flex items-center gap-2">{b.nameAr || <span className="text-dim">—</span>}<Tech><StateBadge state="PROPOSED" /></Tech></span>],
             [t('الاسم القانوني'), b.legalName || <span className="text-dim">—</span>],
-            [t('العملة'), <span className="flex items-center gap-2"><span className="num">{b.currency}</span><Pill tone="neutral">{t('ثابتة بعد التجهيز')}</Pill></span>],
+            [t('العملة'), <span className="flex items-center gap-2"><span>{b.currency === 'EGP' ? CURRENCY : b.currency}</span><Pill tone="neutral">{t('ثابتة بعد التجهيز')}</Pill></span>],
           ]} />
           <Tech><div className="num text-[11px] text-dim">v{b.version}</div></Tech>
-          <Banner tone="info" action={<Button size="sm" variant="ghost" onClick={() => nav('fiscal')}><Landmark className="w-3.5 h-3.5" />{t('التسجيل الضريبي')}</Button>}>
-            {t('بيانات الإيصال الإلكتروني (رقم التسجيل الضريبي، كود الفرع، النشاط) بتتكتب في شاشة التسجيل الضريبي، مش هنا.')}<Tech> (G4 · E-40)</Tech>
-          </Banner>
         </div>
       )}
       {open && b && <BusinessModal b={b} onClose={() => setOpen(false)} />}
@@ -114,7 +111,6 @@ function BranchesCard() {
         ])}
         empty={<EmptyState compact icon={<GitBranch />} title={t('مفيش فروع لسه')} text={t('ابدأ بالفرع الأول من «فرع جديد».')} />} />
       <div className="mt-3 space-y-2">
-        <div className="text-xs text-dim leading-relaxed">{t('أي بيعة قبل ساعة البداية بتتحسب على اليوم اللي فات: بيعة الساعة 2 الفجر بتدخل في تقارير امبارح. الساعة دي من السيرفر، مش من ساعة الجهاز.')}</div>
         <Tech>{cal && <div className="text-[11px] rounded-lg bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] border border-[color-mix(in_srgb,var(--warning)_30%,transparent)] px-2 py-1"><b>{t('سؤال للخبير')}:</b> {t('المطعم بيقفل الساعة كام؟ بداية اليوم 4 الفجر مناسبة؟')}<Tech> <Pill tone="warning">{cal.confidence}</Pill> {cal.expertQuestion}</Tech></div>}</Tech>
       </div>
       {open && <BranchModal onClose={() => setOpen(false)} />}
@@ -250,7 +246,6 @@ function ProvisioningCard() {
   const ownerScreen: Record<string, string> = { 'EG-VAT': 'شاشة الضرايب', 'EG-BRANCH-CALENDAR': 'الفروع (فوق)', 'EG-CURRENCY-RECEIPT': 'بيانات المطعم (فوق)', 'EG-REASON-CODES': 'الإعدادات والأسباب' };
   return (
     <Card className="border-[rgba(168,85,247,.4)]" title={<span className="flex items-center gap-2"><Wrench className="w-4 h-4 text-[#c084fc]" />{t('إعدادات السوق المصري — أداة فريق التركيب')}<Tech><span className="num text-xs text-dim font-normal">settings.ApplyMarketProfile</span></Tech></span>}
-      description={t('فريق التركيب بيطبقها مرة واحدة على مطعم جديد، وبعدها يراجع كل قيمة مع صاحب المطعم. أي تغيير بعد كده بيتعمل من شاشة الإعدادات.')}
       badge={<Pill tone="violet">{t('أداة داخلية')}</Pill>}
       actions={<Button size="sm" variant="primary" data-fb="org:apply-eg-profile" disabled={!can('*') && !can('settings:updatepolicy')} onClick={() => (applied ? setConfirmAgain(true) : apply())}>{t('طبّق إعدادات مصر')}</Button>}>
       <div className="space-y-4">

@@ -56,7 +56,6 @@ export default function DocTemplates() {
   return (
     <div className="space-y-4" data-fb="screen:G5">
       <PageHeader icon={<Receipt />} title={t('قوالب الإيصال والتقارير')} ops={['DocTemplate.Get', 'DocTemplate.Update', 'Settings.UpdatePolicy']}
-        description={t('اللوجو وسطور الإيصال من فوق ومن تحت، ومقاس الورق، واللغة التانية، ورقم النداء. السيستم هو اللي بيطبع اللوجو — مش محتاج تبرمجه على الطابعة.')}
         actions={<Button variant="primary" disabled={!dirty || busy} loading={busy} onClick={save} data-fb="tpl:save"><Save className="w-4 h-4" />{t('احفظ القالب')}</Button>} />
       {loading && !d && <Skeleton className="h-64 rounded-2xl" />}
       {d && draft && (
@@ -115,16 +114,14 @@ function PolicyCards() {
   const setPol = async (policyId: string, value: any, msg: string) => { const r = await run('Settings.UpdatePolicy', { params: { policyId }, body: { scopeType: 'TENANT', scopeId: 'biz', state: 'SET', value } }, { success: msg }); if (r) { lang.refetch(); num.refetch(); } };
   return (
     <>
-      <Card title={<span className="flex items-center gap-2"><Languages className="w-4 h-4 text-[var(--primary)]" />{t('اللغة التانية')}</span>} badge={<StateBadge state="PROPOSED" />}
-        description={t('الاسم الإنجليزي بيتطبع تحت العربي — بس للأصناف اللي ليها اسم تاني متسجل. مفيش ترجمة أوتوماتيك.')}>
+      <Card title={<span className="flex items-center gap-2"><Languages className="w-4 h-4 text-[var(--primary)]" />{t('اللغة التانية')}</span>} badge={<StateBadge state="PROPOSED" />}>
         <div className="grid sm:grid-cols-3 gap-3">
           {([['receipt', t('على إيصال الزبون')], ['kitchen', t('على تذكرة المطبخ')], ['menu', t('في أزرار المنيو')]] as const).map(([k, label]) => (
             <div key={k} className="rounded-xl surface-1 px-3 py-2.5 flex items-center justify-between gap-2" data-fb={`tpl:lang2:${k}`}><span className="text-sm font-bold">{label}</span><Switch checked={!!lv[k]} disabled={busy || !lang.data} onChange={(v) => setPol('SecondLanguagePolicy', { ...lv, [k]: v }, t('اتحفظ — هيطبق على اللي جاي'))} /></div>
           ))}
         </div>
       </Card>
-      <Card title={<span className="flex items-center gap-2"><Hash className="w-4 h-4 text-[var(--primary)]" />{t('رقم النداء القصير')}</span>} badge={<StateBadge state="PROPOSED" />}
-        description={t('رقم صغير للنداء على الزبون والمطبخ (1، 2، 3…) بيظهر كبير على الإيصال وتذكرة المطبخ. رقم العملية الأصلي ثابت، ومستحيل يتغير، وبيتطبع دايمًا.')}>
+      <Card title={<span className="flex items-center gap-2"><Hash className="w-4 h-4 text-[var(--primary)]" />{t('رقم النداء القصير')}</span>} badge={<StateBadge state="PROPOSED" />}>
         <div className="flex items-end gap-3 flex-wrap">
           <SegmentedControl value={nv.mode} onChange={(m) => setPol('ShortOrderNumberPolicy', { ...nv, mode: m }, t('رقم النداء اتحفظ — هيطبق على الطلبات الجديدة'))}
             options={[{ id: 'OFF', label: t('مقفول'), fb: 'tpl:shortno:OFF' }, { id: 'DAILY', label: t('من 1 كل يوم'), fb: 'tpl:shortno:DAILY' }, { id: 'EVERY_N', label: t('يرجع لـ 1 كل كام طلب'), fb: 'tpl:shortno:EVERY_N' }]} />
@@ -135,7 +132,7 @@ function PolicyCards() {
             </div>
           )}
         </div>
-        <Banner tone="info" className="mt-3">{t('رقم العملية بيفضل مطبوع على الإيصال دايمًا — ده اللي بيتبعت لمنظومة الضرايب وبيربط كل حاجة ببعض.')}</Banner>
+        
       </Card>
     </>
   );

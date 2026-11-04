@@ -51,8 +51,8 @@ export default function CustomerProfile() {
           </Card>
           <div className="grid grid-cols-2 gap-2">
             <StatTile label={t('الطلبات')} v={String(c.stats.orders)} />
-            <StatTile label={t('إجمالي الصرف')} v={money(c.stats.spent)} />
-            <StatTile label={t('متوسط الطلب')} v={money(c.stats.average)} />
+            <StatTile label={t('إجمالي الصرف')} v={<Money v={c.stats.spent} plain />} />
+            <StatTile label={t('متوسط الطلب')} v={<Money v={c.stats.average} plain />} />
             <StatTile label={t('آخر طلب')} v={c.stats.lastOrderAt ? dateTime(c.stats.lastOrderAt) : '—'} small />
           </div>
           <Card title={<span className="flex items-center gap-2"><Star className="w-4 h-4 text-[var(--primary)]" />{t('نقاط الولاء')}</span>}>
@@ -87,8 +87,8 @@ export default function CustomerProfile() {
   );
 }
 
-function StatTile({ label, v, small }: { label: string; v: string; small?: boolean }) {
-  return <div className="glass rounded-xl px-3 py-2"><div className="text-[11px] text-dim">{label}</div><div className={cn('font-bold num', small ? 'text-sm' : 'text-lg')}>{v}</div></div>;
+function StatTile({ label, v, small }: { label: string; v: React.ReactNode; small?: boolean }) {
+  return <div className="glass rounded-xl px-3 py-2"><div className="text-[11px] text-dim">{label}</div><div className={cn('font-bold', small ? 'text-sm' : 'text-lg')}>{typeof v === 'string' || typeof v === 'number' ? <span className="num">{v}</span> : v}</div></div>;
 }
 
 function EditDialog({ c, onClose }: { c: any; onClose: () => void }) {

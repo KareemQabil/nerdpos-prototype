@@ -24,7 +24,6 @@ export default function Inbox() {
   return (
     <div data-screen="DL3" className="space-y-4">
       <Section title={t('الطلبات الأونلاين')} badge={<StateBadge ops={['Channel.IngestExternalOrder', 'ExternalOrder.Find', 'ExternalOrder.Accept', 'ExternalOrder.Reject', 'ChannelItemMap.Set']} />}
-        sub={t('الطلبات اللي جاية من تطبيقات التوصيل والموقع والواتساب. اقبل الطلب وحدد وقت التحضير — يتبعت للمطبخ ويظهر في لوحة الدليفري.')}
         actions={<>
           <Tech><div className="flex items-center gap-1.5 rounded-xl border border-dashed line px-2 py-1">
             <span className="text-[11px] text-dim flex items-center gap-1"><Sparkles className="w-3.5 h-3.5" />{t('تجربة')}</span>
@@ -107,7 +106,7 @@ function ItemRow({ e, it }: { e: any; it: any }) {
     <div className={cn('rounded-lg px-3 py-1.5 text-sm border', it.productId ? 'surface-1 border-transparent' : 'border-amber-400/50 bg-amber-400/5')}>
       <div className="flex items-center justify-between gap-2">
         <span><b className="num">{qty(it.quantity)}×</b> {tv(it.name)}{it.productId && L(it.productName) !== tv(it.name) && <span className="text-xs text-dim"> ← {L(it.productName)}</span>}</span>
-        <span className="text-xs num">{money(it.unitPrice)}{diff && <span className="block text-[10px] text-dim">{t('سعرنا')} {money(it.ourPrice)}</span>}</span>
+        <span className="text-xs"><Money v={it.unitPrice} plain />{diff && <span className="block text-[10px] text-dim">{t('سعرنا')} <Money v={it.ourPrice} plain /></span>}</span>
       </div>
       {tv(it.note) && <div className="text-[11px] text-[var(--warning-text)]">✎ {tv(it.note)}</div>}
       {!it.productId && e.state === 'NEW' && (

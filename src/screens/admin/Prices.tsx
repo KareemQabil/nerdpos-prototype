@@ -32,7 +32,7 @@ export default function Prices() {
   const needsApproval = approvals?.PRICE_CHANGE?.mode && approvals.PRICE_CHANGE.mode !== 'NEVER';
   return (
     <div>
-      <Section title={t('الأسعار')} badge={<StateBadge ops={['Catalog.SetPrice', 'Product.PriceHistory', 'Catalog.PriceList', 'Catalog.BulkPriceChange']} />} sub={t('سعر لكل صنف وحجم في كل فرع وقناة، من دلوقتي أو مجدول، وتغيير جماعي بمعاينة قبل التطبيق')} />
+      <Section title={t('الأسعار')} badge={<StateBadge ops={['Catalog.SetPrice', 'Product.PriceHistory', 'Catalog.PriceList', 'Catalog.BulkPriceChange']} />} />
       <Tech>
         <div className="flex flex-wrap gap-1.5 mb-3" data-fb="prices:policies">
           <PolicyChip id="PriceSchedulingPolicy" value={sched ?? '…'} />
@@ -40,7 +40,7 @@ export default function Prices() {
           <PolicyChip id="ApprovalRequirementPolicy[PRICE_CHANGE]" value={ruleText(approvals?.PRICE_CHANGE ?? { mode: 'NEVER' })} />
         </div>
       </Tech>
-      <Banner tone="info">{t('السعر الجديد بيسري على الطلبات الجديدة بس؛ السطور اللي اتسجلت في الشيكات بتفضل بسعرها.')} {needsApproval ? t('تغيير السعر محتاج موافقة مدير حسب الإعدادات.') : ''} {sched === 'IMMEDIATE_ONLY' ? t('الجدولة مقفولة في الإعدادات — التغيير من دلوقتي بس.') : ''}</Banner>
+      {(needsApproval || sched === 'IMMEDIATE_ONLY') && <Banner tone="info">{needsApproval ? t('تغيير السعر محتاج موافقة مدير حسب الإعدادات.') : ''} {sched === 'IMMEDIATE_ONLY' ? t('الجدولة مقفولة في الإعدادات — التغيير من دلوقتي بس.') : ''}</Banner>}
       <div className="flex flex-wrap gap-3 items-end my-4">
         <Tabs<Tab> value={tab} onChange={setTab} tabs={[{ id: 'product', label: t('سعر صنف') }, { id: 'bulk', label: <span className="inline-flex items-center gap-1"><Wand2 className="w-3.5 h-3.5" />{t('تغيير جماعي')}</span> }, { id: 'batches', label: t('التغييرات الجماعية') }]} />
         <div className="flex-1" />
@@ -112,7 +112,7 @@ function PriceScope({ product, variant, branchId, channel, effective, sched }: {
             <span className="text-xs">{r.effectiveToIso ? dateTime(r.effectiveToIso) : t('مفتوح')}</span>,
             <span className="text-[11px] text-dim">{dateTime(r.createdAt)}<Tech> · <span className="num">{r.createdBy} · v{r.version} · {r.id}</span></Tech></span>,
           ])} />
-          <div className="text-[11px] text-dim mt-2">{t('السعر اللي بدأ ما بيتغيرش — بيتقفل وتبدأ فترة جديدة. ده السجل الكامل للأسعار اللي اتطبقت.')}</div>
+          
         </Card>
       </div>
       <SetPriceForm product={product} variant={variant} branchId={branchId} channel={channel} current={current ?? (effective && !channel.isDefault ? { amount: effective.amount } : undefined)} sched={sched} />

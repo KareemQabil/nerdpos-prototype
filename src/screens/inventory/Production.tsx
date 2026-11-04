@@ -17,7 +17,7 @@ export default function Production() {
   const hist = useList<any>('Production.Find', { branchId: scope.branchId });
   return (
     <div>
-      <Section title={t('التحضير')} badge={<StateBadge ops={OPS} />} sub={t('تحضير الصوصات والعجين والتتبيلات في المطبخ: الخامات بتطلع من المخزن، والتحضيرة بتدخل بتكلفتها الحقيقية.')} actions={<BranchScope scope={scope} />} />
+      <Section title={t('التحضير')} badge={<StateBadge ops={OPS} />} actions={<BranchScope scope={scope} />} />
       <div className="grid grid-cols-1 2xl:grid-cols-5 gap-4">
         <div className="2xl:col-span-3"><NewRun /></div>
         <Card className="2xl:col-span-2" title={t('آخر التحضيرات')}>
@@ -27,7 +27,7 @@ export default function Production() {
                 <div key={p.id} className="rounded-xl surface-1 p-3">
                   <div className="flex justify-between gap-2"><span className="font-bold">{L(p.output?.name)} <Qty v={p.actualOutput} unit={p.output?.unit} /></span><span className="num text-xs text-dim">{p.number}</span></div>
                   <div className="text-xs text-dim mt-0.5">{dateTime(p.at)} · {personText(p.userName)} · {tv(p.warehouse.name)}</div>
-                  <div className="text-xs mt-1">{t('التكلفة')}: <b className="num">{money(p.totalCost)}</b> · {t('الوحدة')}: <b className="num">{money(p.unitCost)}</b>{p.expiryDate && <> · {t('صلاحية')} <span className="num">{p.expiryDate}</span></>}</div>
+                  <div className="text-xs mt-1">{t('التكلفة')}: <Money v={p.totalCost} /> · {t('الوحدة')}: <Money v={p.unitCost} />{p.expiryDate && <> · {t('صلاحية')} <span className="num">{p.expiryDate}</span></>}</div>
                   <div className="text-[11px] text-dim mt-1">{p.inputs.map((i: any) => `${L(i.name)} ${fmtQty(i.actual)} ${unitLabel(i.unit)}`).join(t('، '))}</div>
                 </div>
               ))}
@@ -89,8 +89,8 @@ function NewRun() {
                 <Field label={t('طلع فعلًا')} hint={t('لو طلع أقل أو أكتر من المتوقع')}><div className="flex gap-1 items-center"><Input data-fb="production:actual-out" inputMode="decimal" value={actualOut} placeholder={out} onChange={(e) => setActualOut(e.target.value.replace(/[^\d.]/g, ''))} /><span className="text-xs text-dim">{unitLabel(p.output.unit)}</span></div></Field>
                 <Field label={t('تاريخ الصلاحية')} hint={p.shelfLifeDays ? t('لو فاضي: بعد {n} يوم', { n: p.shelfLifeDays }) : undefined}><Input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} /></Field>
                 <div className="rounded-xl surface-1 p-3 text-sm">
-                  <div>{t('تكلفة الدفعة')}: <b className="num">{money(p.totalCost)}</b></div>
-                  <div>{t('تكلفة الوحدة')}: <b className="num">{money(p.unitCost)}</b> <span className="text-dim text-xs">({t('المتوسط دلوقتي')} {money(p.currentAvgCost)})</span></div>
+                  <div>{t('تكلفة الدفعة')}: <Money v={p.totalCost} /></div>
+                  <div>{t('تكلفة الوحدة')}: <Money v={p.unitCost} /> <span className="text-dim text-xs">({t('المتوسط دلوقتي')} {money(p.currentAvgCost)})</span></div>
                 </div>
               </div>
               {!p.canProduce && <Banner tone="warning">{t('فيه خامات مش كفاية في المخزن ده. حوّل من المخزن الرئيسي الأول، أو قلل الكمية.')}</Banner>}

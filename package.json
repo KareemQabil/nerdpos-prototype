@@ -6,7 +6,7 @@
   "scripts": {
     "contracts": "node scripts/build-contracts.mjs",
     "dev": "node scripts/build-contracts.mjs && vite",
-    "build": "node scripts/build-contracts.mjs && tsc -b && vite build",
+    "build": "node scripts/build-contracts.mjs && node scripts/check-money.mjs && tsc -b && vite build",
     "check:money": "node scripts/check-money.mjs",
     "typecheck": "tsc -b",
     "preview": "vite preview",

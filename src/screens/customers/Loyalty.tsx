@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Award, Crown, Plus, Pencil, Star, Search } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';
-import { PageHeader, StateBadge, Button, Card, Pill, Money, Modal, Field, Input, Switch, Tabs, Table, Spinner, Select, StatGrid, StatCard } from '../../ui';
+import { PageHeader, StateBadge, Button, Card, Pill, Money, Modal, Field, Input, Switch, Tabs, Table, Spinner, Select, StatGrid, StatCard, currencyText } from '../../ui';
 import { t, L, tv } from '../../i18n';
 import { cn, money, dateTime } from '../../lib/format';
 import { PolicyCard } from './PolicyCard';
@@ -13,8 +13,7 @@ export default function Loyalty() {
   const [tab, setTab] = useState<'program' | 'tiers' | 'ledger'>('program');
   return (
     <div data-screen="CR3" className="space-y-4">
-      <PageHeader icon={<Award />} title={t('برنامج الولاء')} badge={<StateBadge ops={['Loyalty.Balance', 'Loyalty.Adjust', 'Loyalty.Redeem', 'LoyaltyTier.Upsert', 'LoyaltyTier.List', 'Loyalty.Ledger']} />}
-        description={t('العميل بيكسب نقاط على كل طلب بيتقفل، ويصرفها كدفع في التحصيل. المستوى بيزوّد النقاط اللي بيكسبها.')} />
+      <PageHeader icon={<Award />} title={t('برنامج الولاء')} badge={<StateBadge ops={['Loyalty.Balance', 'Loyalty.Adjust', 'Loyalty.Redeem', 'LoyaltyTier.Upsert', 'LoyaltyTier.List', 'Loyalty.Ledger']} />} />
       <Tabs variant="underline" value={tab} onChange={setTab} tabs={[{ id: 'program', label: t('البرنامج') }, { id: 'tiers', label: t('المستويات') }, { id: 'ledger', label: t('سجل النقاط') }]} />
       {tab === 'program' && <Program />}
       {tab === 'tiers' && <Tiers />}
@@ -33,23 +32,10 @@ function Program() {
           <StatCard label={t('نقاط اتكسبت')} value={String(tt.earned)} icon={<Star />} tone="success" />
           <StatCard label={t('نقاط اتصرفت')} value={String(tt.redeemed)} icon={<Award />} />
           <StatCard label={t('رصيد العملاء دلوقتي')} value={String(tt.outstanding)} icon={<Crown />} tone="primary" />
-          <StatCard label={t('قيمتها بالجنيه')} value={money(ledger.data.liabilityEgp)} hint={t('فلوس ممكن العملاء يصرفوها')} tone="warning" />
+          <StatCard label={t('قيمتها بالجنيه')} value={money(ledger.data.liabilityEgp, false)} unit={currencyText()} hint={t('فلوس ممكن العملاء يصرفوها')} tone="warning" />
         </StatGrid>
       )}
-      <PolicyCard policyId="LoyaltyProgramPolicy" title={t('قواعد النقاط')} explain={(v) => {
-        const per = Number(v.egpPerPoint ?? 10) || 10;
-        const val = Number(v.pointValue ?? 0.25);
-        return <span>{t('مثال: طلب أصنافه بـ 300 ج.م = {p} نقطة (عميل فضي). عشان يصرف لازم يكون معاه {m} نقطة على الأقل = {mv}، ومينفعش النقاط تدفع أكتر من {x}% من الشيك.', { p: Math.floor(300 / per), m: v.minRedeemPoints ?? 100, mv: money(String(((v.minRedeemPoints ?? 100) * val).toFixed(2))), x: v.maxRedeemPercent ?? 50 })}</span>;
-      }} />
-      <Card title={t('إزاي بيشتغل')}>
-        <ul className="text-sm space-y-1.5 list-disc ps-5 text-soft">
-          <li>{t('النقاط بتتحسب على قيمة الأصناف بعد الخصم — من غير رسوم التوصيل والضريبة والخدمة.')}</li>
-          <li>{t('الجزء اللي اتدفع بالنقاط مش بياخد نقاط.')}</li>
-          <li>{t('النقاط بتتضاف لما الشيك يتقفل (اتدفع بالكامل). في الدليفري كاش: لما الطيار يسلّم الفلوس.')}</li>
-          <li>{t('الصرف بيتعمل من شاشة التحصيل كوسيلة دفع "نقاط" — لازم الشيك يكون عليه العميل.')}</li>
-          <li>{t('التعديل اليدوي محتاج سبب، وأكتر من 200 نقطة محتاج موافقة مدير.')}</li>
-        </ul>
-      </Card>
+      <PolicyCard policyId="LoyaltyProgramPolicy" title={t('قواعد النقاط')} />
     </div>
   );
 }

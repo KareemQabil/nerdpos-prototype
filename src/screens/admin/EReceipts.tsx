@@ -57,7 +57,6 @@ export default function EReceipts() {
   return (
     <div className="space-y-4" data-screen-id="G3">
       <PageHeader icon={<FileCheck2 />} title={t('الإيصال الإلكتروني')} badge={<StateBadge ops={['Compliance.Find', 'Compliance.ReissueDocument']} />}
-        description={t('كل شيك بيتقفل بيطلع له إيصال إلكتروني لمصلحة الضرايب. الإرسال بيحصل بعد البيع — عمره ما بيوقف بيع.')}
         actions={<>
           <Button variant="outline" onClick={verify} loading={chain?.loading} data-fb="ereceipts:verify-chain"><Link2 className="w-4 h-4" />{t('افحص تسلسل الإيصالات')}</Button>
           <Button variant="ghost" onClick={() => { all.refetch(); list.refetch(); }} data-fb="ereceipts:refresh"><RefreshCw className="w-4 h-4" />{t('تحديث')}</Button>

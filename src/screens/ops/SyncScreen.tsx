@@ -44,8 +44,7 @@ export default function SyncScreen() {
   const conflicts = items.filter((x) => x.state === 'CONFLICT');
   return (
     <div className="space-y-4" data-screen="SYN">
-      <Section title={t('المزامنة والشغل من غير نت')} badge={<StateBadge ops={['Sync.Status', 'Sync.Replay', 'Sync.ResolveConflict', 'Sync.Bootstrap', 'Sync.Changes']} />}
-        sub={t('لو النت قطع، الجهاز بيكمّل شغل على آخر بيانات عنده ويسجل العمليات المسموحة برقمها. أول ما النت يرجع بتتبعت بنفس الترتيب، ولو حاجة اتغيرت في النص بتظهر هنا تقرر فيها.')} />
+      <Section title={t('المزامنة والشغل من غير نت')} badge={<StateBadge ops={['Sync.Status', 'Sync.Replay', 'Sync.ResolveConflict', 'Sync.Bootstrap', 'Sync.Changes']} />} />
       <div className="grid xl:grid-cols-[1fr_1fr] gap-4 items-start">
         <Card title={<span className="flex items-center gap-2">{offline ? <WifiOff className="w-4 h-4 text-[var(--error)]" /> : <Wifi className="w-4 h-4 text-[var(--success)]" />}{t('الجهاز ده')}</span>}
           actions={offline ? <Pill tone="error">{t('أوفلاين')}</Pill> : <Pill tone="success">{t('متصل')}</Pill>}>

@@ -29,7 +29,7 @@ export default function Refunds() {
   const { terminal } = useDev();
   return (
     <div data-screen="D3" className="space-y-4">
-      <PageHeader title={t('المرتجعات')} ops={['Refund.Refundable', 'Refund.Request', 'Refund.Approve', 'Refund.Find', 'Order.CancelStaffMeal']} description={t('رجّع فلوس لزبون على شيك اتدفع. الكاشير بيصرف من درجه، والمدير بيوافق على نفس الجهاز.')} className="!mb-0" />
+      <PageHeader title={t('المرتجعات')} ops={['Refund.Refundable', 'Refund.Request', 'Refund.Approve', 'Refund.Find', 'Order.CancelStaffMeal']} className="!mb-0" />
       {!terminal?.drawer && <Banner tone="info" title={t('الجهاز ده من غير درج')}>{t('المرتجع الكاش بيطلع من درج الكاشير اللي بيعمله: اطلبه واصرفه من جهاز الكاشير، والمدير يوافق هناك بالرقم السري أو الكارت أو البصمة — أو يوافق على الطلب من جهازه.')}</Banner>}
       <Tabs variant="underline" value={tab} onChange={setTab} tabs={[{ id: 'new', label: t('مرتجع جديد'), fb: 'refunds-tab:new' }, { id: 'cases', label: t('الطلبات'), count: waiting || undefined, fb: 'refunds-tab:cases' }]} />
       {tab === 'new' ? <NewRefund onDone={() => setTab('cases')} /> : <Cases q={cases} />}
@@ -51,7 +51,7 @@ function NewRefund({ onDone }: { onDone: () => void }) {
           {found.loading && <Skeleton lines={3} />}
           {list.map((o: any) => <button key={o.id} onClick={() => setOrderId(o.id)} data-fb={`refund-order:${o.number}`} className={cn('w-full text-start px-3 min-h-[52px] rounded-xl border text-sm flex items-center justify-between gap-2', orderId === o.id ? 'border-[var(--primary)] bg-[var(--primary-container)]' : 'surface-1 border-[var(--glass-border)] hover:bg-[var(--surface-2)]')}>
             <span><span className="num font-bold">#{o.number}</span> · {o.kind === 'STAFF_MEAL' ? <span className="inline-flex items-center gap-1"><Coffee className="w-3.5 h-3.5" />{t('وجبة موظف')} — {first(o.staffMeal?.employeeName ?? o.customerName)}</span> : o.tableName ? `${t('ترابيزة')} ${o.tableName}` : o.channel === 'TAKEAWAY' ? t('تيك أواي') : o.channel === 'DELIVERY' ? t('دليفري') : t('كاونتر')}<span className="block text-[11px] text-dim num">{o.completedBusinessDate ?? o.businessDate}</span></span>
-            <span className="num font-bold">{o.kind === 'STAFF_MEAL' ? money(o.staffMeal?.value ?? '0') : money(o.totals.payable)}</span></button>)}
+            <Money v={o.kind === 'STAFF_MEAL' ? o.staffMeal?.value ?? '0' : o.totals.payable} /></button>)}
           {number && !found.loading && !list.length && <div className="text-sm text-dim text-center py-3">{t('مفيش شيك مدفوع بالرقم ده')}</div>}
           {!number && <div className="text-xs text-dim py-2">{t('اكتب رقم الشيك اللي على الإيصال (مثلًا 0388 من امبارح).')}</div>}
         </div>

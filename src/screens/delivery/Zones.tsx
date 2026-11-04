@@ -20,7 +20,6 @@ export default function Zones() {
   return (
     <div data-screen="DL5" className="space-y-4">
       <Section title={t('مناطق التوصيل')} badge={<StateBadge ops={['DeliveryZone.Upsert', 'DeliveryZone.List']} />}
-        sub={t('كل منطقة ليها أحياء، ورسوم توصيل، وأقل طلب، ووقت وصول متوقع. عنوان العميل بيتربط بالمنطقة من الحي.')}
         actions={can('delivery:configure') && <Button variant="primary" onClick={() => setEdit({})} data-fb="zone-new"><Plus className="w-4 h-4" />{t('منطقة جديدة')}</Button>} />
       {q.loading && !zones.length && <Spinner />}
       <div className="grid lg:grid-cols-[1.1fr_1fr] gap-4">
@@ -46,7 +45,7 @@ export default function Zones() {
           ))}
         </div>
       </div>
-      <PolicyCard policyId="DeliveryPolicy" title={t('قواعد التوصيل')} explain={(v) => t('مثال: طلب وقته المتوقع 30 دقيقة بيبقى "متأخر" بعد {m} دقيقة. الطيار ميشيلش أكتر من {n} طلبات في نفس الوقت.', { m: 30 + Number(v.graceMinutes ?? 0), n: v.maxActivePerDriver ?? 3 })} />
+      <PolicyCard policyId="DeliveryPolicy" title={t('قواعد التوصيل')} />
       {edit && <ZoneDialog z={edit} count={zones.length} onClose={() => setEdit(null)} />}
     </div>
   );

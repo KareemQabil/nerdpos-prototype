@@ -69,7 +69,6 @@ export default function Promotions() {
   return (
     <div className="space-y-4">
       <Section title={t('العروض')} badge={<StateBadge ops={['Promotion.Upsert', 'Promotion.Find', 'Promotion.Create', 'Promotion.Configure']} />}
-        sub={t('هابي أور، خصم على أصناف معينة، اشتري وخد، وأكواد خصم — بمواعيد وحدود استخدام. السيستم هو اللي بيحسب الخصم على الشيك.')}
         actions={<><Tabs value={filter} onChange={setFilter} tabs={[{ id: 'all', label: t('الكل') }, { id: 'live', label: t('شغالة دلوقتي') }, { id: 'off', label: t('موقوفة') }]} /><Button data-fb="promotions:new" variant="primary" onClick={() => setForm({ ...EMPTY, branchIds: branches.items.map((b) => b.id).slice(0, 1) })}><Plus className="w-4 h-4" />{t('عرض جديد')}</Button></>} />
       <Banner tone="info">
         {stacking?.mode === 'NO_STACKING' || !stacking ? t('الشيك عليه خصم واحد بس: يا عرض يا خصم مدير.') : t('ينفع أكتر من خصم على نفس الشيك — بس العرض اللي متعلم "لوحده" مش بيتجمع مع حاجة.')}{' '}
@@ -90,7 +89,7 @@ export default function Promotions() {
         <Switch checked={pr.active} onChange={(v) => toggle(pr, v)} />,
         <Button size="sm" data-fb={`promotion:edit:${pr.id}`} onClick={() => setForm(toDraft(pr))}><Pencil className="w-3.5 h-3.5" />{t('تعديل')}</Button>,
       ])} empty={t('مفيش عروض')} />
-      <div className="text-[11px] text-dim">{t('"شغال دلوقتي" حسب وقت السيرفر وتوقيت الفرع (الوقت مش قابل للتعديل) — الهابي أور بيشتغل لوحده في ميعاده.')}</div>
+      
       <Modal open={!!form} onClose={() => setForm(null)} xwide title={form?.id ? t('تعديل العرض') : t('عرض جديد')} badge={<StateBadge ops={['Promotion.Upsert']} />}
         footer={<><Button onClick={() => setForm(null)}>{t('إلغاء')}</Button><Button data-fb="promotion-form:save" variant="primary" loading={busy} onClick={save} disabled={!form?.name.ar.trim() || !form?.channels.length}><Save className="w-4 h-4" />{t('حفظ')}</Button></>}>
         {form && <PromoForm d={form} set={setForm} branches={branches.items} products={products.items} categories={categories.items} />}

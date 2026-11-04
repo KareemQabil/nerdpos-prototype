@@ -232,27 +232,27 @@ export default function Import() {
 
   return (
     <div>
-      <Section title={t('استيراد المنيو')} badge={<StateBadge ops={['Catalog.Import']} />} sub={t('ارفع شيت المنيو (Excel أو CSV) — بيتقري في المتصفح، تجرّبه الأول وتشوف الغلطات صف صف، وبعدين تطبقه كله أو لا شيء')} />
+      <Section title={t('استيراد المنيو')} badge={<StateBadge ops={['Catalog.Import']} />} />
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 mb-4">
         <Card><div className="flex flex-col gap-2 h-full">
           <div className="font-bold flex items-center gap-2"><Upload className="w-4 h-4" />{t('ارفع ملف')}</div>
-          <div className="text-xs text-dim flex-1">{t('xlsx فيه شيتات بالأسماء المعروفة، أو ملفات CSV اسم كل ملف هو اسم الشيت (products.csv، prices.csv…)')}</div>
+          <div className="flex-1" />
           <input ref={fileRef} type="file" multiple accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => onFiles(e.target.files)} />
           <Button data-fb="import:upload" variant="primary" onClick={() => fileRef.current?.click()}><FileSpreadsheet className="w-4 h-4" />{t('اختار ملف')}</Button>
         </div></Card>
         <Card><div className="flex flex-col gap-2 h-full">
           <div className="font-bold flex items-center gap-2"><Download className="w-4 h-4" />{t('القالب')}</div>
-          <div className="text-xs text-dim flex-1">{t('ملف Excel فيه الشيتات والأعمدة بالظبط زي ما السيرفر بيقراها، وصف مثال في كل شيت')}</div>
+          <div className="flex-1" />
           <Button data-fb="import:template" onClick={downloadTemplate}><Download className="w-4 h-4" />{t('نزّل القالب')}</Button>
         </div></Card>
         <Card><div className="flex flex-col gap-2 h-full">
           <div className="font-bold flex items-center gap-2"><FlaskConical className="w-4 h-4" />{t('عينة سليمة')}</div>
-          <div className="text-xs text-dim flex-1">{t('منيو صغير: مشويات وعصاير، وحدة بالكيلو، إضافات، أسعار وتوفر')}</div>
+          <div className="flex-1" />
           <Button data-fb="import:sample-valid" onClick={loadValidSample}>{t('حمّل العينة')}</Button>
         </div></Card>
         <Card><div className="flex flex-col gap-2 h-full">
           <div className="font-bold flex items-center gap-2"><Bug className="w-4 h-4" />{t('عينة فيها غلطات')}</div>
-          <div className="text-xs text-dim flex-1">{t('وحدة ناقصة، قسم مش موجود، كود مستخدم، اسم متكرر، سعر مش رقم، قناة غلط، فرع مش موجود…')}</div>
+          <div className="flex-1" />
           <Button data-fb="import:sample-errors" variant="warning" onClick={() => load(SAMPLE_ERRORS, t('عينة فيها غلطات'))}>{t('حمّل العينة')}</Button>
         </div></Card>
       </div>

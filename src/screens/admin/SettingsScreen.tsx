@@ -25,7 +25,6 @@ export default function SettingsScreen() {
         icon={<SlidersHorizontal />}
         title={t('الإعدادات والأسباب')}
         badge={<StateBadge ops={['Settings.Effective', 'Settings.UpdatePolicy', 'Policy.History', 'ReasonCode.List', 'ReasonCode.Create', 'ReasonCode.Configure']} />}
-        description={t('هنا بتتغيّر طريقة شغل المطعم بجد. كل تغيير بيتسجل ومش بيمسح اللي قبله، والإعدادات الحساسة محتاجة موافقة مدير تاني.')}
         meta={<SensitiveRulePill />}
       />
       <Tabs variant="underline" value={tab} onChange={setTab} tabs={[{ id: 'policies', icon: <SlidersHorizontal className="w-4 h-4" />, label: t('إعدادات المطعم') }, { id: 'reasons', icon: <ListChecks className="w-4 h-4" />, label: t('أسباب الإلغاء والخصم') }]} />
@@ -70,7 +69,6 @@ function PoliciesTab() {
           options={[{ value: 'TENANT', label: t('بتظبط: المطعم كله') }, ...branches.items.map((b) => ({ value: b.id, label: t('بتظبط: {b} بس', { b: branchLabel(b) }) }))]} />
       </Toolbar>
       {!needle && <Tabs value={group} onChange={setGroup} tabs={POLICY_GROUPS.map((g) => ({ id: g.id, label: lang === 'ar' ? g.title.replace(' (مقترح)', '') : g.titleEn, count: POLICIES.filter((p) => p.group === g.id).length }))} />}
-      <div className="text-xs text-dim leading-relaxed">{t('الفرع اللي مالوش قيمة خاصة بياخد قيمة المطعم كله. التغيير بيطبق على اللي جاي بس — الشيكات القديمة محتفظة بقيمتها. الموافقة لازم تيجي من مدير غير اللي طلب التغيير (مثلًا هبة — مديرة الفرع).')}</div>
       <div className="grid xl:grid-cols-2 gap-3 items-start">
         {list.map((p) => <PolicyCard key={`${p.id}:${scopeId}`} p={p} scopeType={scopeType} scopeId={scopeId} scopeName={branch ? branchLabel(branch) : undefined} nameOf={nameOf} ctx={ctx} />)}
       </div>
@@ -105,7 +103,6 @@ function PolicyCard({ p, scopeType, scopeId, scopeName, nameOf, ctx }: { p: Poli
           {p.sensitive && <Pill tone="warning">{t('حساس')}</Pill>}
         </div>
       </div>
-      <div className="text-xs text-soft leading-relaxed">{policyExplain(p)}</div>
       <Refused error={eff.error} />
       <div className="rounded-lg surface-1 p-2.5">
         <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
@@ -210,7 +207,7 @@ function ReasonsTab() {
   return (
     <div className="space-y-3">
       <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div className="text-xs text-dim leading-relaxed max-w-3xl">{t('لكل نوع حركة: «من قايمة ثابتة» يعني الموظف يختار سبب من القايمة دي بس، و«كتابة حرة» يعني يكتب السبب بإيده (بتتغير من تبويب «إعدادات المطعم»). القايمة لازم يفضل فيها سبب واحد شغال على الأقل.')}</div>
+        <div className="flex-1" />
         <Button variant="primary" data-fb="reasons:new" disabled={!perm.ok} title={permTitle} onClick={() => setCreate('LINE_VOID')}><Plus className="w-4 h-4" />{t('سبب جديد')}</Button>
       </div>
       <Refused error={codes.error} />
@@ -277,7 +274,6 @@ function ReasonModal({ kinds, kind, code, onClose }: { kinds: string[]; kind?: s
         <Field label={t('الملاحظة')}><Switch checked={requiresNote} onChange={setRequiresNote} label={requiresNote ? t('لازم الموظف يكتب ملاحظة') : t('اختيارية')} /></Field>
         {code && <Field label={t('الحالة')}><Switch checked={active} onChange={setActive} label={active ? t('شغال') : t('موقوف')} /></Field>}
       </div>
-      {code && <div className="text-[11px] text-dim mt-3">{t('تغيير الاسم مش بيغيّر اللي اتسجل قبل كده: كل حركة محتفظة بالسبب زي ما كان وقتها.')}<Tech> <span className="num">expectedVersion = {code.version}</span></Tech></div>}
     </Modal>
   );
 }

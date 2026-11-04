@@ -7,7 +7,7 @@
 //   1. an element whose class list has `num` (or data-numeric / dir="ltr") and whose text content calls a currency
 //      formatter — money(x) without `, false`; the reports' fmt(x) / fmt(x, unit) unless the unit is a literal non-money
 //      unit ('count', 'unit', '%', 'minutes', 'hours'); fmtCell(…) / cellText(…); currencyText() — or has «ج.م» / EGP;
-//   2. a StatCard `value={money(x)}` (StatCard puts a plain string value inside `.num`).
+//   2. a `value={money(x)}` / `v={money(x)}` prop (StatCard, Stat, Row, tiles render a plain string value inside `.num`).
 // Usage: node scripts/check-money.mjs   (exit 1 with file:line list on a violation)
 import fs from 'fs';
 import path from 'path';
@@ -57,11 +57,10 @@ for (const f of files) {
       out.push(`${path.relative(ROOT, f)}:${lineOf(i)}  ${c.slice(0, 60)} inside a left-to-right number element`);
     }
   }
-  // 2. StatCard value={money(x)}
-  for (const m of src.matchAll(/value=\{\s*(money\((?:[^()]|\([^()]*\))*\))/g)) {
-    if (isBareMoney(m[1])) continue;
-    const tag = src.lastIndexOf('<', m.index);
-    if (/^<StatCard\b/.test(src.slice(tag))) out.push(`${path.relative(ROOT, f)}:${lineOf(m.index)}  StatCard value=${m[1].slice(0, 50)} (use <Money> or unit)`);
+  // 2. value={money(x)} / v={money(x)} on a component (StatCard, Stat, Row, tiles put a plain string value inside `.num`)
+  for (const m of src.matchAll(/\b(value|v)=\{\s*(money\((?:[^()]|\([^()]*\))*\))/g)) {
+    if (isBareMoney(m[2])) continue;
+    out.push(`${path.relative(ROOT, f)}:${lineOf(m.index)}  ${m[1]}=${m[2].slice(0, 50)} (pass <Money v={…} /> or the unit separately)`);
   }
 }
 if (out.length) {

@@ -262,7 +262,7 @@ export function Stat({ label, value, sub, tone, icon, onClick, fb }: { label: Re
   return (
     <Comp data-fb={fb} onClick={onClick} className={cn('glass rounded-xl p-4 text-start flex flex-col gap-1 min-w-0', onClick && 'hover:border-[var(--primary)] transition-colors cursor-pointer')}>
       <div className="flex items-center justify-between gap-2 text-xs text-soft"><span className="truncate">{label}</span>{icon}</div>
-      <div className={cn('text-2xl font-bold num', c)}>{value}</div>
+      <div className={cn('text-2xl font-bold', c)}>{typeof value === 'string' || typeof value === 'number' ? <span className="num">{value}</span> : value}</div>
       {sub && <div className="text-[11px] text-dim">{sub}</div>}
     </Comp>
   );

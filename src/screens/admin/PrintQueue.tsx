@@ -45,7 +45,6 @@ export default function PrintQueue() {
   return (
     <div className="space-y-4" data-screen-id="G2">
       <PageHeader icon={<Printer />} title={t('طابور الطباعة')} badge={<StateBadge ops={['PrintJob.Find', 'PrintJob.Retry', 'Print.Reprint']} />}
-        description={t('كل ورقة بتطلع من السيستم بتستنى هنا لحد ما الطابعة تستلمها. البيع بيتسجل الأول — عطل الطابعة عمره ما بيوقف بيع.')}
         actions={<Button variant="ghost" onClick={() => { all.refetch(); list.refetch(); }} data-fb="prints:refresh"><RefreshCw className="w-4 h-4" />{t('تحديث')}</Button>} />
 
       {(dead.length > 0 || failed.length > 0) && (
@@ -100,6 +99,7 @@ export default function PrintQueue() {
         )}
       </Card>
 
+      <Tech>
       <Card title={<span className="flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-[var(--warning)]" />{t('إزاي الطباعة شغالة')}</span>} description={t('خمس حاجات تعرفها عن الطابعة والطابور.')}>
         <ul className="text-sm space-y-1.5 list-disc ps-5 text-soft">
           <li>{t('البيع بيتسجل الأول، وبعدين الطباعة بتتعمل كمهمة لوحدها. لو الطابعة واقعة الكاشير يكمل بيع عادي.')}</li>
@@ -110,6 +110,7 @@ export default function PrintQueue() {
           <Tech><li>{t('جرّب: من "المحاكاة" فوق خلّي طابعة الكاشير "واقعة" أو "الورق خلص"، وبيع حاجة.')}</li></Tech>
         </ul>
       </Card>
+      </Tech>
 
       {reprint && <ReprintDialog job={reprint} onClose={() => setReprint(null)} terminalId={terminal?.id ?? reprint.terminalId} />}
     </div>

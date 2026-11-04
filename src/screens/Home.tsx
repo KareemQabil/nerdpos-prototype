@@ -157,10 +157,10 @@ function SalesToday({ bd, eod }: { bd: string; eod: ReturnType<typeof useQuery<a
           hint={outN ? t('عليها {m} لسه ما اتدفعتش', { m: money(outAmount ?? '0') }) : t('كل الشيكات اللي اتأكدت اتدفعت')} />
       </StatGrid>
       <div className="grid xl:grid-cols-[1.5fr_1fr] gap-4">
-        <Card title={t('المبيعات على مدار اليوم')} description={t('النهارده لحد دلوقتي مقارنة بامبارح ونفس اليوم الأسبوع اللي فات (تراكمي من الساعة 4 الفجر).')} badge={<StateBadge ops={['Report.Query']} />}>
+        <Card title={t('المبيعات على مدار اليوم')} badge={<StateBadge ops={['Report.Query']} />}>
           {tQ.loading && !tQ.data ? <Skeleton className="h-52 w-full" /> : <HourChart today={today} yday={yday} lastWeek={lastWeek} hour={hour} />}
         </Card>
-        <Card title={t('آخر 14 يوم')} description={t('صافي المبيعات كل يوم — الخميس والجمعة بلون مختلف.')} actions={<Button size="sm" variant="ghost" onClick={() => nav('reports')}>{t('التفاصيل')}</Button>}>
+        <Card title={t('آخر 14 يوم')} actions={<Button size="sm" variant="ghost" onClick={() => nav('reports')}>{t('التفاصيل')}</Button>}>
           {days.loading && !days.data ? <Skeleton className="h-52 w-full" /> : <DaysChart items={Array.from({ length: 14 }, (_, i) => addDaysIso(bd, i - 13)).map((d) => ({ businessDate: d, netSales: days.data?.rows?.find((r: any) => r.dims?.business_date === d)?.values?.net_item_sales?.value ?? '0' }))} />}
           <TodayBreakdown totals={extra.data?.totals ?? null} />
         </Card>
@@ -245,7 +245,7 @@ function DaysChart({ items }: { items: any[] }) {
           );
         })}
       </svg>
-      {hi && <div className="absolute top-0 left-2 rounded-lg glass-strong px-3 py-1.5 text-xs pointer-events-none" dir="rtl"><b>{dayLabel(hi.businessDate)}</b><div><span className="num">{money(hi.netSales)}</span></div></div>}
+      {hi && <div className="absolute top-0 left-2 rounded-lg glass-strong px-3 py-1.5 text-xs pointer-events-none" dir="rtl"><b>{dayLabel(hi.businessDate)}</b><div><Money v={hi.netSales} plain /></div></div>}
     </div>
   );
 }
@@ -368,7 +368,7 @@ function QuickLinks() {
           return (
             <button key={d.id} type="button" onClick={() => nav(d.id)} data-fb={`home:link:${d.id}`} className="flex items-center gap-2 rounded-xl surface-1 hover:surface-2 border line px-3 h-12 text-sm text-start min-w-0 transition-colors">
               <span className={cn('w-7 h-7 rounded-lg flex items-center justify-center bg-gradient-to-br text-slate-900 shrink-0', d.gradient)}><Icon className="w-4 h-4" /></span>
-              <span className="truncate">{lang === 'ar' ? d.title : d.titleEn}</span>
+              <span className="truncate">{lang === 'ar' ? t(d.title) : d.titleEn}</span>
             </button>
           );
         })}

@@ -27,7 +27,6 @@ export default function Fiscal() {
   return (
     <div className="space-y-4" data-screen-id="G4">
       <PageHeader icon={<Landmark />} title={t('التسجيل الضريبي')} badge={<StateBadge ops={['FiscalProfile.Configure', 'FiscalDevice.Register', 'FiscalDevice.SetState', 'FiscalItemMapping.SetMany']} />}
-        description={t('تجهيز الإيصال الإلكتروني مع مصلحة الضرايب: بيانات الفرع، جهاز ضريبي لكل كاشير، وكود لكل صنف. أي بيانات ناقصة بتخلّي الإيصال يستنى — والبيع بيكمل عادي.')}
         actions={<>
           <Select data-fb="fiscal:branch" className="!w-auto min-w-[180px]" value={branchId} onChange={(e) => setBranchId(e.target.value)} options={branchList.map((b) => ({ value: b.id, label: branchLabel(b) || L(b.name) }))} />
           <Button variant="outline" onClick={() => nav('ereceipts')} data-fb="fiscal:goto-queue">{t('طابور الإيصالات')}</Button>
@@ -45,7 +44,7 @@ export default function Fiscal() {
       </div>
 
       <MappingCard mappings={mappings} />
-      <OpenQuestions />
+      <Tech><OpenQuestions /></Tech>
     </div>
   );
 }
@@ -136,7 +135,7 @@ function DevicesCard({ terminals, devices }: { terminals: any[]; devices: any[] 
             <Input data-fb="fiscal:device:cred" dir="ltr" value={cred} onChange={(e) => setCred(e.target.value)} />
           </Field>
         </div>
-        <div className="text-[11px] text-dim">{t('بيانات دخول المنظومة والختم الإلكتروني بيتحفظوا في خزنة الأسرار بس — هنا بنكتب اسمها بس.')}<Tech> (OD-EG-2)</Tech></div>
+        
         <div className="flex justify-end"><Button variant="primary" loading={busy} disabled={!terminalId || !serial} onClick={register} data-fb="fiscal:device:register"><Cpu className="w-4 h-4" />{t('سجّل الجهاز')}</Button></div>
       </div>
       {stateFor && <DeviceStateDialog d={stateFor} onClose={() => setStateFor(null)} />}
@@ -196,8 +195,7 @@ function MappingCard({ mappings }: { mappings: any[] }) {
     setEdits(next);
   };
   return (
-    <Card title={<span className="flex items-center gap-2"><Barcode className="w-4 h-4" />{t('أكواد الأصناف في المنظومة')}</span>} badge={<Pill tone={missing.length ? 'warning' : 'success'} >{missing.length ? t('{n} صنف من غير كود', { n: missing.length }) : t('كل الأصناف ليها كود')}</Pill>}
-      description={t('كل صنف على الإيصال لازم يبقى له كود مسجل في المنظومة. الصنف اللي من غير كود إيصاله بيستنى لحد ما تضيفه وتعيد بناء الإيصال.')}>
+    <Card title={<span className="flex items-center gap-2"><Barcode className="w-4 h-4" />{t('أكواد الأصناف في المنظومة')}</span>} badge={<Pill tone={missing.length ? 'warning' : 'success'} >{missing.length ? t('{n} صنف من غير كود', { n: missing.length }) : t('كل الأصناف ليها كود')}</Pill>}>
       <Toolbar>
         <SearchInput value={q} onChange={setQ} placeholder={t('دوّر على صنف')} />
         <Switch checked={onlyMissing} onChange={setOnlyMissing} label={t('الناقص بس')} />

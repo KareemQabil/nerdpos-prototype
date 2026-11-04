@@ -7,6 +7,7 @@ import { Section, StateBadge, Card, Button, Pill, Banner, Money, Field, Input, T
 import { t, L, tLabel, tv } from '../../i18n';
 import { Tech } from '../../app/tech';
 import { cn, money, dateTime, dayLong } from '../../lib/format';
+import { sumAmounts, sharePct } from '../../lib/cash';
 import { clock, businessDate } from '../../mock/clock';
 import { store } from '../../mock/store';
 import { branchLabel, personText } from '../../demo/people';
@@ -26,7 +27,6 @@ export default function BusinessDay() {
   return (
     <div className="space-y-4" data-screen="EOD">
       <Section title={t('قفل اليوم')} badge={<StateBadge ops={['BusinessDay.Readiness', 'BusinessDay.Close', 'BusinessDay.Find']} />}
-        sub={t('اليوم التجاري بيبدأ الساعة 4 الفجر بتوقيت القاهرة وبيخلص 4 الفجر اللي بعده — البيع الساعة 2 بالليل تبع اليوم اللي قبله. القفل بيثبّت أرقام اليوم ويبعتها للحسابات.')}
         actions={<div className="flex items-end gap-2">
           <Button size="sm" variant={date === addDays(today, -1) ? 'outline' : 'ghost'} onClick={() => setDate(addDays(today, -1))}>{t('امبارح')}</Button>
           <Button size="sm" variant={date === today ? 'outline' : 'ghost'} onClick={() => setDate(today)}>{t('النهارده')}</Button>
@@ -116,7 +116,7 @@ function Readiness({ d, nav }: { d: any; nav: (s: string) => void }) {
 
 export function Summary({ s, title }: { s: any; title: string }) {
   const pays = Object.entries(s.payments ?? {}) as [string, string][];
-  const totalPay = pays.reduce((a, [, v]) => a + Number(v), 0) || 1;
+  const totalPay = sumAmounts(pays.map(([, v]) => v)); // Decimal
   const kpi = (icon: React.ReactNode, label: string, value: React.ReactNode) => <div className="rounded-xl surface-1 p-3"><div className="text-[11px] text-dim flex items-center gap-1">{icon}{label}</div><div className="text-lg font-extrabold mt-0.5">{value}</div></div>;
   return (
     <Card title={<span className="flex items-center gap-2"><TrendingUp className="w-4 h-4" />{title}</span>}>
@@ -132,7 +132,7 @@ export function Summary({ s, title }: { s: any; title: string }) {
           {pays.length === 0 ? <div className="text-xs text-dim">{t('مفيش دفعات')}</div> : pays.map(([k, v]) => (
             <div key={k} className="flex items-center gap-2 text-sm mb-1">
               <span className="w-20 shrink-0">{t(METHOD_AR[k] ?? k)}</span>
-              <div className="flex-1 h-2.5 rounded-full surface-2 overflow-hidden"><div className="h-full rounded-full bg-gradient-to-l from-cyan-400 to-blue-600" style={{ width: `${(Number(v) / totalPay) * 100}%` }} /></div>
+              <div className="flex-1 h-2.5 rounded-full surface-2 overflow-hidden"><div className="h-full rounded-full bg-gradient-to-l from-cyan-400 to-blue-600" style={{ width: `${sharePct(v, totalPay)}%` }} /></div>
               <Money v={v} className="w-28 text-end" />
             </div>
           ))}
@@ -167,7 +167,7 @@ function ClosePanel({ d }: { d: any }) {
             : <Banner tone="success">{t('كله تمام — تقدر تقفل اليوم.')}</Banner>}
         <Field label={t('ملاحظة للحسابات (اختياري)')}><Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('مثلاً: الكهربا قطعت ساعة')} /></Field>
         <Button variant="primary" size="lg" className="w-full" loading={busy} disabled={d.blockers > 0 || (d.warnings > 0 && !ack)} onClick={close} data-fb="eod-close"><Moon className="w-5 h-5" />{t('اقفل يوم {d}', { d: d.date })}</Button>
-        <div className="text-[11px] text-dim">{t('بعد القفل الأرقام بتتثبت وتتبعت لبرنامج الحسابات. لو حصل بيع قبل 4 الفجر هيتسجل على نفس اليوم ويظهر "بعد القفل".')}</div>
+        
       </div>
     </Card>
   );

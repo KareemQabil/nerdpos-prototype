@@ -23,7 +23,7 @@ export default function Taxes() {
   const taxDefault = usePolicy<any>('ProductTaxDefaultPolicy');
   return (
     <div>
-      <Section title={t('الضرايب')} badge={<StateBadge ops={['TaxPolicy.Create', 'TaxPolicy.Configure', 'TaxPolicy.SetActive', 'TaxPolicy.List', 'Product.SetTaxPolicy']} />} sub={t('مجموعات الضريبة (النسبة، شاملة ولا بتتضاف، التقريب، المعفي)، والأصناف اللي على كل مجموعة، وطريقة عرض الأسعار على الكاشير. النسب بيانات صاحب المطعم والمحاسب.')} />
+      <Section title={t('الضرايب')} badge={<StateBadge ops={['TaxPolicy.Create', 'TaxPolicy.Configure', 'TaxPolicy.SetActive', 'TaxPolicy.List', 'Product.SetTaxPolicy']} />} />
       <Tech>
         <div className="flex flex-wrap gap-1.5 mb-3 items-center">
           <PolicyChip id="ApprovalRequirementPolicy[SENSITIVE_POLICY_CHANGE]" value={ruleText(approvals?.SENSITIVE_POLICY_CHANGE ?? { mode: 'ALWAYS' })} />

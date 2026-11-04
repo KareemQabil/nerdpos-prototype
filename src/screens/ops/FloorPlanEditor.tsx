@@ -131,7 +131,6 @@ export default function FloorPlanEditor() {
   return (
     <div className="space-y-4" data-screen="FLP">
       <Section title={t('خريطة الصالة')} badge={<StateBadge ops={['Floor.List', 'Floor.Upsert']} />}
-        sub={t('اقسم المطعم لأقسام، واسحب كل ترابيزة لمكانها الحقيقي. أول ما تحفظ، تابلت الويتر والكاشير بيشوفوا نفس الخريطة.')}
         actions={<>
           {dirty && <Pill tone="warning">{t('فيه تعديلات ما اتحفظتش')}</Pill>}
           <Button variant="ghost" onClick={discard} disabled={!dirty}><Undo2 className="w-4 h-4" />{t('رجّع')}</Button>

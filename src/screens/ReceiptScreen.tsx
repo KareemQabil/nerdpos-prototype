@@ -7,7 +7,7 @@ import { ArrowRight, Copy, Printer, FileText } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useDev, useQuery, useCommand, errorText } from '../app/hooks';
 import { Tech, useTech } from '../app/tech';
-import { Section, StateBadge, Banner, Button, Empty, Skeleton, Switch, Pill } from '../ui';
+import { Section, StateBadge, Banner, Button, Empty, Skeleton, Switch, Pill, Money } from '../ui';
 import { t, L } from '../i18n';
 import { money, qty, dateTime, cn } from '../lib/format';
 import { ReprintDialog, ReprintRuleNote } from './admin/output/ReprintDialog';
@@ -58,7 +58,6 @@ export default function ReceiptScreen() {
   return (
     <div className="space-y-4" data-screen-id="G1">
       <Section title={isPrebill ? t('شيك مبدئي') : t('الإيصال')} badge={<StateBadge ops={['Receipt.Get', 'Print.Reprint']} />}
-        sub={t('الإيصال زي ما اتطبع بالظبط. النسخة بيتكتب عليها «نسخة» ومش بتعمل إيصال جديد.')}
         actions={<>
           <Button size="sm" variant="ghost" onClick={() => nav('checks')} data-fb="receipt:back"><ArrowRight className="w-4 h-4 ltr:rotate-180" />{t('رجوع للشيكات')}</Button>
           <SegmentedControl size="sm" value={layout} onChange={setLayout} options={[{ id: '80', label: t('إيصال 80 مم'), fb: 'receipt:layout:80' }, { id: 'A4', label: t('صفحة A4'), fb: 'receipt:layout:A4' }]} />
@@ -125,7 +124,7 @@ export default function ReceiptScreen() {
               : nz(tt.tax) && <Row k={t('ضريبة القيمة المضافة')} v={money(tt.tax, false)} />}
             {!tt.comp && nz(tt.discountAfterTax) && <Row k={t('خصم بعد الضريبة')} v={`-${money(tt.discountAfterTax, false)}`} />}
             <Rule dashed={false} />
-            <Row k={t('الإجمالي')} v={money(tt.payable)} bold big />
+            <Row k={t('الإجمالي')} v={<Money v={tt.payable} plain />} bold big />
             <Rule />
             {(r.payments ?? []).length > 0 && (
               <div className="space-y-0.5">
@@ -140,7 +139,7 @@ export default function ReceiptScreen() {
                 ))}
               </div>
             )}
-            {r.settlement && nz(r.settlement.remaining) && <Row k={t('المطلوب')} v={money(r.settlement.remaining)} bold />}
+            {r.settlement && nz(r.settlement.remaining) && <Row k={t('المطلوب')} v={<Money v={r.settlement.remaining} plain />} bold />}
             {r.settlement && nz(r.settlement.refunded) && <Row k={t('اترجع')} v={`-${money(r.settlement.refunded, false)}`} />}
             {!isPrebill && (
               <>
@@ -168,7 +167,7 @@ export default function ReceiptScreen() {
           )}
 
           <div className="flex-1 min-w-[260px] space-y-3">
-            <Banner tone="info">{t('ترتيب الإيصال: الأصناف، بعدها الخصم، بعدها الخدمة، بعدها الضريبة، وفي الآخر الإجمالي.')}</Banner>
+            
             {isPrebill && <Banner tone="warning">{t('الشيك المبدئي "ليست فاتورة ضريبية": مفيهوش QR، وطباعته مش بتغير الشيك ومش محتاجة موافقة.')}</Banner>}
             {fiscal && (
               <div className="glass rounded-xl p-3 text-sm space-y-1">
@@ -219,7 +218,7 @@ function A4Receipt({ r, isPrebill, copy }: { r: any; isPrebill: boolean; copy: b
         {nz(tt.discountTotal) && <Row k={t('خصم')} v={`-${money(tt.discountTotal, false)}`} />}
         {nz(tt.serviceCharge) && <Row k={`${t('خدمة')} ${pctText(tt.serviceRate)}`} v={money(tt.serviceCharge, false)} />}
         {(tt.taxLines ?? []).map((x: any, i: number) => <Row key={i} k={`${L(x.name) || t('ضريبة القيمة المضافة')} ${pctText(x.rate)}`} v={money(x.amount, false)} />)}
-        <div className="border-t-2 border-black pt-1"><Row k={t('الإجمالي')} v={money(tt.payable)} bold big /></div>
+        <div className="border-t-2 border-black pt-1"><Row k={t('الإجمالي')} v={<Money v={tt.payable} plain />} bold big /></div>
         {(r.payments ?? []).map((p: any, i: number) => <Row key={i} k={methodLabel(p.method + (p.walletProvider ? ':' + p.walletProvider : ''))} v={money(p.amount, false)} />)}
       </div>
       {isPrebill && <div className="mt-6 flex flex-col items-start gap-1" data-fb="a4:prebill-barcode"><Barcode128 value={r.number} module={1.8} height={48} /><div className="num text-[11px] tracking-[.3em]">{r.number}</div></div>}

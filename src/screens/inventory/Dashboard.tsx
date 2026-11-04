@@ -16,7 +16,7 @@ export default function InventoryDashboard() {
   const scope = useBranchScope();
   return (
     <div>
-      <Section title={t('المخزن — نظرة عامة')} badge={<StateBadge ops={OPS} />} sub={t('قيمة المخزون، النواقص، الصلاحية، الاستهلاك والهالك وتكلفة الأكل — كله من حركات المخزن الحقيقية.')}
+      <Section title={t('المخزن — نظرة عامة')} badge={<StateBadge ops={OPS} />}
         actions={<BranchScope scope={scope} />} />
       <Tabs className="mb-4" value={tab} onChange={setTab} tabs={[{ id: 'overview', label: t('نظرة عامة') }, { id: 'log', label: t('سجل الحركات') }]} />
       {tab === 'overview' ? <Overview branchId={scope.branchId} /> : <MovementLog branchId={scope.branchId} />}
@@ -52,12 +52,12 @@ function Overview({ branchId }: { branchId?: string }) {
         <Button data-fb="inv-dash:production" onClick={() => nav('inv-production')}><ChefHat className="w-4 h-4" />{t('تحضير')}</Button>
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-3">
-        <Stat fb="inv-dash:stat-value" label={t('قيمة المخزون بالتكلفة')} value={money(d.stockValue)} icon={<Boxes className="w-4 h-4" />} sub={t('{n} مخزن', { n: d.byWarehouse.length })} onClick={() => nav('inv-items')} />
+        <Stat fb="inv-dash:stat-value" label={t('قيمة المخزون بالتكلفة')} value={<Money v={d.stockValue} />} icon={<Boxes className="w-4 h-4" />} sub={t('{n} مخزن', { n: d.byWarehouse.length })} onClick={() => nav('inv-items')} />
         <Stat fb="inv-dash:stat-low" label={t('قربت تخلص')} value={d.lowCount + d.outCount} tone={d.outCount ? 'error' : d.lowCount ? 'warning' : undefined} icon={<TriangleAlert className="w-4 h-4" />} sub={d.outCount ? t('منهم {n} خلصت خالص', { n: d.outCount }) : t('تحت الحد الأدنى')} onClick={() => nav('inv-items', { state: 'LOW,OUT,NEGATIVE' })} />
         <Stat fb="inv-dash:stat-expiry" label={t('صلاحيتها قربت (3 أيام)')} value={d.expiringCount + d.expiredCount} tone={d.expiredCount ? 'error' : d.expiringCount ? 'warning' : undefined} icon={<CalendarClock className="w-4 h-4" />} sub={d.expiredCount ? t('{n} دفعة منتهية — قيمتها {v}', { n: d.expiredCount, v: money(d.expiredValue) }) : t('اتصرف فيها الأول')} />
-        <Stat label={t('استهلاك المبيعات (7 أيام)')} value={money(d.sales7)} icon={<TrendingDown className="w-4 h-4" />} sub={t('تكلفة الخامات اللي اتباعت')} />
-        <Stat fb="inv-dash:stat-waste" label={t('الهالك (7 أيام)')} value={money(d.waste7)} tone={Number(d.waste7) > 0 ? 'warning' : undefined} icon={<Trash2 className="w-4 h-4" />} sub={Number(d.sales7) > 0 ? t('{p}% من الاستهلاك', { p: ((Number(d.waste7) / Number(d.sales7)) * 100).toFixed(1) }) : undefined} onClick={() => nav('inv-waste')} />
-        <Stat label={t('فروقات الجرد (30 يوم)')} value={money(d.variance30)} tone={Number(d.variance30) < 0 ? 'error' : undefined} icon={<Scale className="w-4 h-4" />} sub={t('بالسالب = عجز')} onClick={() => nav('inv-counts')} />
+        <Stat label={t('استهلاك المبيعات (7 أيام)')} value={<Money v={d.sales7} />} icon={<TrendingDown className="w-4 h-4" />} sub={t('تكلفة الخامات اللي اتباعت')} />
+        <Stat fb="inv-dash:stat-waste" label={t('الهالك (7 أيام)')} value={<Money v={d.waste7} />} tone={Number(d.waste7) > 0 ? 'warning' : undefined} icon={<Trash2 className="w-4 h-4" />} sub={Number(d.sales7) > 0 ? t('{p}% من الاستهلاك', { p: ((Number(d.waste7) / Number(d.sales7)) * 100).toFixed(1) }) : undefined} onClick={() => nav('inv-waste')} />
+        <Stat label={t('فروقات الجرد (30 يوم)')} value={<Money v={d.variance30} />} tone={Number(d.variance30) < 0 ? 'error' : undefined} icon={<Scale className="w-4 h-4" />} sub={t('بالسالب = عجز')} onClick={() => nav('inv-counts')} />
       </div>
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <Card className="xl:col-span-2" title={t('آخر 7 أيام')} actions={<div className="flex gap-3 text-[11px]"><Legend c="var(--primary)" l={t('استهلاك مبيعات')} /><Legend c="var(--warning)" l={t('هالك')} /><Legend c="var(--success)" l={t('استلام')} /></div>}>
@@ -105,7 +105,7 @@ function Overview({ branchId }: { branchId?: string }) {
       </div>
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <Card className="xl:col-span-2" title={t('تكلفة الأكل لكل طبق')} actions={<span className="text-xs text-dim">{t('المتوسط')}: <Pct v={d.avgFoodCostPercent} band={Number(d.avgFoodCostPercent) > 40 ? 'HIGH' : Number(d.avgFoodCostPercent) > 30 ? 'WATCH' : 'GOOD'} /></span>}>
-          <div className="text-xs text-dim mb-2">{t('تكلفة الوصفة بمتوسط تكلفة الخامات دلوقتي ÷ سعر البيع في الصالة (من غير ضريبة). أخضر لحد 30%، أصفر لحد 40%، أحمر فوق كده.')}</div>
+          
           <Table head={[t('الطبق'), t('التكلفة'), t('السعر'), t('نسبة التكلفة'), '']} rows={d.dishes.slice(0, 10).map((x: any) => [
             <button className="font-bold hover:text-[var(--primary)]" onClick={() => nav('inv-recipes', { open: x.recipeId })}>{L(x.name)}</button>, <Money v={x.cost} className="text-xs" />, x.price ? <Money v={x.price} className="text-xs" /> : <span className="text-dim text-xs">—</span>,
             <FoodBar pct={x.foodCostPercent} band={x.band} />, <BandPill band={x.band} />,

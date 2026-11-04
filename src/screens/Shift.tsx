@@ -5,7 +5,8 @@ import { DoorOpen, ArrowDownToLine, Inbox, FileText, Lock, HandCoins, Printer, A
 import { useDev, useQuery, useCommand, errorText } from '../app/hooks';
 import { PageHeader, StateBadge, Card, Button, Field, Input, Select, Money, Banner, KV, Table, Modal, Pill, Tabs, Textarea, Stepper, StatGrid, StatCard, EmptyState, Skeleton } from '../ui';
 import { t, L } from '../i18n';
-import { cn, money, time, dateTime } from '../lib/format';
+import { cn, time, dateTime } from '../lib/format';
+import { sign, sumAmounts, absAmount } from '../lib/cash';
 import { useReasons } from './order/CheckPanel';
 import { TransferSessionDialog } from './ops/TransferSessionDialog';
 import { METHOD_AR } from './ops/BusinessDay';
@@ -29,8 +30,7 @@ export default function Shift() {
   const open = !!cur.data;
   return (
     <div data-screen="E1–E3" className="space-y-4">
-      <PageHeader title={t('الوردية والدرج')} ops={['Session.Open', 'Cash.Move', 'Drawer.OpenNoSale', 'Session.XReport', 'Session.Close', 'Session.ZReport']}
-        description={terminal?.drawer ? t('افتح الوردية بالفلوس اللي في الدرج، اشتغل، وفي الآخر اعد الدرج واقفل.') : t('الجهاز ده من غير درج — هنا تقدر تشوف تقارير الورديات بس.')} />
+      <PageHeader title={t('الوردية والدرج')} ops={['Session.Open', 'Cash.Move', 'Drawer.OpenNoSale', 'Session.XReport', 'Session.Close', 'Session.ZReport']} />
       {terminal?.drawer && (
         <Card padding="md">
           <Stepper steps={[{ label: t('افتح الوردية'), hint: t('الفكة أول اليوم') }, { label: t('اشتغل'), hint: t('بيع وتحصيل') }, { label: t('اعد الدرج'), hint: t('بالفئات') }, { label: t('اقفل'), hint: t('تقرير القفلة') }]} current={open ? 1 : 0} />
@@ -51,12 +51,11 @@ export default function Shift() {
   );
 }
 
-/** Variance in words: «مظبوط» / «ناقص 20 جنيه» / «زيادة 5 جنيه». */
+/** Variance in words: «مطابق» / «عجز 30.00 ج.م» / «زيادة 5.00 ج.م» (sign and absolute value in Decimal; amount via <Money>). */
 function VarianceText({ v, short }: { v: string; short?: boolean }) {
-  const n = Number(v);
+  const n = sign(v);
   if (n === 0) return <span className="text-[var(--success)] font-bold inline-flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" />{t('مظبوط')}</span>;
-  const amt = money(String(Math.abs(n)));
-  return <span className={cn('font-bold', n < 0 ? 'text-[var(--error)]' : 'text-[var(--warning-text)]')}>{n < 0 ? t('ناقص') : t('زيادة')} <span className="num">{amt}</span>{!short && <span className="text-dim font-normal text-xs"> {n < 0 ? t('— الدرج فيه أقل من المفروض') : t('— الدرج فيه أكتر من المفروض')}</span>}</span>;
+  return <span className={cn('font-bold', n < 0 ? 'text-[var(--error)]' : 'text-[var(--warning-text)]')} data-fb="variance" data-variance={v}>{n < 0 ? t('عجز') : t('زيادة')} <Money v={absAmount(v)} />{!short && <span className="text-dim font-normal text-xs"> {n < 0 ? t('— الدرج فيه أقل من المفروض') : t('— الدرج فيه أكتر من المفروض')}</span>}</span>;
 }
 
 function OpenShift() {
@@ -64,13 +63,12 @@ function OpenShift() {
   const { run, busy } = useCommand();
   const [float, setFloat] = useState('500.00');
   return (
-    <Card title={<span className="flex items-center gap-2"><DoorOpen className="w-5 h-5 text-[var(--primary)]" />{t('افتح وردية جديدة')}</span>} badge={<StateBadge ops={['Session.Open']} />} description={t('اعد الفكة اللي في الدرج واكتبها — دي بتبقى نقطة البداية لعد آخر الوردية.')}>
+    <Card title={<span className="flex items-center gap-2"><DoorOpen className="w-5 h-5 text-[var(--primary)]" />{t('افتح وردية جديدة')}</span>} badge={<StateBadge ops={['Session.Open']} />}>
       <div className="flex items-end gap-3 flex-wrap">
-        <Field label={t('الفكة في الدرج (جنيه)')}><Input value={float} onChange={(e) => setFloat(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" className="w-44 h-14" style={{ fontSize: 24 }} data-fb="opening-float" /></Field>
+        <Field label={t('الرصيد الافتتاحي (ج.م)')}><Input value={float} onChange={(e) => setFloat(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" className="w-44 h-14" style={{ fontSize: 24 }} data-fb="opening-float" /></Field>
         <div className="flex gap-1.5 pb-1">{['300.00', '500.00', '1000.00'].map((v) => <button key={v} onClick={() => setFloat(v)} className={cn('h-12 px-4 rounded-xl border font-bold num', float === v ? 'bg-[var(--primary)] text-[var(--primary-foreground)] border-transparent' : 'surface-1 border-[var(--glass-border)]')}>{v.replace('.00', '')}</button>)}</div>
         <Button variant="primary" size="xl" loading={busy} onClick={() => run('Session.Open', { body: { terminalId: terminal!.id, openingFloat: float } }, { success: t('الوردية اتفتحت — بالتوفيق') })} data-fb="open-shift"><DoorOpen className="w-5 h-5" />{t('افتح الوردية')}</Button>
       </div>
-      <div className="text-[11px] text-dim mt-3">{t('على كل جهاز درج وردية واحدة مفتوحة بس. شيكات الصالة ممكن تتحصّل على أي درج مفتوح في الفرع.')}</div>
     </Card>
   );
 }
@@ -80,13 +78,13 @@ function OpenSession({ sid, onZ }: { sid: string; onZ: (id: string) => void }) {
   const [dlg, setDlg] = useState<null | 'move' | 'nosale' | 'x' | 'close' | 'tips'>(null);
   const ses = s.data;
   if (!ses) return <Skeleton className="h-48 rounded-2xl" />;
-  const cashIn = ses.cashEntries.filter((e: any) => e.kind === 'TENDER_IN').reduce((a: number, e: any) => a + Number(e.amount), 0);
+  const cashIn = sumAmounts(ses.cashEntries.filter((e: any) => e.kind === 'TENDER_IN').map((e: any) => e.amount)); // Decimal, never JS floats
   return (
     <>
       <StatGrid min={170}>
         <StatCard label={t('الكاشير')} value={<span className="text-lg">{personName(null, personText(ses.cashierName))}</span>} hint={t('من {h} · {n} ساعة', { h: time(ses.openedAt), n: ses.hoursOpen })} icon={<Clock />} />
         <StatCard label={t('الفكة أول الوردية')} value={<Money v={ses.openingFloat} />} icon={<Wallet />} />
-        <StatCard label={t('كاش اتحصّل')} value={<Money v={String(cashIn)} />} tone="success" icon={<Receipt />} hint={t('من الشيكات على الدرج ده')} />
+        <StatCard label={t('كاش اتحصّل')} value={<Money v={cashIn} />} tone="success" icon={<Receipt />} hint={t('من الشيكات على الدرج ده')} />
         <StatCard label={t('حركات الدرج')} value={<span className="num">{ses.cashEntries.length}</span>} icon={<ArrowDownToLine />} hint={t('إدخال وصرف وتحصيل')} />
       </StatGrid>
       {ses.durationWarning && <Banner tone="warning" title={t('الوردية مفتوحة من وقت طويل')}>{t('اقفلها واعد الدرج، وافتح وردية جديدة.')}</Banner>}
@@ -138,7 +136,6 @@ function CashMoveDialog({ ses, onClose }: { ses: any; onClose: () => void }) {
         <Field label={t('المبلغ (جنيه)')}><Input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" className="h-12" style={{ fontSize: 20 }} /></Field>
         <Field label={t('السبب')}><Select value={rc} onChange={(e) => setRc(e.target.value)} options={[{ value: '', label: t('اختار السبب') }, ...reasons.map((r) => ({ value: r.code, label: `${L(r.label)}${r.requiresNote ? ' *' : ''}` }))]} /></Field>
         <Field label={t('ملاحظة')}><Input value={note} onChange={(e) => setNote(e.target.value)} /></Field>
-        <div className="text-[11px] text-dim">{t('أي فلوس بتخرج من الدرج ممكن تحتاج موافقة مدير (حسب إعدادات الموافقات).')}</div>
       </div>
     </Modal>
   );
@@ -154,7 +151,6 @@ function NoSaleDialog({ ses, onClose }: { ses: any; onClose: () => void }) {
       <div className="space-y-4">
         <Field label={t('السبب')}><Select value={rc} onChange={(e) => setRc(e.target.value)} options={[{ value: '', label: t('اختار السبب') }, ...reasons.map((r) => ({ value: r.code, label: L(r.label) }))]} /></Field>
         <Field label={t('ملاحظة')}><Input value={note} onChange={(e) => setNote(e.target.value)} /></Field>
-        <div className="text-[11px] text-dim">{t('مفيش فلوس بتتحرك، بس الفتحة بتتسجل في تقرير الاستثناءات.')}</div>
       </div>
     </Modal>
   );
@@ -218,7 +214,7 @@ function CloseDialog({ ses, onClose, onZ }: { ses: any; onClose: () => void; onZ
   return (
     <Modal open onClose={onClose} size="xl" title={t('اعد الدرج واقفل الوردية')} badge={<StateBadge ops={['Session.Close', 'Approval.Grant']} />}
       description={isBlind ? t('عد أعمى: اعد الفلوس اللي في الدرج من غير ما تشوف المفروض. الفرق بيظهر بعد القفل.') : undefined}
-      footer={<><div className="me-auto text-sm">{t('اللي اتعد')}: <b className="num text-lg">{counted ? money(counted) : '—'}</b></div><Button variant="ghost" onClick={onClose}>{t('رجوع')}</Button><Button variant="warning" size="lg" loading={busy} disabled={!counted} onClick={close} data-fb="close-shift-confirm"><Lock className="w-4 h-4" />{t('اقفل الوردية')}</Button></>}>
+      footer={<><div className="me-auto text-sm">{t('اللي اتعد')}: <Money v={counted || null} className="text-lg" /></div><Button variant="ghost" onClick={onClose}>{t('رجوع')}</Button><Button variant="warning" size="lg" loading={busy} disabled={!counted} onClick={close} data-fb="close-shift-confirm"><Lock className="w-4 h-4" />{t('اقفل الوردية')}</Button></>}>
       <div className="grid lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-5">
         <div>
           <div className="text-sm font-bold mb-2">{t('عدّ بالفئات')}</div>
@@ -232,7 +228,7 @@ function CloseDialog({ ses, onClose, onZ }: { ses: any; onClose: () => void; onZ
                   <button onClick={() => setCount(d.p, n - 1)} disabled={!n} className="w-10 h-10 rounded-lg surface-2 flex items-center justify-center disabled:opacity-30" aria-label={t('أقل')} data-fb={`denom-minus:${d.label}`}><Minus className="w-4 h-4" /></button>
                   <input value={n || ''} onChange={(e) => setCount(d.p, Number(e.target.value.replace(/\D/g, '') || 0))} inputMode="numeric" placeholder="0" className="num w-14 h-10 text-center rounded-lg glass-input !p-0 font-bold" style={{ fontSize: 18 }} aria-label={t('عدد {d}', { d: d.label })} />
                   <button onClick={() => setCount(d.p, n + 1)} className="w-10 h-10 rounded-lg surface-2 flex items-center justify-center" aria-label={t('أكتر')} data-fb={`denom-plus:${d.label}`}><Plus className="w-4 h-4" /></button>
-                  <span className="flex-1 text-end num font-bold text-sm">{n ? money(fromPiasters(d.p * n)) : ''}</span>
+                  <span className="flex-1 text-end text-sm">{n ? <Money v={fromPiasters(d.p * n)} /> : ''}</span>
                 </div>
               );
             })}
@@ -241,10 +237,10 @@ function CloseDialog({ ses, onClose, onZ }: { ses: any; onClose: () => void; onZ
         <div className="space-y-4">
           <div className="rounded-2xl p-4 text-center border border-[color-mix(in_srgb,var(--primary)_30%,transparent)] bg-[var(--primary-container)]">
             <div className="text-sm text-soft font-bold">{t('إجمالي اللي اتعد')}</div>
-            <div className="num font-extrabold text-[var(--primary)]" style={{ fontSize: 40, lineHeight: 1.1 }}>{counted ? money(counted) : '0.00'}</div>
+            <div style={{ fontSize: 40, lineHeight: 1.1 }}><Money v={counted || '0'} className="font-extrabold text-[var(--primary)]" /></div>
           </div>
           <Field label={t('أو اكتب المبلغ على طول')}><Input value={counted} onChange={(e) => setTyped(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" className="h-12" style={{ fontSize: 20 }} data-fb="counted-cash" /></Field>
-          {!isBlind && <Banner tone="info">{t('المفروض في الدرج')}: <b className="num">{x.data?.expectedCash ? money(x.data.expectedCash) : '—'}</b></Banner>}
+          {!isBlind && <Banner tone="info">{t('المفروض في الدرج')}: <Money v={x.data?.expectedCash || null} /></Banner>}
           <Field label={t('ملاحظة (لو فيه فرق)')}><Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('مثلًا: دفعت 20 جنيه مواصلات للطيار')} /></Field>
           <OpenOrders sid={ses.id} warn />
           <p className="text-[11px] text-dim leading-relaxed">{t('لو فيه فرق في العد لازم مدير يوافق. شيكات الصالة اللي لسه ما اتدفعتش مش بتمنع القفل وبتظهر في التقرير. طلبات التيك أواي المفتوحة على الدرج ده لازم تتحصّل أو تتنقل لدرج تاني الأول.')}</p>
@@ -260,7 +256,6 @@ function TipsDialog({ ses, onClose }: { ses: any; onClose: () => void }) {
   return (
     <Modal open onClose={onClose} title={t('توزيع البقشيش')} badge={<StateBadge ops={['Tip.Distribute']} />} footer={<><Button variant="ghost" onClick={onClose}>{t('إغلاق')}</Button><Button variant="primary" loading={busy} onClick={async () => setRes(await run('Tip.Distribute', { params: { sessionId: ses.id }, body: {} }, { success: t('البقشيش اتوزع') }))}>{t('وزّع')}</Button></>}>
       <div className="space-y-3 text-sm">
-        <p className="text-dim">{t('البقشيش فلوس لوحدها مش مبيعات. بيتوزع حسب الإعدادات: كل ويتر بتاعه، أو صندوق مشترك بيتقسم على الكل.')}</p>
         {res && <div className="rounded-xl surface-1 border line p-3 space-y-1"><div className="font-bold flex justify-between">{res.mode === 'POOLED' ? t('صندوق مشترك') : t('كل ويتر بتاعه')}<Money v={res.total} /></div>{res.lines.map((l: any) => <div key={l.userId} className="flex justify-between"><span>{personName(null, l.name)}</span><Money v={l.amount} /></div>)}</div>}
       </div>
     </Modal>
