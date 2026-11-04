@@ -3,11 +3,13 @@
 //   highlighted, always scrolled into view) and the totals — every amount is the server's (CustomerDisplay.View);
 // - paying: amount due, paid and change in very large type, and the tender used;
 // - after payment: thank-you, the change, and a QR for the e-receipt;
-// - idle: the venue's logo and name and a gentle carousel of active promotions and dishes.
+// - idle: the venue's logo and name and a gentle carousel of the content assigned to this display (ux-14: messages,
+//   pictures, promotions and dishes managed in «الأجهزة», each inside its schedule; the automatic promotions / dishes
+//   only under CustomerDisplayPolicy.idleContent ASSIGNED_AND_PROMOTIONS). Settings and timing are the server's.
 // Playful but calm: soft shapes, one accent, slow motion. Sized with container units (1920×1080 down to 1280×800).
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Sparkles, Tag, Clock, ShoppingBag, Utensils, Bike, Heart, WifiOff } from 'lucide-react';
+import { Sparkles, Tag, Clock, ShoppingBag, Utensils, Bike, Heart, WifiOff, Megaphone } from 'lucide-react';
 import { useQuery } from '../../app/hooks';
 import { useCustomerDisplay } from '../../app/customerDisplay';
 import { Money, useNow } from '../../ui';
@@ -15,19 +17,24 @@ import { t, L } from '../../i18n';
 import { cn, money, qty } from '../../lib/format';
 import { sign } from '../../lib/cash';
 import { tenderLabel } from '../../demo/tenderText';
-import type { DisplaySettings } from './settings';
+import { DISPLAY_DEFAULT, type DisplayConfig } from './settings';
 import { currency } from '../../lib/format';
 
-const THANKS_MS = 60_000;
 const nz = (v?: string | null) => !!v && sign(v) !== 0;
 
-export function CustomerDisplay({ displayId, cfg, online }: { displayId: string; cfg: DisplaySettings; online: boolean }) {
+export function CustomerDisplay({ displayId, host, online, onConfig }: { displayId: string; host: string; online: boolean; onConfig: (c: DisplayConfig | null) => void }) {
   useNow(5000);
-  const bus = useCustomerDisplay(cfg.host);
-  const thanks = !!bus.paid && Date.now() - bus.paid.at < THANKS_MS && (!bus.orderId || bus.orderId === bus.paid.orderId);
+  const bus = useCustomerDisplay(host);
+  const [thanksMs, setThanksMs] = useState(DISPLAY_DEFAULT.thanksSeconds * 1000);
+  const thanks = !!bus.paid && Date.now() - bus.paid.at < thanksMs && (!bus.orderId || bus.orderId === bus.paid.orderId);
   const orderId = thanks ? bus.paid!.orderId : bus.orderId;
-  const q = useQuery<any>('CustomerDisplay.View', { query: orderId ? { orderId } : {} });
+  // ux-14: the display reads with its own id — its settings, its content now, and the check on the cashier's screen
+  const q = useQuery<any>('CustomerDisplay.View', { query: orderId ? { displayId, orderId } : { displayId } });
   const view = q.data;
+  const cfg: DisplayConfig | typeof DISPLAY_DEFAULT = view?.display ?? DISPLAY_DEFAULT;
+  useEffect(() => { onConfig(view?.display ?? null); if (view?.display) setThanksMs(view.display.thanksSeconds * 1000); }, [view?.display?.style, view?.display?.branding, view?.display?.enabled, view?.display?.thanksSeconds, view?.display?.name]); // eslint-disable-line react-hooks/exhaustive-deps
+  // the schedule moves with the clock and the screen says it is alive (last seen in «الأجهزة»)
+  useEffect(() => { const iv = setInterval(() => q.refetch(), 30_000); return () => clearInterval(iv); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const order = view?.order && view.order.id === orderId ? view.order : null;
   const phase: 'idle' | 'selling' | 'paying' | 'thanks' = thanks && order ? 'thanks' : bus.paying && order && order.status !== 'COMPLETED' ? 'paying' : order && order.lines.length && order.status !== 'COMPLETED' ? 'selling' : 'idle';
   return (
@@ -35,12 +42,12 @@ export function CustomerDisplay({ displayId, cfg, online }: { displayId: string;
       <Blobs />
       {cfg.branding && phase !== 'idle' && <Brand view={view} order={order} online={online} />}
       <div className="flex-1 min-h-0 relative">
-        {phase === 'idle' && <Idle view={view} />}
+        {phase === 'idle' && <Idle view={view} slideMs={cfg.slideSeconds * 1000} />}
         {phase === 'thanks' && order && <Thanks order={order} paid={bus.paid!} />}
         {(phase === 'selling' || phase === 'paying') && order && (
           <div className="h-full grid grid-cols-[46fr_54fr] gap-[1.8cqmin]">
             <LinesAndTotals order={order} lastLineId={bus.lastLineId} />
-            {phase === 'paying' ? <Paying order={order} paying={bus.paying!} /> : <div className="min-h-0 flex flex-col gap-[1.8cqmin]"><CurrentItem order={order} lastLineId={bus.lastLineId} /><PromoCard view={view} /></div>}
+            {phase === 'paying' ? <Paying order={order} paying={bus.paying!} /> : <div className="min-h-0 flex flex-col gap-[1.8cqmin]"><CurrentItem order={order} lastLineId={bus.lastLineId} /><PromoCard view={view} slideMs={Math.max(cfg.slideSeconds, 5) * 1000} /></div>}
           </div>
         )}
       </div>
@@ -176,11 +183,14 @@ function Thanks({ order, paid }: { order: any; paid: { change: string; method: s
   );
 }
 
-/** Promotions and dishes for the idle screen and the small card beside the current item. */
-function slidesOf(view: any) {
-  const promos = (view?.promos ?? []).map((p: any) => ({ id: p.id, kind: 'promo' as const, p }));
-  const dishes = (view?.featured ?? []).map((d: any) => ({ id: d.id, kind: 'dish' as const, d }));
-  return [...promos, ...dishes];
+/** ux-14: the display's own content (in its order, already filtered by schedule on the server), then — only when the
+ *  setting allows it — the active promotions and dishes. */
+type Slide = { id: string; kind: 'promo'; p: any; title?: any } | { id: string; kind: 'dish'; d: any; title?: any } | { id: string; kind: 'message'; c: any } | { id: string; kind: 'image'; c: any };
+function slidesOf(view: any): Slide[] {
+  const own: Slide[] = (view?.content ?? []).map((c: any): Slide => (c.kind === 'PROMOTION' ? { id: c.id, kind: 'promo', p: c.promo, title: c.title } : c.kind === 'DISH' ? { id: c.id, kind: 'dish', d: c.dish, title: c.title } : c.kind === 'IMAGE' ? { id: c.id, kind: 'image', c } : { id: c.id, kind: 'message', c }));
+  const promos: Slide[] = (view?.promos ?? []).map((p: any) => ({ id: p.id, kind: 'promo' as const, p }));
+  const dishes: Slide[] = (view?.featured ?? []).map((d: any) => ({ id: d.id, kind: 'dish' as const, d }));
+  return [...own, ...promos, ...dishes];
 }
 function useRotate(n: number, ms: number) {
   const [i, setI] = useState(0);
@@ -189,9 +199,9 @@ function useRotate(n: number, ms: number) {
 }
 const benefit = (p: any) => <>{t('خصم')} <span className="num">{p.benefit.kind === 'PERCENT' ? `${qty(p.benefit.value)}%` : money(p.benefit.value, false)}</span>{p.benefit.kind === 'PERCENT' ? null : <> {currency()}</>}</>;
 
-function PromoCard({ view }: { view: any }) {
-  const slides = slidesOf(view).filter((s) => s.kind === 'promo');
-  const i = useRotate(slides.length, 7000);
+function PromoCard({ view, slideMs }: { view: any; slideMs: number }) {
+  const slides = slidesOf(view).filter((s): s is Extract<Slide, { kind: 'promo' }> => s.kind === 'promo');
+  const i = useRotate(slides.length, slideMs);
   const s = slides[i];
   if (!s) return <div className="flex-[1]" />;
   return (
@@ -202,10 +212,10 @@ function PromoCard({ view }: { view: any }) {
   );
 }
 
-function Idle({ view }: { view: any }) {
+function Idle({ view, slideMs }: { view: any; slideMs: number }) {
   const b = view?.branding;
   const slides = slidesOf(view);
-  const i = useRotate(slides.length, 6000);
+  const i = useRotate(slides.length, slideMs);
   const s = slides[i];
   return (
     <div className="h-full grid grid-cols-[42fr_58fr] gap-[3cqmin] items-stretch" data-fb="cd-idle">
@@ -218,7 +228,18 @@ function Idle({ view }: { view: any }) {
       <div className="relative min-h-0 flex flex-col">
         {s ? (
           <div key={s.id} className="flex-1 min-h-0 rounded-[3.4cqmin] border border-[var(--glass-border)] bg-[var(--glass-bg-strong)] overflow-hidden flex flex-col cd-fade" data-fb="cd-slide" data-kind={s.kind}>
-            {s.kind === 'promo' ? (
+            {s.kind === 'message' ? (
+              <div className="flex-1 flex flex-col justify-center gap-[2.4cqmin] p-[5cqmin] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--primary)_22%,transparent),color-mix(in_srgb,var(--success)_14%,transparent))]" data-fb="cd-message">
+                <Megaphone className="w-[6cqmin] h-[6cqmin] text-[var(--primary)]" />
+                <div className="font-display font-extrabold text-[6.4cqmin] leading-[1.15]">{L(s.c.title)}</div>
+                {s.c.body && <div className="text-[3.4cqmin] text-soft font-bold">{L(s.c.body)}</div>}
+              </div>
+            ) : s.kind === 'image' ? (
+              <div className="flex-1 grid grid-rows-[1fr_auto]" data-fb="cd-image">
+                <div className="min-h-0 flex items-center justify-center p-[2cqmin]"><img src={s.c.imageDataUrl} alt="" className="max-h-full max-w-full object-contain rounded-[2.4cqmin]" /></div>
+                <div className="p-[3cqmin] pt-0"><div className="font-display font-extrabold text-[4.6cqmin] leading-tight">{L(s.c.title)}</div>{s.c.body && <div className="text-[2.6cqmin] text-soft">{L(s.c.body)}</div>}</div>
+              </div>
+            ) : s.kind === 'promo' ? (
               <div className="flex-1 flex flex-col justify-center gap-[2.4cqmin] p-[5cqmin] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--primary)_26%,transparent),color-mix(in_srgb,var(--warning)_20%,transparent))]">
                 <span className="inline-flex items-center gap-[1.2cqmin] text-[2.6cqmin] font-bold text-[var(--primary)]"><Sparkles className="w-[3cqmin] h-[3cqmin]" />{t('عرض اليوم')}</span>
                 <div className="font-display font-extrabold text-[6.4cqmin] leading-[1.15]">{L(s.p.name)}</div>

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { Columns2, SlidersHorizontal, MessageSquarePlus, ScrollText, PlayCircle, FlaskConical, Languages, Box, Library, HelpCircle, Code2, Armchair, ShoppingCart, ChefHat, Briefcase, Building2, Monitor, MoreHorizontal, WifiOff, Sun, Moon, Gem, X, Tv, MonitorSmartphone, Smartphone } from 'lucide-react';
 import { DevicePane } from './app/DevicePane';
-import { devices, deviceIds, deviceLabel, useDevicesState, isDisplay, DISPLAY_DEVICES } from './app/devices';
+import { devices, deviceIds, deviceLabel, useDevicesState, isDisplay, displayOf } from './app/devices';
 import { useStoreVersion } from './app/hooks';
 import { Toasts, ConfirmHost } from './ui';
 import { t, setLang, useLang } from './i18n';
@@ -122,15 +122,16 @@ function Divider() { return <span className="w-px h-6 bg-[var(--line)] shrink-0 
 function deviceInfo(id: string, lang: 'ar' | 'en', tech: boolean) {
   const ds = devices.state();
   const l = deviceLabel(id, lang);
-  const disp = isDisplay(id) ? DISPLAY_DEVICES[id] : null; // ux-04: a display uses its host terminal's session
+  const disp = displayOf(id); // ux-04: a display uses its host terminal's session (ux-14: from the device registry)
   const d = ds.devices[disp ? disp.host : id];
   const term = store.db.terminals.find((x) => x.id === id);
   const kind = disp ? disp.kind : term?.kind ?? 'BO';
   const Icon = KIND_ICON[kind] ?? Monitor;
-  const name = (lang === 'en' ? DEVICE_NAMES[id]?.shortEn ?? DEVICE_NAMES[id]?.en : DEVICE_NAMES[id]?.short) ?? deviceName(id, kind, term?.name);
+  const tname = term?.name ?? disp?.name; // ux-14: a display registered later carries its own name
+  const name = (lang === 'en' ? DEVICE_NAMES[id]?.shortEn ?? DEVICE_NAMES[id]?.en : DEVICE_NAMES[id]?.short) ?? deviceName(id, kind, tname);
   const who = d?.token ? personName(null, d.userName) : null;
   const offline = sim.isOffline(id);
-  const tip = [deviceHint(id) || deviceName(id, kind, term?.name), who ? t('داخل عليه: {n}', { n: who }) : t('محدش داخل عليه'), offline ? t('النت مقطوع عن الجهاز ده (محاكاة)') : '', t('كليك: افتحه — كليك يمين: افتحه في الشاشة التانية'), tech ? `${l.short} · ${l.code}` : ''].filter(Boolean).join('\n');
+  const tip = [deviceHint(id) || deviceName(id, kind, tname), who ? t('داخل عليه: {n}', { n: who }) : t('محدش داخل عليه'), offline ? t('النت مقطوع عن الجهاز ده (محاكاة)') : '', t('كليك: افتحه — كليك يمين: افتحه في الشاشة التانية'), tech ? `${l.short} · ${l.code}` : ''].filter(Boolean).join('\n');
   return { l, Icon, name, who, tip, offline, logged: !!d?.token };
 }
 

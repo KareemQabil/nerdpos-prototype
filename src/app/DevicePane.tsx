@@ -25,6 +25,7 @@ import { Sidebar, visibleScreens, markPane, startScreenFor } from './DeviceNav';
 import { useProfile } from './useProfile';
 import { profileShows } from './profiles';
 import { drawerBus } from './drawerBus';
+import { useKeySync } from './keymap'; // ux-14
 export { visibleScreens } from './DeviceNav';
 
 const KIND_ICON: Record<string, React.ComponentType<{ className?: string }>> = { CASH: ShoppingCart, FLOOR: Armchair, KDS: ChefHat, ADMIN: Briefcase, BO: Building2, MOBILE: Smartphone };
@@ -74,6 +75,7 @@ function Authed({ compact, width }: { compact?: boolean; width: number }) {
   const perms: string[] = me.data?.effectivePermissions ?? [];
   const can = (p: string) => hasPermission(perms, p); // r3C: '*' excludes vendor-only; '-p' = revoked for this user
   const ctx: DevCtx = { ...base, me: me.data, can };
+  useKeySync(base.id); // ux-14: this terminal's key changes come from the server (the device keeps a copy)
   if (!me.data) return <div className="flex-1 flex items-center justify-center"><Spinner /></div>;
   return (
     <DeviceProvider value={ctx}>

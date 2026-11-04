@@ -6,6 +6,7 @@ import type { DeviceAuth } from '../api/client';
 import { DEVICE_NAMES } from '../demo/people';
 import { resolveRoute } from './routes';
 import { techMode } from './tech';
+import { devOf } from '../mock/devices'; // ux-14: display screens come from the device registry
 
 export interface DeviceState { id: string; terminalId: string | null; branchId: string | null; token: string | null; userName: string | null; screen: string; params: Record<string, any> }
 interface Persisted { devices: Record<string, DeviceState>; primary: string; secondary: string | null; split: boolean }
@@ -40,16 +41,18 @@ export const SEEDED_LABELS: Record<string, { short: string }> = {
 };
 
 /** ux-04: display screens are attached to a terminal (HDMI / second screen) and use its session — no sign-in of their
- *  own. The call board follows the dispatch kitchen screen, the customer display a cashier terminal (both changeable). */
-export const DISPLAY_DEVICES: Record<string, { kind: 'CALLBOARD' | 'CUSTOMER'; host: string }> = {
-  d_callboard: { kind: 'CALLBOARD', host: 't_kds' },
-  d_customer: { kind: 'CUSTOMER', host: 't_cash' },
-};
-export const isDisplay = (id: string) => id in DISPLAY_DEVICES;
+ *  own. ux-14: they are the registered display screens of the device registry (the server record says which terminal
+ *  each one follows; it changes in «الأجهزة», not on the screen). A registered display appears in the device bar. */
+export interface DisplayDevice { kind: 'CALLBOARD' | 'CUSTOMER'; host: string; name: string; code: string; enabled: boolean }
+export function displayOf(id: string): DisplayDevice | null {
+  const d = devOf(store.db).devices.find((x) => x.id === id && (x.kind === 'CUSTOMER_DISPLAY' || x.kind === 'CALL_BOARD'));
+  return d ? { kind: d.kind === 'CALL_BOARD' ? 'CALLBOARD' : 'CUSTOMER', host: d.terminalId ?? '', name: d.name, code: d.code, enabled: d.enabled } : null;
+}
+export const isDisplay = (id: string) => !!displayOf(id);
 
 export function deviceIds(): string[] {
   const ids = store.db.terminals.filter((t) => t.lifecycle === 'ACTIVE').map((t) => t.id);
-  const displays = Object.entries(DISPLAY_DEVICES).filter(([, d]) => ids.includes(d.host)).map(([id]) => id);
+  const displays = devOf(store.db).devices.filter((d) => (d.kind === 'CUSTOMER_DISPLAY' || d.kind === 'CALL_BOARD') && !!d.terminalId && ids.includes(d.terminalId)).map((d) => d.id);
   return [...ids, 'BO', ...displays];
 }
 
@@ -111,5 +114,7 @@ export function deviceLabel(id: string, lang: 'ar' | 'en') {
   const t = store.db.terminals.find((x) => x.id === id);
   const n = DEVICE_NAMES[id];
   if (s && n) return { short: s.short, name: lang === 'ar' ? n.name : n.en, code: t?.code ?? (id === 'BO' ? '—' : id) };
+  const disp = displayOf(id);
+  if (disp) return { short: disp.code, name: disp.name, code: disp.code };
   return { short: t?.code ?? id, name: t?.name ?? id, code: t?.code ?? id };
 }

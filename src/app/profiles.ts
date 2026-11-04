@@ -112,7 +112,7 @@ export const PROFILES: Profile[] = [
   { id: 'callCenter', group: g('الدليفري', 'Delivery'), role: g('مركز الاتصال', 'Call center'), workspaces: ['counter', 'customers'], start: 'counter', saleModes: ['delivery'], defaultMode: 'delivery', keys: { customer: 'F2', new: 'F4' },
     actionBar: { secondary: ['customer'], overflow: [], primary: 'confirm' }, quantity: ALL_QTY, input: 'keyboard', hidden: ['drawer'] },
   // ── system
-  { id: 'support', group: g('النظام', 'System'), role: g('فريق التركيب والدعم', 'Install & support team'), workspaces: ['import', 'settings', 'org', 'capabilities'], start: 'org',
+  { id: 'support', group: g('النظام', 'System'), role: g('فريق التركيب والدعم', 'Install & support team'), workspaces: ['import', 'settings', 'org', 'devices', 'capabilities'], start: 'org',
     actionBar: { secondary: [], overflow: [], primary: 'confirm' }, quantity: NO_QTY, input: 'keyboard', hidden: ['customerPersonalData'] },
 ];
 

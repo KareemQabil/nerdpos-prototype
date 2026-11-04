@@ -1,6 +1,6 @@
 // A0 Business, branches & devices (J-A1 steps 2–4 and the step-6 provisioning tool).
 import React, { useState } from 'react';
-import { Building2, GitBranch, MonitorSmartphone, Plus, Pencil, Power, Wrench, Landmark, Info, Clock3 } from 'lucide-react';
+import { Building2, GitBranch, MonitorSmartphone, Plus, Pencil, Power, Wrench, Landmark, Info, Clock3, Printer } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Banner, Button, Card, EmptyState, Field, Input, KV, PageHeader, Pill, Select, StatCard, StatGrid, StateBadge, Switch, Table, Textarea, toast } from '../../ui';
 import { t, getLang } from '../../i18n';
@@ -150,14 +150,14 @@ function TerminalsCard() {
   const branches = useList<any>('Branch.List');
   const perm = usePerm('terminal:register');
   const permDec = usePerm('terminal:decommission');
-  const { terminal } = useDev();
+  const { terminal, can, nav } = useDev(); // ux-14: the printers and display screens attached to the terminals live in «الأجهزة»
   const [open, setOpen] = useState(false);
   const [dec, setDec] = useState<any | null>(null);
   const bName = (id: string) => branchLabel(branches.items.find((b) => b.id === id)) || id;
   const kinds = new Set(terms.items.filter((x) => x.lifecycle === 'ACTIVE').map((x) => x.kind));
   return (
     <Card title={<span className="flex items-center gap-2"><MonitorSmartphone className="w-4 h-4 text-[var(--primary)]" />{t('الأجهزة')}</span>} description={t('كل جهاز جديد بيظهر فوق في شريط الأجهزة وتقدر تشتغل عليه.')}
-      actions={<Button size="sm" variant="primary" data-fb="org:terminal-new" disabled={!perm.ok || branches.items.length === 0} title={perm.title} onClick={() => setOpen(true)}><Plus className="w-3.5 h-3.5" />{t('تسجيل جهاز')}</Button>}>
+      actions={<div className="flex gap-1.5">{can('device:read') && <Button size="sm" variant="ghost" data-fb="org:devices" onClick={() => nav('devices')}><Printer className="w-3.5 h-3.5" />{t('الطابعات والشاشات')}</Button>}<Button size="sm" variant="primary" data-fb="org:terminal-new" disabled={!perm.ok || branches.items.length === 0} title={perm.title} onClick={() => setOpen(true)}><Plus className="w-3.5 h-3.5" />{t('تسجيل جهاز')}</Button></div>}>
       <Refused error={terms.error} />
       <div className="flex flex-wrap gap-1 mb-3 text-xs items-center">
         <span className="text-dim">{t('المطلوب للتجهيز:')}</span>

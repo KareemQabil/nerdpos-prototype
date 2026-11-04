@@ -10,11 +10,12 @@ import { demo } from '../mock/demo';
 import { Pill, Select, Button } from '../ui';
 import { useTech } from '../app/tech';
 import { deviceIds } from '../app/devices';
-import { t } from '../i18n';
+import { t, tv } from '../i18n';
+import { devOf, simState } from '../mock/devices'; // ux-14
 import { cn } from '../lib/format';
 import { deviceName } from './people';
 
-const STATE: Record<string, string> = { UP: 'شغالة', DOWN: 'واقعة', SLOW: 'بطيئة', REJECT: 'بترفض الإيصالات', TIMEOUT: 'مش بترد', PAPER_OUT: 'الورق خلص' };
+const STATE: Record<string, string> = { UP: 'شغالة', DOWN: 'واقعة', SLOW: 'بطيئة', REJECT: 'بترفض الإيصالات', TIMEOUT: 'مش بترد', PAPER_OUT: 'الورق خلص', ERROR: 'عطل' };
 const DROP_OPS: [string, string][] = [['Payment.Capture', 'الدفع'], ['Order.Fire', 'الإرسال للمطبخ'], ['Order.Confirm', 'تأكيد الشيك'], ['Order.Complete', 'قفل الشيك'], ['Order.AddLines', 'إضافة أصناف'], ['TableVisit.Open', 'فتح ترابيزة'], ['Session.Close', 'قفل الوردية'], ['Refund.Approve', 'اعتماد المرتجع']];
 
 function Row({ icon, title, hint, children }: { icon: React.ReactNode; title: React.ReactNode; hint?: React.ReactNode; children: React.ReactNode }) {
@@ -73,10 +74,11 @@ export function Simulators() {
         <Row icon={<Plug />} title={t('البرامج التانية المربوطة (الحسابات، تطبيقات الدليفري)')} hint={t('لو واقعة، التحديثات اللي بتتبعت لها بتستنى وتتعاد أوتوماتيك — تقدر تتابعها من «صحة النظام».')}>
           <div className="flex gap-1">{(['UP', 'DOWN'] as const).map((v) => <button key={v} data-fb={`sim-webhooks:${v}`} onClick={() => set({ webhooks: v })} aria-pressed={s.webhooks === v} className={cn('px-2.5 h-7 rounded-lg text-[11px] font-bold border transition-colors', s.webhooks === v ? (v === 'UP' ? 'bg-[var(--success)] text-white border-transparent' : 'bg-[var(--error)] text-white border-transparent') : 'bg-[var(--surface-1)] border-[var(--glass-border)] text-soft hover:bg-[var(--surface-2)]')}>{t(STATE[v])}{tech && <span className="num opacity-70 ms-1 text-[9px]">webhooks {v}</span>}</button>)}</div>
         </Row>
-        <Row icon={<Printer />} title={t('الطابعات')}>
-          <div className="space-y-1.5">
-            {store.db.terminals.filter((x) => x.kind !== 'KDS').map((term) => (
-              <div key={term.id} className="flex items-center justify-between gap-2"><span className="text-xs min-w-0 truncate">{t('طابعة {d}', { d: deviceName(term.id, term.kind, term.name) })}{tech && <span className="num text-[9px] text-dim ms-1">{term.code}</span>}</span><div className="flex gap-1 shrink-0">{(['UP', 'DOWN', 'PAPER_OUT'] as const).map((v) => <Opt key={v} v={v} cur={sim.printer(term.id)} on={() => set({ printers: { ...s.printers, [term.id]: v } })} />)}</div></div>
+        {/* ux-14: every registered device (printers, cash drawers, scanners, display screens) by its own id */}
+        <Row icon={<Printer />} title={t('الأجهزة الطرفية')}>
+          <div className="space-y-1.5 max-h-56 overflow-y-auto">
+            {devOf(store.db).devices.filter((d) => d.enabled).map((d) => (
+              <div key={d.id} className="flex items-center justify-between gap-2" data-fb={`sim-device:${d.id}`}><span className="text-xs min-w-0 truncate">{tv(d.name)}{tech && <span className="num text-[9px] text-dim ms-1">{d.code}</span>}</span><div className="flex gap-1 shrink-0">{(d.kind === 'PRINTER' ? ['UP', 'DOWN', 'PAPER_OUT'] as const : ['UP', 'DOWN', 'ERROR'] as const).map((v) => <Opt key={v} v={v} cur={simState(d)} on={() => set({ printers: { ...s.printers, [d.id]: v } })} />)}</div></div>
             ))}
           </div>
         </Row>

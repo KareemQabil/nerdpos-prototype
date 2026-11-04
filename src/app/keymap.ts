@@ -4,10 +4,14 @@
 // so whichever profile signs in, two actions never share a key. Assigning a key that another action uses swaps the two.
 // ux-04: one map per scope — 'sale' (the sale screen's F-keys) and 'kds' (a kitchen screen driven by a bump bar, which
 // is a keyboard sending digits, arrows, Enter, Space…). Each scope has its defaults and its assignable keys.
+// ux-14: the device's changes are a server record (Terminal.KeyMap / Terminal.SetKeyMap, KeyMapPolicy decides who may
+// change them); this module keeps a copy in the browser only so the keys work at once on start (a per-device
+// convenience) and replaces it with the server's as soon as it is read (useKeySync).
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { SALE_KEYS, KDS_KEYS, type SaleAction, type KdsAction } from './profiles';
 import { inScanBurst } from './scanburst';
 import { keyPane } from './devices';
+import { useQuery, useDev } from './hooks';
 
 export type KeyScope = 'sale' | 'kds';
 export type KeyAction = SaleAction | 'primary' | KdsAction;
@@ -61,6 +65,29 @@ export const keymap = {
   },
   /** Back to the profile's keys on this device. */
   reset(deviceId: string, scope: KeyScope = 'sale') { const { [slot(deviceId, scope)]: _, ...rest } = all; all = rest; emit(); },
+  /** ux-14: the changes this device would store after assigning `key` to `action` (swap on conflict) — sent to the server. */
+  changesAfter(deviceId: string, action: KeyAction, key: string, scope: KeyScope = 'sale', profileKeys?: Map): Record<string, string> {
+    const cur = keymap.get(deviceId, scope, profileKeys);
+    const old = cur[action];
+    const other = (Object.keys(cur) as KeyAction[]).find((a) => a !== action && cur[a] === key);
+    const changes: Map = { ...(all[slot(deviceId, scope)] ?? {}) };
+    delete changes[action];
+    changes[action] = key;
+    if (other && old) { delete changes[other]; changes[other] = old; }
+    // a change equal to the profile's own key is no change; two actions never keep the same key
+    const base = keymap.base(scope, profileKeys);
+    const out: Record<string, string> = {};
+    for (const [a, k] of Object.entries(changes) as [KeyAction, string | undefined][]) if (k && base[a] !== k && !Object.values(out).includes(k)) out[a] = k;
+    return out;
+  },
+  /** ux-14: the server's record replaces the device's copy. */
+  hydrate(deviceId: string, scope: KeyScope, changes: Record<string, string>) {
+    const cur = all[slot(deviceId, scope)] ?? {};
+    if (JSON.stringify(cur) === JSON.stringify(changes)) return;
+    all = { ...all, [slot(deviceId, scope)]: { ...changes } as Map };
+    if (!Object.keys(changes).length) { const { [slot(deviceId, scope)]: _, ...rest } = all; all = rest; }
+    emit();
+  },
   subscribe(fn: () => void) { ls.add(fn); return () => { ls.delete(fn); }; },
   snapshot: () => all,
 };
@@ -109,4 +136,15 @@ export function useHotkeys(deviceId: string, active: boolean, handlers: Partial<
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
   }, [active]);
+}
+
+/** ux-14: reads this terminal's key changes from the server (Terminal.KeyMap) and keeps the device's copy in step.
+ *  `canChange` follows KeyMapPolicy (the server refuses otherwise). Devices without a terminal keep their copy only. */
+export function useKeySync(deviceId: string, enabled = true) {
+  const { terminal } = useDev();
+  const on = enabled && !!terminal && terminal.id === deviceId;
+  const q = useQuery<any>(on ? 'Terminal.KeyMap' : null, { params: { terminalId: deviceId } });
+  const d = q.data;
+  useEffect(() => { if (d && on) { keymap.hydrate(deviceId, 'sale', d.sale ?? {}); keymap.hydrate(deviceId, 'kds', d.kds ?? {}); } }, [d?.version, d?.updatedAt, on]); // eslint-disable-line react-hooks/exhaustive-deps
+  return { canChange: on ? !!d?.canChange : true, version: d?.version ?? 0, server: on, loaded: !on || !!d, refetch: q.refetch };
 }

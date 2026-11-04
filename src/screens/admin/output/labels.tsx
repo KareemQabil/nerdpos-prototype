@@ -19,10 +19,10 @@ export function PrintStatePill({ state }: { state: string }) {
   return <Pill tone={tone} dot>{printStateLabel(state)}</Pill>;
 }
 export function docTypeLabel(d: string): string {
-  return ({ RECEIPT: t('إيصال'), KITCHEN_TICKET: t('تذكرة مطبخ'), PRE_BILL: t('شيك مبدئي'), X_REPORT: t('تقرير X'), Z_REPORT: t('تقرير Z'), FISCAL_DOCUMENT: t('إيصال إلكتروني') } as Record<string, string>)[d] ?? d;
+  return ({ RECEIPT: t('إيصال'), KITCHEN_TICKET: t('تذكرة مطبخ'), PRE_BILL: t('شيك مبدئي'), X_REPORT: t('تقرير X'), Z_REPORT: t('تقرير Z'), FISCAL_DOCUMENT: t('إيصال إلكتروني'), TEST_PAGE: t('صفحة تجربة'), DRAWER_KICK: t('فتح درج النقدية') /* ux-14 */ } as Record<string, string>)[d] ?? d;
 }
 export function printErrorLabel(e: string): string {
-  return ({ PAPER_OUT: t('الورق خلص'), PRINTER_UNREACHABLE: t('الطابعة مش بترد') } as Record<string, string>)[e] ?? e;
+  return ({ PAPER_OUT: t('الورق خلص'), PRINTER_UNREACHABLE: t('الطابعة مش بترد'), NO_PRINTER: t('لا توجد طابعة للجهاز'), DEVICE_DISABLED: t('الجهاز متوقف'), DEVICE_ERROR: t('عطل في الجهاز') /* ux-14 */ } as Record<string, string>)[e] ?? e;
 }
 /** Time relative to the mock server clock ("بعد 12 ث"), display only. */
 export function inTime(ms: number): string {

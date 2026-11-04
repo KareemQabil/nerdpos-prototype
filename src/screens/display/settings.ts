@@ -1,31 +1,14 @@
-// Settings of a display screen, kept on the display device itself (like a TV's own menu): which terminal it follows,
-// its look (the app theme or the high-contrast display style) and the branding strip. ux-12c: when a number is called and
-// how long it stays «جاهز» are the venue rule CallBoardPolicy (restaurant settings), not a setting of one screen.
-import { useSyncExternalStore } from 'react';
-import { DISPLAY_DEVICES } from '../../app/devices';
-
+// ux-14: a display screen's settings are a server record of the device registry (managed in «الأجهزة»: which terminal
+// it follows, its look, the branding strip; the customer display's content and timing come with it). The screen reads
+// them with its own view (CustomerDisplay.View / CallBoard.View with displayId). The display device keeps only
+// per-viewer conveniences — mute (app/sound) and full screen; nothing else is stored in its browser.
 export type DisplayStyle = 'theme' | 'display';
-export interface DisplaySettings { host: string; style: DisplayStyle; branding: boolean }
-const KEY = 'nerdpos.display.v1';
-let all: Record<string, Partial<DisplaySettings>> = (() => { try { return JSON.parse(localStorage.getItem(KEY) ?? '{}') ?? {}; } catch { return {}; } })();
-const ls = new Set<() => void>();
-const cache = new Map<string, DisplaySettings>();
+export interface DisplayConfig {
+  id: string; code: string; name: string; kind: 'CUSTOMER_DISPLAY' | 'CALL_BOARD'; enabled: boolean;
+  style: DisplayStyle; branding: boolean; slideSeconds: number; thanksSeconds: number; idleContent: 'ASSIGNED_ONLY' | 'ASSIGNED_AND_PROMOTIONS';
+}
+/** Shown until the server answers (the strictest workable defaults of CustomerDisplayPolicy). */
+export const DISPLAY_DEFAULT: Omit<DisplayConfig, 'id' | 'code' | 'name' | 'kind'> = { enabled: true, style: 'theme', branding: true, slideSeconds: 8, thanksSeconds: 60, idleContent: 'ASSIGNED_ONLY' };
 
-export function displaySettings(id: string): DisplaySettings {
-  const hit = cache.get(id);
-  if (hit) return hit;
-  const d = DISPLAY_DEVICES[id];
-  const { readyMinutes: _r, autoCall: _a, ...saved } = (all[id] ?? {}) as Partial<DisplaySettings> & { readyMinutes?: unknown; autoCall?: unknown }; // older builds kept these per screen
-  const v: DisplaySettings = { host: d?.host ?? 't_cash', style: 'theme', branding: true, ...saved };
-  cache.set(id, v);
-  return v;
-}
-export function setDisplaySettings(id: string, patch: Partial<DisplaySettings>) {
-  all = { ...all, [id]: { ...(all[id] ?? {}), ...patch } };
-  cache.delete(id);
-  try { localStorage.setItem(KEY, JSON.stringify(all)); } catch { /* ignore */ }
-  ls.forEach((f) => f());
-}
-export function useDisplaySettings(id: string): DisplaySettings {
-  return useSyncExternalStore((cb) => { ls.add(cb); return () => { ls.delete(cb); }; }, () => displaySettings(id));
-}
+// the settings a display kept in its own browser before ux-14 are dropped once (the server record replaces them)
+try { if (typeof localStorage !== 'undefined') localStorage.removeItem('nerdpos.display.v1'); } catch { /* blocked storage: nothing to drop */ }

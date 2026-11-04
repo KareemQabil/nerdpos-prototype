@@ -10,7 +10,7 @@ import {
 import { useDev, useQuery } from '../app/hooks';
 import { screenById } from '../app/registry';
 import { Banner, Button, Card, Money, Pill, StateBadge, PageHeader, StatGrid, StatCard, EmptyState, Skeleton } from '../ui';
-import { t, L, useLang } from '../i18n';
+import { t, L, tv, useLang } from '../i18n';
 import { Tech } from '../app/tech';
 import { cn, money, dayLong, qty } from '../lib/format';
 import { pctChange, sign, sumAmounts, sumDecimals } from '../lib/cash';
@@ -310,6 +310,8 @@ function NeedsAction() {
   const days = useList<any>('BusinessDay.Find', { query: { limit: 7 } });
   const recon = useQuery<any>('Reconciliation.Board', { query: { status: 'UNEXPLAINED_DIFFERENCE' } });
   const outbox = useQuery<any>('OutboxDelivery.Find', { query: { limit: 1 } });
+  const { can } = useDev();
+  const devs = useList<any>(can('device:read') ? 'Device.List' : null); // ux-14
 
   const alerts: Alert[] = [];
   const pending = approvals.data?.pending ?? 0;
@@ -321,6 +323,8 @@ function NeedsAction() {
   const nearDeadline = fiscal.items.filter((d) => d.alert).length;
   if (rejected || nearDeadline) alerts.push({ id: 'fiscal', tone: nearDeadline ? 'error' : 'warning', icon: <FileWarning className="w-4 h-4" />, title: t('{n} إيصال إلكتروني محتاج تدخل', { n: rejected || nearDeadline }), text: nearDeadline ? t('{h} منهم قربوا من مهلة الـ 24 ساعة. البيع ماشي عادي.', { h: nearDeadline }) : t('مرفوض أو ناقصه بيانات — البيع ماشي عادي.'), screen: 'ereceipts', cta: t('افتح') });
   if (prints.items.length) alerts.push({ id: 'prints', tone: prints.items.some((j) => j.state === 'DEAD') ? 'error' : 'warning', icon: <Printer className="w-4 h-4" />, title: t('{n} أمر طباعة ما طبعش', { n: prints.items.length }), text: t('شوف الطابعة واضغط «إعادة» من طابور الطباعة.'), screen: 'prints', cta: t('افتح') });
+  const sick = devs.items.filter((d) => d.status === 'OFFLINE' || d.status === 'PAPER_OUT' || d.status === 'ERROR');
+  if (sick.length) alerts.push({ id: 'devices', tone: 'error', icon: <Printer className="w-4 h-4" />, title: t('{n} جهاز يحتاج انتباهًا', { n: sick.length }), text: sick.slice(0, 3).map((d) => tv(d.name)).join(t('، ')), screen: 'devices', cta: t('افتح') }); // ux-14
   const lastClosed = days.items.find((d) => d.state === 'CLOSED');
   const variance = n(lastClosed?.summary?.cashVariance);
   if (lastClosed && variance !== 0) alerts.push({ id: 'variance', tone: Math.abs(variance) >= 100 ? 'error' : 'warning', icon: <Banknote className="w-4 h-4" />, title: variance < 0 ? t('عجز {m} في الدرج', { m: money(String(Math.abs(variance))) }) : t('زيادة {m} في الدرج', { m: money(String(variance)) }), text: t('في قفلة {d}.', { d: dayLabel(lastClosed.date) }), screen: 'reconciliation', cta: t('راجع') });

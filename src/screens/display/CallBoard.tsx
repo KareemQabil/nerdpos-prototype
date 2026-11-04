@@ -10,14 +10,18 @@ import { cn } from '../../lib/format';
 import { cue, useSound } from '../../app/sound';
 import { useNow } from '../../ui';
 import { clock, localTime } from '../../mock/clock';
-import type { DisplaySettings } from './settings';
+import { DISPLAY_DEFAULT, type DisplayConfig } from './settings';
 
 const MAX_PREP = 15, MAX_READY = 8;
 
-export function CallBoard({ displayId, cfg, online }: { displayId: string; cfg: DisplaySettings; online: boolean }) {
+export function CallBoard({ displayId, online, onConfig }: { displayId: string; online: boolean; onConfig: (c: DisplayConfig | null) => void }) {
   useNow(15000);
   useStoreVersion();
-  const q = useQuery<any>('CallBoard.View'); // ux-12c: timing, call mode and delivery numbers are the venue rule CallBoardPolicy
+  // ux-12c: timing, call mode and delivery numbers are the venue rule CallBoardPolicy; ux-14: the board's own look and
+  // branding strip are its server record (read with displayId)
+  const q = useQuery<any>('CallBoard.View', { query: { displayId } });
+  const cfg: DisplayConfig | typeof DISPLAY_DEFAULT = q.data?.display ?? DISPLAY_DEFAULT;
+  useEffect(() => { onConfig(q.data?.display ?? null); }, [q.data?.display?.style, q.data?.display?.branding, q.data?.display?.enabled, q.data?.display?.name]); // eslint-disable-line react-hooks/exhaustive-deps
   const tpl = useQuery<any>(cfg.branding ? 'DocTemplate.Get' : null);
   // a number also leaves «جاهز» when its minutes run out with nothing else changing
   useEffect(() => { const iv = setInterval(() => q.refetch(), 15000); return () => clearInterval(iv); }, []); // eslint-disable-line react-hooks/exhaustive-deps

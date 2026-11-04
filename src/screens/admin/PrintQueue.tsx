@@ -1,19 +1,23 @@
 // G2 Print queue: jobs from PrintJob.Find, retry the same job (never a new copy), reprint a receipt as a copy.
+// ux-14: each job shows the device it went to; the printers of this terminal show their status and a test page.
 import React, { useMemo, useState } from 'react';
-import { RefreshCw, Copy, Eye, AlertTriangle, Printer, Clock3, CheckCircle2, XCircle, Ban } from 'lucide-react';
+import { RefreshCw, Copy, Eye, AlertTriangle, Printer, Clock3, CheckCircle2, XCircle, Ban, FileText, MonitorSmartphone, Archive } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';
 import { PageHeader, StateBadge, Banner, Button, Pill, Select, Table, Card, useNow, StatGrid, StatCard, Toolbar, EmptyState, DateTime } from '../../ui';
 import { t, tLabel, tv } from '../../i18n';
+import { useList } from './org/common';
 import { Tech } from '../../app/tech';
 import { deviceName } from '../../demo/people';
 import { dateTime } from '../../lib/format';
 import { PrintStatePill, printStateLabel, docTypeLabel, printErrorLabel, inTime } from './output/labels';
 import { ReprintDialog } from './output/ReprintDialog';
+import { StatusPill } from './Devices'; // ux-14
 
 const REPRINTABLE = ['RECEIPT', 'FISCAL_DOCUMENT'];
 
 export default function PrintQueue() {
-  const { terminal, can, nav } = useDev();
+  const { terminal, can, nav, kind } = useDev();
+  const screenOk = kind === 'ADMIN' || kind === 'BO'; // «الأجهزة» lives on the office devices
   useNow(1000);
   const [state, setState] = useState('');
   const [terminalId, setTerminalId] = useState('');
@@ -45,7 +49,8 @@ export default function PrintQueue() {
   return (
     <div className="space-y-4" data-screen-id="G2">
       <PageHeader icon={<Printer />} title={t('طابور الطباعة')} badge={<StateBadge ops={['PrintJob.Find', 'PrintJob.Retry', 'Print.Reprint']} />}
-        actions={<Button variant="ghost" onClick={() => { all.refetch(); list.refetch(); }} data-fb="prints:refresh"><RefreshCw className="w-4 h-4" />{t('تحديث')}</Button>} />
+        actions={<>{can('device:read') && screenOk && <Button variant="ghost" onClick={() => nav('devices')} data-fb="prints:devices"><MonitorSmartphone className="w-4 h-4" />{t('الأجهزة')}</Button>}<Button variant="ghost" onClick={() => { all.refetch(); list.refetch(); }} data-fb="prints:refresh"><RefreshCw className="w-4 h-4" />{t('تحديث')}</Button></>} />
+      {terminal && can('device:read') && <TerminalPrinters terminalId={terminal.id} />}
 
       {(dead.length > 0 || failed.length > 0) && (
         <Banner tone={dead.length ? 'error' : 'warning'} action={dead.length > 0 && can('print:retry') ? <Button size="sm" variant="danger" loading={busy} data-fb="prints:retry-all-dead" onClick={async () => { for (const j of dead) await retry(j); }}>{t('إعادة كل الواقفة')}</Button> : undefined}>
@@ -68,12 +73,12 @@ export default function PrintQueue() {
         <Toolbar>
           <Select data-fb="prints:filter-state" className="!w-auto min-w-[190px]" value={state} onChange={(e) => setState(e.target.value)} options={[{ value: '', label: t('كل الحالات') }, { value: 'FAILED,DEAD', label: t('محتاجة تدخل (فشلت أو وقفت)') }, ...['PENDING', 'SUCCEEDED', 'FAILED', 'DEAD'].map((s) => ({ value: s, label: printStateLabel(s) }))]} />
           <Select data-fb="prints:filter-terminal" className="!w-auto min-w-[170px]" value={terminalId} onChange={(e) => setTerminalId(e.target.value)} options={[{ value: '', label: t('كل الأجهزة') }, ...terminals.map(([id, code]) => ({ value: id, label: deviceName(code) + (terminal?.id === id ? ` (${t('الجهاز ده')})` : '') }))]} />
-          <Select data-fb="prints:filter-doctype" className="!w-auto min-w-[160px]" value={documentType} onChange={(e) => setDocumentType(e.target.value)} options={[{ value: '', label: t('كل الأوراق') }, ...['RECEIPT', 'KITCHEN_TICKET', 'PRE_BILL', 'X_REPORT', 'Z_REPORT', 'FISCAL_DOCUMENT'].map((d) => ({ value: d, label: docTypeLabel(d) }))]} />
+          <Select data-fb="prints:filter-doctype" className="!w-auto min-w-[160px]" value={documentType} onChange={(e) => setDocumentType(e.target.value)} options={[{ value: '', label: t('كل الأوراق') }, ...['RECEIPT', 'KITCHEN_TICKET', 'PRE_BILL', 'X_REPORT', 'Z_REPORT', 'FISCAL_DOCUMENT', 'TEST_PAGE', 'DRAWER_KICK'].map((d) => ({ value: d, label: docTypeLabel(d) }))]} />
         </Toolbar>
         {(
           <Table loading={list.loading && !list.data} maxHeight={620}
-            align={[undefined, undefined, undefined, undefined, undefined, undefined, undefined, 'end']}
-            head={[t('الورقة'), t('النوع'), t('أصل / نسخة'), t('الجهاز'), t('الحالة'), t('المحاولات'), t('المحاولة الجاية'), '']}
+            align={[undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 'end']}
+            head={[t('الورقة'), t('النوع'), t('أصل / نسخة'), t('الجهاز'), t('الطابعة'), t('الحالة'), t('المحاولات'), t('المحاولة الجاية'), '']}
             empty={<EmptyState compact icon={<Printer />} title={t('مفيش أوراق في الطابور')} text={t('بيع حاجة على الكاشير وهتظهر هنا.')} />}
             rows={rows.map((j) => {
               const errs = (j.attempts ?? []).filter((a: any) => a.error);
@@ -82,6 +87,7 @@ export default function PrintQueue() {
                 docTypeLabel(j.documentType),
                 j.copyKind === 'REPRINT' ? <Pill tone="violet" title="REPRINT">{t('نسخة')}</Pill> : <Pill tone="neutral" title="ORIGINAL">{t('أصل')}</Pill>,
                 <span>{deviceName(j.terminalCode ?? j.terminalId)}<Tech><span className="num text-[10px] text-dim block">{j.terminalCode}</span></Tech></span>,
+                <span data-fb={`prints:printer:${j.id}`}>{j.printerName ? tv(j.printerName) : <span className="text-dim">—</span>}<Tech><span className="num text-[10px] text-dim block">{j.printerCode}</span></Tech></span>,
                 <PrintStatePill state={j.state} />,
                 <div className="text-xs space-y-0.5">
                   <div><span className="num font-bold">{(j.attempts ?? []).length}</span> {t('محاولة')}{errs.length > 0 && <span className="text-dim"> · <span className="num">{errs.length}</span> {t('فشلت')}</span>}</div>
@@ -113,6 +119,27 @@ export default function PrintQueue() {
       </Tech>
 
       {reprint && <ReprintDialog job={reprint} onClose={() => setReprint(null)} terminalId={terminal?.id ?? reprint.terminalId} />}
+    </div>
+  );
+}
+
+/** ux-14: the printers and the cash drawer attached to this terminal — status and a test page (Device.TestPrint). */
+function TerminalPrinters({ terminalId }: { terminalId: string }) {
+  const { can } = useDev();
+  const devs = useList<any>('Device.List', { query: { terminalId } });
+  const { run, busy } = useCommand();
+  const list = devs.items.filter((d) => d.kind === 'PRINTER' || d.kind === 'CASH_DRAWER');
+  if (!list.length) return null;
+  return (
+    <div data-fb="prints:terminal-printers">
+      <div className="flex flex-wrap gap-2">
+        {list.map((d) => (
+          <div key={d.id} className="flex items-center gap-2 rounded-xl surface-1 border border-[var(--glass-border)] px-3 py-1.5" data-fb={`prints:device:${d.id}`} data-status={d.status}>
+            {d.kind === 'CASH_DRAWER' ? <Archive className="w-4 h-4 text-soft" /> : <Printer className="w-4 h-4 text-soft" />}<span className="text-sm font-bold">{tv(d.name)}</span><StatusPill status={d.status} />
+            {d.kind === 'PRINTER' && d.enabled && can('device:test') && <Button size="sm" variant="ghost" loading={busy} onClick={() => run('Device.TestPrint', { params: { deviceId: d.id } }, { success: t('أُرسلت صفحة التجربة إلى الطابعة') })} data-fb={`prints:test:${d.id}`}><FileText className="w-3.5 h-3.5" />{t('صفحة تجربة')}</Button>}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
