@@ -201,7 +201,7 @@ function TerminalModal({ branches, onClose }: { branches: any[]; onClose: () => 
       footer={<><Button variant="ghost" onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" loading={busy} disabled={!code.trim() || !name.trim() || !branchId} onClick={save} data-fb="org:terminal-save">{t('تسجيل')}</Button></>}>
       <div className="grid grid-cols-2 gap-3">
         <Field label={t('الكود')} required hint={t('حروف إنجليزي قصيرة ومينفعش تتكرر، مثلًا: CASH-2')}><Input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} dir="ltr" data-fb="org:terminal-code" /></Field>
-        <Field label={t('اسم الجهاز')} required hint={t('مثلًا: كاشير التيك أواي')}><Input value={name} onChange={(e) => setName(e.target.value)} data-fb="org:terminal-name" /></Field>
+        <Field label={t('اسم الجهاز')} required hint={t('مثال: جهاز الكاشير 3')}><Input value={name} onChange={(e) => setName(e.target.value)} data-fb="org:terminal-name" /></Field>
         <Field label={t('الفرع')} className="col-span-2"><Select value={branchId} onChange={(e) => setBranchId(e.target.value)} options={branches.map((b) => ({ value: b.id, label: `${branchLabel(b)}${b.active ? '' : ' — ' + t('موقوف')}` }))} /></Field>
         <Field label={<span className="flex items-center gap-2">{t('نوع الجهاز')}<Tech><StateBadge state="PROPOSED" /></Tech></span>}>
           <Select value={kind} onChange={(e) => { const k = e.target.value as any; setKind(k); setDrawer(k === 'CASH'); }} options={(['CASH', 'FLOOR', 'KDS', 'ADMIN'] as const).map((k) => ({ value: k, label: terminalKindLabel(k) }))} data-fb="org:terminal-kind" />

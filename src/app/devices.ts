@@ -3,6 +3,9 @@
 import { useSyncExternalStore } from 'react';
 import { store } from '../mock/store';
 import type { DeviceAuth } from '../api/client';
+import { DEVICE_NAMES } from '../demo/people';
+import { resolveRoute } from './routes';
+import { techMode } from './tech';
 
 export interface DeviceState { id: string; terminalId: string | null; branchId: string | null; token: string | null; userName: string | null; screen: string; params: Record<string, any> }
 interface Persisted { devices: Record<string, DeviceState>; primary: string; secondary: string | null; split: boolean }
@@ -12,6 +15,15 @@ let st: Persisted = (() => {
   try { const p = JSON.parse(localStorage.getItem(KEY) ?? 'null'); if (p?.devices) return p; } catch { /* ignore */ }
   return { devices: {}, primary: 't_floor', secondary: 't_cash', split: false };
 })();
+/** ux-07: removed / merged screens land on the surviving entry point (stored state, deep links, journeys, search). */
+const kindOf = (id: string) => (store.db.terminals.find((x) => x.id === id)?.kind ?? (id === 'BO' ? 'BO' : null));
+const orderVisit = (orderId: string) => !!store.db.orders.find((o) => o.id === orderId)?.visitId;
+export const routeFor = (id: string, screen: string, params: Record<string, any>) => resolveRoute(screen, params, kindOf(id), techMode.get(), orderVisit);
+try {
+  let moved = false;
+  for (const [id, d] of Object.entries(st.devices)) { const r = routeFor(id, d.screen, d.params ?? {}); if (r.screen !== d.screen) { st.devices[id] = { ...d, screen: r.screen, params: r.params }; moved = true; } }
+  if (moved) localStorage.setItem(KEY, JSON.stringify(st));
+} catch { /* the store is not ready: getDevice / ScreenHost redirect later */ }
 const ls = new Set<() => void>();
 let snapshot = { ...st };
 function emit() {
@@ -20,17 +32,11 @@ function emit() {
   ls.forEach((f) => f());
 }
 
-export const SEEDED_LABELS: Record<string, { ar: string; en: string; short: string }> = {
-  t_cash: { ar: 'كاشير (درج)', en: 'Cashier (drawer)', short: 'T1' },
-  t_floor: { ar: 'تابلت الويتر', en: 'Waiter tablet', short: 'T2' },
-  t_kds: { ar: 'شاشة المطبخ (التسليم)', en: 'Kitchen screen (dispatch)', short: 'K1' },
-  t_admin: { ar: 'مكتب المدير', en: 'Manager office', short: 'ADM' },
-  t_second_floor: { ar: 'تابلت الفرع التاني', en: 'Second branch tablet', short: 'B2' },
-  t_cash2: { ar: 'كاشير التيك أواي', en: 'Takeaway cashier', short: 'T3' },
-  t_kds2: { ar: 'شاشة المشويات', en: 'Grill screen', short: 'K2' },
-  BO: { ar: 'باك أوفيس (من غير جهاز)', en: 'Back office (no terminal)', short: 'BO' },
-  d_callboard: { ar: 'شاشة النداء', en: 'Call board', short: 'CB' },
-  d_customer: { ar: 'شاشة العميل', en: 'Customer display', short: 'CD' },
+/** Short top-bar codes of the seeded devices (shown only with technical details on). The device NAME has one source:
+ *  DEVICE_NAMES in demo/people.ts, which is also what the seed writes into terminal.name (ux-07). */
+export const SEEDED_LABELS: Record<string, { short: string }> = {
+  t_cash: { short: 'T1' }, t_floor: { short: 'T2' }, t_kds: { short: 'K1' }, t_admin: { short: 'ADM' }, t_second_floor: { short: 'B2' },
+  t_cash2: { short: 'T3' }, t_kds2: { short: 'K2' }, BO: { short: 'BO' }, d_callboard: { short: 'CB' }, d_customer: { short: 'CD' },
 };
 
 /** ux-04: display screens are attached to a terminal (HDMI / second screen) and use its session — no sign-in of their
@@ -49,7 +55,11 @@ export function deviceIds(): string[] {
 
 export function getDevice(id: string): DeviceState {
   const existing = st.devices[id];
-  if (existing) return existing;
+  if (existing) {
+    const r = routeFor(id, existing.screen, existing.params);
+    if (r.screen !== existing.screen) st.devices[id] = { ...existing, screen: r.screen, params: r.params };
+    return st.devices[id];
+  }
   const t = store.db.terminals.find((x) => x.id === id);
   const kind = t?.kind;
   const screen = isDisplay(id) ? 'display' : kind === 'KDS' ? 'kitchen' : kind === 'FLOOR' ? 'floor' : kind === 'CASH' ? 'counter' : 'home';
@@ -70,7 +80,8 @@ export const devices = {
     emit();
   },
   navigate(id: string, screen: string, params: Record<string, any> = {}) {
-    st.devices[id] = { ...getDevice(id), screen, params };
+    const r = routeFor(id, screen, params);
+    st.devices[id] = { ...getDevice(id), screen: r.screen, params: r.params };
     emit();
   },
   logout(id: string) {
@@ -98,6 +109,7 @@ export function useDevicesState() {
 export function deviceLabel(id: string, lang: 'ar' | 'en') {
   const s = SEEDED_LABELS[id];
   const t = store.db.terminals.find((x) => x.id === id);
-  if (s) return { short: s.short, name: lang === 'ar' ? s.ar : s.en, code: t?.code ?? (id === 'BO' ? '—' : id) };
+  const n = DEVICE_NAMES[id];
+  if (s && n) return { short: s.short, name: lang === 'ar' ? n.name : n.en, code: t?.code ?? (id === 'BO' ? '—' : id) };
   return { short: t?.code ?? id, name: t?.name ?? id, code: t?.code ?? id };
 }

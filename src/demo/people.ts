@@ -77,35 +77,37 @@ export const verb = (username: string | null | undefined, m: string, f: string) 
 export interface DeviceName { name: string; short: string; en: string; shortEn?: string; hint: string }
 /** Seeded device ids and the short top-bar codes (T1, T2…) → plain names. */
 export const DEVICE_NAMES: Record<string, DeviceName> = {
-  t_cash: { name: 'جهاز الكاشير', short: 'الكاشير', en: 'Cashier station', shortEn: 'Cashier', hint: 'جهاز الكاشير اللي عليه درج الفلوس: بيع تيك أواي، تحصيل الشيكات، الوردية' },
-  t_floor: { name: 'تابلت الويتر', short: 'الويتر', en: 'Waiter tablet', shortEn: 'Waiter', hint: 'تابلت الويتر في الصالة: فتح الترابيزات والشيكات والإرسال للمطبخ (من غير درج)' },
-  t_kds: { name: 'شاشة المطبخ', short: 'المطبخ', en: 'Kitchen screen', shortEn: 'Kitchen', hint: 'شاشة المطبخ والتسليم: كل المحطات، وعليها «جاهز للتسليم» والتسليم للويتر' },
-  t_admin: { name: 'كمبيوتر المدير', short: 'المدير', en: "Manager's PC", shortEn: 'Manager', hint: 'كمبيوتر المدير في المكتب: الموافقات والتقارير والإعدادات' },
-  t_second_floor: { name: 'تابلت الفرع التاني', short: 'الفرع التاني', en: 'Second-branch tablet', shortEn: 'Branch 2', hint: 'تابلت ويتر في الفرع التاني' },
-  t_kds2: { name: 'شاشة المشويات', short: 'المشويات', en: 'Grill screen', shortEn: 'Grill', hint: 'شاشة محطة المشويات: بتعرض أصناف المشويات بس، و«جاهز» بيبعت الطلب لشاشة التسليم' },
-  t_cash2: { name: 'كاشير التيك أواي', short: 'التيك أواي', en: 'Takeaway counter', shortEn: 'Takeaway', hint: 'كاشير تاني بدرج لطلبات التيك أواي' },
-  BO: { name: 'الإدارة من أي مكان', short: 'الإدارة', en: 'Back office', shortEn: 'Back office', hint: 'الإدارة من أي كمبيوتر (من غير جهاز في المطعم): المنيو والإعدادات والتقارير' },
+  // ux-07: ONE canonical name per device, used by the seed (terminal.name), the top bar, headers, toasts and English.
+  // A device is never named after a role (المدير / الإدارة) or a cashier mode (تيك أواي).
+  t_cash: { name: 'جهاز الكاشير 1', short: 'كاشير 1', en: 'Cashier station 1', shortEn: 'Cashier 1', hint: 'جهاز الكاشير الذي عليه درج النقدية: البيع وتحصيل الشيكات والوردية' },
+  t_floor: { name: 'تابلت الويتر', short: 'الويتر', en: 'Waiter tablet', shortEn: 'Waiter', hint: 'تابلت الويتر في الصالة: فتح الترابيزات والشيكات والإرسال للمطبخ (بلا درج)' },
+  t_kds: { name: 'شاشة التسليم', short: 'التسليم', en: 'Dispatch screen', shortEn: 'Dispatch', hint: 'شاشة المطبخ للتسليم: كل المحطات، وعليها «جاهز للتسليم» والتسليم للويتر' },
+  t_admin: { name: 'كمبيوتر المكتب', short: 'المكتب', en: 'Office PC', shortEn: 'Office', hint: 'كمبيوتر المكتب في المطعم: الموافقات والتقارير والإعدادات' },
+  t_second_floor: { name: 'تابلت الفرع الثاني', short: 'الفرع الثاني', en: 'Second-branch tablet', shortEn: 'Branch 2', hint: 'تابلت ويتر في الفرع الثاني' },
+  t_kds2: { name: 'محطة المشويات', short: 'المشويات', en: 'Grill station', shortEn: 'Grill', hint: 'شاشة محطة المشويات: تعرض أصناف المشويات فقط، و«جاهز» يرسل الطلب لشاشة التسليم' },
+  t_cash2: { name: 'جهاز الكاشير 2', short: 'كاشير 2', en: 'Cashier station 2', shortEn: 'Cashier 2', hint: 'جهاز كاشير ثانٍ عليه درج نقدية' },
+  BO: { name: 'الإدارة عن بُعد', short: 'عن بُعد', en: 'Remote back office', shortEn: 'Remote', hint: 'الإدارة من أي كمبيوتر خارج المطعم (بلا جهاز مسجّل): القائمة والإعدادات والتقارير' },
   // ux-04: display screens (attached to a terminal; no sign-in of their own)
   d_callboard: { name: 'شاشة النداء', short: 'شاشة النداء', en: 'Call board', shortEn: 'Call board', hint: 'شاشة أرقام الطلبات للعملاء: قيد التحضير وجاهز، تعمل مع شاشة التسليم' },
   d_customer: { name: 'شاشة العميل', short: 'شاشة العميل', en: 'Customer display', shortEn: 'Customer display', hint: 'الشاشة المواجهة للعميل عند الكاشير: الأصناف والإجمالي والدفع' },
 };
-const SHORT_TO_ID: Record<string, string> = { T1: 't_cash', T2: 't_floor', K1: 't_kds', K2: 't_kds2', ADM: 't_admin', B2: 't_second_floor', BO: 'BO' };
-const KIND_NAME: Record<string, string> = { CASH: 'جهاز الكاشير', FLOOR: 'تابلت الويتر', KDS: 'شاشة المطبخ', ADMIN: 'كمبيوتر المدير' };
-const KIND_NAME_EN: Record<string, string> = { CASH: 'Cashier station', FLOOR: 'Waiter tablet', KDS: 'Kitchen screen', ADMIN: "Manager's PC" };
+const SHORT_TO_ID: Record<string, string> = { T1: 't_cash', T2: 't_floor', K1: 't_kds', K2: 't_kds2', ADM: 't_admin', B2: 't_second_floor', T3: 't_cash2', BO: 'BO' };
+const KIND_NAME: Record<string, string> = { CASH: 'جهاز الكاشير', FLOOR: 'تابلت الويتر', KDS: 'شاشة المطبخ', ADMIN: 'كمبيوتر المكتب' };
+const KIND_NAME_EN: Record<string, string> = { CASH: 'Cashier station', FLOOR: 'Waiter tablet', KDS: 'Kitchen screen', ADMIN: 'Office PC' };
 const kindName = (k: string) => (isEn() ? KIND_NAME_EN[k] : KIND_NAME[k]);
 export const terminalKindName = (kind: string) => kindName(kind) ?? kind;
 const devName = (id: string) => (isEn() ? DEVICE_NAMES[id].en : DEVICE_NAMES[id].name);
 /** The device's one-line hint (tooltip) in the UI language. */
 export const deviceHint = (id: string) => (DEVICE_NAMES[id] ? (isEn() ? DEVICE_HINT_EN[id] ?? DEVICE_NAMES[id].hint : DEVICE_NAMES[id].hint) : '');
 const DEVICE_HINT_EN: Record<string, string> = {
-  t_cash: 'The cashier station with the cash drawer: takeaway sales, collecting checks, the shift',
+  t_cash: 'The cashier station with the cash drawer: sales, collecting checks, the shift',
   t_floor: 'The waiter tablet on the floor: opening tables and checks, sending to the kitchen (no drawer)',
-  t_kds: 'The kitchen and dispatch screen: every station, with “ready for hand-off” and the hand-off to the waiter',
-  t_admin: "The manager's PC in the office: approvals, reports and settings",
+  t_kds: 'The kitchen dispatch screen: every station, with “ready for hand-off” and the hand-off to the waiter',
+  t_admin: 'The office PC in the restaurant: approvals, reports and settings',
   t_second_floor: 'A waiter tablet in the second branch',
-  t_cash2: 'A second cashier with a drawer for takeaway orders',
+  t_cash2: 'A second cashier station with a cash drawer',
   t_kds2: 'The grill station screen: grill items only; “Ready” sends the order to the dispatch screen',
-  BO: 'Management from any computer (no device in the restaurant): menu, settings and reports',
+  BO: 'Management from any computer outside the restaurant (no registered device): menu, settings and reports',
   d_callboard: 'The order-number board for guests: preparing and ready, driven by the dispatch screen',
   d_customer: 'The guest-facing screen at the cashier: items, total and payment',
 };
@@ -123,6 +125,7 @@ export function deviceName(idOrCode: string | null | undefined, kind?: string | 
   if (code === 'DEMO-KDS-2') return devName('t_kds2');
   if (code === 'DEMO-ADMIN-1') return devName('t_admin');
   if (code === 'DEMO-SECOND-FLOOR-1') return devName('t_second_floor');
+  if (code === 'DEMO-CASH-2') return devName('t_cash2');
   if (kind && KIND_NAME[kind]) return kindName(kind);
   if (code.includes('CASH')) return kindName('CASH');
   if (code.includes('FLOOR')) return kindName('FLOOR');

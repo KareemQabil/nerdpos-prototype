@@ -82,7 +82,7 @@ export const JOURNEY_PLAIN: Record<string, JourneyPlain> = {
   },
 };
 
-const MGR = B('أحمد (مدير الصالة) على كمبيوتر المدير', 'Ahmed (floor manager) on the manager PC');
+const MGR = B('أحمد (مدير الصالة) على كمبيوتر المكتب', 'Ahmed (floor manager) on the office PC');
 export const STEP_PLAIN: Record<string, StepPlain> = {
   // ───────── J-R1
   'J-R1-1': S('اعمل ترابيزة جديدة رقم 13 في التراس (4 كراسي). بعدها جرّب تعمل ترابيزة تانية اسمها 7.', 'Create a new table 13 on the terrace (4 seats). Then try to create another table named 7.',
@@ -124,15 +124,15 @@ export const STEP_PLAIN: Record<string, StepPlain> = {
   'J-R1-21': S('اضغط «إنهاء».', 'Tap "Complete".', 'الشيك الأول خلص — وترابيزة 7 فضيت لوحدها (حسب إعدادات مصر).', 'The first check is done — and table 7 freed itself (Egypt settings).'),
   'J-R1-22': S('في خريطة الصالة افتح ترابيزة 7 واضغط «قفل الترابيزة» لو لسه مشغولة.', 'On the floor map open table 7 and tap "Close table" if it is still taken.',
     'ترابيزة 7 فاضية. (لو الإعداد «الويتر يقفلها بإيده»، هنا بيقفلها.)', 'Table 7 is free. (With the "waiter closes it" setting, this is where he closes it.)'),
-  'J-R1-23': S('منى تقفل الوردية: تعد الدرج وتكتب 700 جنيه (500 + 200 كاش؛ الكارت مش في الدرج). وبعدين أحمد يفتح تقرير قفلة الوردية (Z) على كمبيوتر المدير.', 'Mona closes the shift: she counts 700 EGP (500 + 200 cash; card money is not in the drawer). Then Ahmed opens the end-of-shift report (Z) on the manager PC.',
+  'J-R1-23': S('منى تقفل الوردية: تعد الدرج وتكتب 700 جنيه (500 + 200 كاش؛ الكارت مش في الدرج). وبعدين أحمد يفتح تقرير قفلة الوردية (Z) على كمبيوتر المكتب.', 'Mona closes the shift: she counts 700 EGP (500 + 200 cash; card money is not in the drawer). Then Ahmed opens the end-of-shift report (Z) on the office PC.',
     'الوردية بتتقفل والفرق صفر. التقرير بيعرض الكاش 200 جنيه والكارت في سطرين منفصلين، والكارت مش محسوب في فلوس الدرج.', 'The shift closes with zero difference. The report shows 200 EGP cash and the card on separate lines; the card is not counted as drawer cash.',
-    B('منى على جهاز الكاشير، وبعدين أحمد على كمبيوتر المدير', 'Mona on the cashier station, then Ahmed on the manager PC')),
+    B('منى على جهاز الكاشير، وبعدين أحمد على كمبيوتر المكتب', 'Mona on the cashier station, then Ahmed on the office PC')),
   // ───────── J-R2
   'J-R2-1': S('سارة تفتح وردية جديدة على جهاز الكاشير (500 جنيه). محمود يفتح ترابيزة 3، يعمل شيك، يضيف مشويات مشكلة (مستوية كويس) ويبعتها للمطبخ. سارة تأكد الشيك.', 'Sara opens a new shift on the cashier station (500 EGP). Mahmoud opens table 3, creates a check, adds a mixed grill (well done) and sends it. Sara confirms the check.',
     'الشيك متأكد ولسه ما اتدفعش. محطة المشويات فيها الطلب.', 'The check is confirmed and unpaid. The Grill station has the ticket.', B('سارة على جهاز الكاشير، ومحمود على تابلت الويتر', 'Sara on the cashier station, Mahmoud on the waiter tablet')),
   'J-R2-2': S('الزباين مشيوا. أحمد يفتح الشيك ويضغط «إلغاء الشيك»، يختار «الزبون مشي» ويكتب ملاحظة. أحمد يحاول يوافق لنفسه، وبعدين هبة توافق برقمها السري. محمود يقفل ترابيزة 3.', 'The guests left. Ahmed opens the check, taps "Void check", picks "customer left" and writes a note. Ahmed tries to approve it himself, then Heba approves with her PIN. Mahmoud closes table 3.',
     'موافقة أحمد لنفسه بتترفض. بعد موافقة هبة الشيك بيتلغي، والأصناف والأرقام بتفضل متسجلة زي ما هي، ومفيش فلوس اتحركت. طلب المشويات اتلغى، وترابيزة 3 فضيت.', 'Ahmed\'s self-approval is refused. After Heba approves, the check is voided, items and amounts stay on record, no money moved. The grill ticket is cancelled and table 3 is free.',
-    B('أحمد على كمبيوتر المدير، وهبة بتوافق', 'Ahmed on the manager PC, Heba approves')),
+    B('أحمد على كمبيوتر المكتب، وهبة بتوافق', 'Ahmed on the office PC, Heba approves')),
   // ───────── J-R3
   'J-R3-1': S('سارة تدخل على جهاز الكاشير. بص في أعلى الشاشة (الاسم، الفرع، الجهاز، الوردية). وبعدين تخرج وتجرّب تعمل أي حاجة من نفس الصفحة.', 'Sara signs in on the cashier station. Read the top bar (name, branch, device, shift). Then sign out and try any action from the same page.',
     'أعلى الشاشة بيعرض البيانات الصح. بعد الخروج أي حركة بتترفض والجهاز بيرجع لشاشة الدخول.', 'The top bar shows the right details. After signing out every action is refused and the device goes back to sign-in.'),

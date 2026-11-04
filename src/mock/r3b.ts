@@ -15,7 +15,7 @@ export function r3bOf(db: DB): R3BState {
 
 // ───────── kitchen screens
 /** The configuration of a kitchen screen. A KDS terminal without one shows every station and is its own dispatch
- *  screen (the behaviour before round 3). Non-KDS devices (manager PC, back office) see the full dispatch view. */
+ *  screen (the behaviour before round 3). Non-KDS devices (office PC, back office) see the full dispatch view. */
 export function kdsScreenOf(db: DB, terminalId: string | null | undefined): KdsScreenConfig & { configured: boolean } {
   const c = terminalId ? r3bOf(db).kdsScreens.find((x) => x.terminalId === terminalId) : undefined;
   if (c) return { ...c, configured: true };

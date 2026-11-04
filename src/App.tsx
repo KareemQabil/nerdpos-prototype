@@ -157,7 +157,7 @@ function MoreDevices({ ids, displays }: { ids: string[]; displays?: boolean }) {
   const tech = useTech();
   return (
     <span className={displays ? undefined : 'min-[1560px]:hidden'}>
-      <Popover width={300} title={displays ? t('شاشات العرض: شاشة النداء وشاشة العميل') : t("أجهزة تانية: الفرع التاني وكاشير التيك أواي وأي جهاز جديد")} button={(o) => displays
+      <Popover width={300} title={displays ? t('شاشات العرض: شاشة النداء وشاشة العميل') : t("أجهزة أخرى: الفرع الثاني وجهاز الكاشير 2 وأي جهاز جديد")} button={(o) => displays
         ? <button data-fb="device-displays" data-on={o} className="chrome-btn"><Tv className="w-4 h-4" /><span className="sr-only">{t('شاشات العرض')}</span></button>
         : <button data-fb="device-more" data-on={o} className="chrome-btn"><MoreHorizontal className="w-4 h-4" /><span className="sr-only">{t('أجهزة تانية')}</span></button>}>
         {(close) => (

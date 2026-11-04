@@ -19,7 +19,8 @@ export const DEMO_PASSWORD = 'demo-password-1';
 /** Arabic display names for seeded branches and terminals (ids and codes unchanged). */
 const DISPLAY_NAME_AR: Record<string, string> = {
   branch_main: 'الفرع الرئيسي — مدينة نصر', branch_second: 'الفرع التاني — المعادي',
-  t_floor: 'تابلت الويتر 1 (من غير درج)', t_cash: 'جهاز الكاشير 1 (عليه درج)', t_kds: 'شاشة المطبخ 1', t_admin: 'كمبيوتر المدير', t_second_floor: 'تابلت ويتر الفرع التاني (من غير درج)',
+  // ux-07: the canonical device names (same as DEVICE_NAMES in demo/people.ts)
+  t_floor: 'تابلت الويتر', t_cash: 'جهاز الكاشير 1', t_kds: 'شاشة التسليم', t_admin: 'كمبيوتر المكتب', t_second_floor: 'تابلت الفرع الثاني',
 };
 const KIND: Record<string, 'FLOOR' | 'CASH' | 'KDS' | 'ADMIN'> = { t_floor: 'FLOOR', t_cash: 'CASH', t_kds: 'KDS', t_admin: 'ADMIN', t_second_floor: 'FLOOR' };
 

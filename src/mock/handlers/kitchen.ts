@@ -62,7 +62,7 @@ export const kitchenHandlers: Record<string, Handler> = {
   'Kitchen.Board': (ctx) => {
     const kt = policy<{ targetMinutes: number; alertMinutes: number }>('KitchenTimingPolicy') ?? { targetMinutes: 15, alertMinutes: 20 };
     const states = ctx.query.lifecycle ? ctx.query.lifecycle.split(',') : null;
-    // round 3 (F3-02): a kitchen screen shows only the stations it subscribes to; the manager PC / back office see all
+    // round 3 (F3-02): a kitchen screen shows only the stations it subscribes to; the office PC / back office see all
     const screen = screenView(ctx);
     const mine = screen.stationIds.length ? new Set(screen.stationIds) : null;
     const doneWithin = Number(ctx.query.doneWithinMinutes ?? 0);

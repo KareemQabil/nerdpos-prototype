@@ -14,8 +14,8 @@ export function seedR3B(db: DB, nowMs: number) {
   const nowIso = new Date(nowMs).toISOString();
   const kds = db.terminals.find((t) => t.id === 't_kds');
   if (!kds) return; // "start from zero" has no terminals
-  kds.name = 'شاشة المطبخ 1 — التسليم (كل المحطات)';
-  if (!db.terminals.some((t) => t.id === 't_kds2')) db.terminals.push({ id: 't_kds2', code: 'DEMO-KDS-2', name: 'شاشة المشويات', branchId: 'branch_main', drawer: false, lifecycle: 'ACTIVE', purpose: 'grill station screen', kind: 'KDS', version: 1 });
+  kds.name = 'شاشة التسليم'; // ux-07: one name per device (the dispatch screen for every station)
+  if (!db.terminals.some((t) => t.id === 't_kds2')) db.terminals.push({ id: 't_kds2', code: 'DEMO-KDS-2', name: 'محطة المشويات', branchId: 'branch_main', drawer: false, lifecycle: 'ACTIVE', purpose: 'grill station screen', kind: 'KDS', version: 1 });
   const r = r3bOf(db);
   const grill = db.stations.find((s) => s.id === 'st_grill');
   r.kdsScreens = [

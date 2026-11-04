@@ -24,8 +24,8 @@ const ROLES: Role[] = [
   { id: 'waiter', icon: Armchair, title: 'ويتر', who: 'محمود على تابلت الويتر', what: 'افتح ترابيزة، خد الطلب، وابعته للمطبخ على دفعات.', device: 't_floor', user: 'demo-waiter-1', screen: 'floor', journey: 'J-R1', journeyLabel: 'رحلة: يوم صالة كامل', tone: 'from-pink-400 to-rose-500' },
   { id: 'cashier', icon: ShoppingCart, title: 'كاشير', who: 'سارة على جهاز الكاشير', what: 'افتح الوردية، بيع تيك أواي، حصّل شيكات الترابيزات، واقفل الدرج.', device: 't_cash', user: 'demo-cashier-a', screen: 'counter', journey: 'J-C1', journeyLabel: 'رحلة: كاونتر وتيك أواي', tone: 'from-cyan-400 to-blue-600' },
   { id: 'kitchen', icon: ChefHat, title: 'المطبخ', who: 'الشيف حسن على شاشة المطبخ', what: 'شوف الطلبات اللي بتوصل لكل محطة، ابدأها وخلّصها.', device: 't_kds', user: 'demo-chef-1', screen: 'kitchen', tone: 'from-red-400 to-red-600' },
-  { id: 'manager', icon: Briefcase, title: 'مدير', who: 'أحمد على كمبيوتر المدير', what: 'وافق على الإلغاءات والمرتجعات، تابع الشيكات والتقارير.', device: 't_admin', user: 'demo-manager-1', screen: 'home', journey: 'J-R2', journeyLabel: 'رحلة: إلغاء شيك بموافقة مدير', tone: 'from-amber-400 to-orange-600' },
-  { id: 'owner', icon: Crown, title: 'صاحب المطعم', who: 'الحاج سامي من الإدارة (أي كمبيوتر)', what: 'المنيو والأسعار والإعدادات والتقارير — وكل الصلاحيات.', device: 'BO', user: 'demo-owner', screen: 'reports', tone: 'from-violet-400 to-purple-600' },
+  { id: 'manager', icon: Briefcase, title: 'مدير', who: 'أحمد على كمبيوتر المكتب', what: 'وافق على الإلغاءات والمرتجعات، تابع الشيكات والتقارير.', device: 't_admin', user: 'demo-manager-1', screen: 'home', journey: 'J-R2', journeyLabel: 'رحلة: إلغاء شيك بموافقة مدير', tone: 'from-amber-400 to-orange-600' },
+  { id: 'owner', icon: Crown, title: 'صاحب المطعم', who: 'الحاج سامي من الإدارة عن بُعد', what: 'المنيو والأسعار والإعدادات والتقارير — وكل الصلاحيات.', device: 'BO', user: 'demo-owner', screen: 'reports', tone: 'from-violet-400 to-purple-600' },
   { id: 'setup', icon: Wrench, title: 'تركيب مطعم من الصفر', who: 'كريم مهندس التركيب', what: 'ابدأ بمطعم فاضي: الفرع والأجهزة والناس والمنيو لحد أول بيعة.', device: 'BO', user: null, screen: 'home', journey: 'J-A1', journeyLabel: 'رحلة: تركيب مطعم من الصفر', tone: 'from-emerald-400 to-teal-600', zero: true },
 ];
 
@@ -105,7 +105,7 @@ export function Welcome({ open, onClose, onOpenPanel, startTab = 'start' }: { op
 
 function HelpPage({ onOpenPanel }: { onOpenPanel: (p: 'walk' | 'policy') => void }) {
   const items: { icon: React.ElementType; title: string; body: string }[] = [
-    { icon: MonitorSmartphone, title: 'الأجهزة', body: 'كل زرار في أول الشريط جهاز في المطعم: الكاشير، تابلت الويتر، المطبخ، كمبيوتر المدير، والإدارة. كل جهاز عليه الشخص اللي داخل بيه، واللي بيحصل على جهاز بيبان على الباقيين.' },
+    { icon: MonitorSmartphone, title: 'الأجهزة', body: 'كل زر في بداية الشريط جهاز في المطعم: جهاز الكاشير، وتابلت الويتر، وشاشة التسليم، وكمبيوتر المكتب، والإدارة عن بُعد. على كل جهاز الشخص المسجّل به، وما يحدث على جهاز يظهر على البقية.' },
     { icon: KeyRound, title: 'الدخول', body: 'اختار اسمك واكتب الرقم السري 123456 (أو «دخول سريع»). كل شخص بيشوف الشاشات اللي مسموح له بيها بس.' },
     { icon: Columns2, title: 'جهازين جنب بعض', body: 'اضغط «جهازين» عشان تشوف شاشتين مع بعض — مثلًا الويتر بيبعت والمطبخ بيستلم. كليك يمين على أي جهاز بيفتحه في الشاشة التانية.' },
     { icon: Clock, title: 'الساعة', body: 'الساعة اللي فوق هي وقت السيرفر — مش قابل للتعديل. وقت كل حركة واليوم التجاري بييجوا من السيرفر بس، ومحدش يقدر يغيّرهم (ولا حتى صاحب المطعم). عايز تشوف المنيو في وقت تاني؟ فيه «معاينة» في شاشة المنيوهات من غير ما الوقت يتغير.' },

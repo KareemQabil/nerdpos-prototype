@@ -28,7 +28,7 @@ export function seedOps(db: DB, nowMs: number) {
   }
 
   // a second drawer at the takeaway counter: shift handover moves open checks between two drawers (Order.TransferSession)
-  if (!db.terminals.some((t) => t.id === 't_cash2')) db.terminals.push({ id: 't_cash2', code: 'DEMO-CASH-2', name: 'كاشير التيك أواي', branchId: 'branch_main', drawer: true, lifecycle: 'ACTIVE', purpose: 'TAKEAWAY_COUNTER', kind: 'CASH', version: 1 });
+  if (!db.terminals.some((t) => t.id === 't_cash2')) db.terminals.push({ id: 't_cash2', code: 'DEMO-CASH-2', name: 'جهاز الكاشير 2', branchId: 'branch_main', drawer: true, lifecycle: 'ACTIVE', purpose: 'TAKEAWAY_COUNTER', kind: 'CASH', version: 1 });
 
   // ───────── floors and positions (canvas units: 1000 × 620)
   const floor = (id: string, branchId: string, ar: string, en: string, sortOrder: number, decor: FloorPlan['decor']): FloorPlan => ({ id, branchId, name: { ar, en }, sortOrder, width: 1000, height: 620, active: true, decor, version: 1, updatedAt: nowIso, updatedBy: 'provisioning' });
