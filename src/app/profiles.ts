@@ -9,7 +9,8 @@ export type SaleAction =
   | 'new' | 'held' | 'customer' | 'discount' | 'orders'
   | 'note' | 'prebill' | 'comp' | 'move' | 'split' | 'merge' | 'channel' | 'cancel' | 'history'
   | 'delivery' | 'staffMeal' | 'staffMeals' | 'soldOut' | 'drawer' | 'mode' | 'search' | 'shortcuts' | 'more'
-  | 'guests' | 'label' | 'undo' | 'viewTables' | 'viewChecks' | 'viewClosed';
+  | 'guests' | 'label' | 'undo' | 'viewTables' | 'viewChecks' | 'viewClosed'
+  | 'modeTakeaway' | 'modeDineIn' | 'modeDelivery';
 
 /** What the big primary button does; 'auto' follows the check state (send → pay → finish paying). */
 export type PrimaryAction = 'auto' | 'send' | 'pay' | 'seat' | 'ready' | 'delivered' | 'dispatch' | 'confirm';
@@ -32,7 +33,14 @@ export interface Profile {
   hidden: string[];
   /** ux-05: first view of the boards this profile works with (each person can switch; the choice is remembered) */
   boards?: Partial<Record<BoardId, 'board' | 'list'>>;
+  /** ux-05 owner rule: the sale screen's peer modes this profile has (default all three) and the one it opens in.
+   *  «دليفري» also needs delivery:create on the server; without it the mode is hidden. */
+  saleModes?: SaleMode[];
+  defaultMode?: SaleMode;
 }
+
+/** The cashier's three peer jobs: sell تيك أواي, close a ترابيزة (الصالة), sell دليفري. */
+export type SaleMode = 'takeaway' | 'dinein' | 'delivery';
 
 /** ux-05: the four boards. orders = «الشيكات», delivery = «لوحة الدليفري», purchasing = «أوامر الشراء», approvals = «الموافقات والمراجعات». */
 export type BoardId = 'orders' | 'delivery' | 'purchasing' | 'approvals';
@@ -45,7 +53,7 @@ const SALE_OVERFLOW: SaleAction[] = ['label', 'delivery', 'staffMeal', 'staffMea
 
 export const PROFILES: Profile[] = [
   // ── floor & counter
-  { id: 'cashier', group: g('الصالة والكاونتر', 'Floor & counter'), role: g('كاشير', 'Cashier'), workspaces: ['counter', 'checks', 'shift', 'receipt', 'refunds'], start: 'counter', boards: { orders: 'list' },
+  { id: 'cashier', group: g('الصالة والكاونتر', 'Floor & counter'), role: g('كاشير', 'Cashier'), workspaces: ['counter', 'checks', 'shift', 'receipt', 'refunds'], start: 'counter', boards: { orders: 'list' }, saleModes: ['takeaway', 'dinein', 'delivery'], defaultMode: 'takeaway',
     actionBar: { secondary: ['new', 'held', 'customer', 'discount', 'orders'], overflow: SALE_OVERFLOW, primary: 'auto' }, quantity: ALL_QTY, input: 'mixed', hidden: ['expectedCash', 'reports'] },
   { id: 'waiter', group: g('الصالة والكاونتر', 'Floor & counter'), role: g('ويتر', 'Waiter'), workspaces: ['floor', 'order'], start: 'floor',
     actionBar: { secondary: ['guests', 'prebill', 'move', 'note'], overflow: ['customer', 'split', 'merge', 'history', 'cancel'], primary: 'send' }, quantity: TOUCH_QTY, input: 'touch', hidden: ['collection', 'drawer', 'reports'] },
@@ -55,9 +63,9 @@ export const PROFILES: Profile[] = [
     actionBar: { secondary: [], overflow: [], primary: 'seat' }, quantity: NO_QTY, input: 'touch', hidden: ['orders', 'payment'] },
   { id: 'runner', group: g('الصالة والكاونتر', 'Floor & counter'), role: g('رانر', 'Runner'), workspaces: ['kitchen'], start: 'kitchen',
     actionBar: { secondary: [], overflow: [], primary: 'delivered' }, quantity: NO_QTY, input: 'touch', hidden: ['everythingButHandover'] },
-  { id: 'barista', group: g('الصالة والكاونتر', 'Floor & counter'), role: g('باريستا', 'Barista'), workspaces: ['counter', 'kitchen'], start: 'kitchen',
+  { id: 'barista', group: g('الصالة والكاونتر', 'Floor & counter'), role: g('باريستا', 'Barista'), workspaces: ['counter', 'kitchen'], start: 'kitchen', saleModes: ['takeaway'],
     actionBar: { secondary: [], overflow: [], primary: 'ready' }, quantity: TOUCH_QTY, input: 'touch', hidden: ['drawer', 'reports'] },
-  { id: 'bartender', group: g('الصالة والكاونتر', 'Floor & counter'), role: g('بارتندر', 'Bartender'), workspaces: ['counter', 'kitchen'], start: 'kitchen',
+  { id: 'bartender', group: g('الصالة والكاونتر', 'Floor & counter'), role: g('بارتندر', 'Bartender'), workspaces: ['counter', 'kitchen'], start: 'kitchen', saleModes: ['takeaway', 'dinein'],
     actionBar: { secondary: ['orders'], overflow: [], primary: 'ready' }, quantity: TOUCH_QTY, input: 'touch', hidden: ['reports'] },
   // ── kitchen
   { id: 'stationChef', group: g('المطبخ', 'Kitchen'), role: g('شيف محطة', 'Station chef'), workspaces: ['kitchen'], start: 'kitchen',
@@ -67,7 +75,7 @@ export const PROFILES: Profile[] = [
   { id: 'kitchenManager', group: g('المطبخ', 'Kitchen'), role: g('مدير مطبخ', 'Kitchen manager'), workspaces: ['kitchen', 'inv-waste', 'soldout'], start: 'kitchen',
     actionBar: { secondary: [], overflow: [], primary: 'ready' }, quantity: NO_QTY, input: 'mixed', hidden: ['drawer', 'financialReports'] },
   // ── management
-  { id: 'shiftManager', group: g('الإدارة', 'Management'), role: g('مدير وردية', 'Shift manager'), workspaces: ['approvals-inbox', 'checks', 'counter', 'floor', 'shift'], start: 'approvals-inbox', boards: { approvals: 'board', orders: 'board' },
+  { id: 'shiftManager', group: g('الإدارة', 'Management'), role: g('مدير وردية', 'Shift manager'), workspaces: ['approvals-inbox', 'checks', 'counter', 'floor', 'shift'], start: 'approvals-inbox', boards: { approvals: 'board', orders: 'board' }, saleModes: ['takeaway', 'dinein', 'delivery'],
     actionBar: { secondary: ['new', 'held', 'customer', 'discount', 'orders'], overflow: SALE_OVERFLOW, primary: 'auto' }, quantity: ALL_QTY, input: 'mixed', hidden: [] },
   { id: 'branchManager', group: g('الإدارة', 'Management'), role: g('مدير فرع', 'Branch manager'), workspaces: [], start: 'approvals-inbox', boards: { approvals: 'board', orders: 'board', delivery: 'board', purchasing: 'board' },
     actionBar: { secondary: ['new', 'held', 'customer', 'discount', 'orders'], overflow: SALE_OVERFLOW, primary: 'auto' }, quantity: ALL_QTY, input: 'keyboard', hidden: ['systemSettings', 'license'] },
@@ -89,7 +97,7 @@ export const PROFILES: Profile[] = [
     actionBar: { secondary: [], overflow: [], primary: 'delivered' }, quantity: NO_QTY, input: 'touch', hidden: ['everythingButOwnOrders'] },
   { id: 'dispatcher', group: g('الدليفري', 'Delivery'), role: g('موزع الدليفري', 'Delivery dispatcher'), workspaces: ['delivery-board', 'delivery-new', 'drivers'], start: 'delivery-board', boards: { delivery: 'board' },
     actionBar: { secondary: [], overflow: [], primary: 'dispatch' }, quantity: NO_QTY, input: 'mixed', hidden: ['financialReports'] },
-  { id: 'callCenter', group: g('الدليفري', 'Delivery'), role: g('مركز الاتصال', 'Call center'), workspaces: ['delivery-new', 'customers'], start: 'delivery-new',
+  { id: 'callCenter', group: g('الدليفري', 'Delivery'), role: g('مركز الاتصال', 'Call center'), workspaces: ['counter', 'delivery-new', 'customers'], start: 'counter', saleModes: ['delivery'], defaultMode: 'delivery',
     actionBar: { secondary: ['customer'], overflow: [], primary: 'confirm' }, quantity: ALL_QTY, input: 'keyboard', hidden: ['drawer'] },
   // ── system
   { id: 'support', group: g('النظام', 'System'), role: g('فريق التركيب والدعم', 'Install & support team'), workspaces: ['import', 'settings', 'org', 'capabilities'], start: 'org',
@@ -102,6 +110,7 @@ export const profileById = (id: string) => PROFILES.find((p) => p.id === id) ?? 
 export const SALE_KEYS: Partial<Record<SaleAction | 'primary', string>> = {
   shortcuts: 'F1', new: 'F2', held: 'F3', customer: 'F4', discount: 'F6', orders: 'F7', more: 'F8', mode: 'F9', search: 'F10', primary: 'Enter',
   viewTables: 'PageUp', viewChecks: 'PageDown', viewClosed: 'End',
+  modeTakeaway: 'Insert', modeDineIn: 'Home', modeDelivery: 'Delete', // ux-05: the three peer modes (F9 still cycles)
 };
 
 /** Kitchen screen actions a bump bar (or a keyboard) drives. ←/→ move between tickets and 1–9 pick one (fixed). */

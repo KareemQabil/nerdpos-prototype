@@ -1,8 +1,9 @@
 // Shared delivery UI: plain labels, the simple zone map, the delivery card actions and the details dialog.
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Bike, Car, Clock, MapPin, Phone, ChefHat, CheckCircle2, XCircle, AlertTriangle, Send, UserCheck, Ban, Banknote, CreditCard, Globe, History, Store } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';
-import { Modal, Button, Field, Input, Select, Textarea, Pill, Banner, KV, Money, StateBadge, Spinner, confirmDialog, Popover } from '../../ui';
+import { Modal, Button, Field, Input, Select, Textarea, Pill, Banner, KV, Money, StateBadge, Spinner, confirmDialog, Popover, Popup, Numpad, applyNumpadKey, useNumpadKeys, type NumpadKey } from '../../ui';
+import { sumAmounts, changePreview, sign, plainAmount } from '../../lib/cash';
 import { Tech } from '../../app/tech';
 import { t, L, tv } from '../../i18n';
 import { cn, money, time, dateTime, qty } from '../../lib/format';
@@ -345,5 +346,67 @@ export function RiderButton({ d, size = 'sm' }: { d: any; size?: 'sm' | 'md' }) 
         <RiderList d={d} onDone={(ok) => { if (ok) setAnchor(null); }} />
       </Popover>
     </>
+  );
+}
+
+// ───────── ux-05: «استلام فلوس الطيار» — one centered popup shared by the cashier's delivery mode and the riders
+// screen. Driver.SettleCash into THIS terminal's open drawer; counted cash on the shared Numpad (keyboard too), an
+// exact-amount key; a shortage needs a manager (DRIVER_CASH_VARIANCE → the existing approval popup, same command id).
+export function RiderCashPopup({ d, onClose }: { d: any; onClose: () => void }) {
+  const { run, busy } = useCommand();
+  const [picked, setPicked] = useState<string[]>(d.cashDeliveries.map((x: any) => x.id));
+  const [counted, setCounted] = useState('');
+  const [reason, setReason] = useState('');
+  const [result, setResult] = useState<any>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const chosen = d.cashDeliveries.filter((x: any) => picked.includes(x.id));
+  const all = picked.length === d.cashDeliveries.length;
+  const expected = all ? d.cashInHand : sumAmounts(chosen.map((x: any) => x.amount));
+  const variance = counted !== '' ? changePreview(counted, expected) : null;
+  const short = variance !== null && sign(variance) < 0;
+  const key = (k: NumpadKey) => setCounted((c) => applyNumpadKey(c, k, { decimals: 2, maxDigits: 7 }));
+  const save = async () => {
+    if (!picked.length || counted === '' || busy) return;
+    const r = await run<any>('Driver.SettleCash', { params: { driverId: d.id }, body: { countedCash: counted, deliveryIds: all ? undefined : picked, reason: reason.trim() || undefined } }, { success: t('دخلت فلوس الطيار الدرج') });
+    if (r) setResult(r);
+  };
+  useNumpadKeys(!result, key, { onEnter: save, scope: panel });
+  return (
+    <Popup open onClose={onClose} size="lg" fb="rider-cash-popup" title={<span className="flex items-center gap-2"><Banknote className="w-5 h-5 text-[var(--primary)]" />{t('استلام فلوس الطيار')} · {d.name}</span>}
+      footer={result ? <Button variant="primary" onClick={onClose} data-fb="rider-cash:done">{t('تم')}</Button> : <><Button variant="ghost" onClick={onClose}>{t('إلغاء')}</Button><Button variant="success" size="lg" loading={busy} disabled={!picked.length || counted === ''} onClick={save} data-fb="settle-confirm">{short ? <AlertTriangle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}{t('استلام وإدخال الدرج')}</Button></>}>
+      <div ref={panel}>
+        {result ? (
+          <div className="space-y-3 text-center py-2" data-fb="rider-cash:result">
+            <CheckCircle2 className="w-12 h-12 mx-auto text-[var(--success)]" />
+            <div className="font-bold">{t('استُلم {c} — أُغلق {n} طلب', { c: money(result.settlement.counted), n: result.completedOrders.length })}</div>
+            {sign(result.settlement.variance) !== 0 && <Banner tone={sign(result.settlement.variance) < 0 ? 'warning' : 'info'}>{sign(result.settlement.variance) < 0 ? t('عجز {v} سُجل على الطيار مع صرف من الدرج بالمبلغ نفسه.', { v: money(result.settlement.variance.replace('-', '')) }) : t('زيادة {v} سُجلت إيداعًا في الدرج.', { v: money(result.settlement.variance) })}</Banner>}
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-[minmax(0,1fr)_260px] gap-4">
+            <div className="space-y-3 min-w-0">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-2xl p-3 text-center border border-[color-mix(in_srgb,var(--warning)_40%,transparent)] bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]"><div className="text-xs text-soft font-bold">{t('المطلوب تسليمه')}</div><Money v={expected} className="text-2xl" /></div>
+                <div className={cn('rounded-2xl p-3 text-center border', short ? 'border-[color-mix(in_srgb,var(--error)_45%,transparent)] bg-[color-mix(in_srgb,var(--error)_10%,transparent)]' : 'border-[color-mix(in_srgb,var(--primary)_30%,transparent)] bg-[var(--primary-container)]')}><div className="text-xs text-soft font-bold">{t('المعدود')}</div><span className="num text-2xl font-extrabold" dir="ltr" data-fb="settle-counted">{counted || '0'}</span></div>
+              </div>
+              {variance !== null && sign(variance) !== 0 && <div className={cn('text-sm font-bold flex items-center gap-1.5', short ? 'text-[var(--error)]' : 'text-[var(--info)]')} data-fb="settle-variance">{short ? <><AlertTriangle className="w-4 h-4" />{t('عجز {v} — يتطلب موافقة المدير', { v: money(variance.replace('-', '')) })}</> : t('زيادة {v}', { v: money(variance) })}</div>}
+              <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                {d.cashDeliveries.map((x: any) => (
+                  <label key={x.id} className={cn('flex items-center gap-3 rounded-xl border px-3 py-2 text-sm cursor-pointer', picked.includes(x.id) ? 'border-[var(--primary)] bg-[var(--primary-container)]' : 'surface-1 border-[var(--glass-border)]')}>
+                    <input type="checkbox" checked={picked.includes(x.id)} onChange={(e) => setPicked(e.target.checked ? [...picked, x.id] : picked.filter((q) => q !== x.id))} />
+                    <span className="flex-1 min-w-0"><span className="num">{x.number}</span> · <span className="num">#{x.orderNumber}</span> · {x.customerName}<span className="block text-[11px] text-dim">{t('سُلِّم')} {time(x.deliveredAt)}</span></span>
+                    <Money v={x.amount} />
+                  </label>
+                ))}
+              </div>
+              <Field label={t('ملاحظة')}><Input value={reason} onChange={(e) => setReason(e.target.value)} data-fb="settle-note" /></Field>
+            </div>
+            <div className="space-y-2">
+              <Button className="w-full" size="lg" onClick={() => setCounted(plainAmount(expected))} data-fb="settle-exact">{t('المبلغ بالضبط')} · <Money v={expected} /></Button>
+              <Numpad mode="amount" size="md" onKey={key} fb="settle-numpad" />
+            </div>
+          </div>
+        )}
+      </div>
+    </Popup>
   );
 }

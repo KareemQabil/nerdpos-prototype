@@ -6,7 +6,7 @@ import { useDev, useQuery, useCommand } from '../../app/hooks';
 import { Section, StateBadge, Button, Card, Pill, Money, Modal, Field, Input, Select, Banner, Empty, Table, Switch, Spinner } from '../../ui';
 import { t } from '../../i18n';
 import { cn, money, time, dateTime } from '../../lib/format';
-import { DRIVER_STATUS, STATE, VEHICLE, VehicleIcon } from './common';
+import { DRIVER_STATUS, STATE, VEHICLE, VehicleIcon, RiderCashPopup } from './common';
 import { personText } from '../../demo/people';
 
 export default function Drivers() {
@@ -99,50 +99,7 @@ function DriverDialog({ d, onClose }: { d: any; onClose: () => void }) {
   );
 }
 
+/** ux-05: the same «استلام فلوس الطيار» popup as the cashier's delivery mode (no drawer / Modal divergence). */
 function SettleDialog({ d, onClose }: { d: any; onClose: () => void }) {
-  const { run, busy } = useCommand();
-  const [picked, setPicked] = useState<string[]>(d.cashDeliveries.map((x: any) => x.id));
-  const [counted, setCounted] = useState('');
-  const [reason, setReason] = useState('');
-  const [result, setResult] = useState<any>(null);
-  const chosen = d.cashDeliveries.filter((x: any) => picked.includes(x.id));
-  const all = picked.length === d.cashDeliveries.length;
-  const save = async () => {
-    const r = await run<any>('Driver.SettleCash', { params: { driverId: d.id }, body: { countedCash: counted, deliveryIds: all ? undefined : picked, reason: reason || undefined } }, { success: t('الفلوس دخلت الدرج') });
-    if (r) setResult(r);
-  };
-  return (
-    <Modal open onClose={onClose} wide title={`${t('استلام فلوس')} ${d.name}`} badge={<StateBadge ops={['Driver.SettleCash', 'Approval.Grant']} />}
-      footer={result ? <Button variant="primary" onClick={onClose}>{t('تمام')}</Button> : <><Button variant="ghost" onClick={onClose}>{t('إلغاء')}</Button><Button variant="success" loading={busy} disabled={!picked.length || counted === ''} onClick={save} data-fb="settle-confirm"><Wallet className="w-4 h-4" />{t('استلم ودخّل الدرج')}</Button></>}>
-      {result ? (
-        <div className="space-y-3 text-center">
-          <CheckCircle2 className="w-12 h-12 mx-auto text-[var(--success)]" />
-          <div className="font-bold">{t('اتسلّم {c} — {n} طلب اتقفل', { c: money(result.settlement.counted), n: result.completedOrders.length })}</div>
-          {Number(result.settlement.variance) !== 0 && <Banner tone={Number(result.settlement.variance) < 0 ? 'warning' : 'info'}>{Number(result.settlement.variance) < 0 ? t('عجز {v} اتسجل على الطيار واتسجل صرف من الدرج بنفس المبلغ.', { v: money(String(Math.abs(Number(result.settlement.variance)))) }) : t('زيادة {v} اتسجلت إيداع في الدرج.', { v: money(result.settlement.variance) })}</Banner>}
-          <div className="text-xs text-dim">{t('العملاء أخدوا نقاط الولاء على الطلبات اللي اتقفلت.')}</div>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-2xl p-3 text-center border border-[color-mix(in_srgb,var(--warning)_40%,transparent)] bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]"><div className="text-xs text-soft font-bold">{all ? t('المفروض يسلّم') : t('الطلبات المختارة')}</div>{all ? <Money v={d.cashInHand} className="text-3xl" /> : <div className="text-3xl font-extrabold num">{chosen.length}</div>}</div>
-            <div className="rounded-2xl p-3 text-center border border-[color-mix(in_srgb,var(--primary)_30%,transparent)] bg-[var(--primary-container)]"><div className="text-xs text-soft font-bold">{t('اللي اتعد')}</div><Money v={counted || '0'} className="text-3xl text-[var(--primary)]" /></div>
-          </div>
-          <div className="text-sm text-dim">{t('اختار الطلبات اللي الطيار بيسلّم فلوسها، وعد الفلوس اللي في إيده.')}</div>
-          <div className="space-y-1.5">
-            {d.cashDeliveries.map((x: any) => (
-              <label key={x.id} className={cn('flex items-center gap-3 rounded-xl border px-3 py-2 text-sm cursor-pointer', picked.includes(x.id) ? 'border-[var(--primary)] bg-[var(--primary-container)]' : 'surface-1 border-[var(--glass-border)]')}>
-                <input type="checkbox" checked={picked.includes(x.id)} onChange={(e) => setPicked(e.target.checked ? [...picked, x.id] : picked.filter((p) => p !== x.id))} />
-                <span className="flex-1"><span className="num">{x.number}</span> · <span className="num">#{x.orderNumber}</span> · {x.customerName}<span className="block text-[11px] text-dim">{t('اتسلّم')} {time(x.deliveredAt)}</span></span>
-                <Money v={x.amount} />
-              </label>
-            ))}
-          </div>
-          <div className="text-xs text-dim">{t('عدد الطلبات المختارة')}: {chosen.length}</div>
-          <Field label={t('المبلغ اللي اتعد')} hint={t('لو أقل من المفروض = عجز ومحتاج موافقة مدير')}><Input data-fb="settle-counted" value={counted} onChange={(e) => setCounted(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" className="text-2xl num" placeholder="0.00" /></Field>
-          <div className="flex gap-1.5 flex-wrap">{(all || chosen.length === 1) && <Button size="sm" onClick={() => setCounted(money(all ? d.cashInHand : chosen[0].amount, false).replace(/,/g, ''))} data-fb="settle-exact">{t('المبلغ مظبوط')} ({money(all ? d.cashInHand : chosen[0].amount)})</Button>}</div>
-          <Field label={t('ملاحظة')}><Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t('مثلاً: ناقص فكة')} /></Field>
-        </div>
-      )}
-    </Modal>
-  );
+  return <RiderCashPopup d={d} onClose={onClose} />;
 }

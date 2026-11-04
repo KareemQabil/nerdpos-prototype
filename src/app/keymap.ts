@@ -16,9 +16,9 @@ const ls = new Set<() => void>();
 const emit = () => { try { localStorage.setItem(KEY, JSON.stringify(all)); } catch { /* ignore */ } ls.forEach((f) => f()); };
 
 /** Keys that may be assigned: function keys (not F5 reload, F11 full screen, F12 tools) and a few navigation keys. */
-export const ASSIGNABLE = ['F1', 'F2', 'F3', 'F4', 'F6', 'F7', 'F8', 'F9', 'F10', 'Insert', 'Home', 'End', 'PageUp', 'PageDown'];
+export const ASSIGNABLE = ['F1', 'F2', 'F3', 'F4', 'F6', 'F7', 'F8', 'F9', 'F10', 'Insert', 'Home', 'End', 'PageUp', 'PageDown', 'Delete'];
 /** Kitchen screen (bump bar): ←/→ and 1–9 stay fixed (move and pick a ticket); everything else a bump bar sends may be assigned. */
-export const ASSIGNABLE_KDS = [...ASSIGNABLE, 'Enter', ' ', 'Backspace', 'Delete', 'ArrowUp', 'ArrowDown', '0', '+', '-', '*', '/', '.', ...'abcdefghijklmnopqrstuvwxyz'.split('')];
+export const ASSIGNABLE_KDS = [...ASSIGNABLE, 'Enter', ' ', 'Backspace', 'ArrowUp', 'ArrowDown', '0', '+', '-', '*', '/', '.', ...'abcdefghijklmnopqrstuvwxyz'.split('')];
 export const assignableOf = (scope: KeyScope) => (scope === 'kds' ? ASSIGNABLE_KDS : ASSIGNABLE);
 const slot = (deviceId: string, scope: KeyScope) => (scope === 'sale' ? deviceId : `${deviceId}@${scope}`);
 const defaultsOf = (scope: KeyScope): Map => (scope === 'kds' ? KDS_KEYS : SALE_KEYS);

@@ -137,7 +137,7 @@ export function CustomerRow({ c, onClick, active }: { c: any; onClick?: () => vo
   );
 }
 
-function QuickCreate({ phone, name, onCancel, onCreated }: { phone: string; name: string; onCancel: () => void; onCreated: (c: any) => void }) {
+export function QuickCreate({ phone, name, onCancel, onCreated }: { phone: string; name: string; onCancel: () => void; onCreated: (c: any) => void }) {
   const { auth } = useDev();
   const { run, busy } = useCommand();
   const [f, setF] = useState({ name, phone, notes: '', allergies: [] as string[], withAddress: true });

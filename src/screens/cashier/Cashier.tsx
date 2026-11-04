@@ -18,7 +18,9 @@ import { cn } from '../../lib/format';
 import { addQty, cmpQty, sumQty } from '../../lib/cash';
 import { clock } from '../../mock/clock';
 import { minutesSince } from '../order/tableStage';
-import { profileFor, type SaleAction } from '../../app/profiles';
+import { profileFor, type SaleAction, type SaleMode } from '../../app/profiles';
+import { call } from '../../api/client';
+import { DeliveryStartPopup, DeliveryDraftBar, DeliveryQueue, CashierDeliveryBoard, deliveryDrafts } from './DeliveryMode';
 import { useHotkeys, useKeymap, type KeyAction } from '../../app/keymap';
 import { inScanBurst, burstLength } from '../../app/scanburst';
 import { approvalRule } from '../../mock/policies';
@@ -31,7 +33,12 @@ import { SalesChannelPicker } from '../channels/common';
 import { CustomerPicker } from '../customers/common';
 import { customerDisplay } from '../../app/customerDisplay';
 
-type Mode = 'sell' | 'collect';
+type Mode = 'sell' | 'collect' | 'delivery';
+const MODE_OF: Record<SaleMode, Mode> = { takeaway: 'sell', dinein: 'collect', delivery: 'delivery' };
+// ux-05: each mode remembers its own current check on this device (switching modes never loses a check)
+const MEM_KEY = 'nerdpos.saleModeChecks.v1';
+let modeMem: Record<string, Partial<Record<Mode, string | null>>> = (() => { try { return JSON.parse(localStorage.getItem(MEM_KEY) ?? '{}') ?? {}; } catch { return {}; } })();
+const remember = (deviceId: string, m: Mode, orderId: string | null) => { modeMem = { ...modeMem, [deviceId]: { ...(modeMem[deviceId] ?? {}), [m]: orderId } }; try { localStorage.setItem(MEM_KEY, JSON.stringify(modeMem)); } catch { /* memory only */ } };
 type NewType = 'TAKEAWAY' | 'DINE_IN';
 
 /** Width of an element (drives the narrow layout where the cart opens from the total). */
@@ -62,9 +69,16 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
   const keys = useKeymap(deviceId);
   const showKeys = profile.input !== 'touch';
   const orderId: string | null = params.orderId ?? null;
-  const mode: Mode = params.mode === 'collect' ? 'collect' : 'sell';
   const o = useQuery<any>(orderId ? 'Order.Get' : null, { params: { orderId } });
   const order = o.data && o.data.id === orderId ? o.data : null;
+  // ux-05 owner rule: three peer modes — تيك أواي (counter sale), الصالة (collect), دليفري — from the profile
+  const allowed: Mode[] = useMemo(() => (profile.saleModes ?? ['takeaway', 'dinein', 'delivery']).map((m) => MODE_OF[m]).filter((m) => m !== 'delivery' || can('delivery:create')), [profile, can]);
+  const requested: Mode = params.mode === 'collect' ? 'collect' : params.mode === 'delivery' ? 'delivery' : params.mode === 'sell' ? 'sell' : order?.channel === 'DELIVERY' ? 'delivery' : profile.defaultMode ? MODE_OF[profile.defaultMode] : 'sell';
+  const mode: Mode = allowed.includes(requested) ? requested : allowed[0] ?? 'sell';
+  const deliveryOn = allowed.includes('delivery');
+  const deliveriesQ = useQuery<any>(deliveryOn && can('delivery:read') ? 'Delivery.Board' : null, { query: { scope: 'active' } });
+  const deliveryOpen = useQuery<any>(deliveryOn ? 'Order.Find' : null, { query: { channel: 'DELIVERY', lifecycle: 'DRAFT,CONFIRMED' } });
+  const [startOpen, setStartOpen] = useState<null | 'new' | 'edit'>(null);
   const counterOpen = useQuery<any>('Order.Find', { query: { sessionId, lifecycle: 'DRAFT,CONFIRMED' } });
   const dineOpen = useQuery<any>('Order.Find', { query: { channel: 'DINE_IN', lifecycle: 'DRAFT,CONFIRMED', sort: 'OLDEST' } });
   const fireP = useQuery<any>('Settings.Effective', { query: { policyId: 'FireTimingPolicy', scopeType: 'BRANCH', scopeId: auth.branchId } });
@@ -112,7 +126,18 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
     const m = p.mode ?? mode;
     if (oid) next.orderId = oid;
     if (m === 'collect') next.mode = 'collect';
+    if (m === 'delivery') next.mode = 'delivery';
+    if (m === 'sell' && profile.defaultMode && profile.defaultMode !== 'takeaway') next.mode = 'sell';
+    remember(deviceId, m, oid ?? null);
     nav('counter', next);
+  };
+  /** Switch to a mode and back to the check it was on (if that check is still open). */
+  const switchMode = (m: Mode) => {
+    if (!allowed.includes(m) || m === mode) return;
+    remember(deviceId, mode, orderId);
+    const want = modeMem[deviceId]?.[m] ?? null;
+    const openIds = new Set<string>([...(counterOpen.data?.items ?? []), ...(dineOpen.data?.items ?? []), ...(deliveryOpen.data?.items ?? [])].map((x: any) => x.id));
+    go({ mode: m, orderId: want && openIds.has(want) ? want : null });
   };
 
   // ── check state
@@ -166,6 +191,7 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
   const ensureOrder = async (): Promise<any | null> => {
     if (latest.current && latest.current.id === curId.current && latest.current.status === 'DRAFT') return latest.current;
     if (orderId && order && order.status === 'DRAFT' && curId.current === orderId) return order;
+    if (mode === 'delivery') { setStartOpen('new'); return null; }
     const created = await run<any>('Order.Create', { body: { channel: newType, ...(scPick[newType] ? { salesChannelId: scPick[newType] } : {}) } });
     if (!created) return null;
     latest.current = created;
@@ -223,7 +249,24 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
   // ── primary button: follows the check state
   const openPay = () => { if (order && active.length && can('payment:capture')) setPayOpen(true); };
   const fire = () => order && run('Order.Fire', { params: { orderId: order.id }, body: { expectedVersion: order.version } }, { success: t('تم الإرسال للمطبخ') });
-  const primary: PrimaryState = !order || !openStatus
+  const sendDelivery = async () => {
+    if (!order) return;
+    const d = deliveryDrafts.get(order.id);
+    if (!order.deliveryId) {
+      if (!d) { setStartOpen('edit'); return; }
+      const del = await run<any>('Delivery.Create', { body: { orderId: order.id, address: { ...d.address }, customerId: d.customerId, zoneId: d.zoneId ?? undefined, paymentMode: d.payMode } }, { refId: order.id });
+      if (!del) return;
+    }
+    const fresh = await call<any>(auth, 'Order.Get', { params: { orderId: order.id } }).then((r) => r.data).catch(() => null);
+    const r = await run<any>('Order.Confirm', { params: { orderId: order.id }, body: { expectedVersion: fresh?.version ?? order.version } }, { success: t('تم الإرسال للمطبخ') });
+    if (!r) return;
+    deliveryDrafts.drop(order.id);
+    if (d?.payMode === 'PAID_ONLINE' && can('payment:capture')) setPayOpen(true);
+  };
+  const deliveryDraft = !!order && draft && order.channel === 'DELIVERY' && order.kind !== 'STAFF_MEAL';
+  const primary: PrimaryState = deliveryDraft
+    ? { kind: 'send', label: t('إرسال للمطبخ'), icon: <Send className="rtl:-scale-x-100" />, count: unfired.length || undefined, disabled: busy || !active.length, run: sendDelivery, fb: 'send-delivery', hotkey: keys.primary }
+    : !order || !openStatus
     ? (order && order.status === 'COMPLETED'
       ? { kind: 'new', label: t('طلب جديد'), icon: <Plus />, run: () => go({ orderId: null }), fb: 'go-new', hotkey: keys.primary }
       : { kind: 'pay', label: t('الدفع'), icon: <Wallet />, disabled: true, run: () => {}, fb: 'go-pay', hotkey: keys.primary })
@@ -265,7 +308,8 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
   };
   const withKey = (a: BarAction): BarAction => ({ ...a, hotkey: keys[a.id as KeyAction] });
   const secondary = profile.actionBar.secondary.slice(0, 5).map((id) => defs[id]).filter(Boolean).map((a) => withKey(a!));
-  const overflow = profile.actionBar.overflow.map((id) => defs[id]).filter((a): a is BarAction => !!a && !(a.id === 'delivery' && !can('delivery:create'))).map(withKey);
+  // the «دليفري» overflow action goes away when the profile has the delivery mode (delivery-new stays for dispatchers)
+  const overflow = profile.actionBar.overflow.map((id) => defs[id]).filter((a): a is BarAction => !!a && !(a.id === 'delivery' && (!can('delivery:create') || deliveryOn))).map(withKey);
 
   const focusSearch = () => (document.querySelector(`[data-device="${deviceId}"] [data-fb="menu-search"]`) as HTMLInputElement | null)?.focus();
   const focusCollect = () => (document.querySelector(`[data-device="${deviceId}"] [data-fb="collect-search"] input, [data-device="${deviceId}"] input[data-fb="collect-search"]`) as HTMLInputElement | null)?.focus();
@@ -284,7 +328,7 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
     return () => window.removeEventListener('keydown', h);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const runUndo = async () => { const u = undoRef.current; if (!u) return; setUndoState(null); await u.run(); };
-  const toggleMode = () => go({ mode: mode === 'sell' ? 'collect' : 'sell' });
+  const toggleMode = () => switchMode(allowed[(allowed.indexOf(mode) + 1) % allowed.length]);
   useHotkeys(deviceId, !payOpen, {
     primary: () => !primary.disabled && primary.run(),
     new: defs.new?.run as () => void,
@@ -294,19 +338,25 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
     orders: () => defs.orders?.run?.(null),
     more: () => moreRef.current?.(),
     mode: toggleMode,
+    modeTakeaway: () => switchMode('sell'),
+    modeDineIn: () => switchMode('collect'),
+    modeDelivery: () => switchMode('delivery'),
     search: () => { if (mode !== 'sell') return focusCollect(); setTimeout(focusSearch, 50); },
     shortcuts: () => setKeysOpen(true),
-    viewTables: () => { if (mode !== 'collect') go({ mode: 'collect' }); setView('tables'); },
-    viewChecks: () => { if (mode !== 'collect') go({ mode: 'collect' }); setView('checks'); setTimeout(focusCollect, 60); },
-    viewClosed: () => { if (mode !== 'collect') go({ mode: 'collect' }); setView('closed'); },
+    viewTables: () => { if (!allowed.includes('collect')) return; if (mode !== 'collect') switchMode('collect'); setView('tables'); },
+    viewChecks: () => { if (!allowed.includes('collect')) return; if (mode !== 'collect') switchMode('collect'); setView('checks'); setTimeout(focusCollect, 60); },
+    viewClosed: () => { if (!allowed.includes('collect')) return; if (mode !== 'collect') switchMode('collect'); setView('closed'); },
   });
 
-  const actionLabels: Partial<Record<KeyAction, string>> = { primary: t('الزر الرئيسي'), shortcuts: t('الاختصارات'), new: t('طلب جديد'), held: t('الطلبات المعلقة'), customer: t('العميل'), discount: t('الخصم'), orders: t('الطلبات'), more: t('المزيد'), mode: t('بيع / تحصيل'), search: t('البحث'), viewTables: t('تحصيل: الترابيزات'), viewChecks: t('تحصيل: الشيكات'), viewClosed: t('تحصيل: المغلقة اليوم') };
+  const actionLabels: Partial<Record<KeyAction, string>> = { primary: t('الزر الرئيسي'), shortcuts: t('الاختصارات'), new: t('طلب جديد'), held: t('الطلبات المعلقة'), customer: t('العميل'), discount: t('الخصم'), orders: t('الطلبات'), more: t('المزيد'), mode: t('الوضع التالي'), modeTakeaway: t('وضع تيك أواي'), modeDineIn: t('وضع الصالة'), modeDelivery: t('وضع دليفري'), search: t('البحث'), viewTables: t('تحصيل: الترابيزات'), viewChecks: t('تحصيل: الشيكات'), viewClosed: t('تحصيل: المغلقة اليوم') };
 
-  const modeSwitch = (
-    <SegmentedControl size="lg" value={mode} onChange={(m) => go({ mode: m })} className="shrink-0"
-      options={[{ id: 'sell', label: t('بيع'), icon: <ShoppingBag />, fb: 'mode:sell' }, { id: 'collect', label: t('تحصيل'), icon: <Armchair />, count: dineChecks.length || undefined, fb: 'mode:collect' }]} />
-  );
+  const activeDeliveries: any[] = (deliveriesQ.data?.items ?? []).filter((d: any) => d.state !== 'DELIVERED' && d.state !== 'CANCELLED');
+  const modeOpts = ([
+    { id: 'sell' as Mode, label: t('تيك أواي'), icon: <ShoppingBag />, fb: 'mode:sell' },
+    { id: 'collect' as Mode, label: t('الصالة'), icon: <Armchair />, count: dineChecks.length || undefined, fb: 'mode:collect' },
+    { id: 'delivery' as Mode, label: t('دليفري'), icon: <Bike />, count: activeDeliveries.length || undefined, fb: 'mode:delivery' },
+  ]).filter((x) => allowed.includes(x.id));
+  const modeSwitch = modeOpts.length > 1 ? <SegmentedControl size="lg" value={mode} onChange={(m) => switchMode(m)} className="shrink-0" options={modeOpts} /> : null;
   const qtyControl = profile.quantity.typedPrefix && (
     <div className="flex items-center gap-1 shrink-0">
       {pendQty && <span className="h-12 ps-3.5 pe-1 rounded-full bg-[var(--primary)] text-[var(--primary-foreground)] font-bold inline-flex items-center gap-1 shadow-[0_4px_16px_-6px_var(--primary-glow)] animate-scale-in" data-fb="qty-pending" title={t('الكمية للصنف التالي')}><span className="num text-xl" dir="ltr">× {pendQty}</span>{showKeys && <Kbd className="!bg-black/10 !border-black/10 !text-current ms-1">Esc</Kbd>}<button onClick={() => setPendQty('')} className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-black/10" aria-label={t('مسح الكمية')}><X className="w-4 h-4" /></button></span>}
@@ -323,7 +373,13 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
 
   const cart = order ? (
     <CheckPanel order={order} refetch={o.refetch} mode="COUNTER" variant="cart" actionRef={checkAction} qty={{ stepper: profile.quantity.stepper, swipe: profile.quantity.swipe }} onCheckSwitch={(id) => go({ orderId: id })} onLineChange={onLineChange} flashLineId={flash} />
-  ) : orderId && o.loading ? <Skeleton className="h-full rounded-2xl" /> : (
+  ) : orderId && o.loading ? <Skeleton className="h-full rounded-2xl" /> : mode === 'delivery' ? (
+    <div className="flex flex-col h-full min-h-0 rounded-2xl overflow-hidden border border-[var(--glass-border)] bg-[var(--glass-bg-strong)]" data-fb="check-panel">
+      <div className="px-4 pt-3 pb-3 border-b line"><div className="font-bold text-lg font-display">{t('طلب دليفري جديد')}</div></div>
+      <div className="flex-1 flex items-center justify-center p-4"><Button variant="primary" size="xl" onClick={() => setStartOpen('new')} disabled={!can('delivery:create')} data-fb="delivery-start-cart"><Bike className="w-5 h-5" />{t('بدء بالعميل')}</Button></div>
+      <div className="border-t line px-4 py-3 surface-1 flex items-end justify-between"><span className="font-bold text-base">{t('الإجمالي')}</span><Money v="0" className="text-[28px] leading-none text-dim" /></div>
+    </div>
+  ) : (
     <div className="flex flex-col h-full min-h-0 rounded-2xl overflow-hidden border border-[var(--glass-border)] bg-[var(--glass-bg-strong)]" data-fb="check-panel">
       <div className="px-4 pt-3 pb-3 border-b line space-y-2.5">
         <div className="font-bold text-lg font-display">{t('طلب جديد')}</div>
@@ -339,7 +395,19 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
     <div ref={rootRef} data-screen="C2" className="relative -m-5 h-[calc(100%+2.5rem)] flex flex-col min-h-0" data-profile={profile.id} data-mode={mode}>
       <div className="flex-1 min-h-0 flex gap-3 p-3">
         <div className="flex-1 min-w-0 min-h-0 flex flex-col">
-          {mode === 'sell' ? (
+          {mode === 'delivery' ? (
+            deliveryDraft ? (
+              <div className="flex-1 min-h-0 flex gap-3">
+                <div className="flex-1 min-w-0 min-h-0 flex flex-col">
+                  <MenuGrid size={profile.input === 'keyboard' ? 'md' : 'lg'} channel="DELIVERY" salesChannelId={order?.salesChannelId ?? null} disabled={!editable} onPick={onPick} onOptions={onOptions}
+                    toolbarStart={<>{modeSwitch}<DeliveryDraftBar orderId={order!.id} delivery={null} onEdit={() => setStartOpen('edit')} /></>} toolbarEnd={qtyControl} inCart={inCart} />
+                </div>
+                {width >= 1180 && <div className="w-[290px] shrink-0 min-h-0"><DeliveryQueue list={activeDeliveries} current={orderId} onOpenCheck={(d) => go({ orderId: d.orderId, mode: 'delivery' })} /></div>}
+              </div>
+            ) : (
+              <CashierDeliveryBoard list={activeDeliveries} loading={!!deliveriesQ.loading && !deliveriesQ.data} onNew={() => setStartOpen('new')} onOpenCheck={(d) => go({ orderId: d.orderId, mode: 'delivery' })} toolbarStart={modeSwitch} />
+            )
+          ) : mode === 'sell' ? (
             <MenuGrid size={profile.input === 'keyboard' ? 'md' : 'lg'} channel={order?.channel ?? newType} salesChannelId={order?.salesChannelId ?? (scPick[newType] || null)} disabled={!!order && !editable} onPick={onPick} onOptions={onOptions}
               toolbarStart={modeSwitch} toolbarEnd={qtyControl} inCart={inCart} />
           ) : (
@@ -400,6 +468,8 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
           </div>
         </div>
       )}
+      {startOpen === 'new' && <DeliveryStartPopup onClose={() => setStartOpen(null)} onStarted={(id) => { setStartOpen(null); latest.current = null; curId.current = id; go({ orderId: id, mode: 'delivery' }); setTimeout(focusSearch, 120); }} />}
+      {startOpen === 'edit' && order && <DeliveryStartPopup onClose={() => setStartOpen(null)} onStarted={() => setStartOpen(null)} edit={{ orderId: order.id, draft: deliveryDrafts.get(order.id) ?? { customerId: order.customerId ?? order.customer?.id ?? '', customerName: order.customer?.name ?? '', phone: order.customer?.phone ?? '', address: null, zoneId: null, payMode: 'CASH_ON_DELIVERY' } }} />}
       {keysOpen && <ShortcutsOverlay deviceId={deviceId} labels={actionLabels} profileName={L(profile.role)} onClose={() => setKeysOpen(false)} />}
       {custOpen && order && <CustomerPicker open onClose={() => setCustOpen(false)} onPick={async (c) => { const r = await run('Order.SetCustomer', { params: { orderId: order.id }, body: { expectedVersion: (latest.current?.id === order.id ? latest.current : order).version, customerId: c.id } }, { success: t('أُضيف العميل إلى الشيك') }); if (r) setCustOpen(false); }} />}
       {staffMeal && <StaffMealDialog onClose={() => setStaffMeal(false)} />}
