@@ -347,14 +347,28 @@ export const moneyHandlers: Record<string, Handler> = {
     r!.state = 'REJECTED'; r!.decidedBy = ctx.user!.id; r!.decidedAt = ctx.nowIso; r!.version++;
     return r;
   },
+  // ux-10 (PROPOSED rule on the existing command): the person who requested a pending refund withdraws it before it is
+  // approved or paid, with a required reason; a holder of refund:reject (the decider) may also withdraw it. CAS on the
+  // case version; the cancellation is a new fact (who, when, why) on the case, the check's history and the audit — the
+  // request itself is never rewritten.
   'Refund.Cancel': (ctx) => {
     const r = ctx.db.refunds.find((x) => x.id === ctx.params.refundCaseId);
     need(r, 'REFUNDS_REFUNDCASE_NOT_FOUND');
-    if (r!.state !== 'REQUESTED') throw new ApiError('REFUND_CASE_NOT_PENDING');
-    r!.state = 'CANCELLED'; r!.version++;
+    const o = getOrder(ctx, r!.orderId, 'REFUNDS_REFUNDCASE_NOT_FOUND'); // another branch's case is "not found"
+    if (r!.requestedBy !== ctx.user!.id && !ctx.can('refund:reject')) throw new ApiError('REFUND_CANCEL_NOT_REQUESTER', { reason: 'only the requester (or a refund:reject holder) withdraws a refund request' }, 403);
+    const reason = typeof ctx.body.reason === 'string' ? ctx.body.reason.trim() : '';
+    if (!reason) throw new ApiError('VALIDATION_FAILED', { field: 'reason', rule: 'required' });
+    if (reason.length > 200) throw new ApiError('VALIDATION_FAILED', { field: 'reason', rule: 'max 200 characters' });
+    if (r!.state !== 'REQUESTED') throw new ApiError('REFUND_CASE_NOT_PENDING', { state: r!.state });
+    checkVersion(r!, ctx.body.expectedVersion);
+    r!.state = 'CANCELLED';
+    Object.assign(r!, { cancelledBy: ctx.user!.id, cancelledAt: ctx.nowIso, cancelReason: reason });
+    r!.version++;
+    o.history.push({ at: ctx.nowIso, by: ctx.user!.id, byName: ctx.user!.displayName, terminal: ctx.terminal?.code, kind: 'REFUND_CANCELLED', text: { ar: `أُلغي طلب المرتجع ${D(r!.amount).toFixed(2)} ج.م — ${reason}`, en: `refund request ${r!.amount} cancelled — ${reason}` }, data: { refundId: r!.id, requestedBy: r!.requestedBy } });
+    ctx.audit(`refund request ${r!.amount} on ${o.number} cancelled: ${reason}`, r!.id, true);
     return r;
   },
-  'Refund.Find': (ctx) => page(ctx.db.refunds.filter((r) => ctx.db.orders.find((o) => o.id === r.orderId)?.branchId === ctx.branchId).map((r) => ({ ...r, orderNumber: ctx.db.orders.find((o) => o.id === r.orderId)?.number, requestedByName: userName(ctx.db, r.requestedBy), approverName: r.approverId ? userName(ctx.db, r.approverId) : null, drawerOwnerName: r.drawerOwnerId ? userName(ctx.db, r.drawerOwnerId) : null, paidByName: r.paidBy ? userName(ctx.db, r.paidBy) : null })), ctx.query),
+  'Refund.Find': (ctx) => page(ctx.db.refunds.filter((r) => ctx.db.orders.find((o) => o.id === r.orderId)?.branchId === ctx.branchId).map((r) => ({ ...r, orderNumber: ctx.db.orders.find((o) => o.id === r.orderId)?.number, requestedByName: userName(ctx.db, r.requestedBy), cancelledByName: r.cancelledBy ? userName(ctx.db, r.cancelledBy) : null, approverName: r.approverId ? userName(ctx.db, r.approverId) : null, drawerOwnerName: r.drawerOwnerId ? userName(ctx.db, r.drawerOwnerId) : null, paidByName: r.paidBy ? userName(ctx.db, r.paidBy) : null })), ctx.query),
   'Refund.Get': (ctx) => {
     const r = ctx.db.refunds.find((x) => x.id === ctx.params.refundCaseId);
     need(r, 'REFUNDS_REFUNDCASE_NOT_FOUND');

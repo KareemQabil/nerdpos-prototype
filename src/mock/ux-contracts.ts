@@ -61,3 +61,24 @@ export type WorkProfileId = (typeof WORK_PROFILE_IDS)[number];
 export const UX09_PROPOSED_OPERATIONS: OperationDef[] = [
   { id: 'User.SetProfile', module: 'access', kind: 'CMD', method: 'POST', path: '/users/{userId}/profile', permission: 'user:manageaccess', input: { userId: { type: 'Ref<access.User>', required: true }, profileId: { type: 'Code', required: false }, expectedVersion: { type: 'Version', required: true } }, output: 'UserView', errors: ['USER_NOT_FOUND', 'CONCURRENCY_CONFLICT', 'VALIDATION_FAILED'], approval: null, backend_state: 'PROPOSED', note: 'ux-09: work profile override of one user (profileId one of WORK_PROFILE_IDS, or null = from the role); UI only, grants nothing; audited with the old and new value; UserView carries profileId' },
 ];
+
+// ux-10 (shift and drawer inside the sale screen): no new drawer command — the popups use Session.Open, Cash.Move,
+// Drawer.OpenNoSale, Session.XReport and Session.Close (SESSION_VARIANCE approval) unchanged. One PROPOSED rule on the
+// existing Refund.Cancel: only the requester of a pending refund (or a holder of refund:reject, the decider) withdraws
+// it, with a required reason (trimmed, ≤ 200 characters), CAS on expectedVersion, never after it was approved / paid /
+// rejected. The cancellation is recorded as new facts on the case (cancelledBy, cancelledAt, cancelReason), the check's
+// history (REFUND_CANCELLED) and the audit; RefundCaseView (Refund.Find) carries cancelledByName.
+export const UX10_RULE_EXTENSIONS: Record<string, { errors: string[]; note: string }> = {
+  'Refund.Cancel': {
+    errors: ['REFUND_CANCEL_NOT_REQUESTER', 'VALIDATION_FAILED'],
+    note: 'ux-10 PROPOSED rule: requester (or refund:reject) only — REFUND_CANCEL_NOT_REQUESTER 403 (not in errors.json yet); reason required (VALIDATION_FAILED); REFUND_CASE_NOT_PENDING once approved / paid / rejected / cancelled; CONCURRENCY_CONFLICT on a stale expectedVersion; audited, check history REFUND_CANCELLED; the case keeps cancelledBy / cancelledAt / cancelReason',
+  },
+};
+export function applyUx10Extensions(ops: OperationDef[]) {
+  for (const op of ops) {
+    const ext = UX10_RULE_EXTENSIONS[op.id];
+    if (!ext) continue;
+    op.errors = [...new Set([...(op.errors ?? []), ...ext.errors])];
+    op.note = `${op.note ? op.note + ' · ' : ''}${ext.note}`;
+  }
+}

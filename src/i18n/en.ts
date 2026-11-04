@@ -6928,4 +6928,10 @@ export const en: Record<string, string> = {
   "حسب الدور": "From the role",
   "تم تغيير البروفايل": "Profile changed",
   "يغيّر البروفايل": "Change the profile",
+  // ux-10: refund cancel
+  "ألغاه": "Cancelled by",
+  "إلغاء الطلب": "Cancel the request",
+  "أُلغي طلب المرتجع": "Refund request cancelled",
+  "إلغاء طلب المرتجع": "Cancel refund request",
+  "تأكيد الإلغاء": "Confirm cancellation",
 };

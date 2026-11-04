@@ -153,6 +153,7 @@ export interface RefundCase {
   allocations: { captureId: string; amount: Money }[]; lines: { lineId: string; quantity: string; disposition?: import('./types-control').Disposition }[]; requestedBy: string; requestedAt: string;
   decidedBy?: string; decidedAt?: string; paidAt?: string; paidSessionId?: string; businessDate?: string; version: number; approvalGrantId?: string;
   /** r3A: stage (S2 same day / S3 after close), the original business date, who approved and whose drawer paid */ stage?: import('./types-control').StageId; afterClose?: boolean; originalBusinessDate?: string; approverId?: string | null; paidBy?: string; drawerOwnerId?: string | null; paidTerminalId?: string | null;
+  /** ux-10: a withdrawn request (Refund.Cancel) — who, when and the required reason */ cancelledBy?: string; cancelledAt?: string; cancelReason?: string;
 }
 export interface ApprovalGrant {
   id: string; action: string; targetType: string; targetId: string; context: Record<string, unknown>; contextHash: string;

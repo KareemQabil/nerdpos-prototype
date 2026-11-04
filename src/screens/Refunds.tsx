@@ -5,9 +5,9 @@
 // authorises it, it is booked today and linked to the original check — the closed day is never rewritten (A08).
 // Staff meals found here are cancelled / returned through their own stages (F3-01).
 import React, { useEffect, useState } from 'react';
-import { RotateCcw, Check, X, Receipt, Search, Wallet, Coffee, ShieldCheck, Lock } from 'lucide-react';
+import { RotateCcw, Check, X, Receipt, Search, Wallet, Coffee, ShieldCheck, Lock, Undo2 } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../app/hooks';
-import { PageHeader, Card, Input, Button, Field, Select, Money, Table, Pill, Textarea, Tabs, SearchInput, EmptyState, Skeleton, FilterChips, Toolbar, Banner, confirmDialog, DateTime } from '../ui';
+import { PageHeader, Card, Input, Button, Field, Select, Money, Table, Pill, Textarea, Tabs, SearchInput, EmptyState, Skeleton, FilterChips, Toolbar, Banner, confirmDialog, DateTime, Popup, StateBadge } from '../ui';
 import { Tech } from '../app/tech';
 import { t, L } from '../i18n';
 import { cn, money, qty } from '../lib/format';
@@ -29,7 +29,7 @@ export default function Refunds() {
   const { terminal } = useDev();
   return (
     <div data-screen="D3" className="space-y-4">
-      <PageHeader title={t('المرتجعات')} ops={['Refund.Refundable', 'Refund.Request', 'Refund.Approve', 'Refund.Find', 'Order.CancelStaffMeal']} className="!mb-0" />
+      <PageHeader title={t('المرتجعات')} ops={['Refund.Refundable', 'Refund.Request', 'Refund.Approve', 'Refund.Cancel', 'Refund.Find', 'Order.CancelStaffMeal']} className="!mb-0" />
       {!terminal?.drawer && <Banner tone="info" title={t('الجهاز ده من غير درج')}>{t('المرتجع الكاش بيطلع من درج الكاشير اللي بيعمله: اطلبه واصرفه من جهاز الكاشير، والمدير يوافق هناك بالرقم السري أو الكارت أو البصمة — أو يوافق على الطلب من جهازه.')}</Banner>}
       <Tabs variant="underline" value={tab} onChange={setTab} tabs={[{ id: 'new', label: t('مرتجع جديد'), fb: 'refunds-tab:new' }, { id: 'cases', label: t('الطلبات'), count: waiting || undefined, fb: 'refunds-tab:cases' }]} />
       {tab === 'new' ? <NewRefund onDone={() => setTab('cases')} /> : <Cases q={cases} />}
@@ -137,8 +137,11 @@ function StaffMealReturn({ order }: { order: any }) {
 
 function Cases({ q }: { q: any }) {
   const { run } = useCommand();
-  const { terminal } = useDev();
+  const { terminal, me, can } = useDev();
   const [f, setF] = useState<'ALL' | 'REQUESTED' | 'PAID' | 'S3'>('ALL');
+  const [cancel, setCancel] = useState<any>(null);
+  // ux-10: the requester withdraws a pending request (a refund:reject holder may too); the server decides
+  const canCancel = (r: any) => r.requestedBy === me?.user?.id || can('refund:reject');
   const approve = (r: any) => run('Refund.Approve', { params: { refundCaseId: r.id }, body: { expectedVersion: r.version, payoutMethod: r.method } }, { success: t('المرتجع اتصرف') });
   const reject = async (r: any) => { if (await confirmDialog(t('ترفض طلب المرتجع ده؟ الزبون مش هياخد فلوس.'), { danger: true, confirmLabel: t('أيوه، ارفض') })) run('Refund.Reject', { params: { refundCaseId: r.id }, body: { expectedVersion: r.version, decisionReason: 'rejected' } }, { success: t('الطلب اترفض') }); };
   const all: any[] = (q.data?.items ?? []).slice().reverse();
@@ -150,12 +153,29 @@ function Cases({ q }: { q: any }) {
         <span className="font-bold"><span className="num">#{r.orderNumber}</span><DateTime v={r.requestedAt} className="block text-[10px] text-dim font-normal" /></span>, <Money v={r.amount} />, methodText(r.method),
         r.stage ? <Pill tone={r.stage === 'S3' ? 'error' : 'info'} data-fb={`refund-case-stage:${r.orderNumber}`}>{t(STAGE_TEXT[r.stage as 'S2'].short)}</Pill> : <span className="text-dim">—</span>,
         <span className="text-soft">{r.reason}<Tech><span className="num text-[10px] ms-1">{r.reasonCode}</span></Tech></span>,
-        <span className="text-xs" data-fb={`refund-case-who:${r.orderNumber}`}>{t('طلب')}: {first(r.requestedByName)}{r.state === 'PAID' && <><br />{t('صرف')}: {first(r.paidByName)}{r.drawerOwnerName ? ` · ${t('من درج')} ${first(r.drawerOwnerName)}` : ''}<br /><ShieldCheck className="w-3 h-3 inline" /> {t('وافق')}: <b>{first(r.approverName)}</b></>}{r.afterClose && r.state === 'PAID' && <><br /><span className="text-[var(--error)]">{t('اتسجل يوم')} <span className="num">{r.businessDate}</span> ({t('الأصلي')} <span className="num">{r.originalBusinessDate}</span>)</span></>}</span>,
+        <span className="text-xs" data-fb={`refund-case-who:${r.orderNumber}`}>{t('طلب')}: {first(r.requestedByName)}{r.state === 'PAID' && <><br />{t('صرف')}: {first(r.paidByName)}{r.drawerOwnerName ? ` · ${t('من درج')} ${first(r.drawerOwnerName)}` : ''}<br /><ShieldCheck className="w-3 h-3 inline" /> {t('وافق')}: <b>{first(r.approverName)}</b></>}{r.afterClose && r.state === 'PAID' && <><br /><span className="text-[var(--error)]">{t('اتسجل يوم')} <span className="num">{r.businessDate}</span> ({t('الأصلي')} <span className="num">{r.originalBusinessDate}</span>)</span></>}{r.state === 'CANCELLED' && r.cancelledByName && <><br /><span data-fb={`refund-case-cancelled:${r.orderNumber}`}>{t('ألغاه')}: {first(r.cancelledByName)}{r.cancelReason ? ` — ${r.cancelReason}` : ''}</span></>}</span>,
         <Pill tone={STATE[r.state]?.[1] ?? 'neutral'} dot>{t(STATE[r.state]?.[0] ?? '—')}</Pill>,
-        r.state === 'REQUESTED' ? <div className="flex gap-1 justify-end">{terminal?.drawer || r.method !== 'CASH' ? <Button size="sm" variant="success" onClick={() => approve(r)} data-fb={`refund-approve:${r.orderNumber}`}><Wallet className="w-3.5 h-3.5" />{t('اصرف (موافقة مدير)')}</Button> : <Pill tone="neutral"><Lock className="w-3 h-3" />{t('من جهاز الكاشير')}</Pill>}<Button size="sm" variant="ghost" onClick={() => reject(r)} title={t('ارفض')} aria-label={t('ارفض')}><X className="w-3.5 h-3.5" /></Button></div> : null,
+        r.state === 'REQUESTED' ? <div className="flex gap-1 justify-end">{terminal?.drawer || r.method !== 'CASH' ? <Button size="sm" variant="success" onClick={() => approve(r)} data-fb={`refund-approve:${r.orderNumber}`}><Wallet className="w-3.5 h-3.5" />{t('اصرف (موافقة مدير)')}</Button> : <Pill tone="neutral"><Lock className="w-3 h-3" />{t('من جهاز الكاشير')}</Pill>}{canCancel(r) && <Button size="sm" variant="ghost" onClick={() => setCancel(r)} data-fb={`refund-cancel:${r.orderNumber}`} title={t('إلغاء الطلب')} aria-label={t('إلغاء الطلب')}><Undo2 className="w-3.5 h-3.5" /></Button>}{can('refund:reject') && <Button size="sm" variant="ghost" onClick={() => reject(r)} title={t('ارفض')} aria-label={t('ارفض')}><X className="w-3.5 h-3.5" /></Button>}</div> : null,
       ])} empty={<EmptyState compact icon={<Receipt />} title={t('مفيش طلبات مرتجع')} text={t('اطلب مرتجع من التاب الأول.')} />} />
       <div className="text-[11px] text-dim">{t('الموافقة لازم تكون من مدير غير اللي طلب، والصرف الكاش بيطلع من الدرج المفتوح على الجهاز اللي بيصرف — عشان يتعرف الفلوس طلعت من درج مين.')}</div>
+      {cancel && <CancelRefundPopup r={cancel} onClose={() => setCancel(null)} />}
     </div>
+  );
+}
+
+/** ux-10: withdraw a pending refund request — required reason, CAS on the case version (Refund.Cancel). */
+function CancelRefundPopup({ r, onClose }: { r: any; onClose: () => void }) {
+  const { run, busy } = useCommand();
+  const [reason, setReason] = useState('');
+  const submit = async () => { if (!reason.trim() || busy) return; if (await run('Refund.Cancel', { params: { refundCaseId: r.id }, body: { expectedVersion: r.version, reason: reason.trim() } }, { success: t('أُلغي طلب المرتجع') })) onClose(); };
+  return (
+    <Popup open onClose={onClose} size="sm" fb="refund-cancel-popup" title={<span className="flex items-center gap-2"><Undo2 className="w-5 h-5 text-[var(--primary)]" />{t('إلغاء طلب المرتجع')} <span className="num">#{r.orderNumber}</span></span>} badge={<StateBadge ops={['Refund.Cancel']} />}
+      footer={<><Button variant="ghost" onClick={onClose}>{t('رجوع')}</Button><Button variant="danger" loading={busy} disabled={!reason.trim()} onClick={submit} data-fb="refund-cancel-confirm">{t('تأكيد الإلغاء')}</Button></>}>
+      <div className="space-y-3 text-sm">
+        <div className="flex items-center justify-between rounded-xl surface-1 border line px-3 py-2"><span className="text-soft">{r.reason}</span><Money v={r.amount} /></div>
+        <Field label={t('سبب الإلغاء')}><Textarea autoFocus value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} data-fb="refund-cancel-reason" className="min-h-[72px]" /></Field>
+      </div>
+    </Popup>
   );
 }
 void Check;
