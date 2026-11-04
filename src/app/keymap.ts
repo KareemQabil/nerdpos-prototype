@@ -17,8 +17,12 @@ let all: Record<string, Map> = (() => { try { return JSON.parse(localStorage.get
 const ls = new Set<() => void>();
 const emit = () => { try { localStorage.setItem(KEY, JSON.stringify(all)); } catch { /* ignore */ } ls.forEach((f) => f()); };
 
-/** Keys that may be assigned: function keys (not F5 reload, F11 full screen, F12 tools) and a few navigation keys. */
-export const ASSIGNABLE = ['F1', 'F2', 'F3', 'F4', 'F6', 'F7', 'F8', 'F9', 'F10', 'Insert', 'Home', 'End', 'PageUp', 'PageDown', 'Delete'];
+/** Keys that may be assigned: function keys (not F5 reload, F11 full screen, F12 tools) and a few navigation keys.
+ *  ux-10: the same function keys with Shift («Shift+F2») — the plain keys were all taken by the sale screen. */
+const F_KEYS = ['F1', 'F2', 'F3', 'F4', 'F6', 'F7', 'F8', 'F9', 'F10'];
+export const ASSIGNABLE = [...F_KEYS, 'Insert', 'Home', 'End', 'PageUp', 'PageDown', 'Delete', ...F_KEYS.map((k) => `Shift+${k}`)];
+/** The key name of a keyboard event as the maps store it: «Shift+F2» for a shifted function key, else `e.key`. */
+export const keyName = (e: KeyboardEvent) => (e.shiftKey && /^F\d{1,2}$/.test(e.key) ? `Shift+${e.key}` : e.key);
 /** Kitchen screen (bump bar): ←/→ and 1–9 stay fixed (move and pick a ticket); everything else a bump bar sends may be assigned. */
 export const ASSIGNABLE_KDS = [...ASSIGNABLE, 'Enter', ' ', 'Backspace', 'ArrowUp', 'ArrowDown', '0', '+', '-', '*', '/', '.', ...'abcdefghijklmnopqrstuvwxyz'.split('')];
 export const assignableOf = (scope: KeyScope) => (scope === 'kds' ? ASSIGNABLE_KDS : ASSIGNABLE);
@@ -68,7 +72,7 @@ export function useKeymap(deviceId: string, scope: KeyScope = 'sale', profileKey
 
 /** Printable key name (F-keys stay Latin; Enter/Esc in words are not needed on a POS keyboard). */
 const KEY_NAMES: Record<string, string> = { PageUp: 'PgUp', PageDown: 'PgDn', Insert: 'Ins', ' ': 'Space', Backspace: '⌫', Delete: 'Del', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Escape: 'Esc' };
-export const keyLabel = (k?: string) => (!k ? '' : KEY_NAMES[k] ?? (k.length === 1 ? k.toUpperCase() : k));
+export const keyLabel = (k?: string): string => (!k ? '' : k.startsWith('Shift+') ? `⇧${keyLabel(k.slice(6))}` : KEY_NAMES[k] ?? (k.length === 1 ? k.toUpperCase() : k));
 
 const typing = (e: KeyboardEvent) => {
   const el = e.target as HTMLElement | null;
@@ -94,7 +98,7 @@ export function useHotkeys(deviceId: string, active: boolean, handlers: Partial<
       const isF = /^F\d{1,2}$/.test(e.key) || ASSIGNABLE.includes(e.key);
       if (typing(e) && (!isF || scope === 'kds')) return;
       if (e.key === '?' && hs.shortcuts) { e.preventDefault(); hs.shortcuts(); return; }
-      const key = scope === 'kds' && e.key.length === 1 ? e.key.toLowerCase() : e.key;
+      const key = scope === 'kds' && e.key.length === 1 ? e.key.toLowerCase() : keyName(e);
       const action = (Object.keys(m) as KeyAction[]).find((a) => m[a] === key);
       if (!action) { if (e.key === 'F1') e.preventDefault(); return; }
       const fn = hs[action];

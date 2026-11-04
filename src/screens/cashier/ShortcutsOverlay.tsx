@@ -5,7 +5,7 @@ import { Keyboard, RotateCcw } from 'lucide-react';
 import { Popup, Kbd, Button } from '../../ui';
 import { t } from '../../i18n';
 import { cn } from '../../lib/format';
-import { keymap, useKeymap, keyLabel, assignableOf, type KeyAction, type KeyScope } from '../../app/keymap';
+import { keymap, useKeymap, keyLabel, keyName, assignableOf, type KeyAction, type KeyScope } from '../../app/keymap';
 
 /** Fixed rows of the sale screen (not remappable). Other scopes pass their own. */
 const SALE_FIXED = (primary?: string): [string, string][] => [['Enter', primary ?? t('الزر الرئيسي')], ['0–9', t('الكمية قبل الصنف')], ['?', t('عرض الاختصارات')], ['Esc', t('إغلاق النافذة')], ['Ctrl K', t('البحث في الشاشات')]];
@@ -19,7 +19,7 @@ export function ShortcutsOverlay({ deviceId, labels, profileName, profileKeys, o
     const h = (e: KeyboardEvent) => {
       e.preventDefault(); e.stopPropagation();
       if (e.key === 'Escape') { setCapture(null); return; }
-      const k = scope === 'kds' && e.key.length === 1 ? e.key.toLowerCase() : e.key;
+      const k = scope === 'kds' && e.key.length === 1 ? e.key.toLowerCase() : keyName(e);
       if (assignableOf(scope).includes(k)) { keymap.assign(deviceId, capture, k, scope, profileKeys); setCapture(null); }
     };
     window.addEventListener('keydown', h, true);
