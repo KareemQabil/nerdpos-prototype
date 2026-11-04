@@ -4,7 +4,7 @@
 // display's own settings: the terminal it follows, the look (app theme or high-contrast), and call-board timing.
 import React, { useEffect, useRef, useState } from 'react';
 import { Maximize2, Minimize2, Settings2, X, Volume2, VolumeX } from 'lucide-react';
-import { DeviceProvider, type DevCtx } from '../../app/hooks';
+import { DeviceProvider, useQuery, type DevCtx } from '../../app/hooks';
 import { devices, useDevicesState, DISPLAY_DEVICES } from '../../app/devices';
 import { store } from '../../mock/store';
 import { t } from '../../i18n';
@@ -14,6 +14,7 @@ import { useSound } from '../../app/sound';
 import { useDisplaySettings, setDisplaySettings, type DisplaySettings } from './settings';
 import { CallBoard } from './CallBoard';
 import { CustomerDisplay } from './CustomerDisplay';
+import { kdsScreenOf } from '../../mock/r3b';
 
 export default function DisplayPane({ id }: { id: string }) {
   const kind = DISPLAY_DEVICES[id]?.kind ?? 'CUSTOMER';
@@ -49,19 +50,38 @@ function CornerBtn({ children, onClick, label, fb, on }: { children: React.React
 
 /** The display's own menu (inline, so it also works in full screen). */
 function SettingsPanel({ id, kind, cfg, onClose }: { id: string; kind: 'CALLBOARD' | 'CUSTOMER'; cfg: DisplaySettings; onClose: () => void }) {
-  const hosts = store.db.terminals.filter((x) => x.lifecycle === 'ACTIVE' && x.kind === (kind === 'CALLBOARD' ? 'KDS' : 'CASH'));
+  // ux-12c: a call board follows a dispatch screen (where numbers are called and orders handed off); a screen that is
+  // only a station is offered only when the branch has no dispatch screen at all
+  const kds = store.db.terminals.filter((x) => x.lifecycle === 'ACTIVE' && x.kind === 'KDS');
+  const dispatch = kds.filter((x) => kdsScreenOf(store.db, x.id).dispatch);
+  const hosts = kind === 'CALLBOARD' ? (dispatch.length ? dispatch : kds) : store.db.terminals.filter((x) => x.lifecycle === 'ACTIVE' && x.kind === 'CASH');
+  const hostIsStation = kind === 'CALLBOARD' && dispatch.length > 0 && !dispatch.some((x) => x.id === cfg.host);
   const set = (p: Partial<DisplaySettings>) => setDisplaySettings(id, p);
   const Opt = ({ on, onClick, children, fb }: { on: boolean; onClick: () => void; children: React.ReactNode; fb: string }) => <button onClick={onClick} data-fb={fb} aria-pressed={on} className={cn('min-h-11 px-3 rounded-xl border text-sm font-bold', on ? 'border-[var(--primary)] bg-[var(--primary-container)] text-[var(--primary)]' : 'border-[var(--glass-border)] surface-1')}>{children}</button>;
   return (
     <div className="absolute top-[calc(1.2cqmin+52px)] end-[1.2cqmin] z-30 w-[min(380px,calc(100%-2rem))] overlay-panel rounded-2xl p-4 space-y-4 text-[var(--foreground)]" role="dialog" aria-label={t('إعدادات الشاشة')} data-fb="display-settings">
       <div className="flex items-center justify-between"><div className="font-bold">{t('إعدادات الشاشة')}</div><button onClick={onClose} className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-[var(--surface-2)]" aria-label={t('إغلاق')}><X className="w-4 h-4" /></button></div>
       <div className="space-y-1.5"><div className="text-xs font-bold text-soft">{kind === 'CALLBOARD' ? t('تتبع شاشة') : t('تتبع جهاز')}</div><div className="flex flex-wrap gap-1.5">{hosts.map((h) => <Opt key={h.id} on={cfg.host === h.id} onClick={() => set({ host: h.id })} fb={`display-host:${h.id}`}>{deviceName(h.id, h.kind, h.name)}</Opt>)}</div></div>
+      {hostIsStation && <div className="text-xs font-bold text-[var(--warning-text)]" data-fb="display-host-not-dispatch">{t('الشاشة المتبوعة ليست شاشة تسليم')}</div>}
       <div className="space-y-1.5"><div className="text-xs font-bold text-soft">{t('المظهر')}</div><div className="flex flex-wrap gap-1.5"><Opt on={cfg.style === 'theme'} onClick={() => set({ style: 'theme' })} fb="display-style:theme">{t('ألوان التطبيق')}</Opt><Opt on={cfg.style === 'display'} onClick={() => set({ style: 'display' })} fb="display-style:display">{t('تباين عالٍ')}</Opt></div></div>
-      {kind === 'CALLBOARD' && <>
-        <div className="space-y-1.5"><div className="text-xs font-bold text-soft">{t('مدة بقاء الرقم في «جاهز»')}</div><div className="flex flex-wrap gap-1.5">{[3, 5, 10, 15].map((m) => <Opt key={m} on={cfg.readyMinutes === m} onClick={() => set({ readyMinutes: m })} fb={`display-ready-min:${m}`}><span className="num">{m}</span> {t('د')}</Opt>)}</div></div>
-        <div className="space-y-1.5"><div className="text-xs font-bold text-soft">{t('النداء')}</div><div className="flex flex-wrap gap-1.5"><Opt on={!cfg.autoCall} onClick={() => set({ autoCall: false })} fb="display-call:manual">{t('من شاشة التسليم')}</Opt><Opt on={cfg.autoCall} onClick={() => set({ autoCall: true })} fb="display-call:auto">{t('تلقائي عند الجاهزية')}</Opt></div></div>
-      </>}
+      {kind === 'CALLBOARD' && <CallRuleRows />}
       <div className="space-y-1.5"><div className="text-xs font-bold text-soft">{t('شريط الهوية')}</div><div className="flex flex-wrap gap-1.5"><Opt on={cfg.branding} onClick={() => set({ branding: true })} fb="display-branding:on">{t('ظاهر')}</Opt><Opt on={!cfg.branding} onClick={() => set({ branding: false })} fb="display-branding:off">{t('مخفي')}</Opt></div></div>
+    </div>
+  );
+}
+
+/** ux-12c: the call rule of the venue (CallBoardPolicy), read-only here — it changes in the restaurant settings. */
+function CallRuleRows() {
+  const q = useQuery<any>('CallBoard.View');
+  const d = q.data;
+  if (!d) return null;
+  const Row = ({ k, v, fb }: { k: string; v: React.ReactNode; fb: string }) => <div className="flex items-center justify-between gap-3 text-sm" data-fb={fb}><span className="text-soft">{k}</span><b>{v}</b></div>;
+  return (
+    <div className="space-y-1.5 rounded-xl surface-1 border border-[var(--glass-border)] p-3" data-fb="display-call-rule">
+      <div className="text-xs font-bold text-soft">{t('من إعدادات المطعم')}</div>
+      <Row k={t('النداء')} v={d.auto ? t('تلقائيًا عند جاهزية كل المحطات') : t('من شاشة التسليم بزر «نداء»')} fb="display-rule:call" />
+      <Row k={t('مدة بقاء الرقم في «جاهز»')} v={<><span className="num">{d.readyMinutes}</span> {t('د')}</>} fb="display-rule:minutes" />
+      <Row k={t('أرقام الدليفري')} v={d.delivery ? t('ظاهرة') : t('مخفية')} fb="display-rule:delivery" />
     </div>
   );
 }

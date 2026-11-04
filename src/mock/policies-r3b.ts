@@ -1,5 +1,6 @@
 // Round 3 (r3B) venue policies — proposed, shown in the Policy Panel and the real settings screen:
-// tender reference capture per method (F3-06), the short display number (E08), second-language lines (E16/P1-034).
+// tender reference capture per method (F3-06), the short display number (E08), second-language lines (E16/P1-034),
+// ux-12c: the call board (CallBoardPolicy).
 // Pushed into POLICIES by policyRegistry.ts. Plain texts live in src/demo/policyText.ts.
 import type { PolicyMeta } from './policyRegistry';
 
@@ -40,5 +41,19 @@ export const R3B_POLICIES: PolicyMeta[] = [
     ] },
     canonicalDefault: { receipt: true, kitchen: false, menu: false }, confidence: 'MEDIUM',
     reacts: 'الإيصال، شاشة المطبخ، أزرار الأصناف',
+  },
+  {
+    // ux-12c: the call board behaviour is a venue rule (the dispatch screen and every call board follow it), not a
+    // setting of one screen. Strictest workable default: called from the dispatch screen, 10 minutes, no delivery.
+    id: 'CallBoardPolicy', group: 'kitchen', title: 'شاشة النداء', titleEn: 'Call board',
+    description: 'متى يظهر رقم الطلب في «جاهز» على شاشة النداء، وكم يبقى، وهل تظهر أرقام الدليفري.',
+    state: 'DIRECTION', scopes: ['TENANT', 'BRANCH'], appliesTo: 'NEW_ACTIONS',
+    editor: { kind: 'object', fields: [
+      { key: 'call', label: 'النداء', kind: 'enum', options: ['MANUAL', 'AUTO'] },
+      { key: 'readyMinutes', label: 'مدة بقاء الرقم في «جاهز» (دقيقة)', kind: 'number', min: 1, max: 120 },
+      { key: 'delivery', label: 'أرقام الدليفري على شاشة النداء', kind: 'bool' },
+    ] },
+    canonicalDefault: { call: 'MANUAL', readyMinutes: 10, delivery: false }, confidence: 'MEDIUM',
+    reacts: 'شاشة النداء وزر «نداء» في شاشة التسليم',
   },
 ];

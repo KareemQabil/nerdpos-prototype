@@ -122,6 +122,7 @@ export const kitchenHandlers: Record<string, Handler> = {
     const scr = screenView(ctx);
     if (to === 'DONE' && !scr.canHandOff) throw new ApiError('KDS_DISPATCH_ONLY', { terminal: ctx.terminal?.code ?? null });
     if (to === 'READY' && t!.state === 'NEW' && scr.start === 'REQUIRED') throw new ApiError('KDS_START_REQUIRED', { terminal: ctx.terminal?.code ?? null });
+    if (t!.state === 'READY' && to === 'IN_PROGRESS') { t!.readyAt = null; uncall(ctx, t!); }
     t!.state = to;
     if (to === 'IN_PROGRESS' && !t!.startedAt) t!.startedAt = ctx.nowIso;
     if (to === 'READY') t!.readyAt = ctx.nowIso;
@@ -143,7 +144,7 @@ export const kitchenHandlers: Record<string, Handler> = {
     if (t!.state === 'NEW' && scr.start === 'REQUIRED') { t!.state = 'IN_PROGRESS'; t!.startedAt = t!.startedAt ?? ctx.nowIso; } // working an item counts as starting
     t!.version++;
     if (t!.items.every((i) => i.status === 'CANCELLED' || (i as any).bumped)) { t!.state = 'READY'; t!.readyAt = ctx.nowIso; }
-    else if (t!.state === 'READY' && !(it as any).bumped) { t!.state = 'IN_PROGRESS'; t!.readyAt = null; } // undoing an item puts the ticket back to cooking
+    else if (t!.state === 'READY' && !(it as any).bumped) { t!.state = 'IN_PROGRESS'; t!.readyAt = null; uncall(ctx, t!); } // undoing an item puts the ticket back to cooking (and off «جاهز»)
     return t;
   },
   'Ticket.Recall': (ctx) => {
@@ -163,6 +164,7 @@ export const kitchenHandlers: Record<string, Handler> = {
     const from = t!.state;
     t!.state = 'IN_PROGRESS'; t!.readyAt = null; t!.doneAt = null;
     t!.version++;
+    uncall(ctx, t!);
     const m = metaOf(ctx, t!.id);
     m.recalledAt = ctx.nowIso;
     m.history.unshift({ at: ctx.nowIso, by: ctx.user!.id, text: { ar: `اترجعت للشغل (كانت ${from === 'DONE' ? 'اتسلمت' : 'جاهزة'})`, en: `recalled from ${from}` } });
@@ -235,7 +237,7 @@ function ticketView(ctx: Ctx, t: KitchenTicket, kt?: { targetMinutes: number; al
     stationName: st?.name, priority: m?.priority ?? 'NORMAL', refireOf: m?.refireOf ?? null, refireReason: m?.refireReason ?? null, refireReasonText: m?.refireReason ? REFIRE_REASONS[m.refireReason] ?? { ar: m.refireReason, en: m.refireReason } : null, refireNote: m?.refireNote ?? null,
     transferredFromName: m?.transferredFrom && m.transferredFrom !== 'MERGED' ? ctx.db.stations.find((s) => s.id === m.transferredFrom)?.name ?? null : null, recalledAt: m?.recalledAt ?? null,
     history: m?.history ?? [], guestCount: visit?.guestCount ?? order?.guestCount ?? null, customerName: order?.customerName ?? null,
-    calledAt: m?.calledAt ?? null, orderLabel: order?.label ?? null, orderKind: order?.kind ?? null,
+    calledAt: m?.calledAt ?? null, orderLabel: order?.label ?? null, orderKind: order?.kind ?? null, callable: callableOrder(order),
     siblings: siblings.map((x) => ({ id: x.id, stationId: x.stationId, stationName: ctx.db.stations.find((s) => s.id === x.stationId)?.name, state: x.state })),
   };
 }
@@ -342,8 +344,35 @@ function withScreenTiming<T extends { ageMinutes: number; warn: boolean; late: b
 }
 
 // ───────── ux-04: calling an order's number to the call board, and the call board itself
-/** Orders that are collected by number (no table): takeaway, delivery pick-up and counter dine-in. */
-const collectedByNumber = (o: { tableId?: string | null; visitId?: string | null; kind?: string } | undefined) => !!o && !o.tableId && !o.visitId && o.kind !== 'STAFF_MEAL';
+// ux-12c: one rule for which orders are called by number (CallBoardPolicy), a call that belongs to the food it
+// announced (a ticket that goes back to the kitchen — recall, item undo — loses its call; a refire or a new round
+// starts uncalled), and voided food that nobody waits for.
+interface CallBoardSettings { readyMinutes: number; call: 'MANUAL' | 'AUTO'; delivery: boolean }
+export const CALL_BOARD_DEFAULT: CallBoardSettings = { readyMinutes: 10, call: 'MANUAL', delivery: false };
+function callBoardPolicy(branchId?: string | null): CallBoardSettings {
+  const v = policy<Partial<CallBoardSettings>>('CallBoardPolicy', branchId ? { branchId } : {}) ?? {};
+  const mins = Math.max(1, Math.min(120, Number(v.readyMinutes ?? CALL_BOARD_DEFAULT.readyMinutes) || CALL_BOARD_DEFAULT.readyMinutes));
+  return { readyMinutes: mins, call: v.call === 'AUTO' ? 'AUTO' : 'MANUAL', delivery: v.delivery === true };
+}
+/** Orders collected by number (no table): takeaway, counter dine-in and — when CallBoardPolicy.delivery — delivery.
+ *  Never a table check, a staff meal or a voided / cancelled check. */
+function callableOrder(o: { tableId?: string | null; visitId?: string | null; kind?: string; status?: string; channel?: string; branchId?: string } | undefined): boolean {
+  if (!o || o.tableId || o.visitId || o.kind === 'STAFF_MEAL' || o.status === 'VOIDED' || o.status === 'CANCELLED') return false;
+  return o.channel !== 'DELIVERY' || callBoardPolicy(o.branchId).delivery;
+}
+/** A ticket the guest still waits for: not handed off, not merged into another, with at least one item not voided. */
+function waitingTickets(ctx: Ctx, orderId: string): KitchenTicket[] {
+  const merged = new Set((ctx.db.ticketMeta ?? []).filter((m) => m.transferredFrom === 'MERGED').map((m) => m.ticketId));
+  return ctx.db.tickets.filter((t) => t.orderId === orderId && !merged.has(t.id) && t.state !== 'DONE' && t.items.some((i) => i.status !== 'CANCELLED'));
+}
+const calledAtOf = (ctx: Ctx, t: KitchenTicket) => (ctx.db.ticketMeta ?? []).find((m) => m.ticketId === t.id)?.calledAt ?? null;
+/** The food went back to the kitchen: its number is no longer «جاهز» until it is called again. */
+function uncall(ctx: Ctx, t: KitchenTicket) {
+  const m = (ctx.db.ticketMeta ?? []).find((x) => x.ticketId === t.id);
+  if (!m?.calledAt) return;
+  m.calledAt = null;
+  m.history.unshift({ at: ctx.nowIso, by: ctx.user?.id ?? 'system', text: { ar: 'رُفع الرقم من «جاهز» في شاشة النداء', en: 'number taken off «ready» on the call board' } });
+}
 
 function callBoardHandlers(): Record<string, Handler> {
   return {
@@ -352,11 +381,11 @@ function callBoardHandlers(): Record<string, Handler> {
       const o = ctx.db.orders.find((x) => x.id === ctx.params.orderId && x.branchId === ctx.branchId);
       need(o, 'ORDER_NOT_FOUND');
       if (!screenView(ctx).canHandOff) throw new ApiError('KDS_DISPATCH_ONLY', { terminal: ctx.terminal?.code ?? null });
-      const merged = new Set((ctx.db.ticketMeta ?? []).filter((m) => m.transferredFrom === 'MERGED').map((m) => m.ticketId));
-      const open = ctx.db.tickets.filter((t) => t.orderId === o!.id && !merged.has(t.id) && t.state !== 'DONE');
+      if (!callableOrder(o)) throw new ApiError('KITCHEN_ORDER_NOT_CALLABLE', { orderId: o!.id, channel: o!.channel, status: o!.status, table: !!(o!.tableId || o!.visitId) }, 409);
+      const open = waitingTickets(ctx, o!.id);
       need(open.length, 'VALIDATION_FAILED', { field: 'orderId', rule: 'the order has no ticket waiting for hand-off' });
-      if (open.some((t) => t.state !== 'READY') && ctx.body?.force !== true) throw new ApiError('KITCHEN_TRANSITION_INVALID', { from: 'IN_PROGRESS', to: 'CALLED', rule: 'every station of the order is ready first' });
-      const again = open.some((t) => (ctx.db.ticketMeta ?? []).find((m) => m.ticketId === t.id)?.calledAt);
+      if (open.some((t) => t.state !== 'READY') && ctx.body?.force !== true) throw new ApiError('KITCHEN_TRANSITION_INVALID', { from: 'IN_PROGRESS', to: 'CALLED', rule: 'every station of the order is ready first', waiting: open.filter((t) => t.state !== 'READY').map((t) => ({ round: t.round, station: ctx.db.stations.find((s) => s.id === t.stationId)?.name ?? t.stationId })) });
+      const again = open.every((t) => calledAtOf(ctx, t));
       for (const t of open) {
         const m = metaOf(ctx, t.id);
         m.calledAt = ctx.nowIso; m.calledBy = ctx.user!.id;
@@ -366,39 +395,35 @@ function callBoardHandlers(): Record<string, Handler> {
       event('OrderCalled', o!.id, `${o!.number}${o!.shortNo ? ' #' + o!.shortNo : ''}${again ? ' (again)' : ''}`);
       return { orderId: o!.id, number: o!.number, shortNo: o!.shortNo ?? null, calledAt: ctx.nowIso, again };
     },
-    /** What the call board shows: numbers being prepared and numbers called (ready). A number leaves «جاهز» when the
-     *  order is handed off or `readyMinutes` after it was called. Only orders collected by number are shown. */
+    /** What the call board shows: numbers being prepared and numbers called (ready). A number is «جاهز» only while every
+     *  ticket the guest waits for carries the call (or, in AUTO, is ready); it leaves «جاهز» when the order is handed
+     *  off or CallBoardPolicy.readyMinutes after the call. Only orders collected by number are shown. */
     'CallBoard.View': (ctx) => {
-      const readyMinutes = Math.max(1, Math.min(120, Number(ctx.query.readyMinutes ?? 10) || 10));
-      const auto = ctx.query.auto === 'true' || ctx.query.auto === '1';
-      const merged = new Set((ctx.db.ticketMeta ?? []).filter((m) => m.transferredFrom === 'MERGED').map((m) => m.ticketId));
-      const byOrder = new Map<string, KitchenTicket[]>();
-      for (const t of ctx.db.tickets) {
-        if (merged.has(t.id) || ctx.db.stations.find((s) => s.id === t.stationId)?.branchId !== ctx.branchId) continue;
-        byOrder.set(t.orderId, [...(byOrder.get(t.orderId) ?? []), t]);
-      }
+      const pol = callBoardPolicy(ctx.branchId);
+      const auto = pol.call === 'AUTO';
+      const orderIds = new Set(ctx.db.tickets.filter((t) => t.state !== 'DONE' && ctx.db.stations.find((s) => s.id === t.stationId)?.branchId === ctx.branchId).map((t) => t.orderId));
       const preparing: any[] = [], ready: any[] = [];
-      for (const [orderId, list] of byOrder) {
+      for (const orderId of orderIds) {
         const o = ctx.db.orders.find((x) => x.id === orderId);
-        if (!collectedByNumber(o)) continue;
-        const open = list.filter((t) => t.state !== 'DONE');
-        if (!open.length) continue; // handed off: gone from the board
-        const metas = open.map((t) => (ctx.db.ticketMeta ?? []).find((m) => m.ticketId === t.id));
-        const calledAt = metas.map((m) => m?.calledAt).filter(Boolean).sort().pop() ?? null;
+        if (!callableOrder(o)) continue;
+        const open = waitingTickets(ctx, orderId);
+        if (!open.length) continue; // handed off (or only voided food left): gone from the board
+        const calls = open.map((t) => calledAtOf(ctx, t));
+        const calledAt = calls.every(Boolean) ? (calls as string[]).sort().pop()! : null;
         const allReady = open.every((t) => t.state === 'READY');
         const readyAt = allReady ? open.map((t) => t.readyAt).filter(Boolean).sort().pop() ?? null : null;
         const since = calledAt ?? (auto && allReady ? readyAt : null);
         const no = o!.shortNo ?? o!.number;
         if (since) {
           const mins = Math.floor((ctx.now - Date.parse(since)) / 60000);
-          if (mins < readyMinutes) ready.push({ orderId, no, short: !!o!.shortNo, calledAt: since, minutes: mins });
+          if (mins < pol.readyMinutes) ready.push({ orderId, no, short: !!o!.shortNo, calledAt: since, minutes: mins });
           continue; // called longer ago than readyMinutes: off the board
         }
-        preparing.push({ orderId, no, short: !!o!.shortNo, since: list.map((t) => t.createdAt).sort()[0] });
+        preparing.push({ orderId, no, short: !!o!.shortNo, since: open.map((t) => t.createdAt).sort()[0] });
       }
       preparing.sort((a, b) => a.since.localeCompare(b.since));
       ready.sort((a, b) => b.calledAt.localeCompare(a.calledAt));
-      return { preparing, ready, readyMinutes, auto, at: ctx.nowIso };
+      return { preparing, ready, readyMinutes: pol.readyMinutes, auto, delivery: pol.delivery, at: ctx.nowIso };
     },
   };
 }
