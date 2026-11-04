@@ -58,7 +58,7 @@ export default function Item360() {
       <div className="text-[11px] text-dim truncate">{sub}</div>
     </button>
   );
-  const arrow = <ArrowLeft className="w-4 h-4 text-dim shrink-0 self-center ltr:rotate-180 hidden @3xl/main:block" />;
+  const arrow = <ArrowLeft className="w-4 h-4 text-dim shrink-0 self-center ltr:rotate-180 hidden @5xl/main:block" />;
   const scrollTo = (sid: string) => document.querySelector(`[data-section="${sid}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   return (
@@ -101,7 +101,7 @@ export default function Item360() {
       {/* lifecycle strip */}
       {st && (
         <Card title={t('رحلة الصنف')} description={t('آخر 30 يوم في مخازن الفرع ده — اضغط على أي خطوة عشان تشوف تفاصيلها.')}>
-          <div className="flex flex-col @3xl/main:flex-row gap-2 items-stretch" data-fb="item360:stages">
+          <div className="grid grid-cols-1 @xl/main:grid-cols-3 @5xl/main:flex @5xl/main:flex-row gap-2 items-stretch" data-fb="item360:stages">
             {stage(<ClipboardList className="w-3.5 h-3.5" />, t('مطلوب من المخزن'), <Qty v={st.requested.quantity} unit={unit} hint={false} />, t('{n} طلبية مفتوحة', { n: st.requested.docs.length }), Number(st.requested.quantity) > 0 ? 'info' : undefined, 'stage:requested', () => scrollTo('docs'))}
             {arrow}
             {stage(<ShoppingBag className="w-3.5 h-3.5" />, t('متطلب من المورد'), <Qty v={st.ordered.quantity} unit={unit} hint={false} />, t('{n} أمر شراء مفتوح', { n: st.ordered.docs.length }), Number(st.ordered.quantity) > 0 ? 'info' : undefined, 'stage:ordered', () => scrollTo('docs'))}
