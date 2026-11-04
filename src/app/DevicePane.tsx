@@ -4,7 +4,7 @@ import { hasPermission } from '../mock/types-channels'; // r3C
 import React, { Suspense, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { LogOut, Lock, KeyRound, Delete, ShieldAlert, WifiOff, RefreshCw, Monitor, CalendarDays, Clock3, Wallet, ShoppingCart, Armchair, ChefHat, Briefcase, Building2, Check, Zap, Inbox } from 'lucide-react';
 import { DeviceProvider, useQuery, useApprovals, useUnknowns, retryUnknown, errorText, type DevCtx, useDev } from './hooks';
-import { devices, deviceLabel, useDevicesState, isDisplay } from './devices';
+import { devices, deviceLabel, useDevicesState, isDisplay, routeFor } from './devices';
 import { screenById, type Kind } from './registry';
 import { call, ApiFailure } from '../api/client';
 import { demo } from '../mock/demo';
@@ -15,7 +15,7 @@ import { t, L, useLang } from '../i18n';
 import { cn, money, dateTime } from '../lib/format';
 import { clock, businessDate, localTime } from '../mock/clock';
 import { APPROVAL_ACTIONS } from '../mock/policyRegistry';
-import { Tech } from './tech';
+import { Tech, useTech } from './tech';
 import { personName, personLabel, personRole, deviceName, roleLabel, branchLabel, userLabel } from '../demo/people'; // plain names (demo layer)
 import { capabilityHiding } from '../screens/ops/capabilities-ui'; // operations & system area
 import { OfflineBar } from '../screens/ops/OfflineBar';
@@ -95,7 +95,12 @@ function ScreenFallback() {
 }
 
 function ScreenHost() {
-  const { screen, kind, can, auth, terminal } = useDev();
+  const { screen, kind, can, auth, terminal, id, params } = useDev();
+  const tech = useTech();
+  // ux-07: a removed / merged screen (or a demo-only page with technical details off) goes to its surviving entry point
+  const route = routeFor(id, screen, params);
+  useEffect(() => { if (route.screen !== screen) devices.navigate(id, route.screen, route.params); }, [route.screen, screen, tech]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (route.screen !== screen) return <ScreenFallback />;
   const def = screenById.get(screen) ?? visibleScreens(kind as Kind, can, auth.branchId ?? terminal?.branchId ?? null)[0];
   if (!def) return <EmptyState icon={<Inbox />} title={t('مفيش شاشات متاحة')} text={t('مفيش شاشات متاحة للمستخدم ده على الجهاز ده. ادخل بحساب تاني.')} />;
   const allowed = def.perm ? can(def.perm) : def.anyPerm ? def.anyPerm.some(can) : true;

@@ -397,8 +397,10 @@ function useSetupSteps(bd: string | null) {
       { screen: 'import', title: t('المنيو (استيراد من إكسيل أو صنف صنف)'), status: known(products) ? products.items.length > 0 : null,
         detail: t('{n} صنف', { n: products.items.length }) },
       { screen: 'prices', title: t('الأسعار لكل فرع ونوع طلب'), status: null, detail: t('راجع إن كل صنف ليه سعر — الصنف اللي من غير سعر ما ينفعش يتباع') },
-      { screen: 'stations', title: t('المطبخ والمحطات والترابيزات'), status: known(stations, rules, tables) ? stations.items.length > 0 && catchAll && tables.items.length > 0 : null,
-        detail: t('{s} محطة · {r} قاعدة توزيع{c} · {tb} ترابيزة', { s: stations.items.length, r: rules.items.length, c: catchAll ? '' : ' — ' + t('ناقصة قاعدة «أي حاجة تانية»'), tb: tables.items.length }) },
+      { screen: 'stations', title: t('المحطات والتوجيه'), status: known(stations, rules) ? stations.items.length > 0 && catchAll : null,
+        detail: t('{s} محطة · {r} قاعدة توزيع{c}', { s: stations.items.length, r: rules.items.length, c: catchAll ? '' : ' — ' + t('ناقصة قاعدة «أي حاجة تانية»') }) },
+      // ux-07: tables are created and drawn in one place
+      { screen: 'floorplan', title: t('خريطة الصالة والترابيزات'), status: known(tables) ? tables.items.length > 0 : null, detail: t('{n} ترابيزة', { n: tables.items.length }) },
       { screen: 'fiscal', title: t('الإيصال الإلكتروني (منظومة الضرايب)'), status: fiscal.data ? (typeof fiscalMode === 'string' ? fiscalMode !== 'OFF' : null) : null,
         detail: t('الوضع: {m}', { m: typeof fiscalMode === 'string' ? t(FISCAL_MODE[fiscalMode] ?? fiscalMode) : '—' }), note: t('ابدأ بالتجريبي، والفعلي بعد اعتماد المنظومة') },
       { screen: 'counter', title: t('أول بيعة على الكاشير'), status: sales.data ? Number(orderCount ?? 0) > 0 : null,

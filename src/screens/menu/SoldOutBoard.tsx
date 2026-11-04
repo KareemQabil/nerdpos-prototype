@@ -1,5 +1,8 @@
 // "خلص النهارده" (86) board: managers and cashiers mark items and options sold out for today; they come back by
 // themselves at the start of the next business day (SoldOutResetPolicy). Every device sees it at once.
+// ux-07: ONE sold-out behaviour. Every entry point (the sale screen's popup and its «المزيد» action, the Menu tab, the
+// kitchen / waiter sidenav entry, the item page, the option row in the modifiers editor) marks through the same
+// SoldOutMarkDialog: the same reasons, «today only» by default (END_OF_BUSINESS_DAY), the same commands.
 import React, { useMemo, useState } from 'react';
 import { Ban, RotateCcw, Search, CircleSlash, Clock, PackageX } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../app/hooks';
@@ -22,7 +25,8 @@ export default function SoldOutScreen() {
   );
 }
 
-type Target = { kind: 'product'; id: string; name: any } | { kind: 'option'; id: string; groupId: string; name: any };
+export type SoldOutTarget = { kind: 'product'; id: string; name: any } | { kind: 'option'; id: string; groupId: string; name: any };
+type Target = SoldOutTarget;
 
 /** Who marked it, in words (the seed's system user is «من الإعداد»). */
 const byText = (n?: string | null) => (!n ? '' : /^[a-z0-9_-]+$/i.test(n) ? ` · ${t('من الإعداد')}` : ` · ${personText(n)}`);
@@ -38,22 +42,12 @@ export function SoldOutBoard({ compact }: { compact?: boolean }) {
   const [q, setQ] = useState('');
   const [cat, setCat] = useState<string | null>(null);
   const [target, setTarget] = useState<Target | null>(null);
-  const [reason, setReason] = useState('');
-  const [untilReset, setUntilReset] = useState(false);
   const allowed = can('product:setavailability');
   const b = board.data;
   const items: any[] = products.data?.items ?? [];
   const shown = items.filter((p) => (!cat || p.categoryId === cat) && (!q || (p.name.ar + p.name.en + p.sku).toLowerCase().includes(q.toLowerCase())));
   const options = useMemo(() => (groups.data?.items ?? []).flatMap((g: any) => g.options.filter((o: any) => o.active).map((o: any) => ({ ...o, group: g }))).filter((o: any) => !q || (o.name.ar + o.name.en + o.group.name.ar).toLowerCase().includes(q.toLowerCase())), [groups.data, q]);
 
-  const markOut = async () => {
-    if (!target) return;
-    const why = reason.trim() || t('خلص النهارده');
-    const ok = target.kind === 'product'
-      ? await run('Product.SetAvailability', { params: { productId: target.id }, body: { state: 'SOLD_OUT', reason: why, until: untilReset ? undefined : 'END_OF_BUSINESS_DAY' } }, { success: t('{n} اتعلّم خلص — اختفى من البيع', { n: L(target.name) }) })
-      : await run('ModifierOption.SetAvailability', { params: { groupId: target.groupId, optionId: target.id }, body: { state: 'SOLD_OUT', reason: why, until: untilReset ? 'UNTIL_RESET' : undefined } }, { success: t('{n} اتعلّم خلص', { n: L(target.name) }) });
-    if (ok) { setTarget(null); setReason(''); setUntilReset(false); }
-  };
   const back = (kind: 'product' | 'option', id: string, groupId?: string, name?: any) => kind === 'product'
     ? run('Product.SetAvailability', { params: { productId: id }, body: { state: 'AVAILABLE' } }, { success: t('{n} رجع للبيع', { n: L(name) }) })
     : run('ModifierOption.SetAvailability', { params: { groupId, optionId: id }, body: { state: 'AVAILABLE' } }, { success: t('{n} رجع للبيع', { n: L(name) }) });
@@ -112,7 +106,7 @@ export function SoldOutBoard({ compact }: { compact?: boolean }) {
                 const notHere = st === 'NOT_ON_BRANCH_MENU';
                 return (
                   <button key={p.id} data-fb={`soldout:product:${p.sku}`} disabled={!allowed || notHere || busy}
-                    onClick={() => (out ? st === 'SOLD_OUT' && back('product', p.id, undefined, p.name) : (setTarget({ kind: 'product', id: p.id, name: p.name }), setReason('')))}
+                    onClick={() => (out ? st === 'SOLD_OUT' && back('product', p.id, undefined, p.name) : setTarget({ kind: 'product', id: p.id, name: p.name }))}
                     className={cn('text-start rounded-xl border p-2.5 transition-colors flex gap-2 items-center disabled:cursor-default', out ? 'border-[color-mix(in_srgb,var(--error)_45%,transparent)] bg-[color-mix(in_srgb,var(--error)_10%,transparent)]' : 'border-[var(--glass-border)] surface-1 hover:surface-2', notHere && 'opacity-40')}>
                     {p.imageUrl ? <img src={p.imageUrl} alt="" className={cn('w-10 h-10 rounded-lg object-cover shrink-0', out && 'grayscale')} /> : <span className="w-10 h-10 rounded-lg shrink-0" style={{ background: (p.colorCode ?? '#64748b') + '44' }} />}
                     <span className="min-w-0 flex-1">
@@ -131,7 +125,7 @@ export function SoldOutBoard({ compact }: { compact?: boolean }) {
         <div className={cn('grid gap-2', compact ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5')}>
           {options.map((o: any) => (
             <button key={o.id} data-fb={`soldout:option:${o.id}`} disabled={!allowed || busy}
-              onClick={() => (o.soldOut ? back('option', o.id, o.group.id, o.name) : (setTarget({ kind: 'option', id: o.id, groupId: o.group.id, name: o.name }), setReason('')))}
+              onClick={() => (o.soldOut ? back('option', o.id, o.group.id, o.name) : setTarget({ kind: 'option', id: o.id, groupId: o.group.id, name: o.name }))}
               className={cn('text-start rounded-xl border p-2.5 transition-colors disabled:cursor-default', o.soldOut ? 'border-[color-mix(in_srgb,var(--warning)_45%,transparent)] bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]' : 'border-[var(--glass-border)] surface-1 hover:surface-2')}>
               <span className={cn('block text-sm font-bold', o.soldOut && 'line-through opacity-70')}>{L(o.name)}</span>
               <span className="block text-[11px] text-dim">{L(o.group.name)} · {o.soldOut ? <span className="text-[var(--warning)] font-bold">{t('خلصت')}</span> : t('متاحة')}</span>
@@ -140,19 +134,51 @@ export function SoldOutBoard({ compact }: { compact?: boolean }) {
         </div>
       )}
 
-      <Modal open={!!target} onClose={() => setTarget(null)} title={<span className="inline-flex items-center gap-2"><CircleSlash className="w-5 h-5 text-[var(--error)]" />{t('خلص: {n}', { n: L(target?.name) })}</span>} badge={<StateBadge ops={[target?.kind === 'option' ? 'ModifierOption.SetAvailability' : 'Product.SetAvailability']} />}
-        footer={<><Button onClick={() => setTarget(null)}>{t('رجوع')}</Button><Button variant="danger" data-fb="soldout:confirm" loading={busy} onClick={markOut}><Ban className="w-4 h-4" />{untilReset ? t('علّمه خلص') : t('خلص النهارده')}</Button></>}>
-        <div className="space-y-3">
-          <div className="text-sm">{target?.kind === 'option' ? t('الإضافة دي هتبان "خلصت" في شاشة البيع ومش هتتختار.') : t('الصنف هيختفي من شاشة البيع على كل الأجهزة، ومش هيتضاف لأي شيك.')}</div>
-          <Field label={t('السبب')}>
-            <div className="flex flex-wrap gap-1.5 mb-2">{QUICK_REASONS.map((r) => <button key={r} type="button" onClick={() => setReason(t(r))} className={cn('px-2.5 h-8 rounded-lg text-xs border', reason === t(r) ? 'border-[var(--primary)] text-[var(--primary)] bg-[var(--primary-container)]' : 'border-[var(--glass-border)] text-soft')}>{t(r)}</button>)}</div>
-            <Textarea data-fb="soldout:reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t('اختياري — مثلاً: الفراخ خلصت')} className="min-h-[44px]" />
-          </Field>
-          <Switch checked={untilReset} onChange={setUntilReset} label={t('يفضل خلصان لحد ما حد يرجّعه (مش النهارده بس)')} />
-          <Tech><div className="text-[11px] text-dim num" dir="ltr">{target?.kind === 'option' ? 'ModifierOption.SetAvailability' : 'Product.SetAvailability'} until={untilReset ? 'UNTIL_RESET' : 'END_OF_BUSINESS_DAY'} · business date {b?.businessDate}</div></Tech>
-        </div>
-      </Modal>
+      <SoldOutMarkDialog target={target} onClose={() => setTarget(null)} businessDate={b?.businessDate} />
       <Tech><div className="text-[11px] text-dim">{t('اليوم التجاري')}: <span className="num">{b?.businessDate}</span> · {dateTime(b?.resetsAt)}</div></Tech>
     </div>
+  );
+}
+
+/** ux-07: the one «mark sold out» dialog every entry point uses (reason chips, today only by default, same commands). */
+export function SoldOutMarkDialog({ target, onClose, onDone, businessDate }: { target: SoldOutTarget | null; onClose: () => void; onDone?: () => void; businessDate?: string }) {
+  const { run, busy } = useCommand();
+  const [reason, setReason] = useState('');
+  const [untilReset, setUntilReset] = useState(false);
+  const key = target ? `${target.kind}:${target.id}` : '';
+  React.useEffect(() => { setReason(''); setUntilReset(false); }, [key]);
+  const markOut = async () => {
+    if (!target) return;
+    const why = reason.trim() || t('خلص النهارده');
+    const ok = target.kind === 'product'
+      ? await run('Product.SetAvailability', { params: { productId: target.id }, body: { state: 'SOLD_OUT', reason: why, until: untilReset ? undefined : 'END_OF_BUSINESS_DAY' } }, { success: t('{n} اتعلّم خلص — اختفى من البيع', { n: L(target.name) }) })
+      : await run('ModifierOption.SetAvailability', { params: { groupId: target.groupId, optionId: target.id }, body: { state: 'SOLD_OUT', reason: why, until: untilReset ? 'UNTIL_RESET' : undefined } }, { success: t('{n} اتعلّم خلص', { n: L(target.name) }) });
+    if (ok) { onClose(); onDone?.(); }
+  };
+  return (
+    <Modal open={!!target} onClose={onClose} title={<span className="inline-flex items-center gap-2"><CircleSlash className="w-5 h-5 text-[var(--error)]" />{t('خلص: {n}', { n: L(target?.name) })}</span>} badge={<StateBadge ops={[target?.kind === 'option' ? 'ModifierOption.SetAvailability' : 'Product.SetAvailability']} />}
+      footer={<><Button onClick={onClose}>{t('رجوع')}</Button><Button variant="danger" data-fb="soldout:confirm" loading={busy} onClick={markOut}><Ban className="w-4 h-4" />{untilReset ? t('علّمه خلص') : t('خلص النهارده')}</Button></>}>
+      <div className="space-y-3" data-fb="soldout:mark-dialog">
+        <div className="text-sm">{target?.kind === 'option' ? t('الإضافة دي هتبان "خلصت" في شاشة البيع ومش هتتختار.') : t('الصنف هيختفي من شاشة البيع على كل الأجهزة، ومش هيتضاف لأي شيك.')}</div>
+        <Field label={t('السبب')}>
+          <div className="flex flex-wrap gap-1.5 mb-2">{QUICK_REASONS.map((r) => <button key={r} type="button" data-fb={`soldout:reason:${QUICK_REASONS.indexOf(r)}`} onClick={() => setReason(t(r))} className={cn('px-2.5 h-8 rounded-lg text-xs border', reason === t(r) ? 'border-[var(--primary)] text-[var(--primary)] bg-[var(--primary-container)]' : 'border-[var(--glass-border)] text-soft')}>{t(r)}</button>)}</div>
+          <Textarea data-fb="soldout:reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t('اختياري — مثلاً: الفراخ خلصت')} className="min-h-[44px]" />
+        </Field>
+        <Switch checked={untilReset} onChange={setUntilReset} label={t('يفضل خلصان لحد ما حد يرجّعه (مش النهارده بس)')} />
+        <Tech><div className="text-[11px] text-dim num" dir="ltr">{target?.kind === 'option' ? 'ModifierOption.SetAvailability' : 'Product.SetAvailability'} until={untilReset ? 'UNTIL_RESET' : 'END_OF_BUSINESS_DAY'}{businessDate ? ` · business date ${businessDate}` : ''}</div></Tech>
+      </div>
+    </Modal>
+  );
+}
+
+/** ux-07: the sale screen's sold-out popup (the menu header button and «المزيد → خلص النهارده» open this same popup). */
+export function SoldOutPopup({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { can } = useDev();
+  return (
+    <Modal open={open} onClose={onClose} xwide title={<span className="inline-flex items-center gap-2"><PackageX className="w-5 h-5 text-[var(--error)]" />{t('خلص النهارده')}</span>} badge={<StateBadge ops={OPS} />}
+      footer={<Button onClick={onClose}>{t('تمام')}</Button>}>
+      <div data-fb="soldout-popup"><SoldOutBoard compact /></div>
+      {!can('product:setavailability') && <div className="text-xs text-dim mt-2">{t('اطلب من المدير يعلّم الصنف.')}</div>}
+    </Modal>
   );
 }

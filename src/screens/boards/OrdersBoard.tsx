@@ -13,6 +13,7 @@ import { clock, businessDate } from '../../mock/clock';
 import { personName } from '../../demo/people';
 import { useBoardRules, AgeChip, mins } from './common';
 import { StatusPill } from '../order/CheckPanel';
+import { useCollect } from '../cashier/PaymentPopup';
 
 type Stage = 'open' | 'kitchen' | 'ready' | 'payment' | 'closed';
 export function orderStage(o: any): Stage | null {
@@ -79,7 +80,8 @@ export default function OrdersBoard({ onList }: { onList?: () => void }) {
     return false;
   };
   const openCheck = (o: any) => nav(o.visitId ? 'order' : kind === 'CASH' ? 'counter' : 'order', { orderId: o.id, back: 'checks' });
-  const collect = (o: any) => (kind === 'CASH' ? nav('counter', { orderId: o.id, ...(o.visitId ? { mode: 'collect' } : {}) }) : nav('pay', { orderId: o.id, back: 'checks' }));
+  const pay = useCollect(); // ux-07: one payment UI on every device
+  const collect = (o: any) => pay.collect(o);
   const liveO = (o: any) => o.status === 'DRAFT' || o.status === 'CONFIRMED';
   const actions = (o: any): CardAction[] => [
     ...(liveO(o) ? [{ id: 'open', label: t('فتح الشيك'), icon: <ClipboardList className="w-4 h-4" />, onSelect: () => openCheck(o) }] : []),
@@ -127,6 +129,7 @@ export default function OrdersBoard({ onList }: { onList?: () => void }) {
         renderDetail={(o: any) => <OrderDetail o={o} onOpen={() => openCheck(o)} onCollect={() => collect(o)} />}
         toolbarEnd={onList && <BoardViewToggle value="board" onChange={(v) => v === 'list' && onList()} />}
       />
+      {pay.node}
     </div>
   );
 }

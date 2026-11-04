@@ -1,6 +1,7 @@
 // Floor plan editor (setup): sections of the restaurant ("الصالة الرئيسية", "التراس", "الدور التاني"), tables dragged
 // to their place, shapes and seats, decor (bar, doors, windows, plants, labels). Saving publishes the layout to every
-// waiter tablet and cashier at once (Floor.Upsert).
+// waiter tablet and cashier at once (Floor.Upsert). ux-07: the one place where tables are created, named, seated,
+// stopped (removed from the map) and switched back on (Table.SetActive).
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Save, Undo2, Trash2, Square, Circle, RectangleHorizontal, Sofa, Wine, DoorOpen, PanelTop, Sprout, Type, MapPinned, EyeOff, Copy, LayoutGrid } from 'lucide-react';
 import { useQuery, useCommand } from '../../app/hooks';
@@ -53,6 +54,8 @@ export default function FloorPlanEditor() {
   const otherFloors = (tablesQ.data?.items ?? []).filter((x: any) => x.floorId && x.floorId !== draft?.id && !x.layout?.auto);
 
   const update = (fn: (d: Draft) => Draft) => { setDraft((d) => (d ? fn(d) : d)); setDirty(true); };
+  // ux-07: tables live here only (the Stations screen no longer manages them): a stopped table can be switched back on
+  const reactivate = async (u: any) => { const tb = live.get(u.id); if (!tb) return; if (await run('Table.SetActive', { params: { tableId: tb.id }, body: { active: true, expectedVersion: tb.version } }, { success: t('الترابيزة {n} اتفعلت', { n: tb.name }) })) { floors.refetch(); tablesQ.refetch(); } };
   const selTable = draft?.tables.find((x) => sel?.kind === 'table' && x.key === sel.key) ?? null;
   const selDecor = draft?.decor.find((x) => sel?.kind === 'decor' && x.id === sel.key) ?? null;
 
@@ -209,7 +212,7 @@ export default function FloorPlanEditor() {
             <Card title={<span className="flex items-center gap-2"><MapPinned className="w-4 h-4" />{t('ترابيزات مش على الخريطة')}</span>}>
               {unplaced.length === 0 && otherFloors.length === 0 ? <div className="text-xs text-dim">{t('كل الترابيزات متحطة في أماكنها')}</div> : (
                 <div className="space-y-1.5">
-                  {unplaced.map((u) => <div key={u.id} className="flex items-center justify-between gap-2 text-sm"><span><span className="num font-bold">{u.name}</span> · {u.capacity} {t('كرسي')}{!u.active && <Pill tone="neutral" className="ms-1">{t('موقوفة')}</Pill>}</span><Button size="sm" onClick={() => addTable(u.capacity > 4 ? 'RECT' : 'SQUARE', u)} data-fb={`floorplan-place:${u.name}`}>{t('حطها هنا')}</Button></div>)}
+                  {unplaced.map((u) => <div key={u.id} className="flex items-center justify-between gap-2 text-sm"><span><span className="num font-bold">{u.name}</span> · {u.capacity} {t('كرسي')}{!u.active && <Pill tone="neutral" className="ms-1">{t('موقوفة')}</Pill>}</span><span className="flex gap-1">{!u.active && <Button size="sm" variant="ghost" disabled={busy} onClick={() => reactivate(u)} data-fb={`floorplan-activate:${u.name}`}>{t('تفعيل')}</Button>}<Button size="sm" onClick={() => addTable(u.capacity > 4 ? 'RECT' : 'SQUARE', u)} data-fb={`floorplan-place:${u.name}`}>{t('حطها هنا')}</Button></span></div>)}
                   {otherFloors.length > 0 && <div className="text-[11px] text-dim pt-1 border-t line">{t('تقدر تنقل ترابيزة من قسم تاني:')}</div>}
                   {otherFloors.slice(0, 12).map((u: any) => <div key={u.id} className="flex items-center justify-between gap-2 text-xs"><span><span className="num font-bold">{u.name}</span> · {L(u.floorName)}</span><Button size="sm" variant="ghost" onClick={() => addTable(u.layout?.shape ?? 'SQUARE', u)}>{t('انقلها هنا')}</Button></div>)}
                 </div>

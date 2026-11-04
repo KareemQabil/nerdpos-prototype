@@ -49,11 +49,11 @@ const ALL_QTY: Record<QuantityMethod, boolean> = { typedPrefix: true, repeatTap:
 const TOUCH_QTY: Record<QuantityMethod, boolean> = { typedPrefix: false, repeatTap: true, stepper: true, swipe: true, longPress: true };
 const NO_QTY: Record<QuantityMethod, boolean> = { typedPrefix: false, repeatTap: false, stepper: false, swipe: false, longPress: false };
 const g = (ar: string, en: string) => ({ ar, en });
-const SALE_OVERFLOW: SaleAction[] = ['label', 'delivery', 'staffMeal', 'staffMeals', 'prebill', 'comp', 'channel', 'cancel', 'history', 'soldOut', 'drawer', 'shortcuts'];
+const SALE_OVERFLOW: SaleAction[] = ['label', 'staffMeal', 'staffMeals', 'prebill', 'comp', 'channel', 'cancel', 'history', 'soldOut', 'drawer', 'shortcuts'];
 
 export const PROFILES: Profile[] = [
   // ── floor & counter
-  { id: 'cashier', group: g('الصالة والكاونتر', 'Floor & counter'), role: g('كاشير', 'Cashier'), workspaces: ['counter', 'checks', 'shift', 'receipt', 'refunds'], start: 'counter', boards: { orders: 'list' }, saleModes: ['takeaway', 'dinein', 'delivery'], defaultMode: 'takeaway',
+  { id: 'cashier', group: g('الصالة والكاونتر', 'Floor & counter'), role: g('كاشير', 'Cashier'), workspaces: ['counter', 'shift', 'receipt', 'refunds'], start: 'counter', /* ux-07: the cashier's checks list is inside the sale screen (F7) */ saleModes: ['takeaway', 'dinein', 'delivery'], defaultMode: 'takeaway',
     actionBar: { secondary: ['new', 'held', 'customer', 'discount', 'orders'], overflow: SALE_OVERFLOW, primary: 'auto' }, quantity: ALL_QTY, input: 'mixed', hidden: ['expectedCash', 'reports'] },
   { id: 'waiter', group: g('الصالة والكاونتر', 'Floor & counter'), role: g('ويتر', 'Waiter'), workspaces: ['floor', 'order'], start: 'floor',
     actionBar: { secondary: ['guests', 'prebill', 'move', 'note'], overflow: ['customer', 'split', 'merge', 'history', 'cancel'], primary: 'send' }, quantity: TOUCH_QTY, input: 'touch', hidden: ['collection', 'drawer', 'reports'] },
@@ -95,9 +95,9 @@ export const PROFILES: Profile[] = [
   // ── delivery
   { id: 'driver', group: g('الدليفري', 'Delivery'), role: g('طيار', 'Driver'), workspaces: ['delivery-board'], start: 'delivery-board', boards: { delivery: 'list' },
     actionBar: { secondary: [], overflow: [], primary: 'delivered' }, quantity: NO_QTY, input: 'touch', hidden: ['everythingButOwnOrders'] },
-  { id: 'dispatcher', group: g('الدليفري', 'Delivery'), role: g('موزع الدليفري', 'Delivery dispatcher'), workspaces: ['delivery-board', 'delivery-new', 'drivers'], start: 'delivery-board', boards: { delivery: 'board' },
+  { id: 'dispatcher', group: g('الدليفري', 'Delivery'), role: g('موزع الدليفري', 'Delivery dispatcher'), workspaces: ['delivery-board', 'counter', 'drivers'], start: 'delivery-board', boards: { delivery: 'board' }, saleModes: ['delivery'], defaultMode: 'delivery', /* ux-07: new deliveries from the sale screen's «دليفري» mode */
     actionBar: { secondary: [], overflow: [], primary: 'dispatch' }, quantity: NO_QTY, input: 'mixed', hidden: ['financialReports'] },
-  { id: 'callCenter', group: g('الدليفري', 'Delivery'), role: g('مركز الاتصال', 'Call center'), workspaces: ['counter', 'delivery-new', 'customers'], start: 'counter', saleModes: ['delivery'], defaultMode: 'delivery',
+  { id: 'callCenter', group: g('الدليفري', 'Delivery'), role: g('مركز الاتصال', 'Call center'), workspaces: ['counter', 'customers'], start: 'counter', saleModes: ['delivery'], defaultMode: 'delivery',
     actionBar: { secondary: ['customer'], overflow: [], primary: 'confirm' }, quantity: ALL_QTY, input: 'keyboard', hidden: ['drawer'] },
   // ── system
   { id: 'support', group: g('النظام', 'System'), role: g('فريق التركيب والدعم', 'Install & support team'), workspaces: ['import', 'settings', 'org', 'capabilities'], start: 'org',

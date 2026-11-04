@@ -112,18 +112,18 @@ const R1: StepDef[] = [
     const ids = order(c1.id).lines.filter((l) => l.status === 'ACTIVE' && ['p_orange_juice', 'p_tea'].includes(l.productId)).map((l) => l.id);
     if (ids.length) await api(w, 'Order.MoveLines', { params: { orderId: c1.id }, body: { expectedVersion: order(c1.id).version, targetExpectedVersion: order(c2.id).version, targetOrderId: c2.id, lineIds: ids } }, log, 'OJ ×2 + tea ×3 → check 2');
   } },
-  { id: 'J-R1-14', device: 't_cash', user: 'demo-cashier-a', screen: () => ['pay', { orderId: checksOf(openVisit('7')!.id)[1]?.id, back: 'floor' }], run: async (log) => {
+  { id: 'J-R1-14', device: 't_cash', user: 'demo-cashier-a', screen: () => ['counter', { orderId: checksOf(openVisit('7')!.id)[1]?.id, mode: 'collect', pay: '1' }], run: async (log) => {
     const c = await as('t_cash', 'demo-cashier-a', log);
     const c2 = checksOf(openVisit('7')!.id)[1];
     if (order(c2.id).status === 'DRAFT') { const r = await api<any>(c, 'Order.Confirm', { params: { orderId: c2.id }, body: { expectedVersion: order(c2.id).version } }, log, 'confirm check 2'); log({ ok: true, text: `${r.confirmMessage} · payable ${r.totals.payable}` }); }
   } },
-  { id: 'J-R1-15', device: 't_cash', user: 'demo-cashier-a', screen: () => ['pay', { orderId: checksOf(openVisit('7')!.id)[1]?.id, back: 'floor' }], run: async (log) => {
+  { id: 'J-R1-15', device: 't_cash', user: 'demo-cashier-a', screen: () => ['counter', { orderId: checksOf(openVisit('7')!.id)[1]?.id, mode: 'collect', pay: '1' }], run: async (log) => {
     const c = await as('t_cash', 'demo-cashier-a', log);
     const c2 = checksOf(openVisit('7')!.id)[1];
     const r = await api<any>(c, 'Payment.Capture', { params: { orderId: c2.id }, body: { tenders: [{ method: 'CASH', tendered: '300.00' }] } }, log, 'cash 300.00');
     log({ ok: true, text: `change ${r.change} (server) · remaining ${r.settlement.remaining}`, plain: Number(r.settlement.remaining) === 0 ? t('مفيش متبقي على الشيك (الباقي محسوب من السيرفر)') : t('لسه متبقي {a}', { a: egp(r.settlement.remaining) }) });
   } },
-  { id: 'J-R1-16', device: 't_cash', user: 'demo-cashier-a', screen: () => ['pay', { orderId: checksOf(lastVisit('7')!.id)[1]?.id, back: 'floor' }], run: async (log) => {
+  { id: 'J-R1-16', device: 't_cash', user: 'demo-cashier-a', screen: () => ['counter', { orderId: checksOf(lastVisit('7')!.id)[1]?.id, mode: 'collect', pay: '1' }], run: async (log) => {
     const c = await as('t_cash', 'demo-cashier-a', log);
     const c2 = checksOf(lastVisit('7')!.id)[1];
     await api(c, 'Order.Complete', { params: { orderId: c2.id }, body: { expectedVersion: order(c2.id).version } }, log, 'complete check 2');
@@ -145,19 +145,19 @@ const R1: StepDef[] = [
     const c = await as('t_cash', 'demo-cashier-b', log);
     if (!openSession('t_cash')) await api(c, 'Session.Open', { body: { terminalId: 't_cash', openingFloat: '500.00' } }, log, 'float 500.00');
   } },
-  { id: 'J-R1-19', device: 't_cash', user: 'demo-cashier-b', screen: () => ['pay', { orderId: checksOf(lastVisit('7')!.id)[0]?.id, back: 'floor' }], run: async (log) => {
+  { id: 'J-R1-19', device: 't_cash', user: 'demo-cashier-b', screen: () => ['counter', { orderId: checksOf(lastVisit('7')!.id)[0]?.id, mode: 'collect', pay: '1' }], run: async (log) => {
     const c = await as('t_cash', 'demo-cashier-b', log);
     const c1 = checksOf(lastVisit('7')!.id)[0];
     if (order(c1.id).status === 'DRAFT') { const r = await api<any>(c, 'Order.Confirm', { params: { orderId: c1.id }, body: { expectedVersion: order(c1.id).version } }, log, 'confirm check 1'); log({ ok: true, text: `${r.confirmMessage} · payable ${r.totals.payable}`, plain: t('الحمص الملغي مش محسوب في الإجمالي') }); }
   } },
-  { id: 'J-R1-20', device: 't_cash', user: 'demo-cashier-b', screen: () => ['pay', { orderId: checksOf(lastVisit('7')!.id)[0]?.id, back: 'floor' }], run: async (log) => {
+  { id: 'J-R1-20', device: 't_cash', user: 'demo-cashier-b', screen: () => ['counter', { orderId: checksOf(lastVisit('7')!.id)[0]?.id, mode: 'collect', pay: '1' }], run: async (log) => {
     const c = await as('t_cash', 'demo-cashier-b', log);
     const c1 = checksOf(lastVisit('7')!.id)[0];
     await api(c, 'Payment.Capture', { params: { orderId: c1.id }, body: { tenders: [{ method: 'CASH', tendered: '200.00' }] } }, log, 'cash 200.00');
     const st = await api<any>(c, 'Payment.GetSettlement', { params: { orderId: c1.id } }, log);
     await api(c, 'Payment.Capture', { params: { orderId: c1.id }, body: { tenders: [{ method: 'CARD', amount: st.remaining, reference: 'DEMO-REF-0001' }] } }, log, `card ${st.remaining} DEMO-REF-0001`);
   } },
-  { id: 'J-R1-21', device: 't_cash', user: 'demo-cashier-b', screen: () => ['pay', { orderId: checksOf(lastVisit('7')!.id)[0]?.id, back: 'floor' }], run: async (log) => {
+  { id: 'J-R1-21', device: 't_cash', user: 'demo-cashier-b', screen: () => ['counter', { orderId: checksOf(lastVisit('7')!.id)[0]?.id, mode: 'collect', pay: '1' }], run: async (log) => {
     const c = await as('t_cash', 'demo-cashier-b', log);
     const c1 = checksOf(lastVisit('7')!.id)[0];
     await api(c, 'Order.Complete', { params: { orderId: c1.id }, body: { expectedVersion: order(c1.id).version } }, log, 'complete check 1');
@@ -451,7 +451,7 @@ const C1: StepDef[] = [
     const ord = order(o.id);
     log({ ok: true, text: `OJ line ${ord.lines[1].lineTotal} · service: ${ord.service?.origin}`, plain: t('سعر العصير في التيك أواي: {a}', { a: egp(ord.lines[1].lineTotal) }) });
   } },
-  { id: 'J-C1-2', device: 't_cash', user: 'demo-cashier-a', screen: () => ['pay', { orderId: [...store.db.orders].reverse().find((o) => o.channel === 'TAKEAWAY')?.id, back: 'counter' }], text: { who: 'demo-cashier-a on DEMO-CASH-1', do_ar: 'ادفع الأول: تأكيد (بيبعت للمطبخ وقت التأكيد) ثم كاش 300.', do_en: 'Pay first: confirm (fires at confirm), then cash 300.', expect_ar: 'التأكيد بيعمل جولة للمطبخ (AT_CONFIRM). الباقي من السيرفر.', expect_en: 'Confirm creates the kitchen round (AT_CONFIRM). Change from the server.', operations: [] }, run: async (log) => {
+  { id: 'J-C1-2', device: 't_cash', user: 'demo-cashier-a', screen: () => ['counter', { orderId: [...store.db.orders].reverse().find((o) => o.channel === 'TAKEAWAY')?.id, pay: '1' }], text: { who: 'demo-cashier-a on DEMO-CASH-1', do_ar: 'ادفع الأول: تأكيد (بيبعت للمطبخ وقت التأكيد) ثم كاش 300.', do_en: 'Pay first: confirm (fires at confirm), then cash 300.', expect_ar: 'التأكيد بيعمل جولة للمطبخ (AT_CONFIRM). الباقي من السيرفر.', expect_en: 'Confirm creates the kitchen round (AT_CONFIRM). Change from the server.', operations: [] }, run: async (log) => {
     const c = await as('t_cash', 'demo-cashier-a', log);
     const o = [...store.db.orders].reverse().find((x) => x.channel === 'TAKEAWAY' && x.status === 'DRAFT');
     if (!o) return log({ ok: false, text: 'run step 1 first', plain: t('اعمل الخطوة 1 الأول') });
@@ -479,7 +479,7 @@ const F1: StepDef[] = [
     await api(c, 'Order.Confirm', { params: { orderId: o.id }, body: { expectedVersion: order(o.id).version } }, log, 'confirm');
     sim.set({ dropNextResponse: 'Payment.Capture' });
     log({ ok: null, text: 'simulator: the next Payment.Capture response will be lost — now pay it in the UI', plain: t('جهّزنا العطل: رد الدفع الجاي هيضيع — ادفع الطلب بنفسك من شاشة التحصيل') });
-    devices.navigate('t_cash', 'pay', { orderId: o.id, back: 'counter' });
+    devices.navigate('t_cash', 'counter', { orderId: o.id, pay: '1' }); // ux-07: the payment popup over the sale screen (was the «pay» page)
   } },
   { id: 'J-F1-2', device: 't_floor', user: 'demo-waiter-1', screen: 'floor', before: () => sim.set({ dropNextResponse: null }), text: { who: 'demo-waiter-1 (T2) and demo-waiter-2', do_ar: 'جهازين بيعدلوا نفس الشيك: الاتنين بيضغطوا "ابعت للمطبخ" على نفس النسخة.', do_en: 'Two devices edit one check: both send to the kitchen from the same version.', expect_ar: 'واحد بس بينجح؛ التاني بياخد CONCURRENCY_CONFLICT "حد تاني عدّل الشيك ده" وبيعمل تحديث. جولة واحدة وتذاكر مرة واحدة.', expect_en: 'Exactly one succeeds; the other gets CONCURRENCY_CONFLICT and refreshes. One round, one ticket set.', operations: [{ op: 'Order.Fire', http: 'POST /orders/{orderId}/fire', actor: 'two waiters', expected: 'N3' }] }, run: async (log) => {
     sim.set({ dropNextResponse: null });

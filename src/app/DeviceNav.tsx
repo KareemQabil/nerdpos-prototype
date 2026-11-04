@@ -16,12 +16,13 @@ import { store } from '../mock/store';
 import { Avatar, Kbd } from '../ui';
 import { t, L, useLang } from '../i18n';
 import { cn } from '../lib/format';
-import { Tech } from './tech';
+import { Tech, techMode, useTech } from './tech';
 import { personName, personRole, roleLabel } from '../demo/people';
 import { capabilityHiding, pendingApprovalCount } from '../screens/ops/capabilities-ui';
 
 export function visibleScreens(kind: Kind, can: (p: string) => boolean, branchId: string | null = null) {
-  return SCREENS.filter((s) => !s.hidden && s.kinds.includes(kind) && (s.perm ? can(s.perm) : s.anyPerm ? s.anyPerm.some(can) : true) && !capabilityHiding(s, branchId));
+  const tech = techMode.get(); // ux-07: demo / engineering pages only with technical details on
+  return SCREENS.filter((s) => !s.hidden && (!s.demoOnly || tech) && s.kinds.includes(kind) && (s.perm ? can(s.perm) : s.anyPerm ? s.anyPerm.some(can) : true) && !capabilityHiding(s, branchId));
 }
 
 const GROUP_ICON: Record<ScreenGroup, React.ComponentType<{ className?: string }>> = {
@@ -50,6 +51,7 @@ export interface NavSection { group: ScreenGroup; title: string; items: ScreenDe
 export function useNavSections(): NavSection[] {
   const { kind, can, me, id } = useDev();
   const lang = useLang();
+  useTech(); // re-list when technical details are switched (demo-only pages)
   const branchId = me?.branchId ?? devices.auth(id).branchId ?? null;
   const items = visibleScreens(kind as Kind, can, branchId);
   const roles: string[] = (me?.user?.roleAssignments ?? []).map((r: any) => String(r.roleName ?? ''));
@@ -62,7 +64,7 @@ export function useNavSections(): NavSection[] {
   }, [items.map((s) => s.id).join(','), order, lang]);
 }
 
-export const isActiveItem = (sid: string, screen: string) => screen === sid || (sid === 'floor' && (screen === 'order' || screen === 'pay')) || (sid === 'checks' && screen === 'receipt') || (sid === 'customers' && screen === 'customer') || (sid === 'counter' && screen === 'staffmeal');
+export const isActiveItem = (sid: string, screen: string) => screen === sid || (sid === 'floor' && screen === 'order') || (sid === 'checks' && screen === 'receipt') || (sid === 'customers' && screen === 'customer');
 
 /** Live counts shown next to nav items. */
 function useBadges(branchId: string | null): Record<string, { n: number; tone: 'warning' | 'error' | 'primary'; pulse?: boolean; tip: string }> {

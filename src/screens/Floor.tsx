@@ -3,6 +3,7 @@
 // printed · waiting payment · needs cleaning · reserved), guests, time seated, waiter and the check total; a
 // "my tables" filter and a list view. On the waiter's tablet a table opens its check IN PLACE (products | check |
 // action bar); a free table opens a short centered popup (guests). No side panels.
+import { useCollect } from './cashier/PaymentPopup';
 import React, { useState } from 'react';
 import { Users, Clock, Plus, ArrowRightLeft, Link2, Unlink, DoorClosed, Wallet, ClipboardList, UserCog, CalendarClock, Minus, Sparkles, Map as MapIcon, LayoutGrid, Brush, ZoomIn, ZoomOut, Maximize2, Receipt, ChevronLeft, Armchair, Send } from 'lucide-react';
 import { useDev, useQuery, useCommand, errorText } from '../app/hooks';
@@ -270,6 +271,7 @@ function OpenTable({ tb, onClose, title, sub, openCheck }: { tb: any; onClose: (
 }
 
 function VisitSheet({ tableId, visitId, onClose, tables, title, sub, openCheck, waiter }: { tableId: string; visitId: string; onClose: () => void; tables: any[]; title: React.ReactNode; sub: React.ReactNode; openCheck: (id: string) => void; waiter?: boolean }) {
+  const pay = useCollect();
   const { nav, kind, can } = useDev();
   const { run, busy } = useCommand();
   const vq = useQuery<any>('TableVisit.List', { query: { tableId, state: 'OPEN' } });
@@ -286,6 +288,7 @@ function VisitSheet({ tableId, visitId, onClose, tables, title, sub, openCheck, 
   const openChecks = (v?.checks ?? []).filter((c: any) => c.status === 'DRAFT' || c.status === 'CONFIRMED');
   const canPay = kind !== 'FLOOR' && can('payment:capture');
   const total = sumAmounts(openChecks.map((c: any) => c.payable));
+  if (pay.node) return pay.node; // ux-07: the one payment popup (in place of the sheet while paying)
   return (
     <Modal open onClose={onClose} size="md" title={v ? <span className="flex items-center gap-2">{title}{v.joinedTableNames?.length ? <span className="text-soft text-base font-bold">+ {v.joinedTableNames.join(' + ')}</span> : null}</span> : title} description={sub}
       badge={<StateBadge ops={['TableVisit.List', 'Order.Create', 'TableVisit.Close', 'TableVisit.Transfer']} />}
@@ -320,7 +323,7 @@ function VisitSheet({ tableId, visitId, onClose, tables, title, sub, openCheck, 
                   {live && (
                     <div className="flex gap-2 mt-2.5">
                       <Button size="lg" className="flex-1" onClick={() => { onClose(); openCheck(c.id); }} data-fb={`visit-open-check:${c.checkNo}`}>{t('فتح الشيك')}<ChevronLeft className="w-4 h-4 ltr:rotate-180" /></Button>
-                      {canPay && <Button size="lg" variant="success" className="flex-1" onClick={() => (kind === 'CASH' ? nav('counter', { orderId: c.id, mode: 'collect' }) : nav('pay', { orderId: c.id, back: 'floor' }))} data-fb="visit-pay"><Wallet className="w-4 h-4" />{t('تحصيل')}</Button>}
+                      {canPay && <Button size="lg" variant="success" className="flex-1" onClick={() => pay.collect({ id: c.id, visitId: v.id })} data-fb="visit-pay"><Wallet className="w-4 h-4" />{t('تحصيل')}</Button>}
                     </div>
                   )}
                 </div>

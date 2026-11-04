@@ -13,6 +13,7 @@ import { personName } from '../demo/people';
 import { useBoardView } from '../app/useBoardView';
 import { BoardViewToggle } from '../ui/board';
 import OrdersBoard from './boards/OrdersBoard';
+import { PaymentPopup, useCollect } from './cashier/PaymentPopup';
 
 type St = 'ALL' | 'DRAFT' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED,VOIDED';
 const placeOf = (o: any) => (o.kind === 'STAFF_MEAL' ? t('وجبة موظف') : o.tableName ? `${t('ترابيزة')} ${o.tableName} · ${t('شيك')} ${o.checkNo}` : o.channel === 'TAKEAWAY' ? t('تيك أواي') : o.channel === 'DELIVERY' ? t('دليفري') : t('صالة كاونتر'));
@@ -21,12 +22,16 @@ const live = (o: any) => o.status === 'DRAFT' || o.status === 'CONFIRMED';
 // ux-05: the checks screen is the orders board or this list (board / list switch, remembered per user).
 export default function Checks() {
   const { view, setView } = useBoardView('orders');
-  if (view === 'board') return <div data-screen="D2" className="h-full"><OrdersBoard onList={() => setView('list')} /></div>;
-  return <ChecksList onBoard={() => setView('board')} />;
+  const { params, nav } = useDev();
+  // ux-07: the old «pay» route lands here (?pay=<orderId>) on a device without the sale screen: the one payment popup
+  const payHere = params.pay ? <PaymentPopup orderId={params.pay} onClose={() => nav('checks', {})} onNext={() => nav('checks', {})} nextLabel={t('تم')} /> : null;
+  if (view === 'board') return <div data-screen="D2" className="h-full"><OrdersBoard onList={() => setView('list')} />{payHere}</div>;
+  return <><ChecksList onBoard={() => setView('board')} />{payHere}</>;
 }
 
 function ChecksList({ onBoard }: { onBoard: () => void }) {
   const { nav, kind, can } = useDev();
+  const pay = useCollect();
   const [number, setNumber] = useState('');
   const [st, setSt] = useState<St>('ALL');
   const [bd, setBd] = useState('');
@@ -46,7 +51,7 @@ function ChecksList({ onBoard }: { onBoard: () => void }) {
     <Money v={o.totals.payable} />,
     <div className="flex gap-1 justify-end" onClick={(e) => e.stopPropagation()}>
       {live(o) && <Button size="sm" onClick={() => open(o)} data-fb={`check-open:${o.number}`}><ClipboardList className="w-3.5 h-3.5" />{t('افتح')}</Button>}
-      {live(o) && can('payment:capture') && kind !== 'FLOOR' && <Button size="sm" variant="success" onClick={() => nav('pay', { orderId: o.id, back: 'checks' })} title={t('تحصيل')} aria-label={t('تحصيل')}><Wallet className="w-3.5 h-3.5" /></Button>}
+      {live(o) && can('payment:capture') && kind !== 'FLOOR' && <Button size="sm" variant="success" onClick={() => pay.collect(o)} title={t('تحصيل')} aria-label={t('تحصيل')} data-fb={`check-pay:${o.number}`}><Wallet className="w-3.5 h-3.5" /></Button>}
       {o.status !== 'DRAFT' && <Button size="sm" variant="ghost" onClick={() => nav('receipt', { orderId: o.id })} title={t('الإيصال')} aria-label={t('الإيصال')}><Receipt className="w-3.5 h-3.5" /></Button>}
     </div>,
   ]);
@@ -63,14 +68,15 @@ function ChecksList({ onBoard }: { onBoard: () => void }) {
       <Table head={['#', t('المكان'), t('الحالة'), t('الوقت'), t('الويتر / الكاشير'), t('الإجمالي'), '']} align={['start', 'start', 'start', 'start', 'start', 'end', 'end']} rows={rows} loading={q.loading} maxHeight="calc(100vh - 300px)"
         onRowClick={(i) => setSel(items[i])}
         empty={<EmptyState compact icon={<Receipt />} title={number || st !== 'ALL' || bd ? t('مفيش شيكات بالبحث ده') : t('لسه مفيش شيكات')} text={number || st !== 'ALL' || bd ? t('غيّر الرقم أو الحالة أو اليوم.') : t('أول شيك هيتفتح من الصالة أو نقطة البيع هيظهر هنا.')} />} />
-      {sel && <CheckDrawer o={items.find((x) => x.id === sel.id) ?? sel} onClose={() => setSel(null)} onOpen={() => open(sel)} onHistory={() => setHist(sel)} onMove={() => setMove(sel)} />}
+      {sel && <CheckDrawer o={items.find((x) => x.id === sel.id) ?? sel} onClose={() => setSel(null)} onOpen={() => open(sel)} onHistory={() => setHist(sel)} onMove={() => setMove(sel)} onPay={() => { setSel(null); pay.collect(sel); }} />}
+      {pay.node}
       {hist && <HistoryDialog order={hist} onClose={() => setHist(null)} />}
       {move && <TransferSessionDialog orders={[move]} onClose={() => setMove(null)} />}
     </div>
   );
 }
 
-function CheckDrawer({ o, onClose, onOpen, onHistory, onMove }: { o: any; onClose: () => void; onOpen: () => void; onHistory: () => void; onMove: () => void }) {
+function CheckDrawer({ o, onClose, onOpen, onHistory, onMove, onPay }: { o: any; onClose: () => void; onOpen: () => void; onHistory: () => void; onMove: () => void; onPay: () => void }) {
   const { nav, kind, can } = useDev();
   const full = useQuery<any>('Order.Get', { params: { orderId: o.id } });
   const d = full.data ?? o;
@@ -82,7 +88,7 @@ function CheckDrawer({ o, onClose, onOpen, onHistory, onMove }: { o: any; onClos
         {live(o) && o.sessionId && can('session:close') && <Button variant="ghost" onClick={onMove} data-fb={`check-transfer:${o.number}`}><ArrowRightLeft className="w-4 h-4" />{t('نقل لدرج تاني')}</Button>}
         <div className="flex-1" />
         {o.status !== 'DRAFT' && <Button onClick={() => nav('receipt', { orderId: o.id })}><Receipt className="w-4 h-4" />{t('الإيصال')}</Button>}
-        {live(o) && can('payment:capture') && kind !== 'FLOOR' && <Button variant="success" onClick={() => (kind === 'CASH' ? nav('counter', { orderId: o.id, ...(o.visitId ? { mode: 'collect' } : {}) }) : nav('pay', { orderId: o.id, back: 'checks' }))} data-fb="check-collect"><Wallet className="w-4 h-4" />{t('تحصيل')}</Button>}
+        {live(o) && can('payment:capture') && kind !== 'FLOOR' && <Button variant="success" onClick={onPay} data-fb="check-collect"><Wallet className="w-4 h-4" />{t('تحصيل')}</Button>}
         {live(o) && <Button variant="primary" onClick={onOpen}><ClipboardList className="w-4 h-4" />{t('افتح الشيك')}</Button>}
       </>}>
       <div className="space-y-4">

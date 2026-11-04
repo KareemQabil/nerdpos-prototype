@@ -12,7 +12,7 @@ import { Pill, StateBadge, Input, Modal, Button, EmptyState, Skeleton, toast, Mo
 import { Tech } from '../../app/tech';
 import { t, L, tv, getLang } from '../../i18n';
 import { cn, money } from '../../lib/format';
-import { SoldOutBoard } from '../menu/SoldOutBoard';
+import { SoldOutPopup } from '../menu/SoldOutBoard';
 import { timeText } from '../menu/parts';
 
 type QuoteState = { data?: any; error?: ApiFailure; at: number };
@@ -94,7 +94,7 @@ function useClockTick(onTick: () => void) {
  * `onOptions` (long-press on a tile, or its visible ⋯ button) opens quantity / options / note for that item.
  * `toolbarStart` / `toolbarEnd` add controls to the search row (the sale screen's mode switch and typed quantity).
  */
-export function MenuGrid({ channel, onPick, disabled, salesChannelId, onOptions, toolbarStart, toolbarEnd, size = 'md', inCart, above }: { channel: string; onPick: (p: any) => void; disabled?: boolean; salesChannelId?: string | null; onOptions?: (p: any) => void; toolbarStart?: React.ReactNode; toolbarEnd?: React.ReactNode; size?: 'md' | 'lg'; inCart?: Record<string, string>; above?: React.ReactNode }) {
+export function MenuGrid({ channel, onPick, disabled, salesChannelId, onOptions, toolbarStart, toolbarEnd, size = 'md', inCart, above, onSoldOut }: { onSoldOut?: () => void /* ux-07: the sale screen owns the one sold-out popup */; channel: string; onPick: (p: any) => void; disabled?: boolean; salesChannelId?: string | null; onOptions?: (p: any) => void; toolbarStart?: React.ReactNode; toolbarEnd?: React.ReactNode; size?: 'md' | 'lg'; inCart?: Record<string, string>; above?: React.ReactNode }) {
   const { auth, can } = useDev();
   const cats = useQuery<any>('Category.List', { query: { active: true } });
   const products = useQuery<any>('Catalog.Search', { query: { active: true, limit: 500, channel } });
@@ -186,7 +186,7 @@ export function MenuGrid({ channel, onPick, disabled, salesChannelId, onOptions,
             else if (e.key === 'Escape') (e.target as HTMLInputElement).blur();
           }} placeholder={t('ابحث بالاسم أو الكود')} className={cn('ps-9', size === 'lg' ? '!h-12' : '!h-11')} /></div>
         {toolbarEnd}
-        <button data-fb="menu:soldout-board" onClick={() => setBoard(true)} title={t('خلص النهارده')} className={cn('shrink-0 px-3 rounded-xl border text-sm inline-flex items-center gap-1.5', size === 'lg' ? 'h-12' : 'h-11', soldOutCount ? 'border-[color-mix(in_srgb,var(--error)_45%,transparent)] text-[var(--error)] bg-[color-mix(in_srgb,var(--error)_10%,transparent)]' : 'border-[var(--glass-border)] text-soft surface-1')}>
+        <button data-fb="menu:soldout-board" onClick={() => (onSoldOut ? onSoldOut() : setBoard(true))} title={t('خلص النهارده')} className={cn('shrink-0 px-3 rounded-xl border text-sm inline-flex items-center gap-1.5', size === 'lg' ? 'h-12' : 'h-11', soldOutCount ? 'border-[color-mix(in_srgb,var(--error)_45%,transparent)] text-[var(--error)] bg-[color-mix(in_srgb,var(--error)_10%,transparent)]' : 'border-[var(--glass-border)] text-soft surface-1')}>
           <PackageX className="w-4 h-4" /><span className="hidden @[460px]/menu:inline">{t('خلص النهارده')}</span>{soldOutCount > 0 && <span className="num text-xs font-bold">{soldOutCount}</span>}
         </button>
         <StateBadge ops={['Category.List', 'Catalog.Search', 'ModifierGroup.List', 'Pricing.QuoteItem', 'Menu.Overview']} />
@@ -216,11 +216,7 @@ export function MenuGrid({ channel, onPick, disabled, salesChannelId, onOptions,
           {visible.map((p, i) => <Tile key={p.id} p={p} quote={quoteOf(p.id)} onPick={() => onPick(p)} onOptions={onOptions ? () => onOptions(p) : undefined} disabled={disabled} inCart={inCart?.[p.id]} active={i === hi} />)}
         </div>
       )}
-      <Modal open={board} onClose={() => setBoard(false)} xwide title={<span className="inline-flex items-center gap-2"><PackageX className="w-5 h-5 text-[var(--error)]" />{t('خلص النهارده')}</span>} badge={<StateBadge ops={['SoldOut.Board', 'Product.SetAvailability', 'ModifierOption.SetAvailability']} />}
-        footer={<Button onClick={() => setBoard(false)}>{t('تمام')}</Button>}>
-        <SoldOutBoard compact />
-        {!can('product:setavailability') && <div className="text-xs text-dim mt-2">{t('اطلب من المدير يعلّم الصنف.')}</div>}
-      </Modal>
+      {!onSoldOut && <SoldOutPopup open={board} onClose={() => setBoard(false)} />}
     </div>
   );
 }

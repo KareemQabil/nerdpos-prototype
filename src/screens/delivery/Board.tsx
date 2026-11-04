@@ -151,7 +151,7 @@ function DeliveryBoard({ mode, onMode }: { mode: 'board' | 'list' | 'map'; onMod
   const modeSwitch = <SegmentedControl size="sm" value={mode} onChange={onMode} options={[{ id: 'board', label: t('لوحة'), icon: <LayoutGrid />, fb: 'view:board' }, { id: 'list', label: t('قائمة'), icon: <ListIcon />, fb: 'view:list' }, { id: 'map', label: t('الخريطة'), icon: <MapIcon />, fb: 'dl-view:map' }]} />;
   const actionsEnd = <>
     {newOnline > 0 && <Button size="sm" variant="warning" onClick={() => nav('online-orders')} data-fb="go-inbox"><Globe className="w-4 h-4" />{t('طلبات إلكترونية جديدة')} ({newOnline})</Button>}
-    {can('delivery:create') && <Button size="sm" variant="primary" onClick={() => nav('delivery-new')} data-fb="new-delivery"><PhoneCall className="w-4 h-4" />{t('طلب دليفري جديد')}</Button>}
+    {can('delivery:create') && <Button size="sm" variant="primary" onClick={() => nav('counter', { mode: 'delivery', startDelivery: '1' })} data-fb="new-delivery"><PhoneCall className="w-4 h-4" />{t('طلب دليفري جديد')}</Button>}
     {modeSwitch}
   </>;
   if (mode === 'board') {
@@ -184,7 +184,7 @@ function DeliveryBoard({ mode, onMode }: { mode: 'board' | 'list' | 'map'; onMod
         <Table loading={board.loading && !board.data} onRowClick={(i) => setOpen(list[i].id)} maxHeight="calc(100vh - 230px)"
           head={[t('الرقم'), t('العميل'), t('المنطقة'), t('الحالة'), t('الطيار'), t('الوصول المتوقع'), t('القيمة')]} align={['start', 'start', 'start', 'start', 'start', 'start', 'end']}
           rows={list.map((d) => [<span className="num font-bold">{d.number}</span>, <span className="font-bold">{d.customerName}</span>, d.zoneName, <StatePill s={d.state} />, <RiderButton d={d} />, <Eta d={d} />, <Money v={d.amount} />])}
-          empty={<EmptyState compact icon={<Bike />} title={t('لا توجد طلبات دليفري')} action={can('delivery:create') && <Button variant="primary" onClick={() => nav('delivery-new')}><PhoneCall className="w-4 h-4" />{t('طلب دليفري جديد')}</Button>} />} />
+          empty={<EmptyState compact icon={<Bike />} title={t('لا توجد طلبات دليفري')} action={can('delivery:create') && <Button variant="primary" onClick={() => nav('counter', { mode: 'delivery', startDelivery: '1' })}><PhoneCall className="w-4 h-4" />{t('طلب دليفري جديد')}</Button>} />} />
       ) : (
         <MapView zones={zones.data?.items ?? []} drivers={drivers.data?.items ?? []} deliveries={list} restaurant={zones.data?.restaurant} onOpen={setOpen} />
       )}

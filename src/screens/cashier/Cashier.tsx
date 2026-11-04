@@ -29,6 +29,7 @@ import { PaymentPopup, placeOf } from './PaymentPopup';
 import { CollectWorkspace, type CollectView } from './CollectWorkspace';
 import { ShortcutsOverlay } from './ShortcutsOverlay';
 import { StaffMealDialog, StaffMealsList } from '../control/StaffMeal';
+import { SoldOutPopup } from '../menu/SoldOutBoard';
 import { SalesChannelPicker } from '../channels/common';
 import { CustomerPicker } from '../customers/common';
 import { customerDisplay } from '../../app/customerDisplay';
@@ -78,7 +79,9 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
   const deliveryOn = allowed.includes('delivery');
   const deliveriesQ = useQuery<any>(deliveryOn && can('delivery:read') ? 'Delivery.Board' : null, { query: { scope: 'active' } });
   const deliveryOpen = useQuery<any>(deliveryOn ? 'Order.Find' : null, { query: { channel: 'DELIVERY', lifecycle: 'DRAFT,CONFIRMED' } });
-  const [startOpen, setStartOpen] = useState<null | 'new' | 'edit'>(null);
+  // ux-07: «طلب دليفري جديد» from anywhere (old delivery-new route, a customer's page) opens the same start popup here
+  const [startOpen, setStartOpen] = useState<null | 'new' | 'edit'>(params.startDelivery && allowed.includes('delivery') ? 'new' : null);
+  const startCustomerId: string | null = params.startDelivery && params.startDelivery !== '1' ? String(params.startDelivery) : null;
   const counterOpen = useQuery<any>('Order.Find', { query: { sessionId, lifecycle: 'DRAFT,CONFIRMED' } });
   const dineOpen = useQuery<any>('Order.Find', { query: { channel: 'DINE_IN', lifecycle: 'DRAFT,CONFIRMED', sort: 'OLDEST' } });
   const fireP = useQuery<any>('Settings.Effective', { query: { policyId: 'FireTimingPolicy', scopeType: 'BRANCH', scopeId: auth.branchId } });
@@ -93,6 +96,7 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
   const [pendQty, setPendQty] = useState('');
   const [pick, setPick] = useState<null | { product: any; qty: string }>(null);
   const [payOpen, setPayOpen] = useState(false);
+  const [soldOutOpen, setSoldOutOpen] = useState(params.soldOut === '1'); // ux-07: one sold-out popup (menu header + «المزيد»)
   const [cartOpen, setCartOpen] = useState(false);
   const [keysOpen, setKeysOpen] = useState(false);
   const [staffMeal, setStaffMeal] = useState(!!staffMealOnOpen);
@@ -248,6 +252,9 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
 
   // ── primary button: follows the check state
   const openPay = () => { if (order && active.length && can('payment:capture')) setPayOpen(true); };
+  // ux-07: the old «pay» route lands here with ?pay=1 — the one payment UI opens over the sale screen
+  const payAsked = useRef(params.pay === '1');
+  useEffect(() => { if (payAsked.current && order && openStatus) { payAsked.current = false; openPay(); } }, [order?.id, openStatus]); // eslint-disable-line react-hooks/exhaustive-deps
   const fire = () => order && run('Order.Fire', { params: { orderId: order.id }, body: { expectedVersion: order.version } }, { success: t('تم الإرسال للمطبخ') });
   const sendDelivery = async () => {
     if (!order) return;
@@ -268,7 +275,7 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
     ? { kind: 'send', label: t('إرسال للمطبخ'), icon: <Send className="rtl:-scale-x-100" />, count: unfired.length || undefined, disabled: busy || !active.length, run: sendDelivery, fb: 'send-delivery', hotkey: keys.primary }
     : !order || !openStatus
     ? (order && order.status === 'COMPLETED'
-      ? { kind: 'new', label: t('طلب جديد'), icon: <Plus />, run: () => go({ orderId: null }), fb: 'go-new', hotkey: keys.primary }
+      ? { kind: 'new', label: t('شيك جديد'), icon: <Plus />, run: () => go({ orderId: null }), fb: 'go-new', hotkey: keys.primary }
       : { kind: 'pay', label: t('الدفع'), icon: <Wallet />, disabled: true, run: () => {}, fb: 'go-pay', hotkey: keys.primary })
     : explicitRounds && unfired.length && order.kind !== 'STAFF_MEAL'
       ? { kind: 'send', label: t('إرسال للمطبخ'), icon: <Send className="rtl:-scale-x-100" />, count: unfired.length, disabled: busy, run: fire, fb: 'send-round', hotkey: keys.primary }
@@ -290,8 +297,8 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
     held: { id: 'held', label: t('المعلقة'), icon: <PauseCircle />, badge: held.length || undefined, disabled: !held.length, fb: 'bar:held', run: (a) => setHeldAnchor(heldAnchor ? null : a) },
     customer: { id: 'customer', label: t('العميل'), icon: <UserRound />, fb: 'bar:customer', disabled: !can('order:setcustomer') || (!!order && !openStatus), run: async () => { if (await ensureOrder()) setCustOpen(true); } },
     discount: { id: 'discount', label: t('الخصم'), icon: <Tag />, fb: 'bar:discount', disabled: !editable || !active.length || !canAsk('order:applydiscount'), lock: needsApproval('ORDER_DISCOUNT', 'order:applydiscount'), waiting: waitingFor(['Order.ApplyDiscount']), run: () => checkAction.current?.('discount') },
-    orders: { id: 'orders', label: t('الشيكات'), icon: <ClipboardList />, fb: 'bar:orders', run: () => nav('checks') },
-    delivery: { id: 'delivery', label: t('دليفري'), icon: <Bike />, fb: 'counter-delivery', disabled: !can('delivery:create'), run: () => nav('delivery-new') },
+    // ux-07: «الشيكات» (F7) opens the checks list inside the sale screen (الصالة → الشيكات), never another page
+    orders: { id: 'orders', label: t('الشيكات'), icon: <ClipboardList />, fb: 'bar:orders', run: () => { if (allowed.includes('collect')) { if (mode !== 'collect') switchMode('collect'); setView('checks'); setTimeout(focusCollect, 60); } else nav('checks'); } },
     staffMeal: { id: 'staffMeal', label: t('وجبة موظف'), icon: <Coffee />, fb: 'staff-meal', run: () => setStaffMeal(true) },
     staffMeals: { id: 'staffMeals', label: t('وجبات الموظفين'), icon: <Utensils />, fb: 'staff-meals-list-open', run: () => setMeals(true) },
     prebill: { id: 'prebill', label: t('شيك مبدئي'), icon: <Printer />, fb: 'bar:prebill', disabled: !editable || !active.length, run: () => order && run('Print.PreBill', { params: { orderId: order.id }, body: { terminalId: auth.terminalId } }, { success: t('أُرسل الشيك المبدئي للطابعة') }) },
@@ -304,14 +311,14 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
     move: { id: 'move', label: t('نقل أصناف'), icon: <ArrowRightLeft />, disabled: !editable || !order?.visitId, run: () => checkAction.current?.('move') },
     split: { id: 'split', label: t('تقسيم'), icon: <Split />, disabled: !editable || !order?.visitId, run: () => checkAction.current?.('split') },
     merge: { id: 'merge', label: t('دمج'), icon: <Merge />, disabled: !editable || !order?.visitId, run: () => checkAction.current?.('merge') },
-    soldOut: { id: 'soldOut', label: t('خلص النهارده'), icon: <PackageX />, run: () => nav('soldout') },
+    soldOut: { id: 'soldOut', label: t('خلص النهارده'), icon: <PackageX />, run: () => setSoldOutOpen(true) },
     drawer: { id: 'drawer', label: t('الوردية والدرج'), icon: <Wallet />, fb: 'bar:drawer', run: () => nav('shift') },
     shortcuts: { id: 'shortcuts', label: t('الاختصارات'), icon: <Keyboard />, fb: 'bar:shortcuts', run: () => setKeysOpen(true) },
   };
   const withKey = (a: BarAction): BarAction => ({ ...a, hotkey: keys[a.id as KeyAction] });
   const secondary = profile.actionBar.secondary.slice(0, 5).map((id) => defs[id]).filter(Boolean).map((a) => withKey(a!));
-  // the «دليفري» overflow action goes away when the profile has the delivery mode (delivery-new stays for dispatchers)
-  const overflow = profile.actionBar.overflow.map((id) => defs[id]).filter((a): a is BarAction => !!a && !(a.id === 'delivery' && (!can('delivery:create') || deliveryOn))).map(withKey);
+  // ux-07: delivery is sold from the «دليفري» mode only (the old overflow action and the delivery-new page are gone)
+  const overflow = profile.actionBar.overflow.map((id) => defs[id]).filter((a): a is BarAction => !!a).map(withKey);
 
   const focusSearch = () => (document.querySelector(`[data-device="${deviceId}"] [data-fb="menu-search"]`) as HTMLInputElement | null)?.focus();
   const focusCollect = () => (document.querySelector(`[data-device="${deviceId}"] [data-fb="collect-search"] input, [data-device="${deviceId}"] input[data-fb="collect-search"]`) as HTMLInputElement | null)?.focus();
@@ -350,7 +357,7 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
     viewClosed: () => { if (!allowed.includes('collect')) return; if (mode !== 'collect') switchMode('collect'); setView('closed'); },
   });
 
-  const actionLabels: Partial<Record<KeyAction, string>> = { primary: t('الزر الرئيسي'), shortcuts: t('الاختصارات'), new: t('طلب جديد'), held: t('الطلبات المعلقة'), customer: t('العميل'), discount: t('الخصم'), orders: t('الشيكات'), more: t('المزيد'), mode: t('الوضع التالي'), modeTakeaway: t('وضع تيك أواي'), modeDineIn: t('وضع الصالة'), modeDelivery: t('وضع دليفري'), search: t('البحث'), viewTables: t('الصالة: الترابيزات'), viewChecks: t('الصالة: الشيكات'), viewClosed: t('الصالة: المغلقة اليوم') };
+  const actionLabels: Partial<Record<KeyAction, string>> = { primary: t('الزر الرئيسي'), shortcuts: t('الاختصارات'), new: t('شيك جديد'), held: t('الطلبات المعلقة'), customer: t('العميل'), discount: t('الخصم'), orders: t('الشيكات'), more: t('المزيد'), mode: t('الوضع التالي'), modeTakeaway: t('وضع تيك أواي'), modeDineIn: t('وضع الصالة'), modeDelivery: t('وضع دليفري'), search: t('البحث'), viewTables: t('الصالة: الترابيزات'), viewChecks: t('الصالة: الشيكات'), viewClosed: t('الصالة: المغلقة اليوم') };
 
   const activeDeliveries: any[] = (deliveriesQ.data?.items ?? []).filter((d: any) => d.state !== 'DELIVERED' && d.state !== 'CANCELLED');
   const modeOpts = ([
@@ -384,7 +391,7 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
   ) : (
     <div className="flex flex-col h-full min-h-0 rounded-2xl overflow-hidden border border-[var(--glass-border)] bg-[var(--glass-bg-strong)]" data-fb="check-panel">
       <div className="px-4 pt-3 pb-3 border-b line space-y-2.5">
-        <div className="font-bold text-lg font-display">{t('طلب جديد')}</div>
+        <div className="font-bold text-lg font-display">{t('شيك جديد')}</div>
         <SegmentedControl full size="lg" value={newType} onChange={setNewType} options={[{ id: 'TAKEAWAY', label: t('تيك أواي'), icon: <ShoppingBag />, fb: 'order-type:TAKEAWAY' }, { id: 'DINE_IN', label: t('صالة'), icon: <Utensils />, fb: 'new-counter-dinein' }]} />
         <SalesChannelPicker orderType={newType} compact fb="counter-channel" label={t('قناة البيع')} value={scPick[newType] ?? ''} onChange={(id) => setScPick({ ...scPick, [newType]: id })} />
       </div>
@@ -402,7 +409,7 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
               <div className="flex-1 min-h-0 flex gap-3">
                 <div className="flex-1 min-w-0 min-h-0 flex flex-col">
                   <MenuGrid size={profile.input === 'keyboard' ? 'md' : 'lg'} channel="DELIVERY" salesChannelId={order?.salesChannelId ?? null} disabled={!editable} onPick={onPick} onOptions={onOptions}
-                    toolbarStart={<>{modeSwitch}<DeliveryDraftBar orderId={order!.id} delivery={null} onEdit={() => setStartOpen('edit')} /></>} toolbarEnd={qtyControl} inCart={inCart} />
+                    toolbarStart={<>{modeSwitch}<DeliveryDraftBar orderId={order!.id} delivery={null} onEdit={() => setStartOpen('edit')} /></>} toolbarEnd={qtyControl} inCart={inCart} onSoldOut={() => setSoldOutOpen(true)} />
                 </div>
                 {width >= 1180 && <div className="w-[290px] shrink-0 min-h-0"><DeliveryQueue list={activeDeliveries} current={orderId} onOpenCheck={(d) => go({ orderId: d.orderId, mode: 'delivery' })} /></div>}
               </div>
@@ -411,7 +418,7 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
             )
           ) : mode === 'sell' ? (
             <MenuGrid size={profile.input === 'keyboard' ? 'md' : 'lg'} channel={order?.channel ?? newType} salesChannelId={order?.salesChannelId ?? (scPick[newType] || null)} disabled={!!order && !editable} onPick={onPick} onOptions={onOptions}
-              toolbarStart={modeSwitch} toolbarEnd={qtyControl} inCart={inCart} />
+              toolbarStart={modeSwitch} toolbarEnd={qtyControl} inCart={inCart} onSoldOut={() => setSoldOutOpen(true)} />
           ) : (
             <CollectWorkspace view={view} onView={setView} current={orderId} sessionId={sessionId} businessDate={businessDate ?? null} showKeys={showKeys} keys={keys} onPick={(c) => go({ orderId: c.id, mode: 'collect' })} toolbarStart={modeSwitch} />
           )}
@@ -470,11 +477,12 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
           </div>
         </div>
       )}
-      {startOpen === 'new' && <DeliveryStartPopup onClose={() => setStartOpen(null)} onStarted={(id) => { setStartOpen(null); latest.current = null; curId.current = id; go({ orderId: id, mode: 'delivery' }); setTimeout(focusSearch, 120); }} />}
+      {startOpen === 'new' && <DeliveryStartPopup customerId={startCustomerId} onClose={() => setStartOpen(null)} onStarted={(id) => { setStartOpen(null); latest.current = null; curId.current = id; go({ orderId: id, mode: 'delivery' }); setTimeout(focusSearch, 120); }} />}
       {startOpen === 'edit' && order && <DeliveryStartPopup onClose={() => setStartOpen(null)} onStarted={() => setStartOpen(null)} edit={{ orderId: order.id, draft: deliveryDrafts.get(order.id) ?? { customerId: order.customerId ?? order.customer?.id ?? '', customerName: order.customer?.name ?? '', phone: order.customer?.phone ?? '', address: null, zoneId: null, payMode: 'CASH_ON_DELIVERY' } }} />}
       {keysOpen && <ShortcutsOverlay deviceId={deviceId} labels={actionLabels} profileName={L(profile.role)} onClose={() => setKeysOpen(false)} />}
       {custOpen && order && <CustomerPicker open onClose={() => setCustOpen(false)} onPick={async (c) => { const r = await run('Order.SetCustomer', { params: { orderId: order.id }, body: { expectedVersion: (latest.current?.id === order.id ? latest.current : order).version, customerId: c.id } }, { success: t('أُضيف العميل إلى الشيك') }); if (r) setCustOpen(false); }} />}
       {staffMeal && <StaffMealDialog onClose={() => setStaffMeal(false)} />}
+      <SoldOutPopup open={soldOutOpen} onClose={() => setSoldOutOpen(false)} />
       {meals && <Modal open onClose={() => setMeals(false)} wide title={t('وجبات الموظفين')}><StaffMealsList /></Modal>}
     </div>
   );

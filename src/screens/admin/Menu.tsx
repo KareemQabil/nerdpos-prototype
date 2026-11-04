@@ -14,14 +14,15 @@ import { ProductCreate, ProductPage, type ProductTab } from './catalog/ProductEd
 import { NewProductWizard } from './catalog/NewProductWizard';
 import { useDev } from '../../app/hooks';
 import { MenusAdmin } from '../menu/MenusAdmin';
-import { SoldOutBoard } from '../menu/SoldOutBoard';
+import { SoldOutBoard, SoldOutMarkDialog } from '../menu/SoldOutBoard';
 
 type Tab = 'products' | 'categories' | 'units' | 'modifiers' | 'menus' | 'soldout';
 const OPS = ['Category.Create', 'Category.Configure', 'Unit.Create', 'Unit.Configure', 'Product.Create', 'Product.Configure', 'Product.NameCheck', 'Product.SetModifierGroups', 'Product.SetTaxPolicy', 'Product.SetAvailability', 'ModifierGroup.Create', 'ModifierGroup.Configure', 'ModifierOption.Create', 'ModifierOption.Configure', 'Variant.Upsert', 'Product.SetCombo', 'Menu.Upsert'];
 
 export default function Menu() {
   const { params, nav } = useDev();
-  const [tab, setTab] = useState<Tab>('products');
+  // ux-07: ?tab=soldout opens «نفد اليوم» (the old standalone sold-out screen redirects here on the office / remote back office)
+  const [tab, setTab] = useState<Tab>(() => (['products', 'categories', 'units', 'modifiers', 'menus', 'soldout'].includes(params?.tab) ? params.tab : 'products'));
   const go = (p: Record<string, any>) => nav('menu', p);
   const productId: string | undefined = params?.openProduct;
   const ptab = (params?.ptab === 'direction' ? 'sizes' : params?.ptab ?? 'data') as ProductTab;
@@ -49,7 +50,7 @@ export default function Menu() {
       {tab === 'units' && <Units />}
       {tab === 'modifiers' && <Modifiers />}
       {tab === 'menus' && <MenusAdmin />}
-      {tab === 'soldout' && <SoldOutBoard />}
+      {tab === 'soldout' && <div data-fb="menu:soldout-tab"><SoldOutBoard /></div>}
     </FillPage>
   );
   const detail = productId ? <ProductPage key={productId} productId={productId} tab={ptab} onTab={(x) => go({ openProduct: productId, ptab: x })} onClose={() => go({})} />
@@ -271,7 +272,9 @@ function GroupCard({ g, all, onToggle, onEdit }: { g: any; all: any[]; onToggle:
     if (r) setOpt({ name: { ar: '', en: '' }, priceDelta: '0' });
   };
   const setOption = (o: any, patch: any) => run('ModifierOption.Configure', { params: { groupId: g.id, optionId: o.id }, body: { name: o.name, priceDelta: o.priceDelta, active: o.active, ...patch, expectedVersion: o.version } }, { success: t('الاختيار اتحدث — للطلبات الجديدة بس') });
-  const soldOut = (o: any, v: boolean) => run('ModifierOption.SetAvailability', { params: { groupId: g.id, optionId: o.id }, body: { state: v ? 'SOLD_OUT' : 'AVAILABLE', reason: v ? t('خلص النهارده') : undefined } }, { success: v ? t('{n} خلصت النهارده', { n: L(o.name) }) : t('{n} رجعت', { n: L(o.name) }) });
+  // ux-07: marking an option sold out uses the one sold-out dialog; bringing it back is one tap (as on the board)
+  const [markOpt, setMarkOpt] = useState<any | null>(null);
+  const soldOut = (o: any, v: boolean) => (v ? setMarkOpt(o) : run('ModifierOption.SetAvailability', { params: { groupId: g.id, optionId: o.id }, body: { state: 'AVAILABLE' } }, { success: t('{n} رجع للبيع', { n: L(o.name) }) }));
   const reorder = (i: number, d: number) => { const ids = g.options.map((o: any) => o.id); const j = i + d; if (j < 0 || j >= ids.length) return; [ids[i], ids[j]] = [ids[j], ids[i]]; run('ModifierGroup.ReorderOptions', { params: { groupId: g.id }, body: { optionIds: ids, expectedVersion: g.version } }); };
   const [editOpt, setEditOpt] = useState<any | null>(null);
   const nestedName = (id?: string | null) => (id ? L(all.find((x) => x.id === id)?.name) : '');
@@ -297,6 +300,7 @@ function GroupCard({ g, all, onToggle, onEdit }: { g: any; all: any[]; onToggle:
         <Field label={ing ? t('سعر الزيادة') : t('فرق السعر')} hint={ing ? t('0 = الزيادة ببلاش') : t('ممكن بالسالب')}><Input data-fb={`option-create:${g.id}:delta`} inputMode="decimal" value={opt.priceDelta} onChange={(e) => setOpt({ ...opt, priceDelta: e.target.value })} /></Field>
         <Button data-fb={`option-create:${g.id}:submit`} loading={busy} onClick={addOption}><Plus className="w-4 h-4" />{t('ضيف')}</Button>
       </div>
+      <SoldOutMarkDialog target={markOpt ? { kind: 'option', id: markOpt.id, groupId: g.id, name: markOpt.name } : null} onClose={() => setMarkOpt(null)} />
       <Modal open={!!editOpt} onClose={() => setEditOpt(null)} title={t('تعديل الاختيار')} badge={<StateBadge ops={['ModifierOption.Configure']} />}
         footer={<><Button onClick={() => setEditOpt(null)}>{t('إلغاء')}</Button><Button variant="primary" data-fb="option-edit:save" loading={busy} onClick={async () => { const d = editOpt.d; if (await setOption(editOpt, { name: d.name, priceDelta: d.priceDelta || '0', extraPriceDelta: d.extraPriceDelta, isDefault: d.isDefault, nestedGroupId: d.nestedGroupId })) setEditOpt(null); }}><Save className="w-4 h-4" />{t('حفظ')}</Button></>}>
         {editOpt && (

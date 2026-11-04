@@ -46,12 +46,13 @@ const PAY_OPTS: { id: PayMode; label: string; icon: React.ReactNode }[] = [
  * Start (or edit) a delivery check with the customer: phone lookup → customer (or quick create) → address with its
  * zone and fee → payment. «بدء الطلب» creates the DELIVERY check for that customer; the items follow on the sale screen.
  */
-export function DeliveryStartPopup({ onClose, onStarted, edit }: { onClose: () => void; onStarted: (orderId: string) => void; edit?: { orderId: string; draft: DeliveryDraft } }) {
+export function DeliveryStartPopup({ onClose, onStarted, edit, customerId }: { onClose: () => void; onStarted: (orderId: string) => void; edit?: { orderId: string; draft: DeliveryDraft }; customerId?: string | null /* ux-07: start with this customer (a customer's page, the old delivery-new link) */ }) {
   const { run, busy } = useCommand();
   const { zones, zoneOf } = useZones();
   const [phone, setPhone] = useState('');
   const [creating, setCreating] = useState(false);
-  const custQ = useQuery<any>(edit?.draft.customerId ? 'Customer.Get' : null, { params: { customerId: edit?.draft.customerId } });
+  const startCust = edit?.draft.customerId ?? customerId ?? null;
+  const custQ = useQuery<any>(startCust ? 'Customer.Get' : null, { params: { customerId: startCust } });
   const [cust, setCust] = useState<any>(null);
   const c = cust ?? custQ.data ?? null;
   const q = phone.trim();

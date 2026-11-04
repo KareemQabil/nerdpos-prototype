@@ -16,6 +16,7 @@ import { lineStage, STAGE_TEXT, DISPOSITION_TEXT, DISPOSITIONS } from '../../moc
 import { approvalRule } from '../../mock/policies';
 import { addQty, cmpQty, subQty, sumQty } from '../../lib/cash';
 import { QtyPopover, LineEditorPopover } from './LineEditors';
+import { useCollect } from '../cashier/PaymentPopup';
 
 export function useReasons(kind: string) {
   const r = useQuery<any>('ReasonCode.List', { query: { kind, active: true } });
@@ -43,6 +44,7 @@ export type LineChange = { kind: 'qty'; lineId: string; name: any; from: string;
 export function CheckPanel({ order, refetch, mode, onCheckSwitch, variant = 'panel', actionRef, qty: qtyMethods, onLineChange, flashLineId, seatsOn }: { order: any; refetch: () => void; mode: 'FLOOR' | 'COUNTER'; onCheckSwitch?: (id: string) => void; variant?: 'panel' | 'cart'; actionRef?: React.MutableRefObject<((k: CheckDialog) => void) | null>; qty?: { stepper?: boolean; swipe?: boolean }; onLineChange?: (c: LineChange) => void; flashLineId?: string | null; seatsOn?: boolean }) {
   const { nav, can, auth, kind } = useDev();
   const { run, busy } = useCommand();
+  const pay = useCollect(); // ux-07: the one payment popup (no separate payment page)
   const [dlg, setDlg] = useState<null | { k: string; line?: any }>(null);
   const cart = variant === 'cart';
   if (actionRef) actionRef.current = (k) => (k === 'history' ? setShowHist(true) : setDlg({ k }));
@@ -195,7 +197,7 @@ export function CheckPanel({ order, refetch, mode, onCheckSwitch, variant = 'pan
         {order.status === 'CONFIRMED' && canAsk('order:void') && order.kind !== 'STAFF_MEAL' && <Button variant="danger" size="sm" className="w-full" onClick={() => setDlg({ k: 'voidOrder' })}><Ban className="w-4 h-4" />{t('إلغاء الشيك (موافقة مدير)')}</Button>}
         <div className="flex gap-2">
           {showFire && order.kind !== 'STAFF_MEAL' && <Button data-fb="send-round" variant="primary" size="xl" className="flex-1" disabled={!unfired.length || busy} onClick={fire}><Send className="w-5 h-5 rtl:-scale-x-100" />{t('ابعت للمطبخ')}{unfired.length ? <span className="num">({unfired.length})</span> : null}</Button>}
-          {canPay && <Button data-fb="go-pay" variant={showFire && unfired.length ? 'success' : 'success'} size="xl" className={cn(showFire ? 'flex-1' : 'w-full')} disabled={!active.length} onClick={() => nav('pay', { orderId: order.id, back: mode === 'COUNTER' ? 'counter' : 'order' })}><Wallet className="w-5 h-5" />{draft ? t('ادفع') : t('تحصيل')}<Money v={T.payable} className="text-base opacity-90" /></Button>}
+          {canPay && <Button data-fb="go-pay" variant={showFire && unfired.length ? 'success' : 'success'} size="xl" className={cn(showFire ? 'flex-1' : 'w-full')} disabled={!active.length} onClick={() => pay.collect(order)}><Wallet className="w-5 h-5" />{draft ? t('ادفع') : t('تحصيل')}<Money v={T.payable} className="text-base opacity-90" /></Button>}
         </div>
         {draft && !showFire && order.kind !== 'STAFF_MEAL' && <div className="text-[11px] text-dim text-center">{t('الأصناف بتروح المطبخ لوحدها أول ما الشيك يتأكد.')}</div>}
         {draft && kind === 'FLOOR' && order.visitId && <div className="text-[11px] text-dim text-center">{t('التحصيل بيكون على جهاز الكاشير.')}</div>}
@@ -217,6 +219,7 @@ export function CheckPanel({ order, refetch, mode, onCheckSwitch, variant = 'pan
       {dlg?.k === 'merge' && <MergeDialog order={order} siblings={siblings} onClose={() => setDlg(null)} />}
       {dlg?.k === 'channel' && <ChannelDialog order={order} onClose={() => setDlg(null)} />}
       {showHist && <HistoryDialog order={order} onClose={() => setShowHist(false)} />}
+      {pay.node}
     </div>
   );
 }

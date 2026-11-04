@@ -19,6 +19,7 @@ import { SR_STATE } from '../inventory/Chain';
 import { ItemActionsPopup } from '../inventory/ItemDetail';
 import { ReceiveDialog } from '../inventory/Receipts';
 import { StoreRequestEditor } from '../inventory/Purchasing';
+import { SoldOutMarkDialog } from '../menu/SoldOutBoard';
 
 const CH: Record<string, string> = { DINE_IN: 'صالة', TAKEAWAY: 'تيك أواي', DELIVERY: 'دليفري' };
 const STOCKING: Record<string, { ar: string; tone: 'primary' | 'info' | 'neutral' | 'violet' | 'success' }> = {
@@ -37,6 +38,7 @@ export default function Item360() {
   const [receive, setReceive] = useState(false);
   const [request, setRequest] = useState(false);
   const [price, setPrice] = useState(false);
+  const [markOut, setMarkOut] = useState(false);
   const { run, busy } = useCommand();
   if (!id) return <EmptyState icon={<ScanSearch />} title={t('افتح صنف من البحث')} text={t('اضغط Ctrl+K ودوّر على أي طبق أو خامة.')} />;
   if (q.loading && !q.data) return <Spinner />;
@@ -50,7 +52,8 @@ export default function Item360() {
   const isDish = !!d.product;
   const stockItemId: string | null = d.item?.id ?? null;
   const avail = d.product?.availability?.state;
-  const toggleAvail = () => run('Product.SetAvailability', { params: { productId: d.product.id }, body: avail === 'AVAILABLE' ? { state: 'SOLD_OUT', reason: t('خلص النهارده'), until: 'END_OF_BUSINESS_DAY' } : { state: 'AVAILABLE' } }, { success: avail === 'AVAILABLE' ? t('اتعلّم «خلص النهارده»') : t('رجع متاح') });
+  // ux-07: marking sold out goes through the one sold-out dialog (same reasons and «today only» as every entry point)
+  const toggleAvail = () => (avail === 'AVAILABLE' ? setMarkOut(true) : run('Product.SetAvailability', { params: { productId: d.product.id }, body: { state: 'AVAILABLE' } }, { success: t('{n} رجع للبيع', { n: L(d.product.name) }) }));
   const stage = (icon: React.ReactNode, label: string, value: React.ReactNode, sub: React.ReactNode, tone?: 'warning' | 'error' | 'success' | 'info', fb?: string, onClick?: () => void) => (
     <button type="button" data-fb={fb} onClick={onClick} disabled={!onClick} className={cn('flex-1 min-w-[132px] rounded-xl border p-3 text-start surface-1 transition-colors', onClick && 'hover:border-[var(--primary)]', tone === 'warning' ? 'border-[color-mix(in_srgb,var(--warning)_45%,transparent)]' : tone === 'error' ? 'border-[color-mix(in_srgb,var(--error)_45%,transparent)]' : 'border-[var(--glass-border)]')}>
       <div className="text-[11px] text-soft flex items-center gap-1.5">{icon}{label}</div>
@@ -239,6 +242,7 @@ export default function Item360() {
       {receive && stockItemId && <ReceiveDialog presetItemId={stockItemId} presetSupplierId={d.item.defaultSupplierId ?? undefined} onClose={() => setReceive(false)} />}
       {request && stockItemId && <StoreRequestEditor presetItemId={stockItemId} onClose={() => setRequest(false)} onSaved={(sid) => { setRequest(false); nav('inv-purchasing', { tab: 'requests', open: sid }); }} />}
       {price && isDish && <PriceDialog d={d} onClose={() => setPrice(false)} />}
+      {isDish && <SoldOutMarkDialog target={markOut ? { kind: 'product', id: d.product.id, name: d.product.name } : null} onClose={() => setMarkOut(false)} onDone={() => q.refetch()} />}
     </div>
   );
 }

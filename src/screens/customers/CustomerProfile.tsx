@@ -35,7 +35,7 @@ export default function CustomerProfile() {
         actions={<>
           <Button variant="ghost" onClick={() => nav('customers')}><ArrowRight className="w-4 h-4 ltr:rotate-180" />{t('العملاء')}</Button>
           {c.active && can('customer:update') && <Button onClick={() => setEdit(true)} data-fb="customer-edit"><Pencil className="w-4 h-4" />{t('تعديل')}</Button>}
-          {c.active && can('delivery:create') && <Button variant="primary" onClick={() => nav('delivery-new', { customerId: c.id })} data-fb="customer-order"><PhoneCall className="w-4 h-4" />{t('طلب دليفري')}</Button>}
+          {c.active && can('delivery:create') && <Button variant="primary" onClick={() => nav('counter', { mode: 'delivery', startDelivery: c.id })} data-fb="customer-order"><PhoneCall className="w-4 h-4" />{t('طلب دليفري')}</Button>}
         </>} />
       {!c.active && c.mergedInto && <Banner tone="warning" action={<Button size="sm" onClick={() => nav('customer', { customerId: c.mergedInto })}>{t('افتح العميل الأساسي')}</Button>}>{t('العميل ده اتدمج في عميل تاني — كل طلباته ونقاطه اتنقلت هناك.')}</Banner>}
       <div className="grid lg:grid-cols-[340px_1fr] gap-4">

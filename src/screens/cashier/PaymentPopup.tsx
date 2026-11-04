@@ -23,7 +23,7 @@ const TENDER_KEYS = ['F1', 'F2', 'F3', 'F4', 'F6', 'F7'];
 
 export const placeOf = (o: any) => (o.kind === 'STAFF_MEAL' ? t('وجبة موظف') : o.tableName ? `${t('ترابيزة')} ${o.tableName} · ${t('شيك')} ${o.checkNo}` : o.channel === 'TAKEAWAY' ? t('تيك أواي') : o.channel === 'DELIVERY' ? t('دليفري') : t('صالة كاونتر'));
 
-export function PaymentPopup({ orderId, onClose, onNext }: { orderId: string; onClose: () => void; onNext: () => void }) {
+export function PaymentPopup({ orderId, onClose, onNext, nextLabel }: { orderId: string; onClose: () => void; onNext: () => void; nextLabel?: string /* the «next» button after paying (sale screen: «شيك جديد») */ }) {
   const { auth, nav } = useDev();
   const o = useQuery<any>('Order.Get', { params: { orderId } });
   const order = o.data;
@@ -140,11 +140,11 @@ export function PaymentPopup({ orderId, onClose, onNext }: { orderId: string; on
           {order && <span className="text-sm text-soft truncate">{placeOf(order)} · <span className="num">#{order.number}</span></span>}
           {order?.shortNo && <span className="text-xs font-bold px-2 py-1 rounded-lg bg-[var(--foreground)] text-[var(--background)]" data-fb="pay-short-no">{t('نداء')} <span className="num">{order.shortNo}</span></span>}
           <div className="flex-1" />
-          <button onClick={close} className="h-10 px-3 rounded-xl text-sm text-soft hover:bg-[var(--surface-2)] inline-flex items-center gap-2" data-fb="pay-close"><X className="w-4 h-4" />{done ? t('طلب جديد') : t('إغلاق')}<Kbd>Esc</Kbd></button>
+          <button onClick={close} className="h-10 px-3 rounded-xl text-sm text-soft hover:bg-[var(--surface-2)] inline-flex items-center gap-2" data-fb="pay-close"><X className="w-4 h-4" />{done ? nextLabel ?? t('شيك جديد') : t('إغلاق')}<Kbd>Esc</Kbd></button>
         </div>
 
         {!order ? <div className="p-5 grid grid-cols-2 gap-4"><Skeleton className="h-80 rounded-2xl" /><Skeleton className="h-80 rounded-2xl" /></div> : done ? (
-          <DoneView order={order} change={done.change} completed={done.completed} onNext={onNext} onReceipt={() => { onClose(); nav('receipt', { orderId }); }} />
+          <DoneView order={order} change={done.change} completed={done.completed} onNext={onNext} nextLabel={nextLabel} onReceipt={() => { onClose(); nav('receipt', { orderId }); }} />
         ) : (
           <div className="grid md:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] min-h-0 overflow-y-auto">
             {/* summary: due, lines, change */}
@@ -268,7 +268,7 @@ function Quick({ children, onClick, on, fb }: { children: React.ReactNode; onCli
   return <button onClick={onClick} data-fb={fb} className={cn('h-14 rounded-xl border font-bold flex flex-col items-center justify-center gap-0.5 px-1 transition-colors', on ? 'border-[var(--success)] bg-[color-mix(in_srgb,var(--success)_12%,transparent)] text-[var(--success)]' : 'surface-1 border-[var(--glass-border)] hover:bg-[var(--surface-2)]')}>{children}</button>;
 }
 
-function DoneView({ order, change, completed, onNext, onReceipt }: { order: any; change: string; completed: boolean; onNext: () => void; onReceipt: () => void }) {
+function DoneView({ order, change, completed, onNext, onReceipt, nextLabel }: { order: any; change: string; completed: boolean; onNext: () => void; onReceipt: () => void; nextLabel?: string }) {
   const has = change && change !== '0.0000';
   return (
     <div className="p-8 flex flex-col items-center text-center gap-4" data-fb="pay-done">
@@ -279,9 +279,22 @@ function DoneView({ order, change, completed, onNext, onReceipt }: { order: any;
       <div className="text-xs text-dim flex items-center gap-1.5"><Printer className="w-3.5 h-3.5" />{t('طباعة الإيصال تلقائيًا')}</div>
       <div className="grid grid-cols-2 gap-2 w-full max-w-md pt-1">
         <Button size="xl" onClick={onReceipt} data-fb="pay-receipt"><Receipt className="w-5 h-5" />{t('الإيصال')}</Button>
-        <Button size="xl" variant="primary" onClick={onNext} data-fb="pay-next" autoFocus><Plus className="w-5 h-5" />{t('طلب جديد')}<Kbd className="!bg-black/10 !border-black/10 !text-current">Enter</Kbd></Button>
+        <Button size="xl" variant="primary" onClick={onNext} data-fb="pay-next" autoFocus><Plus className="w-5 h-5" />{nextLabel ?? t('شيك جديد')}<Kbd className="!bg-black/10 !border-black/10 !text-current">Enter</Kbd></Button>
       </div>
       {!completed && <Pill tone="warning">{t('الشيك مدفوع ولم يُغلق بعد')}</Pill>}
     </div>
   );
+}
+
+/**
+ * ux-07: the ONE way to take a payment from any screen (checks, floor, the orders board, a check page). A cashier
+ * terminal opens the sale screen with the payment popup over it; any other device opens the same popup in place.
+ * (The old full-page «التحصيل» route redirects here too.)
+ */
+export function useCollect() {
+  const { kind, nav } = useDev();
+  const [payId, setPayId] = useState<string | null>(null);
+  const collect = (o: { id: string; visitId?: string | null }) => (kind === 'CASH' ? nav('counter', { orderId: o.id, pay: '1', ...(o.visitId ? { mode: 'collect' } : {}) }) : setPayId(o.id));
+  const node = payId ? <PaymentPopup orderId={payId} onClose={() => setPayId(null)} onNext={() => setPayId(null)} nextLabel={t('تم')} /> : null;
+  return { collect, node, open: setPayId };
 }
