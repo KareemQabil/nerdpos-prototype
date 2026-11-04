@@ -27,7 +27,7 @@ const files = [];
 })(path.join(ROOT, 'src'));
 
 // a currency-bearing formatter call or literal inside the element's own text
-const CURRENCY = /\b(?:money|fmt)\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\)|\bfmtMoney\(|\bfmtCell\(|\bcellText\(|\bcurrencyText\(\)|ج\.م|\bEGP\b|جنيه/g;
+const CURRENCY = /\b(?:money|fmt)\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\)|\bfmtMoney\(|\bfmtCell\(|\bcellText\(|\bcurrencyText\(\)|\bcurrency\(\)|ج\.م|\bEGP\b|جنيه/g;
 const isBareMoney = (s) => (/^money\(/.test(s) && /,\s*false\s*\)$/.test(s)) || (/^fmt\(/.test(s) && /,\s*'(count|unit|%|minutes|hours)'\s*\)$/.test(s));
 const DATE = /\b(?:dateTime|time|dayLong|dateTimeLong)\(/g;
 const NUM_ATTR = /className=(?:"([^"]*)"|'([^']*)'|\{([^}]*)\})|data-numeric|dir="ltr"/g;

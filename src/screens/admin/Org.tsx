@@ -4,7 +4,7 @@ import { Building2, GitBranch, MonitorSmartphone, Plus, Pencil, Power, Wrench, L
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Banner, Button, Card, EmptyState, Field, Input, KV, PageHeader, Pill, Select, StatCard, StatGrid, StateBadge, Switch, Table, Textarea, toast } from '../../ui';
 import { t, getLang } from '../../i18n';
-import { CURRENCY } from '../../lib/format';
+import { currency } from '../../lib/format';
 import { Tech, useTech } from '../../app/tech';
 import { demo } from '../../mock/demo';
 import { egProfile } from '../../mock/contracts';
@@ -61,7 +61,7 @@ function BusinessCard() {
             [t('الاسم (إنجليزي)'), b.name || <span className="text-dim">{t('لسه متكتبش')}</span>],
             [t('الاسم (عربي)'), <span className="flex items-center gap-2">{b.nameAr || <span className="text-dim">—</span>}<Tech><StateBadge state="PROPOSED" /></Tech></span>],
             [t('الاسم القانوني'), b.legalName || <span className="text-dim">—</span>],
-            [t('العملة'), <span className="flex items-center gap-2"><span>{b.currency === 'EGP' ? CURRENCY : b.currency}</span><Pill tone="neutral">{t('ثابتة بعد التجهيز')}</Pill></span>],
+            [t('العملة'), <span className="flex items-center gap-2"><span>{b.currency === 'EGP' ? currency() : b.currency}</span><Pill tone="neutral">{t('ثابتة بعد التجهيز')}</Pill></span>],
           ]} />
           <Tech><div className="num text-[11px] text-dim">v{b.version}</div></Tech>
         </div>

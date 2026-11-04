@@ -36,7 +36,7 @@ function fmtVal(v: string | null | undefined, unit?: string): string {
   return `${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م`; // owner rule: «ج.م» after the number
 }
 // English: the Arabic currency is isolated (FSI…PDI) so a number after it in the sentence keeps its place
-const fmtValEn = (v: string | null | undefined, unit?: string) => fmtVal(v, unit).replace(' ج.م', ' \u2068ج.م\u2069').replace('دقيقة', 'min');
+const fmtValEn = (v: string | null | undefined, unit?: string) => fmtVal(v, unit).replace(' ج.م', ' EGP').replace('دقيقة', 'min');
 
 interface Period { from: string; to: string; label: Loc; defaulted: boolean }
 function parsePeriod(q: string, today: string, fallback: 'TODAY' | 'LAST_7', rules: string[]): Period | { clarify: 'ramadan' } {

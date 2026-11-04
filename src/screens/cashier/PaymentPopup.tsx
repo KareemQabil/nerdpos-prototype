@@ -16,7 +16,7 @@ import { tenderLabel, tenderGroupLabel, providerLabel } from '../../demo/tenderT
 import { LoyaltyRedeemBox, EarnedNote } from '../customers/PayExtras';
 import { Tech } from '../../app/tech';
 import { customerDisplay } from '../../app/customerDisplay';
-import { CURRENCY } from '../../lib/format';
+import { currency } from '../../lib/format';
 
 type Method = 'CASH' | 'CARD' | 'DIGITAL_WALLET' | 'ONLINE' | 'LOYALTY' | 'DEPOSIT';
 const ICON: Record<Method, React.ReactElement> = { CASH: <Banknote />, CARD: <CreditCard />, DIGITAL_WALLET: <Smartphone />, ONLINE: <Globe />, LOYALTY: <Star />, DEPOSIT: <PiggyBank /> };
@@ -219,7 +219,7 @@ export function PaymentPopup({ orderId, onClose, onNext, nextLabel }: { orderId:
               {plain && <>
                 <div className={cn('rounded-2xl border px-4 h-[76px] flex items-center justify-between gap-3', over ? 'border-[var(--error)]' : 'border-[color-mix(in_srgb,var(--primary)_45%,var(--glass-border))] bg-[var(--surface-1)]')} data-fb="cash-tendered">
                   <div className="text-sm text-soft font-semibold leading-tight">{method === 'CASH' && !split ? t('المبلغ المستلم') : t('مبلغ هذه الدفعة')}</div>
-                  <span className={cn('amount text-[40px] font-bold leading-none', !entry && 'opacity-45')}><span className="num">{money(value, false)}</span><span className="amount-unit">{CURRENCY}</span></span>
+                  <span className={cn('amount text-[40px] font-bold leading-none', !entry && 'opacity-45')}><span className="num">{money(value, false)}</span><span className="amount-unit">{currency()}</span></span>
                 </div>
                 {over && <div className="text-xs text-[var(--error)] flex items-center gap-1 -mt-1"><AlertTriangle className="w-3.5 h-3.5" />{t('المبلغ أكبر من المتبقي')}</div>}
 

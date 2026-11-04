@@ -58,7 +58,7 @@ const LABEL_FRAGMENTS: [RegExp, string][] = [
   [/إقفال يوم /g, 'Day close '], [/إيصال مرتجع /g, 'Refund receipt '], [/شيك مبدئي /g, 'Pre-bill '], [/إيصال /g, 'Receipt '], [/^نسخة /g, 'Copy '],
   [/ · جولة /g, ' · round '], [/ · ترابيزة /g, ' · table '], [/ · تيك أواي/g, ' · takeaway'], [/ · دليفري/g, ' · delivery'], [/من غير إيصال/g, 'no receipt'],
   [/^تسوية /g, 'Settlement '], [/ عملية\)/g, ' transactions)'], [/^درج /g, 'Drawer '], [/^من /g, 'from '], [/(\d) م$/g, '$1 PM'], [/(\d) ص$/g, '$1 AM'],
-  [/^مبيعات يوم (\S+) \(بيانات العرض\)$/g, 'Sales on $1 (demo data)'], [/^خبز-/g, 'BREAD-'],
+  [/^مبيعات يوم (\S+) \(بيانات العرض\)$/g, 'Sales on $1 (demo data)'], [/^خبز-/g, 'BREAD-'], [/\u2068?ج\.م\u2069?/g, 'EGP'],
 ];
 // Arabic mode: server-made labels/values use the glossary terms (docs/ux/WRITING_GUIDE.md). A whole known string comes
 // from arMsa; otherwise colloquial glossary words are swapped (an optional و/ف + بال/لل/كال/ال/ب/ل/ك prefix is kept).

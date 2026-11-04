@@ -23,7 +23,7 @@
 import React, { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Loader2, AlertTriangle, CheckCircle2, Info, XCircle, Search, Check, Inbox } from 'lucide-react';
-import { cn, money, CURRENCY, dateTimeParts } from '../lib/format';
+import { cn, money, currency, dateTimeParts } from '../lib/format';
 import { t, L, getLang } from '../i18n';
 import type { BadgeState } from '../mock/contracts';
 import { badgeOfOps, opsById } from '../mock/contracts';
@@ -394,7 +394,7 @@ export function Money({ v, text, className, big, tone, unit = true, plain, fb }:
     </span>
   );
 }
-export const currencyText = () => CURRENCY;
+export const currencyText = () => currency();
 
 /** ux-09: a time stamp in reading order — «04 نوفمبر 07:16 ص» right to left in Arabic, «04 Nov 07:16» left to right in
  *  English. The digits sit in `.num` pieces (tabular), the words between them; the whole is an isolate in the UI

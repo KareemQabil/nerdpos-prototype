@@ -12,7 +12,7 @@ import { Tech } from '../../app/tech';
 import { clock, businessDate } from '../../mock/clock';
 import { EvidenceCtx, Val, additivityText, authorityText, type EvidenceSpec } from './parts';
 import { EvidencePopup } from './Evidence';
-import { CURRENCY } from '../../lib/format';
+import { currency } from '../../lib/format';
 
 const FACT_AR: Record<string, string> = { check: 'الشيكات المقفولة', line: 'سطور البيع', payment: 'الدفعات', refund: 'المرتجعات المصروفة', drawer: 'ورديات الدرج', cash_entry: 'حركات الدرج', removal: 'الإلغاءات بالمراحل', discount: 'الخصومات', comp: 'الضيافة', staff_meal: 'وجبات الموظفين', kitchen: 'تذاكر المطبخ', fiscal: 'الإيصالات الإلكترونية', approval: 'موافقات المدير', stock: 'أرصدة المخزن (لقطة)', count: 'الجرد', waste: 'الهالك', po: 'أوامر الشراء', grn: 'الاستلام', visit: 'قعدات الترابيزات', delivery: 'الدليفري', reservation: 'الحجوزات', open_check: 'الشيكات المفتوحة دلوقتي' };
 const ICONS = [Database, Ruler, FileBarChart, LineChart, FileSearch, MessageCircleQuestion];
@@ -98,7 +98,7 @@ function Metrics({ metrics }: { metrics: any[] }) {
       <Table dense maxHeight={620} head={[t('المقياس'), t('التعريف'), t('الوحدة / الجمع'), t('المصدر'), t('الحالة')]} rows={rows.map((m) => [
         <div className="min-w-40"><div className="font-bold">{L(m.label)}</div><div className="text-[10px] text-dim">{t('نسخة {v}', { v: m.version })} · {authorityText(m.authority)}</div><Tech><div className="num text-[10px] text-dim" dir="ltr">{m.id}</div></Tech></div>,
         <div className="text-xs max-w-md"><div>{L(m.definition)}</div>{m.pitfalls?.map((p: any, i: number) => <div key={i} className="text-[var(--warning-text)]">{t('تنبيه')}: {L(p)}</div>)}<Tech><div className="num text-[10px] text-dim mt-0.5" dir="ltr">{m.formula} · grain {m.grain}</div></Tech></div>,
-        <div className="text-xs"><div>{m.unit === 'EGP' ? CURRENCY : m.unit === 'count' ? t('عدد') : m.unit === '%' ? '%' : m.unit === 'minutes' ? t('دقايق') : m.unit === 'unit' ? t('وحدة') : m.unit}</div><div className="text-dim">{additivityText(m.additivity)}</div></div>,
+        <div className="text-xs"><div>{m.unit === 'EGP' ? currency() : m.unit === 'count' ? t('عدد') : m.unit === '%' ? '%' : m.unit === 'minutes' ? t('دقايق') : m.unit === 'unit' ? t('وحدة') : m.unit}</div><div className="text-dim">{additivityText(m.additivity)}</div></div>,
         <div className="text-xs"><div>{t(FACT_AR[m.fact] ?? (m.fact === 'composite' ? 'مركب من مقاييس' : m.fact))}</div><div className="text-dim">{m.dimensions.length} {t('بُعد مسموح')}</div></div>,
         m.status === 'AVAILABLE' ? <Pill size="sm" tone="success">{t('متاح')}</Pill> : <div className="max-w-xs"><Pill size="sm" tone="warning">{t('مش متاح')}</Pill><div className="text-[10px] text-dim mt-0.5">{L(m.reason)}</div></div>,
       ])} />

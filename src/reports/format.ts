@@ -20,7 +20,7 @@ export function fmtNumber(v: string | number | null | undefined, format: NumberF
   const n = Number(v);
   if (!Number.isFinite(n)) return String(v);
   const f = format === 'auto' ? autoFormat(unit) : format;
-  const cur = 'ج.م'; // owner rule: always «ج.م», after the number (both UI languages)
+  const cur = lang === 'ar' ? 'ج.م' : 'EGP'; // owner rule: after the number; «ج.م» in Arabic, «EGP» in English
   if (f === 'money') return `${NUM(n, 2, 2)} ${cur}`;
   if (f === 'money0') return `${NUM(Math.round(n), 0, 0)} ${cur}`;
   if (f === 'pct') return `${NUM(n, 1, 1)}%`;
@@ -40,7 +40,7 @@ export function cellText(v: MetricValue | undefined, format: NumberFormat, lang:
 }
 /** Excel number formats per column format (the value stays a number in the file). */
 export function excelFormat(format: NumberFormat, lang: Lang): string {
-  const cur = 'ج.م';
+  const cur = lang === 'ar' ? 'ج.م' : 'EGP';
   if (format === 'money') return `#,##0.00 "${cur}";-#,##0.00 "${cur}"`;
   if (format === 'money0') return `#,##0 "${cur}";-#,##0 "${cur}"`;
   if (format === 'pct') return '0.0"%"';

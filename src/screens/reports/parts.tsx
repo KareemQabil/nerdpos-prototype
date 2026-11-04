@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState } from 'react';
 import { ShieldCheck, ShieldAlert, Clock, Info, CheckCircle2, AlertTriangle, BookOpen, ChevronDown } from 'lucide-react';
 import { Pill, Card, Button, Money, DateTime } from '../../ui';
 import { t, L, getLang } from '../../i18n';
-import { cn, CURRENCY } from '../../lib/format';
+import { cn, currency } from '../../lib/format';
 import { Tech } from '../../app/tech';
 
 export type Loc = { ar: string; en: string };
@@ -23,13 +23,13 @@ export function fmt(v: string | null | undefined, unit?: string): string {
   if (unit === '%') return `${n.toFixed(1)}%`;
   if (unit === 'minutes') return `${n.toFixed(1)} ${t('دقيقة')}`;
   if (unit === 'hours') return `${n.toFixed(1)} ${t('ساعة')}`;
-  return `${n.toLocaleString(loc, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${CURRENCY}`;
+  return `${n.toLocaleString(loc, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency()}`;
 }
 /** A report number for the screen: money as <Money> (number in `.num`, «ج.م» after it in reading order), any other unit as
  *  a `.num` span. fmt() keeps the currency for running text and titles only (scripts/check-money.mjs). */
 export function Amt({ v, unit, className }: { v: string | number | null | undefined; unit?: string; className?: string }) {
   const txt = fmt(v === null || v === undefined ? v : String(v), unit);
-  const suffix = ' ' + CURRENCY;
+  const suffix = ' ' + currency();
   return txt.endsWith(suffix) ? <Money text={txt.slice(0, -suffix.length)} className={cn('font-bold', className)} /> : <span className={cn('num', className)}>{txt}</span>;
 }
 

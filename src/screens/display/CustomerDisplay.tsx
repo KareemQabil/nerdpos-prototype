@@ -16,7 +16,7 @@ import { cn, money, qty } from '../../lib/format';
 import { sign } from '../../lib/cash';
 import { tenderLabel } from '../../demo/tenderText';
 import type { DisplaySettings } from './settings';
-import { CURRENCY } from '../../lib/format';
+import { currency } from '../../lib/format';
 
 const THANKS_MS = 60_000;
 const nz = (v?: string | null) => !!v && sign(v) !== 0;
@@ -148,7 +148,7 @@ function Paying({ order, paying }: { order: any; paying: { method: string; walle
       </div>
       <div className="flex-1" />
       {paying.change ? (
-        <div className="rounded-[2.4cqmin] bg-[var(--success)] text-[#04130a] p-[2.4cqmin] flex items-end justify-between" data-fb="cd-change"><span className="text-[3.4cqmin] font-extrabold">{t('الباقي')}</span><span className="amount font-black text-[10cqmin] leading-none"><span className="num">{money(paying.change, false)}</span><span className="amount-unit !text-current">{CURRENCY}</span></span></div>
+        <div className="rounded-[2.4cqmin] bg-[var(--success)] text-[#04130a] p-[2.4cqmin] flex items-end justify-between" data-fb="cd-change"><span className="text-[3.4cqmin] font-extrabold">{t('الباقي')}</span><span className="amount font-black text-[10cqmin] leading-none"><span className="num">{money(paying.change, false)}</span><span className="amount-unit !text-current">{currency()}</span></span></div>
       ) : paying.short ? (
         <div className="rounded-[2.4cqmin] border-[0.3cqmin] border-[var(--warning)] p-[2.4cqmin] flex items-end justify-between" data-fb="cd-short"><span className="text-[3cqmin] font-bold text-[var(--warning-text)]">{t('المتبقي')}</span><Money v={paying.short} className="text-[7cqmin] leading-none text-[var(--warning-text)]" /></div>
       ) : null}
@@ -163,7 +163,7 @@ function Thanks({ order, paid }: { order: any; paid: { change: string; method: s
         <div className="inline-flex items-center gap-[1.4cqmin] text-[var(--primary)]"><Heart className="w-[6cqmin] h-[6cqmin] fill-current" /></div>
         <div className="font-display font-extrabold text-[8.4cqmin] leading-[1.1]">{t('شكرًا لزيارتكم')}</div>
         {order.shortNo && order.channel !== 'DINE_IN' && <div className="text-[3.4cqmin] text-soft">{t('رقم طلبك')} <span className="num font-black text-[6cqmin] text-[var(--foreground)] align-middle px-[1.6cqmin] rounded-[1.4cqmin] bg-[var(--primary-container)]" data-fb="cd-short-no">{order.shortNo}</span></div>}
-        {nz(paid.change) && <div className="inline-flex items-end gap-[2cqmin] rounded-[2.4cqmin] bg-[var(--success)] text-[#04130a] px-[2.6cqmin] py-[1.8cqmin]" data-fb="cd-change"><span className="text-[3cqmin] font-extrabold">{t('الباقي')}</span><span className="amount font-black text-[8cqmin] leading-none"><span className="num">{money(paid.change, false)}</span><span className="amount-unit !text-current">{CURRENCY}</span></span></div>}
+        {nz(paid.change) && <div className="inline-flex items-end gap-[2cqmin] rounded-[2.4cqmin] bg-[var(--success)] text-[#04130a] px-[2.6cqmin] py-[1.8cqmin]" data-fb="cd-change"><span className="text-[3cqmin] font-extrabold">{t('الباقي')}</span><span className="amount font-black text-[8cqmin] leading-none"><span className="num">{money(paid.change, false)}</span><span className="amount-unit !text-current">{currency()}</span></span></div>}
         <div className="text-[2.4cqmin] text-dim flex items-center gap-[1cqmin]"><span>{t('الإجمالي')}</span><Money v={order.totals.payable} /><span>·</span><span>{tenderLabel(paid.method)}</span></div>
       </div>
       {order.receiptUrl && (
@@ -187,7 +187,7 @@ function useRotate(n: number, ms: number) {
   useEffect(() => { if (n < 2) return; const iv = setInterval(() => setI((x) => (x + 1) % n), ms); return () => clearInterval(iv); }, [n, ms]);
   return n ? i % n : 0;
 }
-const benefit = (p: any) => <>{t('خصم')} <span className="num">{p.benefit.kind === 'PERCENT' ? `${qty(p.benefit.value)}%` : money(p.benefit.value, false)}</span>{p.benefit.kind === 'PERCENT' ? null : <> {CURRENCY}</>}</>;
+const benefit = (p: any) => <>{t('خصم')} <span className="num">{p.benefit.kind === 'PERCENT' ? `${qty(p.benefit.value)}%` : money(p.benefit.value, false)}</span>{p.benefit.kind === 'PERCENT' ? null : <> {currency()}</>}</>;
 
 function PromoCard({ view }: { view: any }) {
   const slides = slidesOf(view).filter((s) => s.kind === 'promo');
