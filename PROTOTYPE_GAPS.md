@@ -236,6 +236,16 @@ Principle kept from round 3: the depth sits in the engine, the screens stay simp
 - **[UI]** Detail beside the list when the screen area (window minus the sidebar) is ≥ 1040 px — about a 1280 px wide window — otherwise a full page with back; long forms (product, quick add, new-product wizard, recipe editor, count sheet, role editor) are always full pages.
 - **[OBSERVED, not changed]** The in-browser mock keeps `User.Create` / `Credential.Reset` secrets as given (`db.users[].password`, `pin`); the real backend hashes credentials.
 - `Drawer` stays exported (deprecated) only for the purchasing screens owned by ux-05; remove it once they are converted.
+## 15b. UX slice 05 — boards, drawer-free purchasing, the cashier's three modes
+
+- **[PROPOSED]** `PurchaseOrder.Submit` (`purchaseorder:update`; DRAFT → PENDING_APPROVAL, the order is locked while it waits) and `PurchaseOrder.ReturnToDraft` (`purchaseorder:issue`; PENDING_APPROVAL → DRAFT, reason required; `PURCHASE_ORDER_NOT_PENDING_APPROVAL` 409). Listed in `src/mock/ux-contracts.ts`.
+- **[PROPOSED] Input extension** `PurchaseOrder.Issue.approvalGrantId`: issuing an order that waits for approval needs a `PURCHASE_ORDER_APPROVE` grant (new approval action, permission `approve:purchase_order`, default rule ALWAYS — the strictest operable default; the approver cannot be the issuer unless SelfApprovalPolicy allows it). Issuing a draft directly is unchanged (backward compatible). Approved / returned facts (who, when, grant, reason) are kept on the order, its history and the audit.
+- **[RULE]** PENDING_APPROVAL counts as an open purchase order (low stock «on order», supplier and item pages); goods can be received only after ISSUED.
+- **[PROPOSED] Policy** `BoardAgingPolicy` (DIRECTION, settings screen «تنبيه التأخير في اللوحات»): order warn/late minutes in the same state (10 / 20), approval request warn/late minutes (2 / 5), void-review late hours (24), purchase warn days before / grace days after the due date (1 / 0). Delivery lateness stays in `DeliveryPolicy` (server `late` flag).
+- **[DEMO]** `role_manager` gains `approve:purchase_order` (demo role addition).
+- **[ASSUMED]** Boards are a presentation over the existing reads (Order.Find, Delivery.Board, PurchaseOrder.Find, ApprovalRequest.Find, VoidReview.Find); a drop is offered only where the owner module has a legal command and is always sent as that command (Order.Fire, Order.Confirm, Delivery.Assign / Complete, PurchaseOrder.Submit / Issue / ReturnToDraft, GoodsReceipt.Post, ApprovalRequest.Decide, VoidReview.Decide). Kitchen states, payment-closing and decided approvals are never moved from a board.
+- **[ASSUMED]** The address and payment chosen when a cashier starts a delivery check live on the device until the items exist and `Delivery.Create` records them (the server needs the lines for the minimum order and the fee). The fee shown before that is the zone fee from `DeliveryZone.List`; the charged fee is the server's on send.
+- Purchasing screens no longer use side drawers: details in the page (side by side when wide, full page when narrow), long forms as full pages with back, short forms as centered popups.
 
 ## 16. Prototype limitations
 
