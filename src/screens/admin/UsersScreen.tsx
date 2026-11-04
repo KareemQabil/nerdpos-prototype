@@ -1,9 +1,11 @@
 // A2 Users & roles: create users with roles and branch scope, manage access (approval by policy),
 // credential reset (approval by policy), roles and their permissions.
-import React, { useMemo, useState } from 'react';
+// ux-06: a user's access opens beside the list (wide) or as a full page (narrow) — params.open; a new user is a
+// centered popup; the role editor is a full page with back and a sticky save footer — params.role ('new' | id).
+import React, { useMemo, useRef, useState } from 'react';
 import { UserPlus, ShieldCheck, KeyRound, Pencil, Plus, Power, Lock, Trash2, Users, UserCheck, UserX, KeySquare, Search } from 'lucide-react';
-import { useCommand, useQuery, errorText } from '../../app/hooks';
-import { Avatar, Banner, Button, Card, Drawer, EmptyState, Field, FilterChips, Input, PageHeader, Pill, SearchInput, Select, StatCard, StatGrid, StateBadge, Switch, Table, Tabs, Toolbar, toast } from '../../ui';
+import { useCommand, useDev, useQuery, errorText } from '../../app/hooks';
+import { Avatar, Banner, Button, Card, DetailPane, EmptyState, FILL_BODY, FILL_CARD, Field, FillPage, FilterChips, Input, MasterDetail, PageHeader, Pill, Popup, SearchInput, Select, StatCard, StatGrid, StateBadge, Switch, Table, Tabs, Toolbar, toast, confirmDialog, useEnterSave } from '../../ui';
 import { t } from '../../i18n';
 import { Tech } from '../../app/tech';
 import { cn } from '../../lib/format';
@@ -15,29 +17,42 @@ import { UserPermOverrides } from './UserPermOverrides'; // r3C (P1-041): per-us
 interface RA { roleId: string; branchIds: string[] }
 
 export default function UsersScreen() {
-  const [tab, setTab] = useState<'users' | 'roles'>('users');
+  const { params, nav } = useDev();
+  const tab: 'users' | 'roles' = params?.tab === 'roles' || params?.role ? 'roles' : 'users';
+  const go = (p: Record<string, any>) => nav('users', p);
+  const setTab = (v: 'users' | 'roles') => go(v === 'roles' ? { tab: 'roles' } : {});
   const [newUser, setNewUser] = useState(false);
-  const [newRole, setNewRole] = useState(false);
   const users = useList<any>('User.Find');
   const roles = useList<any>('Role.List');
+  const branches = useList<any>('Branch.List');
   const permCreate = usePerm('user:create');
   const permRole = usePerm('role:create');
-  return (
-    <div className="space-y-4" data-fb="screen:A2">
-      <PageHeader
+  const perms = useList<any>('Permission.List');
+  const openUser: string | null = tab === 'users' ? params?.open ?? null : null;
+  const roleKey: string | null = params?.role ?? null; // 'new' or a role id
+  const sel = openUser ? users.items.find((u) => u.id === openUser) : null;
+  const editRole = roleKey && roleKey !== 'new' ? roles.items.find((r) => r.id === roleKey) : null;
+  const list = (compact: boolean) => (
+    <FillPage fb="screen:A2">
+      <PageHeader className="!mb-0"
         icon={<Users />}
         title={t('المستخدمين والأدوار')}
         badge={<StateBadge ops={['User.Find', 'User.Create', 'User.ManageAccess', 'Credential.Reset', 'Role.List', 'Role.Create', 'Role.Update', 'Permission.List']} />}
-        description={t('مين يدخل على السيستم، بأنهي دور، وعلى أنهي فرع. الدور بيحدد الشاشات والحركات المسموحة.')}
-        meta={<><RulePill action="USER_ACCESS_CHANGE" /><RulePill action="CREDENTIAL_RESET" /></>}
+        meta={!compact ? <><RulePill action="USER_ACCESS_CHANGE" /><RulePill action="CREDENTIAL_RESET" /></> : undefined}
         actions={tab === 'users'
           ? <Button variant="primary" data-fb="users:new" disabled={!permCreate.ok} title={permCreate.title} onClick={() => setNewUser(true)}><UserPlus className="w-4 h-4" />{t('مستخدم جديد')}</Button>
-          : <Button variant="primary" data-fb="roles:new" disabled={!permRole.ok} title={permRole.title} onClick={() => setNewRole(true)}><Plus className="w-4 h-4" />{t('دور جديد')}</Button>}
+          : <Button variant="primary" data-fb="roles:new" disabled={!permRole.ok} title={permRole.title} onClick={() => go({ tab: 'roles', role: 'new' })}><Plus className="w-4 h-4" />{t('دور جديد')}</Button>}
       />
-      <Tabs variant="underline" value={tab} onChange={setTab} tabs={[{ id: 'users', label: t('المستخدمين'), count: users.items.length || undefined }, { id: 'roles', label: t('الأدوار والصلاحيات'), count: roles.items.length || undefined }]} />
-      {tab === 'users' ? <UsersTab users={users} roles={roles.items} creating={newUser} setCreating={setNewUser} /> : <RolesTab roles={roles} creating={newRole} setCreating={setNewRole} />}
-    </div>
+      <Tabs variant="underline" value={tab} onChange={setTab} tabs={[{ id: 'users', label: t('المستخدمين'), count: users.items.length || undefined, fb: 'users-tab:users' }, { id: 'roles', label: t('الأدوار والصلاحيات'), count: roles.items.length || undefined, fb: 'users-tab:roles' }]} />
+      {tab === 'users' ? <UsersTab users={users} roles={roles.items} branches={branches.items} compact={compact} selected={openUser} onOpen={(id) => go({ open: id })} /> : <RolesTab roles={roles} users={users.items} onEdit={(id) => go({ tab: 'roles', role: id })} />}
+      {newUser && <CreateUserPopup roles={roles.items} branches={branches.items} onClose={() => setNewUser(false)} onCreated={(id) => { setNewUser(false); if (id) go({ open: id }); }} />}
+    </FillPage>
   );
+  const detail = roleKey
+    ? (roleKey === 'new' || editRole ? <RoleEditor key={roleKey} role={editRole ?? null} catalog={perms.items.map((p) => p.id)} onClose={() => go({ tab: 'roles' })} /> : <DetailPane onClose={() => go({ tab: 'roles' })} title={t('دور')} escape={false}><Refused error={roles.error} /></DetailPane>)
+    : openUser ? (sel ? <AccessDetail key={sel.id + ':' + sel.version} user={sel} roles={roles.items} branches={branches.items} onClose={() => go({})} /> : <DetailPane onClose={() => go({})} title={t('مستخدم')}><Refused error={users.error} /></DetailPane>)
+    : null;
+  return <MasterDetail fb="users" open={!!detail} side={!roleKey} list={list} detail={detail} />;
 }
 
 function useCredentialPolicy() {
@@ -48,17 +63,15 @@ function useCredentialPolicy() {
 const roleName = (r: { roleName?: string; name?: string; roleId?: string } | undefined) => roleLabel(r?.roleName ?? r?.name ?? '') || t('دور');
 
 // ───────── users
-function UsersTab({ users, roles, creating, setCreating }: { users: ReturnType<typeof useList<any>>; roles: any[]; creating: boolean; setCreating: (v: boolean) => void }) {
-  const branches = useList<any>('Branch.List');
+function UsersTab({ users, roles, branches, compact, selected, onOpen }: { users: ReturnType<typeof useList<any>>; roles: any[]; branches: any[]; compact: boolean; selected: string | null; onOpen: (id: string) => void }) {
   const permAccess = usePerm('user:manageaccess');
   const permReset = usePerm('credential:reset');
   const { run, busy } = useCommand();
-  const [access, setAccess] = useState<any | null>(null);
   const [reset, setReset] = useState<any | null>(null);
   const [q, setQ] = useState('');
   const [st, setSt] = useState<'all' | 'active' | 'off' | 'locked'>('all');
   const [role, setRole] = useState('');
-  const bName = (id: string) => (id === '*' ? t('كل الفروع') : branchLabel(branches.items.find((b) => b.id === id)) || t('فرع'));
+  const bName = (id: string) => (id === '*' ? t('كل الفروع') : branchLabel(branches.find((b) => b.id === id)) || t('فرع'));
   const toggle = async (u: any) => {
     await run('User.ManageAccess', { params: { userId: u.id }, body: { active: !u.active, roleAssignments: u.roleAssignments.map((r: any) => ({ roleId: r.roleId, branchIds: r.branchIds })), expectedVersion: u.version } },
       { success: u.active ? t('اتوقف حساب {n} — خرج من كل الأجهزة', { n: personName(u.username, u.displayName) }) : t('اتفعّل حساب {n}', { n: personName(u.username, u.displayName) }) });
@@ -74,15 +87,15 @@ function UsersTab({ users, roles, creating, setCreating }: { users: ReturnType<t
     return true;
   });
   return (
-    <div className="space-y-4">
+    <>
       <Refused error={users.error} />
-      <StatGrid>
+      {!compact && <StatGrid>
         <StatCard label={t('حسابات شغالة')} value={count.active} icon={<UserCheck />} tone="success" loading={users.loading && !users.data} />
-        <StatCard label={t('حسابات موقوفة')} value={count.off} icon={<UserX />} hint={t('ما يقدروش يدخلوا من أي جهاز')} loading={users.loading && !users.data} />
-        <StatCard label={t('مقفولة من محاولات غلط')} value={count.locked} icon={<Lock />} tone={count.locked ? 'error' : 'neutral'} hint={t('رقم سري جديد بيفك القفل')} loading={users.loading && !users.data} />
-        <StatCard label={t('لازم يغيّروا الرقم السري')} value={count.must} icon={<KeySquare />} tone={count.must ? 'warning' : 'neutral'} hint={t('أول ما يدخلوا')} loading={users.loading && !users.data} />
-      </StatGrid>
-      <Card padding="sm">
+        <StatCard label={t('حسابات موقوفة')} value={count.off} icon={<UserX />} loading={users.loading && !users.data} />
+        <StatCard label={t('مقفولة من محاولات غلط')} value={count.locked} icon={<Lock />} tone={count.locked ? 'error' : 'neutral'} loading={users.loading && !users.data} />
+        <StatCard label={t('لازم يغيّروا الرقم السري')} value={count.must} icon={<KeySquare />} tone={count.must ? 'warning' : 'neutral'} loading={users.loading && !users.data} />
+      </StatGrid>}
+      <Card padding="sm" className={FILL_CARD} bodyClassName={FILL_BODY}>
         <Toolbar>
           <SearchInput value={q} onChange={setQ} placeholder={t('دوّر بالاسم أو الدور')} data-fb="users:search" />
           <FilterChips value={st} onChange={setSt} options={[
@@ -91,12 +104,15 @@ function UsersTab({ users, roles, creating, setCreating }: { users: ReturnType<t
             { id: 'off', label: t('موقوف'), count: count.off },
             { id: 'locked', label: t('مقفول'), count: count.locked, tone: 'error' },
           ]} />
-          <Select className="!w-auto min-w-[150px] h-9 !py-0" value={role} onChange={(e) => setRole(e.target.value)} options={[{ value: '', label: t('كل الأدوار') }, ...roles.map((r) => ({ value: r.id, label: roleName(r) }))]} />
+          {!compact && <Select className="!w-auto min-w-[150px] h-9 !py-0" value={role} onChange={(e) => setRole(e.target.value)} options={[{ value: '', label: t('كل الأدوار') }, ...roles.map((r) => ({ value: r.id, label: roleName(r) }))]} />}
         </Toolbar>
-        <Table head={[t('الموظف'), t('الدور والفروع'), t('الحالة'), '']} align={['start', 'start', 'start', 'end']}
-          loading={users.loading && !users.data}
-          empty={<EmptyState compact icon={<Search />} title={all.length ? t('مفيش حد بالبحث ده') : t('لسه مفيش مستخدمين')} text={all.length ? t('غيّر البحث أو الفلتر.') : t('ضيف أول موظف من «مستخدم جديد».')} />}
-          rows={list.map((u) => [
+        <Table fill head={compact ? [t('الموظف'), t('الحالة')] : [t('الموظف'), t('الدور والفروع'), t('الحالة'), '']} align={compact ? ['start', 'start'] : ['start', 'start', 'start', 'end']}
+          loading={users.loading && !users.data} onRowClick={(i) => onOpen(list[i].id)} rowClassName={(i) => (list[i].id === selected ? 'row-selected' : undefined)}
+          empty={<EmptyState compact icon={<Search />} title={all.length ? t('مفيش حد بالبحث ده') : t('لسه مفيش مستخدمين')} />}
+          rows={list.map((u) => compact ? [
+            <div className="flex items-center gap-2.5 min-w-0" data-fb={`users:row:${u.username}`}><Avatar name={personName(u.username, u.displayName)} size="sm" /><div className="min-w-0"><div className="font-bold truncate">{userLabel(u.username, u.displayName)}</div><div className="text-[11px] text-dim truncate">{u.roleAssignments.map((r: any) => roleName(r)).join(t('، '))}</div></div></div>,
+            <div className="flex flex-wrap gap-1">{u.active ? <Pill tone="success" dot>{t('شغال')}</Pill> : <Pill tone="neutral" dot>{t('موقوف')}</Pill>}{u.locked && <Pill tone="error"><Lock className="w-3 h-3" />{t('مقفول')}</Pill>}</div>,
+          ] : [
             <div className="flex items-center gap-2.5 min-w-0">
               <Avatar name={personName(u.username, u.displayName)} size="sm" />
               <div className="min-w-0"><div className="font-bold truncate">{userLabel(u.username, u.displayName)}</div><Tech><div className="num text-[11px] text-dim" dir="ltr">{u.username}</div></Tech></div>
@@ -110,17 +126,14 @@ function UsersTab({ users, roles, creating, setCreating }: { users: ReturnType<t
               {(u.permOverrides ?? []).filter((o: any) => o.effect === 'REVOKE').length > 0 && <Pill tone="error">−{(u.permOverrides ?? []).filter((o: any) => o.effect === 'REVOKE').length} {t('متشالة منه')}</Pill>}
             </div>,
             <div className="flex gap-1 justify-end flex-wrap">
-              <Button size="sm" variant="outline" data-fb={`users:access:${u.username}`} disabled={!permAccess.ok} title={permAccess.title} onClick={() => setAccess(u)}><ShieldCheck className="w-3.5 h-3.5" />{t('الصلاحيات')}</Button>
-              <Button size="sm" variant="ghost" data-fb={`users:reset:${u.username}`} disabled={!permReset.ok} title={permReset.title} onClick={() => setReset(u)}><KeyRound className="w-3.5 h-3.5" />{t('رقم سري جديد')}</Button>
-              <Button size="sm" variant={u.active ? 'danger' : 'success'} data-fb={`users:toggle:${u.username}`} disabled={!permAccess.ok || busy} title={permAccess.title} onClick={() => toggle(u)}><Power className="w-3.5 h-3.5" />{u.active ? t('إيقاف') : t('تفعيل')}</Button>
+              <Button size="sm" variant="outline" data-fb={`users:access:${u.username}`} disabled={!permAccess.ok} title={permAccess.title} onClick={(e) => { e.stopPropagation(); onOpen(u.id); }}><ShieldCheck className="w-3.5 h-3.5" />{t('الصلاحيات')}</Button>
+              <Button size="sm" variant="ghost" data-fb={`users:reset:${u.username}`} disabled={!permReset.ok} title={permReset.title} onClick={(e) => { e.stopPropagation(); setReset(u); }}><KeyRound className="w-3.5 h-3.5" />{t('رقم سري جديد')}</Button>
+              <Button size="sm" variant={u.active ? 'danger' : 'success'} data-fb={`users:toggle:${u.username}`} disabled={!permAccess.ok || busy} title={permAccess.title} onClick={(e) => { e.stopPropagation(); toggle(u); }}><Power className="w-3.5 h-3.5" />{u.active ? t('إيقاف') : t('تفعيل')}</Button>
             </div>,
           ])} />
-        <div className="text-[11px] text-dim mt-2 px-1">{t('إيقاف الحساب بيخرّج الموظف من كل الأجهزة فورًا — أول حركة بعدها بترجّعه لشاشة الدخول.')}<Tech> (N8)</Tech></div>
       </Card>
-      {creating && <CreateUserDrawer roles={roles} branches={branches.items} onClose={() => setCreating(false)} />}
-      {access && <AccessDrawer user={access} roles={roles} branches={branches.items} onClose={() => setAccess(null)} />}
       {reset && <ResetModal user={reset} onClose={() => setReset(null)} />}
-    </div>
+    </>
   );
 }
 
@@ -162,7 +175,7 @@ function FormGroup({ title, hint, children }: { title: string; hint?: string; ch
   );
 }
 
-function CreateUserDrawer({ roles, branches, onClose }: { roles: any[]; branches: any[]; onClose: () => void }) {
+function CreateUserPopup({ roles, branches, onClose, onCreated }: { roles: any[]; branches: any[]; onClose: () => void; onCreated: (id: string | null) => void }) {
   const { run, busy } = useCommand();
   const cp = useCredentialPolicy();
   const [username, setUsername] = useState('');
@@ -172,21 +185,24 @@ function CreateUserDrawer({ roles, branches, onClose }: { roles: any[]; branches
   const [ras, setRas] = useState<RA[]>([{ roleId: roles.find((r) => r.active)?.id ?? '', branchIds: branches[0] ? [branches[0].id] : [] }]);
   const pwErr = password && password.length < cp.passwordMinLength ? t('قصير — لازم {n} حروف على الأقل', { n: cp.passwordMinLength }) : null;
   const pinErr = pin && !new RegExp(`^\\d{${cp.pinLength}}$`).test(pin) ? t('لازم {n} أرقام بالظبط', { n: cp.pinLength }) : null;
+  const valid = !!username.trim() && !!displayName.trim() && !!password && !pwErr && !pinErr && validRA(ras);
   const save = async () => {
-    const r = await run('User.Create', { body: { username: username.trim(), displayName: displayName.trim(), password, pin: pin || undefined, roleAssignments: ras } }, { success: t('اتعمل حساب {n}', { n: displayName }) });
-    if (r) onClose();
+    if (!valid || busy) return;
+    const r = await run<any>('User.Create', { body: { username: username.trim(), displayName: displayName.trim(), password, pin: pin || undefined, roleAssignments: ras } }, { success: t('اتعمل حساب {n}', { n: displayName }) });
+    if (r) onCreated(r.id ?? null);
   };
+  const onKey = useEnterSave(save, valid && !busy);
   return (
-    <Drawer open width="lg" onClose={onClose} icon={<UserPlus />} title={t('مستخدم جديد')} badge={<StateBadge ops={['User.Create']} />} description={t('الموظف هيدخل بالرقم السري على أي جهاز في الفروع اللي تختارها.')}
-      footer={<><Button variant="ghost" onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" loading={busy} disabled={!username.trim() || !displayName.trim() || !password || !!pwErr || !!pinErr || !validRA(ras)} onClick={save} data-fb="users:create-save">{t('إنشاء الحساب')}</Button></>}>
-      <div className="space-y-6">
+    <Popup open onClose={onClose} size="lg" fb="user-new" title={<span className="flex items-center gap-2"><UserPlus className="w-5 h-5 text-[var(--primary)]" />{t('مستخدم جديد')}<StateBadge ops={['User.Create']} /></span>}
+      footer={<><Button variant="ghost" onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" loading={busy} disabled={!valid} onClick={save} data-fb="users:create-save">{t('إنشاء الحساب')}</Button></>}>
+      <div className="space-y-5" onKeyDown={onKey}>
         <FormGroup title={t('بيانات الموظف')}>
           <div className="grid sm:grid-cols-2 gap-3">
-            <Field label={t('الاسم اللي بيظهر')} required hint={t('مثلًا: منى — الكاشير ب')}><Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} data-fb="users:create-display" /></Field>
-            <Field label={t('اسم الدخول')} required hint={t('حروف إنجليزي صغيرة، ومينفعش يتكرر')}><Input value={username} onChange={(e) => setUsername(e.target.value.trim().toLowerCase())} dir="ltr" data-fb="users:create-username" /></Field>
+            <Field label={t('الاسم اللي بيظهر')} required><Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} data-fb="users:create-display" data-autofocus /></Field>
+            <Field label={t('اسم الدخول')} required><Input value={username} onChange={(e) => setUsername(e.target.value.trim().toLowerCase())} dir="ltr" data-fb="users:create-username" /></Field>
           </div>
         </FormGroup>
-        <FormGroup title={t('الدخول')} hint={t('الرقم السري (PIN) للدخول السريع على الأجهزة، والباسورد للإدارة.')}>
+        <FormGroup title={t('الدخول')}>
           <div className="grid sm:grid-cols-2 gap-3">
             <Field label={t('الباسورد')} required hint={t('على الأقل {n} حروف', { n: cp.passwordMinLength })} error={pwErr}>
               <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} dir="ltr" data-fb="users:create-password" />
@@ -195,28 +211,28 @@ function CreateUserDrawer({ roles, branches, onClose }: { roles: any[]; branches
               <Input inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))} dir="ltr" data-fb="users:create-pin" />
             </Field>
           </div>
-          <div className="text-[11px] text-dim">{t('في التشغيل الحقيقي الرقم السري بيوصل للموظف نفسه وما بيتكتبش في أي ورق. من غير PIN الموظف هيغيّر بياناته أول ما يدخل.')}</div>
         </FormGroup>
-        <FormGroup title={t('الدور والفروع')} hint={t('ممكن تدي الموظف أكتر من دور، كل دور على فروع مختلفة.')}>
+        <FormGroup title={t('الدور والفروع')}>
           <AssignmentsEditor value={ras} onChange={setRas} roles={roles} branches={branches} />
         </FormGroup>
       </div>
-    </Drawer>
+    </Popup>
   );
 }
 
-function AccessDrawer({ user, roles, branches, onClose }: { user: any; roles: any[]; branches: any[]; onClose: () => void }) {
+function AccessDetail({ user, roles, branches, onClose }: { user: any; roles: any[]; branches: any[]; onClose: () => void }) {
   const { run, busy } = useCommand();
   const [active, setActive] = useState<boolean>(user.active);
   const [ras, setRas] = useState<RA[]>(user.roleAssignments.map((r: any) => ({ roleId: r.roleId, branchIds: [...r.branchIds] })));
+  const dirty = active !== user.active || JSON.stringify(ras) !== JSON.stringify(user.roleAssignments.map((r: any) => ({ roleId: r.roleId, branchIds: r.branchIds })));
   const save = async () => {
-    const r = await run('User.ManageAccess', { params: { userId: user.id }, body: { active, roleAssignments: ras, expectedVersion: user.version } }, { success: t('اتحدثت صلاحيات {n}', { n: personName(user.username, user.displayName) }) });
-    if (r) onClose();
+    await run('User.ManageAccess', { params: { userId: user.id }, body: { active, roleAssignments: ras, expectedVersion: user.version } }, { success: t('اتحدثت صلاحيات {n}', { n: personName(user.username, user.displayName) }) });
   };
+  const leave = async () => { if (!dirty || (await confirmDialog(t('تجاهل التعديلات غير المحفوظة؟'), { danger: true, confirmLabel: t('تجاهل التعديلات'), cancelLabel: t('متابعة التعديل') }))) onClose(); };
   return (
-    <Drawer open width="lg" onClose={onClose} icon={<ShieldCheck />} title={t('صلاحيات {n}', { n: userLabel(user.username, user.displayName) })} badge={<StateBadge ops={['User.ManageAccess']} />}
-      description={t('غيّر الدور أو الفروع، أو أوقف الحساب. التغيير بيتطبق من أول حركة جاية.')}
-      footer={<><Button variant="ghost" onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" loading={busy} disabled={!validRA(ras)} onClick={save} data-fb="users:access-save">{t('حفظ')}</Button></>}>
+    <DetailPane fb="user-access" onClose={leave} backLabel={t('المستخدمين')} icon={<ShieldCheck />} title={t('صلاحيات {n}', { n: userLabel(user.username, user.displayName) })} badge={<StateBadge ops={['User.ManageAccess']} />}
+      meta={<>{user.active ? <Pill tone="success" dot>{t('شغال')}</Pill> : <Pill tone="neutral" dot>{t('موقوف')}</Pill>}{user.locked && <Pill tone="error"><Lock className="w-3 h-3" />{t('مقفول')}</Pill>}<Tech><span className="num" dir="ltr">{user.username}</span></Tech></>}
+      footer={<>{dirty && <span className="me-auto text-xs text-[var(--warning-text)]">{t('تعديلات غير محفوظة')}</span>}<Button variant="ghost" onClick={leave}>{t('إغلاق')}</Button><Button variant="primary" loading={busy} disabled={!validRA(ras) || !dirty} onClick={save} data-fb="users:access-save">{t('حفظ')}</Button></>}>
       <div className="space-y-5">
         <div className="flex items-center justify-between gap-2 flex-wrap rounded-xl surface-1 border line p-3">
           <Switch checked={active} onChange={setActive} label={active ? t('الحساب شغال') : t('الحساب موقوف')} />
@@ -224,10 +240,10 @@ function AccessDrawer({ user, roles, branches, onClose }: { user: any; roles: an
         </div>
         {!active && user.active && <Banner tone="warning">{t('الإيقاف بيخرّج الموظف من كل الأجهزة: أول حركة بعدها بترجّعه لشاشة الدخول.')}</Banner>}
         <FormGroup title={t('الدور والفروع')}><AssignmentsEditor value={ras} onChange={setRas} roles={roles} branches={branches} /></FormGroup>
-        <div className="text-[11px] text-dim">{t('لازم يفضل فيه شخص واحد على الأقل يقدر يدير الصلاحيات — السيستم مش هيسمح تشيله.')}<Tech> LAST_OWNER_PROTECTED · v{user.version}</Tech></div>
+        <Tech><div className="text-[11px] text-dim">LAST_OWNER_PROTECTED · v{user.version}</div></Tech>
         <UserPermOverrides user={user} />
       </div>
-    </Drawer>
+    </DetailPane>
   );
 }
 
@@ -270,26 +286,23 @@ const groupPerms = (ids: string[]) => {
   return [...m.entries()].sort((a, b) => moduleText(a[0]).localeCompare(moduleText(b[0]), 'ar'));
 };
 
-function RolesTab({ roles, creating, setCreating }: { roles: ReturnType<typeof useList<any>>; creating: boolean; setCreating: (v: boolean) => void }) {
-  const perms = useList<any>('Permission.List');
-  const users = useList<any>('User.Find');
+function RolesTab({ roles, users, onEdit }: { roles: ReturnType<typeof useList<any>>; users: any[]; onEdit: (id: string) => void }) {
   const permUpdate = usePerm('role:update');
-  const [edit, setEdit] = useState<any | null>(null);
   return (
-    <div className="space-y-3">
+    <div className="flex-1 min-h-0 overflow-y-auto space-y-3 -mx-1 px-1" data-scroll-region>
       <Refused error={roles.error} />
       <Tech><Banner tone="info">{t('الصلاحيات اللي عليها "أضيفت للنموذج" مش في أدوار ملف التجهيز 1.2 — النموذج زوّدها عشان الخبير يقدر يجرب كل الشاشات (PROTOTYPE_GAPS).')}</Banner></Tech>
       <div className="grid xl:grid-cols-2 gap-3">
         {roles.items.map((r) => {
           const added: string[] = r.demoAdded ?? [];
-          const holders = users.items.filter((u) => u.roleAssignments.some((a: any) => a.roleId === r.id));
+          const holders = users.filter((u) => u.roleAssignments.some((a: any) => a.roleId === r.id));
           const all = r.permissionIds.includes('*');
           return (
             <Card key={r.id} title={<span>{roleName(r)}<Tech><span className="num text-xs text-dim font-normal ms-2">{r.id} · v{r.version}</span></Tech></span>}
               description={all ? t('كل الصلاحيات') : t('{n} صلاحية · {u} موظف عليه الدور ده', { n: r.permissionIds.length, u: holders.length })}
               badge={r.active ? <Pill tone="success" dot>{t('شغال')}</Pill> : <Pill tone="neutral" dot>{t('موقوف')}</Pill>}
-              actions={<Button size="sm" variant="outline" data-fb={`roles:edit:${r.id}`} disabled={!permUpdate.ok} title={permUpdate.title} onClick={() => setEdit(r)}><Pencil className="w-3.5 h-3.5" />{t('تعديل')}</Button>}>
-              <div className="space-y-2 max-h-56 overflow-y-auto pe-1">
+              actions={<Button size="sm" variant="outline" data-fb={`roles:edit:${r.id}`} disabled={!permUpdate.ok} title={permUpdate.title} onClick={() => onEdit(r.id)}><Pencil className="w-3.5 h-3.5" />{t('تعديل')}</Button>}>
+              <div className="space-y-2">
                 {groupPerms(r.permissionIds).map(([mod, ids]) => (
                   <div key={mod} className="flex items-start gap-2 text-xs">
                     <span className="font-bold text-soft w-28 shrink-0 pt-0.5">{moduleText(mod)}</span>
@@ -305,12 +318,11 @@ function RolesTab({ roles, creating, setCreating }: { roles: ReturnType<typeof u
           );
         })}
       </div>
-      {(creating || edit) && <RoleDrawer role={edit} catalog={perms.items.map((p) => p.id)} onClose={() => { setCreating(false); setEdit(null); }} />}
     </div>
   );
 }
 
-function RoleDrawer({ role, catalog, onClose }: { role: any | null; catalog: string[]; onClose: () => void }) {
+function RoleEditor({ role, catalog, onClose }: { role: any | null; catalog: string[]; onClose: () => void }) {
   const { run, busy } = useCommand();
   const [name, setName] = useState(role?.name ?? '');
   const [active, setActive] = useState<boolean>(role?.active ?? true);
@@ -335,15 +347,18 @@ function RoleDrawer({ role, catalog, onClose }: { role: any | null; catalog: str
     const r = role
       ? await run('Role.Update', { params: { roleId: role.id }, body: { ...body, active, expectedVersion: role.version } }, { success: t('اتحدث الدور') })
       : await run('Role.Create', { body }, { success: t('اتعمل الدور') });
-    if (r) onClose();
+    if (r) { saved.current = true; onClose(); }
   };
+  const saved = useRef(false);
+  const initial = useRef(JSON.stringify({ name, active, sel: [...sel].sort() }));
+  const dirty = JSON.stringify({ name, active, sel: [...sel].sort() }) !== initial.current;
+  const leave = async () => { if (!dirty || saved.current || (await confirmDialog(t('تجاهل التعديلات غير المحفوظة؟'), { danger: true, confirmLabel: t('تجاهل التعديلات'), cancelLabel: t('متابعة التعديل') }))) onClose(); };
   return (
-    <Drawer open width="xl" onClose={onClose} icon={<ShieldCheck />} title={role ? t('تعديل دور {n}', { n: roleName(role) }) : t('دور جديد')} badge={<StateBadge ops={[role ? 'Role.Update' : 'Role.Create', 'Permission.List']} />}
-      description={t('اختار الحركات المسموحة لأي حد عليه الدور ده. التغيير بيتطبق من أول حركة جاية.')}
-      footer={<><span className="text-xs text-dim me-auto">{t('{n} صلاحية مختارة', { n: sel.length })}</span><Button variant="ghost" onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" loading={busy} disabled={!name.trim()} onClick={save} data-fb="roles:save">{t('حفظ الدور')}</Button></>}>
+    <DetailPane fb="role-editor" onClose={leave} escape={false} backLabel={t('الأدوار والصلاحيات')} icon={<ShieldCheck />} title={role ? t('تعديل دور {n}', { n: roleName(role) }) : t('دور جديد')} badge={<StateBadge ops={[role ? 'Role.Update' : 'Role.Create', 'Permission.List']} />}
+      footer={<><span className="text-xs text-dim me-auto">{t('{n} صلاحية مختارة', { n: sel.length })}</span><Button variant="ghost" onClick={leave}>{t('إلغاء')}</Button><Button variant="primary" loading={busy} disabled={!name.trim()} onClick={save} data-fb="roles:save">{t('حفظ الدور')}</Button></>}>
       <div className="space-y-4">
         <div className="grid md:grid-cols-[1fr_auto] gap-3 items-end">
-          <Field label={t('اسم الدور')} required hint={t('مينفعش يتكرر — مثلًا: كاشير، مشرف صالة')}><Input value={name} onChange={(e) => setName(e.target.value)} data-fb="roles:name" /></Field>
+          <Field label={t('اسم الدور')} required><Input value={name} onChange={(e) => setName(e.target.value)} data-fb="roles:name" /></Field>
           {role && <Field label={t('الحالة')}><Switch checked={active} onChange={setActive} label={active ? t('شغال') : t('موقوف')} /></Field>}
         </div>
         <SearchInput value={filter} onChange={setFilter} placeholder={t('دوّر في الصلاحيات (مثلًا: المطبخ، خصم)')} className="max-w-none" />
@@ -375,8 +390,7 @@ function RoleDrawer({ role, catalog, onClose }: { role: any | null; catalog: str
             <Button variant="secondary" onClick={addFree} disabled={!free.trim()} data-fb="roles:free-add">{t('ضيف')}</Button>
           </div>
         </Tech>
-        <div className="text-[11px] text-dim">{t('تعديل الأدوار ممكن يحتاج موافقة مدير حسب الإعدادات.')}</div>
       </div>
-    </Drawer>
+    </DetailPane>
   );
 }
