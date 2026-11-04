@@ -23,6 +23,8 @@ export const SPLIT_MIN = 1040;
 type Mode = 'side' | 'page';
 const ModeCtx = createContext<Mode>('page');
 export const useDetailMode = () => useContext(ModeCtx);
+/** ux-05: a host that lays out its own detail (a board's detail column) tells DetailPane whether it sits beside or is the page. */
+export const DetailModeProvider = ({ mode, children }: { mode: Mode; children: React.ReactNode }) => <ModeCtx.Provider value={mode}>{children}</ModeCtx.Provider>;
 const CompactCtx = createContext(false);
 /** True while the list shares the width with an open detail: show fewer columns and no KPI tiles. */
 export const useListCompact = () => useContext(CompactCtx);

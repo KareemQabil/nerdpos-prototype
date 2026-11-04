@@ -100,6 +100,7 @@ export default function PurchasingBoard({ onList }: { onList?: () => void }) {
             <AgeChip a={c.aging} />
           </div>
         )}
+        detailPane={() => true}
         renderDetail={(p: any, close) => <PoView id={p.id} onClose={close} onEdit={(po) => setEditor({ po })} />}
         toolbarStart={<BranchScope scope={scope} />}
         toolbarEnd={<>

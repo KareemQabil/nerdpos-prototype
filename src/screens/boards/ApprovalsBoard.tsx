@@ -119,6 +119,7 @@ export default function ApprovalsBoard({ onList }: { onList?: () => void }) {
             {x.status === 'pending' ? <AgeChip a={c.aging} /> : <DecidedLine x={x} />}
           </div>
         )}
+        detailPane={(x) => x.kind === 'po'}
         renderDetail={(x, close) => x.kind === 'po' ? <PoView id={x.raw.id} onClose={close} onEdit={() => undefined} /> : <ItemDetail x={x} onDecide={(to) => void onMove(x, to)} canMove={canMove} />}
         toolbarEnd={onList && <BoardViewToggle value="board" onChange={(v) => v === 'list' && onList()} />} />
       {decide.open && <DecisionPopup item={decide.open.item} to={decide.open.to} onDone={decide.done} />}

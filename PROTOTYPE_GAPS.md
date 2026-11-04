@@ -229,13 +229,6 @@ Principle kept from round 3: the depth sits in the engine, the screens stay simp
 - **[DEMO]** The e-receipt QR on the thank-you screen is a placeholder link (`receipt.nerdpos.example`); sounds are Web Audio tones (played only after the first touch, mute per screen).
 - The pre-bill prints the check number as a Code 128 barcode (not a QR — the QR stays the e-receipt); scanning it in collect mode opens the check.
 
-## 15c. UX slice 06 — no side drawers, one scroll container per region
-
-- No new server reads or commands: details read the existing `Supplier.Get`, `InventoryItem.Get`, `Recipe.Get`/`Recipe.Cost`, `StockCount.Get`, `Approval.Get`, `Audit.Get`, `Product.Get`, `Report.Explain`; nothing added to `src/mock/ux-contracts.ts`.
-- **[ASSUMED]** The selected record of a master-detail screen (and an open full-page editor) lives in the device's route params (`open`, `edit`, `role`, `grant`, `event`, `openProduct` + `ptab`, `newProduct`, `quickProduct`), persisted with the device state, so refresh keeps it; "back" is the in-page back button (the prototype has no browser-history routing).
-- **[UI]** Detail beside the list when the screen area (window minus the sidebar) is ≥ 1040 px — about a 1280 px wide window — otherwise a full page with back; long forms (product, quick add, new-product wizard, recipe editor, count sheet, role editor) are always full pages.
-- **[OBSERVED, not changed]** The in-browser mock keeps `User.Create` / `Credential.Reset` secrets as given (`db.users[].password`, `pin`); the real backend hashes credentials.
-- `Drawer` stays exported (deprecated) only for the purchasing screens owned by ux-05; remove it once they are converted.
 ## 15b. UX slice 05 — boards, drawer-free purchasing, the cashier's three modes
 
 - **[PROPOSED]** `PurchaseOrder.Submit` (`purchaseorder:update`; DRAFT → PENDING_APPROVAL, the order is locked while it waits) and `PurchaseOrder.ReturnToDraft` (`purchaseorder:issue`; PENDING_APPROVAL → DRAFT, reason required; `PURCHASE_ORDER_NOT_PENDING_APPROVAL` 409). Listed in `src/mock/ux-contracts.ts`.
@@ -245,8 +238,15 @@ Principle kept from round 3: the depth sits in the engine, the screens stay simp
 - **[DEMO]** `role_manager` gains `approve:purchase_order` (demo role addition).
 - **[ASSUMED]** Boards are a presentation over the existing reads (Order.Find, Delivery.Board, PurchaseOrder.Find, ApprovalRequest.Find, VoidReview.Find); a drop is offered only where the owner module has a legal command and is always sent as that command (Order.Fire, Order.Confirm, Delivery.Assign / Complete, PurchaseOrder.Submit / Issue / ReturnToDraft, GoodsReceipt.Post, ApprovalRequest.Decide, VoidReview.Decide). Kitchen states, payment-closing and decided approvals are never moved from a board.
 - **[ASSUMED]** The address and payment chosen when a cashier starts a delivery check live on the device until the items exist and `Delivery.Create` records them (the server needs the lines for the minimum order and the fee). The fee shown before that is the zone fee from `DeliveryZone.List`; the charged fee is the server's on send.
-- Purchasing screens no longer use side drawers: details in the page (side by side when wide, full page when narrow), long forms as full pages with back, short forms as centered popups.
+- Purchasing screens no longer use side drawers: purchase order, receipt, store request and invoice details use ux-06 `MasterDetail` / `DetailPane` (beside the list when wide, full page when narrow; on the boards the same pane sits in the board's detail column); long forms (new / edit order, suggestions, receiving, supplier return, store request, direct invoice) are full pages with back built on `DetailPane`; short forms are centered popups. With no users left, the deprecated `Drawer` component is removed from `src/ui/index.tsx`.
 
+## 15c. UX slice 06 — no side drawers, one scroll container per region
+
+- No new server reads or commands: details read the existing `Supplier.Get`, `InventoryItem.Get`, `Recipe.Get`/`Recipe.Cost`, `StockCount.Get`, `Approval.Get`, `Audit.Get`, `Product.Get`, `Report.Explain`; nothing added to `src/mock/ux-contracts.ts`.
+- **[ASSUMED]** The selected record of a master-detail screen (and an open full-page editor) lives in the device's route params (`open`, `edit`, `role`, `grant`, `event`, `openProduct` + `ptab`, `newProduct`, `quickProduct`), persisted with the device state, so refresh keeps it; "back" is the in-page back button (the prototype has no browser-history routing).
+- **[UI]** Detail beside the list when the screen area (window minus the sidebar) is ≥ 1040 px — about a 1280 px wide window — otherwise a full page with back; long forms (product, quick add, new-product wizard, recipe editor, count sheet, role editor) are always full pages.
+- **[OBSERVED, not changed]** The in-browser mock keeps `User.Create` / `Credential.Reset` secrets as given (`db.users[].password`, `pin`); the real backend hashes credentials.
+- `Drawer` stays exported (deprecated) only for the purchasing screens owned by ux-05; remove it once they are converted.
 ## 16. Prototype limitations
 
 - Single-browser simulation: "devices" share one localStorage database; no real concurrency, only simulated races.

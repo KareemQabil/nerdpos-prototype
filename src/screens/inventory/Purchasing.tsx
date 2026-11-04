@@ -7,8 +7,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ClipboardList, Plus, Send, XCircle, ShoppingBag, FileText, PackageCheck, Save, Trash2, Wand2, Receipt as ReceiptIcon, Workflow } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
-import { Banner, Button, Card, EmptyState, Field, Input, KV, Money, PageHeader, Pill, Popup, Select, Spinner, StatCard, StatGrid, StateBadge, Switch, Table, Tabs, Textarea, Toolbar } from '../../ui';
-import { FullPage, SplitDetail, DetailPanel } from './purchasingLayout';
+import { Banner, Button, Card, DetailPane, EmptyState, Field, Input, KV, MasterDetail, Money, PageHeader, Pill, Popup, Select, Spinner, StatCard, StatGrid, StateBadge, Switch, Table, Tabs, Textarea, Toolbar } from '../../ui';
+import { FullPage } from './purchasingLayout';
 import { t, L, tv } from '../../i18n';
 import { cn, dateTime, money } from '../../lib/format';
 import { BranchScope, ItemPicker, Qty, StatePill, WarehouseSelect, fmtQty, unitLabel, useBranchScope, useItemsCatalog, useList, useWarehouses, Inp, Sel } from './common';
@@ -37,8 +37,9 @@ export default function Purchasing() {
   const pending = useList<any>('SupplierInvoice.Pending', { branchId: scope.branchId }, canBuy);
   const waiting = reqs.items.filter((r) => r.state === 'SUBMITTED');
   const loading = reqs.loading && !reqs.raw;
+  // ux-05: store request / invoice details beside the list (wide) or as a full page — ux-06 MasterDetail / DetailPane
   return (
-    <div className="space-y-4">
+    <MasterDetail fb="purchasing" open={!!(openSr || openInv)} detail={openSr ? <StoreRequestView id={openSr} onClose={() => setOpenSr(null)} /> : openInv ? <InvoiceView id={openInv} onClose={() => setOpenInv(null)} /> : null} list={<div className="space-y-4">
       <PageHeader icon={<Workflow />} title={t('دورة الشراء')} badge={<StateBadge ops={OPS} />}
         description={t('أربع مستندات مربوطة ببعض: طلبية المخزن ← أمر الشراء ← الاستلام ← فاتورة المورد. الكمية ممكن تختلف في كل خطوة (100 ← 80 ← 60) والفرق باين.')}
         actions={<><BranchScope scope={scope} />
@@ -56,7 +57,6 @@ export default function Purchasing() {
         ...(canBuy ? [{ id: 'invoices' as Tab, label: t('فواتير الموردين'), count: invs.items.length, fb: 'pur:tab-invoices' }] : []),
       ]} />
       {tab === 'requests' || !canBuy ? (
-        <SplitDetail onClose={() => setOpenSr(null)} detail={openSr ? <StoreRequestView id={openSr} onClose={() => setOpenSr(null)} /> : null} list={
         <Card padding="sm">
           <Table loading={loading} onRowClick={(i) => setOpenSr(reqs.items[i].id)} align={['start', 'start', 'start', 'end', 'start', 'start']}
             empty={<EmptyState compact icon={<ClipboardList />} title={t('مفيش طلبيات مخزن')} text={t('أمين المخزن يعمل طلبية بالنواقص — الكمية بتتحسب لوحدها (المستهدف − الموجود) ويقدر يعدلها.')} action={can('storerequest:create') ? <Button variant="primary" onClick={() => setNewReq({})}>{t('طلبية مخزن جديدة')}</Button> : undefined} />}
@@ -65,9 +65,8 @@ export default function Purchasing() {
               <span className="num">{r.lines.length}</span>, <span className="text-xs">{personText(r.createdByName)} · {dateTime(r.createdAt)}</span>,
               r.purchaseOrders.length ? <span className="text-xs num">{r.purchaseOrders.map((p: any) => p.number).join(t('، '))}</span> : <span className="text-dim text-xs">—</span>,
             ])} />
-        </Card>} />
+        </Card>
       ) : (
-        <SplitDetail onClose={() => setOpenInv(null)} detail={openInv ? <InvoiceView id={openInv} onClose={() => setOpenInv(null)} /> : null} list={
         <div className="space-y-3">
           {pending.items.length > 0 && (
             <Card title={t('استلامات مستنية فاتورة المورد')} description={t('الفاتورة بتتعمل على اللي اتستلم فعلًا — مش على اللي اتطلب.')} padding="sm">
@@ -88,11 +87,11 @@ export default function Purchasing() {
                 <Money v={x.total} className="text-xs" />,
               ])} />
           </Card>
-        </div>} />
+        </div>
       )}
       {newReq && <StoreRequestEditor presetItemId={newReq.itemId} onClose={() => setNewReq(null)} onSaved={(id) => { setNewReq(null); setOpenSr(id); }} />}
       {direct && <DirectInvoiceDialog onClose={() => setDirect(false)} onDone={(id) => { setDirect(false); setTab('invoices'); setOpenInv(id); }} />}
-    </div>
+    </div>} />
   );
 }
 
@@ -163,7 +162,7 @@ function StoreRequestView({ id, onClose }: { id: string; onClose: () => void }) 
   const [toPo, setToPo] = useState(false);
   const [cancel, setCancel] = useState<string | null>(null);
   return (
-    <DetailPanel title={sr ? <span className="flex items-center gap-2">{t('طلبية مخزن')} <span className="num">{sr.number}</span> — {tv(sr.warehouse.name)}</span> : t('طلبية مخزن')} badge={sr ? <><StatePill map={SR_STATE} state={sr.state} /><StateBadge ops={['StoreRequest.Get', 'StoreRequest.CreatePurchaseOrders']} /></> : undefined}
+    <DetailPane onClose={onClose} title={sr ? <span className="flex items-center gap-2">{t('طلبية مخزن')} <span className="num">{sr.number}</span> — {tv(sr.warehouse.name)}</span> : t('طلبية مخزن')} badge={sr ? <><StatePill map={SR_STATE} state={sr.state} /><StateBadge ops={['StoreRequest.Get', 'StoreRequest.CreatePurchaseOrders']} /></> : undefined}
       footer={sr && <>
         {['DRAFT', 'SUBMITTED'].includes(sr.state) && can('storerequest:create') && <Button variant="danger" data-fb="sr-view:cancel" onClick={() => setCancel('')}><XCircle className="w-4 h-4" />{t('الغي')}</Button>}
         <div className="flex-1" />
@@ -189,7 +188,7 @@ function StoreRequestView({ id, onClose }: { id: string; onClose: () => void }) 
           <Field label={t('السبب')}><Textarea value={cancel} onChange={(e) => setCancel(e.target.value)} /></Field>
         </Popup>
       )}
-    </DetailPanel>
+    </DetailPane>
   );
 }
 
@@ -294,7 +293,7 @@ function InvoiceView({ id, onClose }: { id: string; onClose: () => void }) {
   const q = useQuery<any>('SupplierInvoice.Get', { params: { invoiceId: id } });
   const x = q.data;
   return (
-    <DetailPanel title={x ? <span className="flex items-center gap-2">{t('فاتورة مورد')} <span className="num">{x.number}</span> — {tv(x.supplierName)}</span> : t('فاتورة مورد')} badge={x ? <><Pill tone={x.kind === 'DIRECT' ? 'violet' : 'info'}>{x.kind === 'DIRECT' ? t('فاتورة مباشرة') : t('من الاستلام')}</Pill><StateBadge ops={['SupplierInvoice.Get']} /></> : undefined}>
+    <DetailPane onClose={onClose} title={x ? <span className="flex items-center gap-2">{t('فاتورة مورد')} <span className="num">{x.number}</span> — {tv(x.supplierName)}</span> : t('فاتورة مورد')} badge={x ? <><Pill tone={x.kind === 'DIRECT' ? 'violet' : 'info'}>{x.kind === 'DIRECT' ? t('فاتورة مباشرة') : t('من الاستلام')}</Pill><StateBadge ops={['SupplierInvoice.Get']} /></> : undefined}>
       {!x ? <Spinner /> : (
         <div className="space-y-4">
           <KV rows={[[t('رقم فاتورة المورد'), x.supplierInvoiceNo ?? '—'], [t('المخزن'), tv(x.warehouse.name)], [t('اتسجلت'), `${dateTime(x.at)} · ${personText(x.userName)}`], [t('ميعاد الدفع'), x.dueDate ?? '—'], [t('أذون الاستلام'), x.receiptNumbers.join(t('، '))], ...(x.purchaseOrderNumber ? [[t('أمر الشراء'), x.purchaseOrderNumber] as [string, string]] : []), ...(x.storeRequestNumber ? [[t('طلبية المخزن'), x.storeRequestNumber] as [string, string]] : [])]} />
@@ -307,7 +306,7 @@ function InvoiceView({ id, onClose }: { id: string; onClose: () => void }) {
           <Tech><div className="text-[11px] num text-dim">{x.id}</div></Tech>
         </div>
       )}
-    </DetailPanel>
+    </DetailPane>
   );
 }
 

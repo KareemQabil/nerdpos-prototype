@@ -4,8 +4,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, ShoppingBag, Send, XCircle, Lock, PackageCheck, Pencil, Trash2, Save, MessageSquareText, Wand2, ShieldCheck, Undo2 } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
-import { Banner, Button, Card, Empty, EmptyState, Field, Input, KV, Money, PageHeader, Pill, Popup, Section, Select, Spinner, StatCard, StatGrid, StateBadge, Table, Textarea, Toolbar } from '../../ui';
-import { FullPage, SplitDetail, DetailPanel } from './purchasingLayout';
+import { Banner, Button, Card, DetailPane, Empty, EmptyState, Field, Input, KV, MasterDetail, Money, PageHeader, Pill, Popup, Section, Select, Spinner, StatCard, StatGrid, StateBadge, Table, Textarea, Toolbar } from '../../ui';
+import { FullPage } from './purchasingLayout';
 import { BoardViewToggle } from '../../ui/board';
 import { useBoardView } from '../../app/useBoardView';
 import PurchasingBoard from '../boards/PurchasingBoard';
@@ -45,7 +45,7 @@ function PurchaseOrderList({ onBoard }: { onBoard: () => void }) {
   const late = waiting.filter((p) => p.expectedDate && p.expectedDate < today);
   const loading = all.loading && !all.raw;
   return (
-    <div className="space-y-4">
+    <MasterDetail fb="po-list" open={!!open} detail={open && <PoView id={open} onClose={() => setOpen(null)} onEdit={(po) => { setOpen(null); setEditor({ po }); }} />} list={<div className="space-y-4">
       <PageHeader icon={<ShoppingBag />} title={t('أوامر الشراء')} badge={<StateBadge ops={OPS} />} description={t('اطلب من المورد: مسودة ← اتبعت للمورد ← اتستلم جزء أو كله ← اتقفل. ممكن تعمل الأوامر أوتوماتيك من النواقص.')}
         actions={<><BranchScope scope={scope} /><Button data-fb="po:suggest" onClick={() => setSuggest(true)}><Wand2 className="w-4 h-4" />{t('من النواقص')}</Button><Button data-fb="po:new" variant="primary" onClick={() => setEditor({})}><Plus className="w-4 h-4" />{t('أمر شراء جديد')}</Button><BoardViewToggle value="list" onChange={(v) => v === 'board' && onBoard()} /></>} />
       <StatGrid>
@@ -54,7 +54,6 @@ function PurchaseOrderList({ onBoard }: { onBoard: () => void }) {
         <StatCard label={t('مستنيين الاستلام')} value={waiting.length} icon={<PackageCheck />} tone={waiting.length ? 'info' : 'neutral'} loading={loading} onClick={() => setState(state === 'ISSUED,PARTIALLY_RECEIVED' ? '' : 'ISSUED,PARTIALLY_RECEIVED')} />
         <StatCard label={t('متأخرين عن ميعاد التوريد')} value={late.length} icon={<XCircle />} tone={late.length ? 'error' : 'neutral'} loading={loading} hint={late.length ? late.map((p) => tv(p.supplierName)).slice(0, 2).join(t('، ')) : t('كله في ميعاده')} />
       </StatGrid>
-      <SplitDetail onClose={() => setOpen(null)} detail={open ? <PoView id={open} onClose={() => setOpen(null)} onEdit={(po) => { setOpen(null); setEditor({ po }); }} /> : null} list={
       <Card padding="sm">
         <Toolbar>
           <Sel className="w-52" data-fb="po:state" value={state} onChange={(e) => setState(e.target.value)} options={[{ value: '', label: t('كل الحالات') }, { value: 'DRAFT,ISSUED,PARTIALLY_RECEIVED', label: t('المفتوحة بس') }, { value: 'ISSUED,PARTIALLY_RECEIVED', label: t('مستنية الاستلام') }, ...Object.entries(PO_STATE).map(([k, v]) => ({ value: k, label: t(v.ar) }))]} />
@@ -69,10 +68,10 @@ function PurchaseOrderList({ onBoard }: { onBoard: () => void }) {
           <span className={`num text-xs ${p.expectedDate && p.expectedDate < today && ['ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state) ? 'text-[var(--error)] font-bold' : ''}`}>{p.expectedDate ?? '—'}</span>,
           <Button size="sm" variant={p.state === 'DRAFT' || ['ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state) ? 'outline' : 'ghost'} onClick={(e) => { e.stopPropagation(); setOpen(p.id); }}>{p.state === 'DRAFT' ? t('راجع وابعت') : ['ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state) ? t('استلم') : t('اعرض')}</Button>,
         ])} />
-      </Card>} />
+      </Card>
       {suggest && <Suggestions branchId={scope.branchId} onClose={() => setSuggest(false)} onDone={(id) => { setSuggest(false); if (id) setOpen(id); }} />}
       {editor && <PoEditor init={editor} onClose={() => setEditor(null)} onSaved={(id) => { setEditor(null); setOpen(id); }} />}
-    </div>
+    </div>} />
   );
 }
 
@@ -202,7 +201,7 @@ export function PoView({ id, onClose, onEdit }: { id: string | null; onClose: ()
   const open = po && ['ISSUED', 'PARTIALLY_RECEIVED'].includes(po.state);
   const message = po ? `${t('السلام عليكم')} ${po.supplierName}،\n${t('طلبية رقم')} ${po.number}${po.expectedDate ? ` — ${t('التوريد يوم')} ${po.expectedDate}` : ''}:\n${po.lines.map((l: any) => `• ${L(l.item?.name)}: ${fmtQty(l.orderedQuantity)} ${l.packId ? L(l.item?.packs?.find((p: any) => p.id === l.packId)?.name) : unitLabel(l.item?.unit)}`).join('\n')}\n${t('الإجمالي التقريبي')}: ${money(po.total)}\n${t('شكرًا')}` : '';
   return (
-    <DetailPanel fb="po-detail" title={po ? <span className="flex items-center gap-2 min-w-0"><span className="truncate">{t('أمر شراء')} <span className="num">{po.number}</span> — {tv(po.supplierName)}</span></span> : t('أمر شراء')} badge={po ? <><StatePill map={PO_STATE} state={po.state} /><StateBadge ops={OPS} /></> : undefined}
+    <DetailPane fb="po-detail" onClose={onClose} title={po ? <span className="flex items-center gap-2 min-w-0"><span className="truncate">{t('أمر شراء')} <span className="num">{po.number}</span> — {tv(po.supplierName)}</span></span> : t('أمر شراء')} badge={po ? <><StatePill map={PO_STATE} state={po.state} /><StateBadge ops={OPS} /></> : undefined}
       footer={po && <>
         {['DRAFT', 'PENDING_APPROVAL', 'ISSUED'].includes(po.state) && <Button variant="danger" data-fb="po-view:cancel" onClick={() => { setReason(''); setAsk('cancel'); }}><XCircle className="w-4 h-4" />{t('الغي')}</Button>}
         {open && <Button data-fb="po-view:close" onClick={() => { setReason(''); setAsk('close'); }}><Lock className="w-4 h-4" />{t('اقفل الأمر (الباقي مش جاي)')}</Button>}
@@ -251,7 +250,7 @@ export function PoView({ id, onClose, onEdit }: { id: string | null; onClose: ()
       )}
       {back && po && <ReturnPopup po={po} onClose={() => setBack(false)} />}
       {receive && po && <ReceiveDialog po={po} onClose={() => setReceive(false)} />}
-    </DetailPanel>
+    </DetailPane>
   );
 }
 /** Return a purchase order waiting for approval to its buyer, with the reason (required). */

@@ -12,6 +12,7 @@ import { cn } from '../../lib/format';
 import { sumAmounts } from '../../lib/cash';
 import { t, useLang } from '../../i18n';
 import { Money, Pill, Popover, SearchInput, SegmentedControl, SkeletonCard, Kbd, toast, IconButton, Button } from '../index';
+import { DetailModeProvider } from '../layout';
 import { useBoardPrefs, type BoardGroup } from './prefs';
 import type { Aging } from './aging';
 
@@ -40,6 +41,8 @@ export interface BoardProps<T> {
   renderCard: (x: T, c: { compact: boolean; aging: Aging; selected: boolean }) => React.ReactNode;
   cardActions?: (x: T) => CardAction[];
   renderDetail?: (x: T, close: () => void) => React.ReactNode;
+  /** true when renderDetail returns a DetailPane (it has its own header, scroll body and footer) */
+  detailPane?: (x: T) => boolean;
   cardLabel?: (x: T) => string;
   /** screen title shown at the start of the toolbar */
   title?: React.ReactNode;
@@ -311,6 +314,7 @@ export function Board<T>(props: BoardProps<T>) {
   const sel = selected ? byKey.get(selected) ?? null : null;
   useEffect(() => { if (selected && items && !byKey.has(selected)) setSelected(null); }, [selected, items, byKey]);
   const detailOpen = !!(sel && renderDetail);
+  const closeDetail = () => { const k = selected; setSelected(null); if (k) requestAnimationFrame(() => focusCard(k)); };
   const fullDetail = detailOpen && !wide;
   const colW = compact ? 236 : 284;
   const menuItem = menu ? byKey.get(menu.key) ?? null : null;
@@ -424,10 +428,17 @@ export function Board<T>(props: BoardProps<T>) {
         )}
         {detailOpen && (
           <aside className={cn('min-h-0 flex flex-col rounded-2xl glass border overflow-hidden', fullDetail ? 'flex-1' : 'w-[440px] 2xl:w-[500px] shrink-0')} style={{ borderColor: 'var(--glass-border)' }} data-fb="board-detail" aria-label={t('التفاصيل')}>
-            <div className="flex items-center gap-2 px-3 py-2 border-b line shrink-0">
-              <Button size="sm" variant="ghost" onClick={() => { const k = selected; setSelected(null); if (k) requestAnimationFrame(() => focusCard(k)); }} data-fb="board-detail-back">{rtl ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}{fullDetail ? t('رجوع إلى اللوحة') : t('إغلاق')}</Button>
-            </div>
-            <div className="flex-1 min-h-0 overflow-y-auto p-4">{renderDetail!(sel!, () => setSelected(null))}</div>
+            {props.detailPane?.(sel!) ? (
+              // the detail is a DetailPane (ux-06): it brings its own back / close, single scroll body and footer
+              <DetailModeProvider mode={fullDetail ? 'page' : 'side'}>{renderDetail!(sel!, closeDetail)}</DetailModeProvider>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 px-3 py-2 border-b line shrink-0">
+                  <Button size="sm" variant="ghost" onClick={closeDetail} data-fb="board-detail-back">{rtl ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}{fullDetail ? t('رجوع إلى اللوحة') : t('إغلاق')}</Button>
+                </div>
+                <div className="flex-1 min-h-0 overflow-y-auto p-4" data-scroll-region>{renderDetail!(sel!, closeDetail)}</div>
+              </>
+            )}
           </aside>
         )}
       </div>

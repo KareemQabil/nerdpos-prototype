@@ -4,8 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { Plus, PackageCheck, Undo2, RotateCcw, Trash2, Save } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
-import { Banner, Button, Empty, Field, Input, KV, Money, Pill, Popup, Section, Select, Spinner, StateBadge, Table, Tabs, Textarea, EmptyState } from '../../ui';
-import { FullPage, SplitDetail, DetailPanel } from './purchasingLayout';
+import { Banner, Button, DetailPane, Empty, Field, Input, KV, MasterDetail, Money, Pill, Popup, Section, Select, Spinner, StateBadge, Table, Tabs, Textarea, EmptyState } from '../../ui';
+import { FullPage } from './purchasingLayout';
 import { t, L, tv, tLabel } from '../../i18n';
 import { dateTime, money } from '../../lib/format';
 import { BranchScope, ItemPicker, Qty, WarehouseSelect, fmtQty, unitLabel, useBranchScope, useItemsCatalog, useList, useWarehouses, Inp, Sel } from './common';
@@ -19,23 +19,24 @@ export default function Receipts() {
   const { params } = useDev();
   const [tab, setTab] = useState<'gr' | 'sr'>('gr');
   const scope = useBranchScope();
+  // ux-05: a receipt opens beside the list (wide) or as a full page (narrow) — ux-06 MasterDetail / DetailPane
+  const [open, setOpen] = useState<string | null>(params?.open ?? null);
+  useEffect(() => { if (params?.open) setOpen(params.open); }, [params?.open]);
   return (
-    <div>
+    <MasterDetail fb="receipts" open={tab === 'gr' && !!open} detail={open && <ReceiptView id={open} onClose={() => setOpen(null)} />} list={<div>
       <Section title={t('الاستلام ومرتجع الموردين')} badge={<StateBadge ops={OPS} />} sub={t('استلام البضاعة (على أمر شراء أو من السوق)، بسعرها وتاريخ صلاحيتها — بيحدّث الرصيد ومتوسط التكلفة. والمرتجع للمورد للبضاعة التالفة.')} actions={<BranchScope scope={scope} />} />
       <Tabs className="mb-4" value={tab} onChange={setTab} tabs={[{ id: 'gr', label: t('أذون الاستلام') }, { id: 'sr', label: t('مرتجعات الموردين') }]} />
-      {tab === 'gr' ? <ReceiptList branchId={scope.branchId} autoNew={!!params?.newReceipt} openId={params?.open} /> : <ReturnList branchId={scope.branchId} />}
-    </div>
+      {tab === 'gr' ? <ReceiptList branchId={scope.branchId} autoNew={!!params?.newReceipt} setOpen={setOpen} /> : <ReturnList branchId={scope.branchId} />}
+    </div>} />
   );
 }
 
-function ReceiptList({ branchId, autoNew, openId }: { branchId?: string; autoNew: boolean; openId?: string }) {
+function ReceiptList({ branchId, autoNew, setOpen }: { branchId?: string; autoNew: boolean; setOpen: (id: string | null) => void }) {
   const suppliers = useList<any>('Supplier.List');
   const [supplier, setSupplier] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const q = useList<any>('GoodsReceipt.Find', { branchId, supplierId: supplier || undefined, businessDateFrom: from || undefined, businessDateTo: to || undefined });
-  const [open, setOpen] = useState<string | null>(openId ?? null);
-  useEffect(() => { if (openId) setOpen(openId); }, [openId]);
   const [creating, setCreating] = useState(autoNew);
   useEffect(() => { if (autoNew) setCreating(true); }, [autoNew]);
   return (
@@ -47,13 +48,12 @@ function ReceiptList({ branchId, autoNew, openId }: { branchId?: string; autoNew
         <div className="flex-1" />
         <Button variant="primary" data-fb="receipts:new" onClick={() => setCreating(true)}><PackageCheck className="w-4 h-4" />{t('استلام جديد')}</Button>
       </div>
-      <SplitDetail onClose={() => setOpen(null)} detail={open ? <ReceiptView id={open} onClose={() => setOpen(null)} /> : null} list={
       <Table loading={q.loading && !q.raw} onRowClick={(i) => setOpen(q.items[i].id)} empty={<EmptyState compact icon={<PackageCheck />} title={t('مفيش استلامات')} />} head={[t('الإذن'), t('المورد'), t('أمر الشراء'), t('فاتورة المورد'), t('المخزن'), t('القيمة'), t('إمتى'), '']} rows={q.items.map((r) => [
           <button className="num font-bold hover:text-[var(--primary)]" data-fb={`receipts:open:${r.id}`} onClick={(e) => { e.stopPropagation(); setOpen(r.id); }}>{r.number}</button>,
           <span className="font-bold">{tv(r.supplierName)}</span>, <span className="num text-xs">{r.purchaseOrderNumber ?? t('من غير أمر')}</span>, <span className="num text-xs">{tLabel(r.supplierInvoiceNo) || '—'}</span>,
           <span className="text-xs">{tv(r.warehouse.name)}</span>, <Money v={r.total} className="text-xs" />, <span className="text-xs">{dateTime(r.at)} · {personText(r.userName)}</span>,
           r.state === 'REVERSED' ? <Pill tone="error">{t('اتلغى')}</Pill> : Number(r.returnedValue) > 0 ? <Pill tone="warning">{t('فيه مرتجع')}</Pill> : <Pill tone="success">{t('متسجل')}</Pill>,
-        ])} />} />
+        ])} />
       {creating && <ReceiveDialog onClose={() => setCreating(false)} onDone={(id) => { setCreating(false); setOpen(id); }} />}
     </div>
   );
@@ -135,7 +135,7 @@ function ReceiptView({ id, onClose }: { id: string | null; onClose: () => void }
   const [ret, setRet] = useState(false);
   if (!id) return null;
   return (
-    <DetailPanel fb="receipt-detail" title={r ? <span className="truncate">{t('إذن استلام')} <span className="num">{r.number}</span> — {tv(r.supplierName)}</span> : t('إذن استلام')} badge={r ? <>{r.state === 'REVERSED' ? <Pill tone="error">{t('اتلغى')}</Pill> : <Pill tone="success">{t('متسجل')}</Pill>}<StateBadge ops={['GoodsReceipt.Get', 'GoodsReceipt.Reverse']} /></> : undefined}
+    <DetailPane fb="receipt-detail" onClose={onClose} title={r ? <span className="truncate">{t('إذن استلام')} <span className="num">{r.number}</span> — {tv(r.supplierName)}</span> : t('إذن استلام')} badge={r ? <>{r.state === 'REVERSED' ? <Pill tone="error">{t('اتلغى')}</Pill> : <Pill tone="success">{t('متسجل')}</Pill>}<StateBadge ops={['GoodsReceipt.Get', 'GoodsReceipt.Reverse']} /></> : undefined}
       footer={r && r.state === 'POSTED' && <>
         <Button variant="danger" data-fb="receipt:reverse" onClick={() => setRev('')}><RotateCcw className="w-4 h-4" />{t('الغي الإذن ده')}</Button>
         <div className="flex-1" />
@@ -168,7 +168,7 @@ function ReceiptView({ id, onClose }: { id: string | null; onClose: () => void }
         </Popup>
       )}
       {ret && r && <SupplierReturnDialog receipt={r} onClose={() => setRet(false)} />}
-    </DetailPanel>
+    </DetailPane>
   );
 }
 

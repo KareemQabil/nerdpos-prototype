@@ -10,7 +10,6 @@
 //   Page                 page wrapper (vertical rhythm)
 //   PageHeader           title + one plain sentence + small state badge (ops/badge) + actions at the end
 //   StatGrid / StatCard  KPI tiles (label, value, hint, tone, icon, delta, onClick)
-//   Drawer               DEPRECATED (ux-06): no side sheets — use Popup, Popover, MasterDetail/DetailPane (./layout)
 //   Skeleton / SkeletonCard / SkeletonRows   loading placeholders
 //   EmptyState           icon, title, text and the next action
 //   Toolbar (+ Toolbar.Spacer), SearchInput, FilterChips   list filter bar
@@ -189,38 +188,6 @@ export function Popover({ anchor, open, onClose, children, side = 'top', align =
   );
 }
 
-/**
- * @deprecated ux-06: no side sheets (UX brief §3). Use Popup / Popover, or MasterDetail + DetailPane from './layout'.
- * Kept exported only while the purchasing screens (ux-05) still use it; remove once they are converted.
- */
-export function Drawer({ open, onClose, title, children, footer, badge, description, width = 'md', icon }: { open: boolean; onClose: () => void; title: React.ReactNode; children: React.ReactNode; footer?: React.ReactNode; badge?: React.ReactNode; description?: React.ReactNode; width?: 'sm' | 'md' | 'lg' | 'xl'; icon?: React.ReactNode }) {
-  useEscape(open, onClose);
-  const { ctx, anchor } = useOverlayCtx();
-  const panel = useFocusIn(open);
-  const titleId = useId();
-  if (!open) return null;
-  const w = { sm: 'w-[min(380px,100vw)]', md: 'w-[min(480px,100vw)]', lg: 'w-[min(640px,100vw)]', xl: 'w-[min(860px,100vw)]' }[width];
-  return <><span ref={anchor} hidden />{createPortal(
-    <div className="fixed inset-x-0 bottom-0 top-12 z-[70]" role="dialog" aria-modal aria-labelledby={titleId} data-device={ctx.device} data-screen={ctx.screen}>
-      <div className="absolute inset-0 glass-overlay animate-fade-in" onClick={onClose} />
-      <div ref={panel} tabIndex={-1} className={cn('absolute inset-y-0 end-0 overlay-panel drawer-panel flex flex-col outline-none rounded-none border-y-0 border-e-0', w)}>
-        <div className="flex items-start justify-between gap-3 px-5 pt-4 pb-3 border-b line">
-          <div className="flex items-start gap-3 min-w-0">
-            {icon && <span className="w-9 h-9 rounded-xl bg-[var(--primary-container)] text-[var(--primary)] flex items-center justify-center shrink-0 [&_svg]:w-5 [&_svg]:h-5">{icon}</span>}
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap min-w-0"><h2 id={titleId} className="text-lg font-bold leading-snug min-w-0 break-words">{title}</h2>{badge}</div>
-              {description && <p className="text-sm text-dim mt-0.5 leading-relaxed">{description}</p>}
-            </div>
-          </div>
-          <IconButton onClick={onClose} title={t('إغلاق')} className="-me-2 shrink-0"><X className="w-4 h-4" /></IconButton>
-        </div>
-        <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4">{children}</div>
-        {footer && <div className="px-5 py-3.5 border-t line flex flex-wrap gap-2 justify-end items-center overlay-footer">{footer}</div>}
-      </div>
-    </div>,
-    document.body,
-  )}</>;
-}
 
 // ───────── surfaces
 type Tone = 'neutral' | 'primary' | 'success' | 'warning' | 'error' | 'info';
@@ -727,5 +694,5 @@ export function ConfirmHost() {
 }
 
 export { Numpad, applyNumpadKey, useNumpadKeys } from './Numpad';
-export { MasterDetail, DetailPane, FillPage, FILL_CARD, FILL_BODY, useEnterSave, useScrollLock, useDetailMode, useListCompact, SPLIT_MIN } from './layout';
+export { MasterDetail, DetailPane, FillPage, FILL_CARD, FILL_BODY, useEnterSave, useScrollLock, useDetailMode, useListCompact, SPLIT_MIN, DetailModeProvider } from './layout';
 export type { NumpadKey, NumpadMode } from './Numpad';
