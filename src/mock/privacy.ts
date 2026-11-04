@@ -83,10 +83,15 @@ export function maskDeep(v: unknown, phones: Set<string>, allow: Set<string>, de
     return v.replace(DIGITS, (m) => (phones.has(m) && !allow.has(m) ? maskPhone(m) : m));
   }
   if (typeof v !== 'object') return v;
-  if (Array.isArray(v)) return v.map((x) => maskDeep(x, phones, allow, depth + 1));
-  const out: Record<string, unknown> = {};
-  for (const [k, x] of Object.entries(v as Record<string, unknown>)) out[k] = maskDeep(x, phones, allow, depth + 1);
-  return out;
+  // copy on write: an object or array is copied only when something inside it was masked (large report answers)
+  if (Array.isArray(v)) {
+    let out: unknown[] | null = null;
+    for (let i = 0; i < v.length; i++) { const x = maskDeep(v[i], phones, allow, depth + 1); if (x !== v[i]) { out ??= v.slice(); out[i] = x; } }
+    return out ?? v;
+  }
+  let out: Record<string, unknown> | null = null;
+  for (const [k, x] of Object.entries(v as Record<string, unknown>)) { const y = maskDeep(x, phones, allow, depth + 1); if (y !== x) { out ??= { ...(v as Record<string, unknown>) }; out[k] = y; } }
+  return out ?? v;
 }
 
 /** The answer as this viewer may see it (unchanged when the viewer sees full numbers). */
