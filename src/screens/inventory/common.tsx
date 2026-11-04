@@ -70,6 +70,8 @@ export const TRANSFER_STATE: Record<string, { ar: string; tone: 'neutral' | 'inf
 export const COUNT_STATE: Record<string, { ar: string; tone: 'neutral' | 'info' | 'warning' | 'success' | 'error' }> = {
   DRAFT: { ar: 'العد شغال', tone: 'info' }, SUBMITTED: { ar: 'مستني الاعتماد', tone: 'warning' }, POSTED: { ar: 'اتعتمد', tone: 'success' }, CANCELLED: { ar: 'ملغي', tone: 'error' },
 };
+/** ux-16: a state as a table status column ({label, tone}) — the same words and tones as StatePill. */
+export const stateOf = (map: Record<string, { ar: string; tone: any }>, state: string) => ({ label: map[state] ? t(map[state].ar) : state, tone: map[state]?.tone ?? 'neutral' });
 export function StatePill({ map, state }: { map: Record<string, { ar: string; tone: any }>; state: string }) {
   const s = map[state];
   return <Pill tone={s?.tone ?? 'neutral'}>{s ? t(s.ar) : state}<Tech><span className="num opacity-60 ms-1">{state}</span></Tech></Pill>;

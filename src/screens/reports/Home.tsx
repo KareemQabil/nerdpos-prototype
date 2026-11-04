@@ -7,7 +7,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { FileBarChart, Search, Star, ShieldCheck, Wand2, MessageCircleQuestion, ArrowRight, ArrowLeft, Printer, Download, CalendarClock, Pencil, Copy, History, MoreHorizontal, ClipboardCheck, BookOpen, ChevronDown, Archive, Layers, FileSpreadsheet, FileText, LayoutTemplate, Activity, RefreshCw, Clock, Sparkles, User, Plus } from 'lucide-react';
 import { useDev, useQuery, useCommand, errorText } from '../../app/hooks';
 import { call } from '../../api/client';
-import { PageHeader, Tabs, Card, Button, Pill, SearchInput, FilterChips, EmptyState, Skeleton, SkeletonCard, Banner, Select, Spinner, toast, confirmDialog, StateBadge, Table, DateTime } from '../../ui';
+import { PageHeader, Tabs, Card, Button, Pill, SearchInput, FilterChips, EmptyState, Skeleton, SkeletonCard, Banner, Select, Spinner, toast, confirmDialog, StateBadge, DataTable, cols, DateTime } from '../../ui';
 import { t, L, getLang } from '../../i18n';
 import { cn, dateTime } from '../../lib/format';
 import { Tech } from '../../app/tech';
@@ -425,21 +425,22 @@ function ActivityPanel() {
   const items: any[] = q.data?.items ?? [];
   const edits = ['SAVE', 'CREATE', 'DUPLICATE', 'SHARE', 'DELETE', 'TEMPLATE_SAVE', 'RESTORE'];
   const shown = items.filter((a) => f === 'all' || (f === 'EDIT' ? edits.includes(a.action) : a.action === f));
+  const AC = cols<any>();
   return (
     <div className="space-y-3" data-fb="activity-panel">
       <div className="flex items-center gap-2 flex-wrap"><Activity className="w-4 h-4 text-[var(--primary)]" /><div className="min-w-0 flex-1"><div className="font-bold">{t('مين فتح ونزّل وعدّل إيه')}<StateBadge ops={['ReportAudit.Find']} /></div><div className="text-xs text-dim">{q.data?.scope === 'MINE' ? t('بتشوف حركاتك انت بس.') : t('كل حركات التقارير في المطعم: الفترة والفروع وعدد السطور.')}</div></div>
         <FilterChips value={f} onChange={setF} options={[{ id: 'all', label: t('الكل'), count: items.length }, { id: 'RUN', label: t('فتح') }, { id: 'EXPORT', label: t('تنزيل') }, { id: 'EDIT', label: t('تعديل') }, { id: 'SCHEDULE_RUN', label: t('إرسال') }]} />
       </div>
-      <Table dense loading={q.loading && !q.data} head={[t('إمتى'), t('مين'), t('عمل إيه'), t('التقرير'), t('الفترة والفرع'), t('السطور')]} align={['start', 'start', 'start', 'start', 'start', 'end']}
+      <DataTable dense loading={q.loading && !q.data} rows={shown} rowKey={(a: any, i) => a.id ?? i} label={t('مين فتح ونزّل وعدّل إيه')} defaultSort={{ id: 'at', dir: 'desc' }}
         empty={<EmptyState compact icon={<Activity className="w-5 h-5" />} title={t('لسه مفيش حركة')} text={t('افتح أي تقرير أو نزّله وهيظهر هنا.')} />}
-        rows={shown.map((a) => [
-          <DateTime v={a.at} className="text-xs whitespace-nowrap" />,
-          <span className="text-sm">{a.userName || t('السيستم')}</span>,
-          <span className="text-sm">{actionText(a.action)}{a.format ? <Pill size="sm" tone="neutral" className="ms-1">{a.format === 'XLSX' ? t('إكسل') : a.format}</Pill> : null}</span>,
-          <span className="text-sm truncate">{a.targetName}{a.targetKind === 'CERTIFIED' && <ShieldCheck className="w-3 h-3 inline ms-1 text-[var(--success)]" />}</span>,
-          <span className="text-xs">{a.params?.from ? rangeText(a.params.from, a.params.to ?? a.params.from, lang()) : '—'}{a.params?.branchIds?.length ? <span className="block text-[11px] text-dim truncate">{bname(a.params.branchIds)}</span> : null}</span>,
-          <span className="num text-xs">{a.rows ?? '—'}</span>,
-        ])} />
+        columns={[
+          AC.date('at', t('إمتى'), (a) => a.at),
+          AC.text('who', t('مين'), (a) => a.userName || t('السيستم'), { maxChars: 18 }),
+          AC.text('action', t('عمل إيه'), (a) => actionText(a.action), { cell: (a) => <span className="text-sm whitespace-nowrap">{actionText(a.action)}{a.format ? <Pill size="sm" tone="neutral" className="ms-1">{a.format === 'XLSX' ? t('إكسل') : a.format}</Pill> : null}</span> }),
+          AC.text('report', t('التقرير'), (a) => a.targetName, { maxChars: 36, sub: (a) => (a.targetKind === 'CERTIFIED' ? <span className="inline-flex items-center gap-1 text-[var(--success)]"><ShieldCheck className="w-3 h-3" />{t('معتمد')}</span> : null) }),
+          AC.text('period', t('الفترة والفرع'), (a) => (a.params?.from ? rangeText(a.params.from, a.params.to ?? a.params.from, lang()) : null), { maxChars: 28, sub: (a) => (a.params?.branchIds?.length ? bname(a.params.branchIds) : null) }),
+          AC.number('rows', t('السطور'), (a) => a.rows ?? null),
+        ]} />
     </div>
   );
 }

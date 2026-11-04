@@ -3,7 +3,7 @@
 // the selected record (grant / event) so refresh and back keep them.
 import React, { useMemo, useState } from 'react';
 import { ShieldCheck, ScrollText, CheckCircle2, Clock3, TimerOff, ChevronLeft } from 'lucide-react';
-import { Button, DetailPane, EmptyState, FILL_BODY, FILL_CARD, FillPage, FilterChips, KV, MasterDetail, PageHeader, Pill, SearchInput, Select, Spinner, StatCard, StatGrid, StateBadge, Table, Tabs, Card, Toolbar, useNow } from '../../ui';
+import { Button, DetailPane, EmptyState, FILL_BODY, FILL_CARD, FillPage, FilterChips, KV, MasterDetail, PageHeader, Pill, SearchInput, Select, Spinner, StatCard, StatGrid, StateBadge, DataTable, cols, DensityToggle, DateTime, Tabs, Card, Toolbar, useNow } from '../../ui';
 import { t } from '../../i18n';
 import { useDev, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
@@ -45,6 +45,8 @@ export default function Audit() {
 }
 
 const grantState = (g: any) => (g.consumedAt ? 'used' : g.expiresAtMs > clock.now() ? 'waiting' : 'expired');
+const GRANT_STATUS = { used: ['اتستخدمت', 'success'], waiting: ['مستنية الاستخدام', 'warning'], expired: ['انتهت من غير استخدام', 'neutral'] } as const;
+const grantStatus = (g: any) => { const [l, tone] = GRANT_STATUS[grantState(g) as 'used'] ?? GRANT_STATUS.expired; return { label: t(l), tone }; };
 const grantPill = (g: any) => grantState(g) === 'used' ? <Pill tone="success" dot>{t('اتستخدمت')}</Pill> : grantState(g) === 'waiting' ? <Pill tone="warning" dot>{t('مستنية الاستخدام')}</Pill> : <Pill tone="neutral" dot>{t('انتهت من غير استخدام')}</Pill>;
 
 function GrantDetail({ id, nameOf, termOf, onClose }: { id: string; nameOf: (id: string | null) => string; termOf: (id: string | null) => string; onClose: () => void }) {
@@ -108,6 +110,7 @@ function Grants({ nameOf, termOf, compact, selected, onOpen }: { nameOf: (id: st
   const grants = useList<any>('Approval.Find', { query: { action: action || undefined, limit: 200 } });
   const base = grants.items.filter((g) => !action || g.action === action);
   const items = base.filter((g) => st === 'all' || grantState(g) === st);
+  const G = cols<any>();
   const c = { used: base.filter((g) => grantState(g) === 'used').length, waiting: base.filter((g) => grantState(g) === 'waiting').length, expired: base.filter((g) => grantState(g) === 'expired').length };
   return (
     <>
@@ -121,21 +124,21 @@ function Grants({ nameOf, termOf, compact, selected, onOpen }: { nameOf: (id: st
           <FilterChips value={st} onChange={setSt} options={[{ id: 'all', label: t('الكل'), count: base.length }, { id: 'used', label: t('اتستخدمت'), count: c.used }, { id: 'waiting', label: t('مستنية'), count: c.waiting, tone: 'warning' }, { id: 'expired', label: t('انتهت'), count: c.expired }]} />
           <Toolbar.Spacer />
           <Select value={action} onChange={(e) => setAction(e.target.value)} className="!w-auto min-w-[220px]" options={[{ value: '', label: t('كل الحركات') }, ...APPROVAL_ACTIONS.map((a) => ({ value: a.id, label: t(a.title) }))]} data-fb="audit:grant-action" />
+          {!compact && <DensityToggle />}
         </Toolbar>
         <Refused error={grants.error} />
-        <Table fill head={compact ? [t('الحركة'), t('الحالة')] : [t('الحركة'), t('مين طلب'), t('مين وافق'), t('إمتى'), t('الحالة'), '']} align={compact ? undefined : [undefined, undefined, undefined, undefined, undefined, 'end']}
-          loading={grants.loading && !grants.data} onRowClick={(i) => onOpen(items[i].id)} rowClassName={(i) => (items[i].id === selected ? 'row-selected' : undefined)}
-          rows={items.map((g) => compact ? [
-            <div data-fb={`audit:grant:${g.id}`}><div className="font-bold">{actionTitle(g.action)}</div><div className="text-[11px] text-dim">{nameOf(g.approverUserId)} · {dateTime(g.issuedAt)}</div></div>,
-            grantPill(g),
+        <DataTable fill rows={items} rowKey={(g: any) => g.id} selectedKey={selected} onRowOpen={(g) => onOpen(g.id)} loading={grants.loading && !grants.data} label={t('موافقات المدير')} defaultSort={{ id: 'at', dir: 'desc' }}
+          columns={compact ? [
+            G.text('action', t('الحركة'), (g) => actionTitle(g.action), { cell: (g) => <div data-fb={`audit:grant:${g.id}`}><div className="font-bold">{actionTitle(g.action)}</div><div className="text-[11px] text-dim">{nameOf(g.approverUserId)} · <DateTime v={g.issuedAt} /></div></div> }),
+            G.status('state', t('الحالة'), grantStatus),
           ] : [
-            <div><div className="font-bold">{actionTitle(g.action)}</div><Tech><div className="num text-[10px] text-dim">{g.action} · {g.targetType} {g.targetId}</div></Tech></div>,
-            <span>{nameOf(g.requesterUserId)}</span>,
-            <span><span className="font-bold">{nameOf(g.approverUserId)}</span><div className="text-[11px] text-dim">{t(CRED_AR[g.credentialKind ?? 'PIN'] ?? '')}{g.overridePermission ? ` · ${t('وافق في مكان الموظف')}` : ''}</div></span>,
-            <span className="text-xs whitespace-nowrap">{dateTime(g.issuedAt)}<div className="text-[11px] text-dim">{termOf(g.terminalId)}</div></span>,
-            grantPill(g),
-            <span className="text-dim" data-fb={`audit:grant:${g.id}`}><ChevronLeft className="w-4 h-4 ltr:rotate-180" /></span>,
-          ])}
+            G.text('action', t('الحركة'), (g) => actionTitle(g.action), { maxChars: 40, sub: (g) => <Tech><span className="num text-[10px]">{g.action} · {g.targetType} {g.targetId}</span></Tech> }),
+            G.text('requester', t('مين طلب'), (g) => nameOf(g.requesterUserId), { maxChars: 18 }),
+            G.text('approver', t('مين وافق'), (g) => nameOf(g.approverUserId), { maxChars: 22, sub: (g) => <>{t(CRED_AR[g.credentialKind ?? 'PIN'] ?? '')}{g.overridePermission ? ` · ${t('وافق في مكان الموظف')}` : ''}</> }),
+            G.date('at', t('إمتى'), (g) => g.issuedAt, { cell: (g) => <div><DateTime v={g.issuedAt} className="text-xs" /><div className="text-[11px] text-dim">{termOf(g.terminalId)}</div></div> }),
+            G.status('state', t('الحالة'), grantStatus),
+            G.actions('go', (g) => <span className="text-dim" data-fb={`audit:grant:${g.id}`}><ChevronLeft className="w-4 h-4 ltr:rotate-180" /></span>),
+          ]}
           empty={<EmptyState compact icon={<ShieldCheck />} title={t('مفيش موافقات لسه')} />} />
       </Card>
     </>
@@ -148,36 +151,32 @@ function AuditLog({ nameOf, termOf, compact, selected, onOpen }: { nameOf: (id: 
   const [sens, setSens] = useState<'all' | 'sensitive'>('all');
   const [stage, setStage] = useState<'all' | 'approved' | StageId>('all');
   const [q, setQ] = useState('');
-  const [n, setN] = useState(PAGE);
+  const A = cols<any>();
   const items = useMemo(() => audit.items.filter((a) => (sens === 'all' || a.sensitive) && (stage === 'all' || (stage === 'approved' ? !!a.approverUserId : a.stage === stage)) && (!q || (opText(a.op) + ' ' + a.op + ' ' + a.summary + ' ' + (a.target ?? '') + ' ' + nameOf(a.userId) + ' ' + nameOf(a.approverUserId ?? null)).toLowerCase().includes(q.toLowerCase()))), [audit.items, sens, stage, q, nameOf]);
   const sensitive = audit.items.filter((a) => a.sensitive).length;
   return (
     <Card padding="sm" className={FILL_CARD} bodyClassName={FILL_BODY}>
       <Toolbar>
-        <SearchInput value={q} onChange={(v) => { setQ(v); setN(PAGE); }} placeholder={t('دوّر باسم الموظف أو الحركة')} data-fb="audit:search" />
-        <FilterChips value={sens} onChange={(v) => { setSens(v); setN(PAGE); }} options={[{ id: 'all', label: t('كل الحركات'), count: audit.items.length }, { id: 'sensitive', label: t('الحساس بس'), count: sensitive, tone: 'warning' }]} />
+        <SearchInput value={q} onChange={setQ} placeholder={t('دوّر باسم الموظف أو الحركة')} data-fb="audit:search" />
+        <FilterChips value={sens} onChange={setSens} options={[{ id: 'all', label: t('كل الحركات'), count: audit.items.length }, { id: 'sensitive', label: t('الحساس بس'), count: sensitive, tone: 'warning' }]} />
+        {!compact && <><Toolbar.Spacer /><DensityToggle dense /></>}
       </Toolbar>
       <Toolbar>
-        <FilterChips value={stage} onChange={(v) => { setStage(v); setN(PAGE); }} options={[{ id: 'all', label: t('أي مرحلة') }, { id: 'approved', label: t('بموافقة مدير'), count: audit.items.filter((a) => a.approverUserId).length }, ...(['S0', 'S1', 'S2', 'S3'] as StageId[]).map((s) => ({ id: s, label: t(STAGE_TEXT[s].short), count: audit.items.filter((a) => a.stage === s).length, tone: s === 'S3' ? 'error' as const : undefined }))]} />
+        <FilterChips value={stage} onChange={setStage} options={[{ id: 'all', label: t('أي مرحلة') }, { id: 'approved', label: t('بموافقة مدير'), count: audit.items.filter((a) => a.approverUserId).length }, ...(['S0', 'S1', 'S2', 'S3'] as StageId[]).map((s) => ({ id: s, label: t(STAGE_TEXT[s].short), count: audit.items.filter((a) => a.stage === s).length, tone: s === 'S3' ? 'error' as const : undefined }))]} />
       </Toolbar>
       <Refused error={audit.error} />
-      <Table fill dense head={compact ? [t('الحركة'), t('الوقت')] : [t('الوقت'), t('مين عمل'), t('الجهاز'), t('الحركة'), t('مين سمح')]}
-        loading={audit.loading && !audit.data} onRowClick={(i) => onOpen(items[i].id)} rowClassName={(i) => (items[i].id === selected ? 'row-selected' : undefined)}
-        rows={items.slice(0, n).map((a) => compact ? [
-          <div className="text-sm min-w-0" data-fb={`audit:event:${a.id}`}><span className="font-bold">{opText(a.op)}</span>{a.sensitive && <Pill tone="warning" className="ms-2">{t('حساس')}</Pill>}<div className="text-[11px] text-dim">{nameOf(a.userId)}</div></div>,
-          <span className="text-xs whitespace-nowrap">{dateTime(a.at)}</span>,
+      <DataTable fill dense rows={items} rowKey={(a: any) => a.id} selectedKey={selected} onRowOpen={(a) => onOpen(a.id)} loading={audit.loading && !audit.data} label={t('سجل الحركات')} pageSize={PAGE} defaultSort={{ id: 'at', dir: 'desc' }}
+        columns={compact ? [
+          A.text('op', t('الحركة'), (a) => opText(a.op), { cell: (a) => <div className="text-sm min-w-0" data-fb={`audit:event:${a.id}`}><span className="font-bold">{opText(a.op)}</span>{a.sensitive && <Pill tone="warning" className="ms-2">{t('حساس')}</Pill>}<div className="text-[11px] text-dim">{nameOf(a.userId)}</div></div> }),
+          A.date('at', t('الوقت'), (a) => a.at),
         ] : [
-          <span className="text-xs whitespace-nowrap">{dateTime(a.at)}</span>,
-          <span className="text-sm">{nameOf(a.userId)}</span>,
-          <span className="text-xs text-dim">{termOf(a.terminalId)}</span>,
-          <div className="text-sm min-w-0" data-fb={`audit:event:${a.id}`}><span className="font-bold">{opText(a.op)}</span>{a.sensitive && <Pill tone="warning" className="ms-2">{t('حساس')}</Pill>}{a.stage && <span className="ms-2"><StagePill s={a.stage} /></span>}<Tech><div className="num text-[10px] text-dim break-all" dir="ltr">{a.op} · {a.summary}{a.target ? ` · ${a.target}` : ''}</div></Tech></div>,
-          a.approverUserId ? <span className="text-sm"><b>{nameOf(a.approverUserId)}</b><div className="text-[10px] text-dim">{t(CRED_AR[a.credentialKind ?? 'PIN'] ?? '')}{a.override ? ` · ${t('في مكان الموظف')}` : ''}</div></span> : a.approvalGrantId ? <Pill tone="info">{t('بموافقة')}</Pill> : <span className="text-dim">—</span>,
-        ])}
+          A.date('at', t('الوقت'), (a) => a.at),
+          A.text('who', t('مين عمل'), (a) => nameOf(a.userId), { maxChars: 18 }),
+          A.text('device', t('الجهاز'), (a) => termOf(a.terminalId), { maxChars: 18, className: 'text-soft' }),
+          A.text('op', t('الحركة'), (a) => opText(a.op), { cell: (a) => <div className="text-sm min-w-0" data-fb={`audit:event:${a.id}`}><span className="font-bold">{opText(a.op)}</span>{a.sensitive && <Pill tone="warning" className="ms-2">{t('حساس')}</Pill>}{a.stage && <span className="ms-2"><StagePill s={a.stage} /></span>}<Tech><div className="num text-[10px] text-dim break-all" dir="ltr">{a.op} · {a.summary}{a.target ? ` · ${a.target}` : ''}</div></Tech></div> }),
+          A.text('approver', t('مين سمح'), (a) => (a.approverUserId ? nameOf(a.approverUserId) : null), { cell: (a) => a.approverUserId ? <span className="text-sm"><b>{nameOf(a.approverUserId)}</b><div className="text-[10px] text-dim">{t(CRED_AR[a.credentialKind ?? 'PIN'] ?? '')}{a.override ? ` · ${t('في مكان الموظف')}` : ''}</div></span> : a.approvalGrantId ? <Pill tone="info">{t('بموافقة')}</Pill> : <span className="text-dim">—</span> }),
+        ]}
         empty={<EmptyState compact icon={<ScrollText />} title={t('مفيش حركات بالبحث ده')} />} />
-      <div className="flex items-center justify-between gap-2 mt-2 px-1">
-        <span className="text-[11px] text-dim">{t('بيظهر {a} من {b} حركة', { a: Math.min(n, items.length), b: items.length })}</span>
-        {n < items.length && <Button size="sm" variant="ghost" onClick={() => setN(n + PAGE)} data-fb="audit:more">{t('اعرض أكتر')}</Button>}
-      </div>
     </Card>
   );
 }

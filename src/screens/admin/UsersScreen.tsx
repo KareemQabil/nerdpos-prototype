@@ -5,7 +5,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { UserPlus, ShieldCheck, KeyRound, Pencil, Plus, Power, Lock, Trash2, Users, UserCheck, UserX, KeySquare, Search } from 'lucide-react';
 import { useCommand, useDev, useQuery, errorText } from '../../app/hooks';
-import { Avatar, Banner, Button, Card, DetailPane, EmptyState, FILL_BODY, FILL_CARD, Field, FillPage, FilterChips, Input, MasterDetail, PageHeader, Pill, Popup, SearchInput, Select, StatCard, StatGrid, StateBadge, Switch, Table, Tabs, Toolbar, toast, confirmDialog, useEnterSave } from '../../ui';
+import { Avatar, Banner, Button, Card, DetailPane, EmptyState, FILL_BODY, FILL_CARD, Field, FillPage, FilterChips, Input, MasterDetail, PageHeader, Pill, Popup, SearchInput, Select, StatCard, StatGrid, StateBadge, Switch, DataTable, cols, DensityToggle, Tabs, Toolbar, toast, confirmDialog, useEnterSave } from '../../ui';
 import { t, L } from '../../i18n';
 import { PROFILES, profileById } from '../../app/profiles'; // ux-09: work profile per user
 import { Tech } from '../../app/tech';
@@ -78,6 +78,8 @@ function UsersTab({ users, roles, branches, compact, selected, onOpen }: { users
       { success: u.active ? t('اتوقف حساب {n} — خرج من كل الأجهزة', { n: personName(u.username, u.displayName) }) : t('اتفعّل حساب {n}', { n: personName(u.username, u.displayName) }) });
   };
   const all = users.items;
+  const UC = cols<any>();
+  const activeStatus = (u: any) => (u.active ? { label: t('شغال'), tone: 'success' as const } : { label: t('موقوف'), tone: 'neutral' as const });
   const count = { active: all.filter((u) => u.active).length, off: all.filter((u) => !u.active).length, locked: all.filter((u) => u.locked).length, must: all.filter((u) => u.mustChangeCredentials).length };
   const list = all.filter((u) => {
     if (st === 'active' && !u.active) return false;
@@ -106,32 +108,38 @@ function UsersTab({ users, roles, branches, compact, selected, onOpen }: { users
             { id: 'locked', label: t('مقفول'), count: count.locked, tone: 'error' },
           ]} />
           {!compact && <Select className="!w-auto min-w-[150px] h-9 !py-0" value={role} onChange={(e) => setRole(e.target.value)} options={[{ value: '', label: t('كل الأدوار') }, ...roles.map((r) => ({ value: r.id, label: roleName(r) }))]} />}
+          {!compact && <DensityToggle />}
         </Toolbar>
-        <Table fill head={compact ? [t('الموظف'), t('الحالة')] : [t('الموظف'), t('الدور والفروع'), t('الحالة'), '']} align={compact ? ['start', 'start'] : ['start', 'start', 'start', 'end']}
-          loading={users.loading && !users.data} onRowClick={(i) => onOpen(list[i].id)} rowClassName={(i) => (list[i].id === selected ? 'row-selected' : undefined)}
+        <DataTable fill rows={list} rowKey={(u: any) => u.id} selectedKey={selected} onRowOpen={(u) => onOpen(u.id)} loading={users.loading && !users.data} label={t('المستخدمين')}
           empty={<EmptyState compact icon={<Search />} title={all.length ? t('مفيش حد بالبحث ده') : t('لسه مفيش مستخدمين')} />}
-          rows={list.map((u) => compact ? [
-            <div className="flex items-center gap-2.5 min-w-0" data-fb={`users:row:${u.username}`}><Avatar name={personName(u.username, u.displayName)} size="sm" /><div className="min-w-0"><div className="font-bold truncate">{userLabel(u.username, u.displayName)}</div><div className="text-[11px] text-dim truncate">{u.roleAssignments.map((r: any) => roleName(r)).join(t('، '))}{u.profileId && <span className="text-[var(--violet)]" data-fb={`users:profile:${u.username}`}> · {L(profileById(u.profileId).role)}</span>}</div></div></div>,
-            <div className="flex flex-wrap gap-1">{u.active ? <Pill tone="success" dot>{t('شغال')}</Pill> : <Pill tone="neutral" dot>{t('موقوف')}</Pill>}{u.locked && <Pill tone="error"><Lock className="w-3 h-3" />{t('مقفول')}</Pill>}</div>,
+          columns={compact ? [
+            UC.text('name', t('الموظف'), (u) => userLabel(u.username, u.displayName), { cell: (u) => (
+            <div className="flex items-center gap-2.5 min-w-0" data-fb={`users:row:${u.username}`}><Avatar name={personName(u.username, u.displayName)} size="sm" /><div className="min-w-0"><div className="font-bold truncate">{userLabel(u.username, u.displayName)}</div><div className="text-[11px] text-dim truncate">{u.roleAssignments.map((r: any) => roleName(r)).join(t('، '))}{u.profileId && <span className="text-[var(--violet)]" data-fb={`users:profile:${u.username}`}> · {L(profileById(u.profileId).role)}</span>}</div></div></div>) }),
+            UC.status('state', t('الحالة'), activeStatus, { cell: (u) => (
+            <div className="flex flex-wrap gap-1">{u.active ? <Pill tone="success" dot>{t('شغال')}</Pill> : <Pill tone="neutral" dot>{t('موقوف')}</Pill>}{u.locked && <Pill tone="error"><Lock className="w-3 h-3" />{t('مقفول')}</Pill>}</div>) }),
           ] : [
+            UC.text('name', t('الموظف'), (u) => userLabel(u.username, u.displayName), { cell: (u) => (
             <div className="flex items-center gap-2.5 min-w-0">
               <Avatar name={personName(u.username, u.displayName)} size="sm" />
               <div className="min-w-0"><div className="font-bold truncate">{userLabel(u.username, u.displayName)}</div><Tech><div className="num text-[11px] text-dim" dir="ltr">{u.username}</div></Tech></div>
-            </div>,
-            <div className="flex flex-wrap gap-1">{u.roleAssignments.map((r: any, i: number) => <Pill key={i} tone="primary">{roleName(r)} · {r.branchIds.map(bName).join(t('، '))}</Pill>)}{u.profileId && <Pill tone="violet" data-fb={`users:profile:${u.username}`}>{L(profileById(u.profileId).role)}</Pill>}</div>,
+            </div>) }),
+            UC.custom('roles', t('الدور والفروع'), (u) => (
+            <div className="flex flex-wrap gap-1">{u.roleAssignments.map((r: any, i: number) => <Pill key={i} tone="primary">{roleName(r)} · {r.branchIds.map(bName).join(t('، '))}</Pill>)}{u.profileId && <Pill tone="violet" data-fb={`users:profile:${u.username}`}>{L(profileById(u.profileId).role)}</Pill>}</div>)),
+            UC.status('state', t('الحالة'), activeStatus, { cell: (u) => (
             <div className="flex flex-wrap gap-1">
               {u.active ? <Pill tone="success" dot>{t('شغال')}</Pill> : <Pill tone="neutral" dot>{t('موقوف')}</Pill>}
               {u.locked && <Pill tone="error"><Lock className="w-3 h-3" />{t('مقفول')}</Pill>}
               {u.mustChangeCredentials && <Pill tone="warning">{t('لازم يغيّر الرقم السري')}</Pill>}
               {(u.permOverrides ?? []).filter((o: any) => o.effect === 'GRANT').length > 0 && <Pill tone="info" data-fb={`users:extra:${u.username}`}>+{(u.permOverrides ?? []).filter((o: any) => o.effect === 'GRANT').length} {t('زيادة على دوره')}</Pill>}
               {(u.permOverrides ?? []).filter((o: any) => o.effect === 'REVOKE').length > 0 && <Pill tone="error">−{(u.permOverrides ?? []).filter((o: any) => o.effect === 'REVOKE').length} {t('متشالة منه')}</Pill>}
-            </div>,
+            </div>) }),
+            UC.actions('act', (u) => (
             <div className="flex gap-1 justify-end flex-wrap">
               <Button size="sm" variant="outline" data-fb={`users:access:${u.username}`} disabled={!permAccess.ok} title={permAccess.title} onClick={(e) => { e.stopPropagation(); onOpen(u.id); }}><ShieldCheck className="w-3.5 h-3.5" />{t('الصلاحيات')}</Button>
               <Button size="sm" variant="ghost" data-fb={`users:reset:${u.username}`} disabled={!permReset.ok} title={permReset.title} onClick={(e) => { e.stopPropagation(); setReset(u); }}><KeyRound className="w-3.5 h-3.5" />{t('رقم سري جديد')}</Button>
               <Button size="sm" variant={u.active ? 'danger' : 'success'} data-fb={`users:toggle:${u.username}`} disabled={!permAccess.ok || busy} title={permAccess.title} onClick={(e) => { e.stopPropagation(); toggle(u); }}><Power className="w-3.5 h-3.5" />{u.active ? t('إيقاف') : t('تفعيل')}</Button>
-            </div>,
-          ])} />
+            </div>)),
+          ]} />
       </Card>
       {reset && <ResetModal user={reset} onClose={() => setReset(null)} />}
     </>

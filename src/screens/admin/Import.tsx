@@ -5,7 +5,7 @@ import * as XLSX from 'xlsx';
 import { Download, FileSpreadsheet, FlaskConical, Upload, CheckCircle2, XCircle, PlayCircle, Bug, Trash2 } from 'lucide-react';
 import { useCommand, useDev, errorText } from '../../app/hooks';
 import { ApiFailure } from '../../api/client';
-import { Banner, Button, Card, Empty, Pill, Section, StateBadge, Table, Tabs, toast } from '../../ui';
+import { Banner, Button, Card, Empty, Pill, Section, StateBadge, DataTable, cols as tcols, Tabs, toast } from '../../ui';
 import { t } from '../../i18n';
 import { cn } from '../../lib/format';
 import { useItems } from './catalog/common';
@@ -283,19 +283,15 @@ function SheetPreview({ sheet, rows, issues }: { sheet: SheetId; rows: Row[]; is
   const bad = (row: number, col: string) => issues.some((i) => i.row === row && (i.field === col || (i.field === 'name' && (col === 'name_ar' || col === 'name_en'))));
   const badRow = (row: number) => issues.some((i) => i.row === row);
   if (!rows.length) return <div className="text-sm text-dim py-4">{t('الشيت ده فاضي')}</div>;
+  const SC = tcols<Row>();
   return (
-    <div className="overflow-x-auto rounded-xl border line mt-3">
-      <table className="w-full text-xs">
-        <thead className="surface-1"><tr><th className="px-2 py-1.5 text-start text-soft">#</th>{cols.map((c) => <th key={c} className="px-2 py-1.5 text-start text-soft num">{c}</th>)}</tr></thead>
-        <tbody>
-          {rows.map((r, i) => (
-            <tr key={i} className={cn('border-t line', badRow(i + 2) && 'bg-[color-mix(in_srgb,var(--error)_8%,transparent)]')}>
-              <td className="px-2 py-1 num text-dim">{i + 2}</td>
-              {cols.map((c) => <td key={c} className={cn('px-2 py-1 whitespace-nowrap', bad(i + 2, c) && 'text-[var(--error)] font-bold outline outline-1 outline-[var(--error)] rounded')}>{r[c] ?? ''}</td>)}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="mt-3">
+      <DataTable dense rows={rows} rowKey={(_, i) => i} label={sheetLabel(sheet)} pageSize={50}
+        rowClassName={(_, i) => (badRow(i + 2) ? 'bg-[color-mix(in_srgb,var(--error)_8%,transparent)]' : undefined)}
+        columns={[
+          SC.number('row', '#', (_r) => null, { sortable: false, align: 'start', cell: (_r, i) => <span className="num text-dim">{i + 2}</span> }),
+          ...cols.map((c) => SC.custom(c, <span className="num">{c}</span>, (r, i) => <span className={cn('whitespace-nowrap text-xs', bad(i + 2, c) && 'text-[var(--error)] font-bold outline outline-1 outline-[var(--error)] rounded px-0.5')}>{r[c] ?? ''}</span>, { headerText: c })),
+        ]} />
       <div className="text-[11px] text-dim px-2 py-1">{t('رقم الصف زي Excel (الصف 1 هو العناوين)')}</div>
     </div>
   );
@@ -304,6 +300,7 @@ function SheetPreview({ sheet, rows, issues }: { sheet: SheetId; rows: Row[]; is
 function ReportCard({ report, onOpenMenu }: { report: Report; onOpenMenu: () => void }) {
   const title = report.kind === 'APPLIED' ? t('اتطبق') : report.kind === 'REFUSED' ? t('اترفض — مفيش حاجة اتكتبت') : t('تقرير التجربة');
   const tone = report.kind === 'APPLIED' || report.ok ? 'success' : 'error';
+  const IC = tcols<Issue>();
   return (
     <Card title={<span className="flex items-center gap-2">{tone === 'success' ? <CheckCircle2 className="w-4 h-4 text-[var(--success)]" /> : <XCircle className="w-4 h-4 text-[var(--error)]" />}{title}</span>}
       badge={<Pill tone={report.kind === 'DRY_RUN' ? 'info' : tone}>{report.kind === 'DRY_RUN' ? t('تجربة من غير حفظ') : report.kind === 'APPLIED' ? t('اتحفظ') : t('ما اتحفظش')}</Pill>}
@@ -312,9 +309,13 @@ function ReportCard({ report, onOpenMenu }: { report: Report; onOpenMenu: () => 
         {Object.entries(report.summary ?? {}).map(([k, v]) => <Pill key={k} tone="neutral">{sheetLabel(k)} <span className="num">{v}</span></Pill>)}
       </div>
       {report.issues.length > 0 ? (
-        <Table head={[t('الشيت'), t('الصف'), t('العمود'), t('الكود'), t('المشكلة')]} rows={report.issues.map((i) => [
-          sheetLabel(i.sheet), <span className="num">{i.row}</span>, <span className="num text-xs">{i.field}</span>, <Tech fallback={<span className="text-[11px] text-dim">—</span>}><span className="num text-[11px] text-[var(--error)]">{i.code}</span></Tech>, i.message,
-        ])} />
+        <DataTable dense rows={report.issues} rowKey={(_, i) => i} label={t('المشاكل')} columns={[
+          IC.text('sheet', t('الشيت'), (i) => sheetLabel(i.sheet), { maxChars: 16 }),
+          IC.number('row', t('الصف'), (i) => i.row),
+          IC.text('field', t('العمود'), (i) => i.field, { cell: (i) => <span className="num text-xs">{i.field}</span> }),
+          IC.custom('code', t('الكود'), (i) => <Tech fallback={<span className="text-[11px] text-dim">—</span>}><span className="num text-[11px] text-[var(--error)]">{i.code}</span></Tech>),
+          IC.text('message', t('المشكلة'), (i) => i.message, { maxChars: 60 }),
+        ]} />
       ) : report.kind === 'APPLIED'
         ? <Banner tone="success">{t('كل الصفوف اتكتبت في معاملة واحدة. الأصناف اللي ليها سعر في فرع بقت على منيو الفرع ده إلا لو شيت التوفر قال غير كده.')}</Banner>
         : <Banner tone="success">{t('مفيش غلطات — تقدر تطبق.')}</Banner>}

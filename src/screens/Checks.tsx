@@ -4,10 +4,10 @@ import React, { useState } from 'react';
 import { History, Wallet, Receipt, ClipboardList, ArrowRightLeft, CalendarDays } from 'lucide-react';
 import { TransferSessionDialog } from './ops/TransferSessionDialog';
 import { useDev, useQuery } from '../app/hooks';
-import { PageHeader, Input, Table, Money, Button, Toolbar, SearchInput, FilterChips, EmptyState, Modal, KV, StateBadge, DateTime } from '../ui';
+import { PageHeader, Input, DataTable, cols, DensityToggle, Money, Button, Toolbar, SearchInput, FilterChips, EmptyState, Modal, KV, StateBadge, DateTime } from '../ui';
 import { t, L } from '../i18n';
 import { money, qty } from '../lib/format';
-import { StatusPill, HistoryDialog } from './order/CheckPanel';
+import { StatusPill, HistoryDialog, checkStatus } from './order/CheckPanel';
 import { clock, businessDate } from '../mock/clock';
 import { personName } from '../demo/people';
 import { useBoardView } from '../app/useBoardView';
@@ -42,19 +42,22 @@ function ChecksList({ onBoard }: { onBoard: () => void }) {
   const items: any[] = q.data?.items ?? [];
   const today = businessDate(clock.now());
   const open = (o: any) => nav(o.visitId ? 'order' : kind === 'CASH' ? 'counter' : 'order', { orderId: o.id, back: 'checks' });
-  const rows = items.map((o: any) => [
-    <span className="num font-bold">#{o.number}</span>,
-    <span className="font-bold">{placeOf(o)}</span>,
-    <StatusPill s={o.status} />,
-    <DateTime v={o.createdAt} className="text-xs text-soft" fb={`checks:when:${o.id}`} />,
-    <span className="text-soft">{personName(null, o.serverName)}</span>,
-    <Money v={o.totals.payable} />,
-    <div className="flex gap-1 justify-end" onClick={(e) => e.stopPropagation()}>
+  const touch = kind === 'CASH' || kind === 'FLOOR';
+  const C = cols<any>();
+  // ux-16: typed columns (number, place, status, time, person, amount, actions); the amount sorts as a Decimal string
+  const columns = [
+    C.number('number', '#', (o) => o.number, { cell: (o) => <span className="num font-bold">#{o.number}</span> }),
+    C.text('place', t('المكان'), placeOf, { maxChars: 30 }),
+    C.status('status', t('الحالة'), (o) => checkStatus(o.status)),
+    C.date('at', t('الوقت'), (o) => o.createdAt, { cell: (o) => <DateTime v={o.createdAt} className="text-soft" fb={`checks:when:${o.id}`} /> }),
+    C.text('server', t('الويتر / الكاشير'), (o) => personName(null, o.serverName), { maxChars: 18 }),
+    C.money('total', t('الإجمالي'), (o) => o.totals.payable),
+    C.actions('act', (o) => <>
       {live(o) && <Button size="sm" onClick={() => open(o)} data-fb={`check-open:${o.number}`}><ClipboardList className="w-3.5 h-3.5" />{t('افتح')}</Button>}
       {live(o) && can('payment:capture') && kind !== 'FLOOR' && <Button size="sm" variant="success" onClick={() => pay.collect(o)} title={t('تحصيل')} aria-label={t('تحصيل')} data-fb={`check-pay:${o.number}`}><Wallet className="w-3.5 h-3.5" /></Button>}
       {o.status !== 'DRAFT' && <Button size="sm" variant="ghost" onClick={() => nav('receipt', { orderId: o.id })} title={t('الإيصال')} aria-label={t('الإيصال')}><Receipt className="w-3.5 h-3.5" /></Button>}
-    </div>,
-  ]);
+    </>),
+  ];
   return (
     <div data-screen="D2" className="space-y-4">
       <PageHeader title={t('الشيكات')} ops={['Order.Find', 'Order.Get', 'Order.Timeline']} description={t('دوّر على أي شيك وافتحه تاني، حصّله، أو شوف إيصاله وسجله.')} className="!mb-0" actions={<BoardViewToggle value="list" onChange={(v) => v === 'board' && onBoard()} />} />
@@ -64,9 +67,10 @@ function ChecksList({ onBoard }: { onBoard: () => void }) {
         <Toolbar.Spacer />
         <Button size="sm" variant={bd === today ? 'subtle' : 'ghost'} onClick={() => setBd(bd === today ? '' : today)} data-fb="checks-today"><CalendarDays className="w-4 h-4" />{t('النهارده')}</Button>
         <Input type="date" value={bd} onChange={(e) => setBd(e.target.value)} className="!w-44 h-10" aria-label={t('اليوم')} />
+        {!touch && <DensityToggle />}
       </Toolbar>
-      <Table head={['#', t('المكان'), t('الحالة'), t('الوقت'), t('الويتر / الكاشير'), t('الإجمالي'), '']} align={['start', 'start', 'start', 'start', 'start', 'end', 'end']} rows={rows} loading={q.loading} maxHeight="calc(100vh - 300px)"
-        onRowClick={(i) => setSel(items[i])}
+      <DataTable columns={columns} rows={items} rowKey={(o) => o.id} loading={q.loading} maxHeight="calc(100vh - 300px)" touch={touch} label={t('الشيكات')}
+        onRowOpen={(o) => setSel(o)} rowAttrs={(o) => ({ 'data-fb': `check-row:${o.number}` })}
         empty={<EmptyState compact icon={<Receipt />} title={number || st !== 'ALL' || bd ? t('مفيش شيكات بالبحث ده') : t('لسه مفيش شيكات')} text={number || st !== 'ALL' || bd ? t('غيّر الرقم أو الحالة أو اليوم.') : t('أول شيك هيتفتح من الصالة أو نقطة البيع هيظهر هنا.')} />} />
       {sel && <CheckDrawer o={items.find((x) => x.id === sel.id) ?? sel} onClose={() => setSel(null)} onOpen={() => open(sel)} onHistory={() => setHist(sel)} onMove={() => setMove(sel)} onPay={() => { setSel(null); pay.collect(sel); }} />}
       {pay.node}

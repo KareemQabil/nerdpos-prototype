@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Plus, PackageCheck, Undo2, RotateCcw, Trash2, Save } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
-import { Banner, Button, DetailPane, Empty, Field, Input, KV, MasterDetail, Money, Pill, Popup, Section, Select, Spinner, StateBadge, Table, Tabs, Textarea, EmptyState } from '../../ui';
+import { Banner, Button, DetailPane, Empty, Field, Input, KV, MasterDetail, Money, Pill, Popup, Section, Select, Spinner, StateBadge, Table, DataTable, cols, DateTime, Tabs, Textarea, EmptyState } from '../../ui';
 import { FullPage } from './purchasingLayout';
 import { t, L, tv, tLabel } from '../../i18n';
 import { dateTime, money } from '../../lib/format';
@@ -40,6 +40,7 @@ function ReceiptList({ branchId, autoNew, setOpen }: { branchId?: string; autoNe
   const q = useList<any>('GoodsReceipt.Find', { branchId, supplierId: supplier || undefined, businessDateFrom: from || undefined, businessDateTo: to || undefined });
   const [creating, setCreating] = useState(autoNew);
   useEffect(() => { if (autoNew) setCreating(true); }, [autoNew]);
+  const RC = cols<any>();
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2 items-end">
@@ -49,12 +50,17 @@ function ReceiptList({ branchId, autoNew, setOpen }: { branchId?: string; autoNe
         <div className="flex-1" />
         <Button variant="primary" data-fb="receipts:new" onClick={() => setCreating(true)}><PackageCheck className="w-4 h-4" />{t('استلام جديد')}</Button>
       </div>
-      <Table loading={q.loading && !q.raw} onRowClick={(i) => setOpen(q.items[i].id)} empty={<EmptyState compact icon={<PackageCheck />} title={t('مفيش استلامات')} />} head={[t('الإذن'), t('المورد'), t('أمر الشراء'), t('فاتورة المورد'), t('المخزن'), t('القيمة'), t('إمتى'), '']} rows={q.items.map((r) => [
-          <button className="num font-bold hover:text-[var(--primary)]" data-fb={`receipts:open:${r.id}`} onClick={(e) => { e.stopPropagation(); setOpen(r.id); }}>{r.number}</button>,
-          <span className="font-bold">{tv(r.supplierName)}</span>, <span className="num text-xs">{r.purchaseOrderNumber ?? t('من غير أمر')}</span>, <span className="num text-xs">{tLabel(r.supplierInvoiceNo) || '—'}</span>,
-          <span className="text-xs">{tv(r.warehouse.name)}</span>, <Money v={r.total} className="text-xs" />, <span className="text-xs">{dateTime(r.at)} · {personText(r.userName)}</span>,
-          r.state === 'REVERSED' ? <Pill tone="error">{t('اتلغى')}</Pill> : Number(r.returnedValue) > 0 ? <Pill tone="warning">{t('فيه مرتجع')}</Pill> : <Pill tone="success">{t('متسجل')}</Pill>,
-        ])} />
+      <DataTable rows={q.items} rowKey={(r: any) => r.id} loading={q.loading && !q.raw} onRowOpen={(r) => setOpen(r.id)} label={t('الاستلامات')} empty={<EmptyState compact icon={<PackageCheck />} title={t('مفيش استلامات')} />}
+        columns={[
+          RC.text('number', t('الإذن'), (r) => r.number, { cell: (r) => <span className="num font-bold" data-fb={`receipts:open:${r.id}`}>{r.number}</span> }),
+          RC.text('supplier', t('المورد'), (r) => tv(r.supplierName), { maxChars: 24, className: 'font-bold' }),
+          RC.text('po', t('أمر الشراء'), (r) => r.purchaseOrderNumber ?? t('من غير أمر'), { cell: (r) => <span className="num text-xs">{r.purchaseOrderNumber ?? t('من غير أمر')}</span> }),
+          RC.text('invoice', t('فاتورة المورد'), (r) => tLabel(r.supplierInvoiceNo) || null, { cell: (r) => <span className="num text-xs">{tLabel(r.supplierInvoiceNo) || '—'}</span> }),
+          RC.text('warehouse', t('المخزن'), (r) => tv(r.warehouse.name), { maxChars: 16 }),
+          RC.money('total', t('القيمة'), (r) => r.total),
+          RC.date('at', t('إمتى'), (r) => r.at, { cell: (r) => <div><DateTime v={r.at} className="text-xs" /><div className="text-[11px] text-dim">{personText(r.userName)}</div></div> }),
+          RC.status('state', t('الحالة'), (r) => (r.state === 'REVERSED' ? { label: t('اتلغى'), tone: 'error' } : Number(r.returnedValue) > 0 ? { label: t('فيه مرتجع'), tone: 'warning' } : { label: t('متسجل'), tone: 'success' })),
+        ]} />
       {creating && <ReceiveDialog onClose={() => setCreating(false)} onDone={(id) => { setCreating(false); setOpen(id); }} />}
     </div>
   );
@@ -176,13 +182,20 @@ function ReceiptView({ id, onClose }: { id: string | null; onClose: () => void }
 function ReturnList({ branchId }: { branchId?: string }) {
   const q = useList<any>('SupplierReturn.Find', { branchId });
   const [open, setOpen] = useState(false);
+  const RC = cols<any>();
   return (
     <div className="space-y-3">
       <div className="flex justify-end"><Button variant="primary" data-fb="supplier-returns:new" onClick={() => setOpen(true)}><Undo2 className="w-4 h-4" />{t('مرتجع جديد')}</Button></div>
-      <Table loading={q.loading && !q.raw} empty={<EmptyState compact icon={<Undo2 />} title={t('مفيش مرتجعات للموردين')} />} head={[t('الرقم'), t('المورد'), t('من إذن'), t('الأصناف'), t('السبب'), t('القيمة'), t('إمتى')]} rows={q.items.map((r) => [
-          <span className="num font-bold">{r.number}</span>, <span className="font-bold">{tv(r.supplierName)}</span>, <span className="num text-xs">{r.receiptNumber ?? '—'}</span>,
-          <span className="text-xs">{r.lines.map((l: any) => `${L(l.name)} ${fmtQty(l.quantity)} ${unitLabel(l.unit)}`).join(t('، '))}</span>, <span className="text-xs">{tv(r.reason)}</span>, <Money v={r.total} className="text-xs" />, <span className="text-xs">{dateTime(r.at)} · {personText(r.userName)}</span>,
-        ])} />
+      <DataTable rows={q.items} rowKey={(r: any) => r.id ?? r.number} loading={q.loading && !q.raw} label={t('مرتجعات الموردين')} empty={<EmptyState compact icon={<Undo2 />} title={t('مفيش مرتجعات للموردين')} />}
+        columns={[
+          RC.text('number', t('الرقم'), (r) => r.number, { cell: (r) => <span className="num font-bold">{r.number}</span> }),
+          RC.text('supplier', t('المورد'), (r) => tv(r.supplierName), { maxChars: 24, className: 'font-bold' }),
+          RC.text('receipt', t('من إذن'), (r) => r.receiptNumber, { cell: (r) => <span className="num text-xs">{r.receiptNumber ?? '—'}</span> }),
+          RC.text('lines', t('الأصناف'), (r) => r.lines.map((l: any) => `${L(l.name)} ${fmtQty(l.quantity)} ${unitLabel(l.unit)}`).join(t('، ')), { maxChars: 36 }),
+          RC.text('reason', t('السبب'), (r) => tv(r.reason), { maxChars: 24 }),
+          RC.money('total', t('القيمة'), (r) => r.total),
+          RC.date('at', t('إمتى'), (r) => r.at, { cell: (r) => <div><DateTime v={r.at} className="text-xs" /><div className="text-[11px] text-dim">{personText(r.userName)}</div></div> }),
+        ]} />
       {open && <SupplierReturnDialog onClose={() => setOpen(false)} />}
     </div>
   );

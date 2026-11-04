@@ -230,9 +230,11 @@ export function CheckPanel({ order, refetch, mode, onCheckSwitch, variant = 'pan
   );
 }
 
+const CHECK_STATUS: Record<string, [string, any]> = { DRAFT: ['مفتوح', 'primary'], CONFIRMED: ['بانتظار الدفع', 'warning'], COMPLETED: ['مغلق', 'success'], CANCELLED: ['ملغى', 'neutral'], VOIDED: ['ملغى بموافقة', 'error'], MERGED: ['مدموج', 'neutral'] };
+/** ux-16: a check's state as a table status column ({label, tone}); the same words and tones as StatusPill. */
+export const checkStatus = (s: string) => { const [ar, tone] = CHECK_STATUS[s] ?? ['—', 'neutral']; return { label: t(ar), tone }; };
 export function StatusPill({ s }: { s: string }) {
-  const m: Record<string, [string, any]> = { DRAFT: ['مفتوح', 'primary'], CONFIRMED: ['بانتظار الدفع', 'warning'], COMPLETED: ['مغلق', 'success'], CANCELLED: ['ملغى', 'neutral'], VOIDED: ['ملغى بموافقة', 'error'], MERGED: ['مدموج', 'neutral'] };
-  const [ar, tone] = m[s] ?? ['—', 'neutral'];
+  const [ar, tone] = CHECK_STATUS[s] ?? ['—', 'neutral'];
   return <Pill tone={tone} dot>{t(ar)}<Tech><span className="num opacity-70">{s}</span></Tech></Pill>;
 }
 

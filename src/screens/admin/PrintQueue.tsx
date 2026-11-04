@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { RefreshCw, Copy, Eye, AlertTriangle, Printer, Clock3, CheckCircle2, XCircle, Ban, FileText, MonitorSmartphone, Archive } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';
-import { PageHeader, StateBadge, Banner, Button, Pill, Select, Table, Card, useNow, StatGrid, StatCard, Toolbar, EmptyState, DateTime } from '../../ui';
+import { PageHeader, StateBadge, Banner, Button, Pill, Select, DataTable, cols, DensityToggle, Card, useNow, StatGrid, StatCard, Toolbar, EmptyState, DateTime } from '../../ui';
 import { t, tLabel, tv } from '../../i18n';
 import { useList } from './org/common';
 import { Tech } from '../../app/tech';
@@ -19,6 +19,7 @@ export default function PrintQueue() {
   const { terminal, can, nav, kind } = useDev();
   const screenOk = kind === 'ADMIN' || kind === 'BO'; // «الأجهزة» lives on the office devices
   useNow(1000);
+  const QC = cols<any>();
   const [state, setState] = useState('');
   const [terminalId, setTerminalId] = useState('');
   const [documentType, setDocumentType] = useState('');
@@ -74,35 +75,28 @@ export default function PrintQueue() {
           <Select data-fb="prints:filter-state" className="!w-auto min-w-[190px]" value={state} onChange={(e) => setState(e.target.value)} options={[{ value: '', label: t('كل الحالات') }, { value: 'FAILED,DEAD', label: t('محتاجة تدخل (فشلت أو وقفت)') }, ...['PENDING', 'SUCCEEDED', 'FAILED', 'DEAD'].map((s) => ({ value: s, label: printStateLabel(s) }))]} />
           <Select data-fb="prints:filter-terminal" className="!w-auto min-w-[170px]" value={terminalId} onChange={(e) => setTerminalId(e.target.value)} options={[{ value: '', label: t('كل الأجهزة') }, ...terminals.map(([id, code]) => ({ value: id, label: deviceName(code) + (terminal?.id === id ? ` (${t('الجهاز ده')})` : '') }))]} />
           <Select data-fb="prints:filter-doctype" className="!w-auto min-w-[160px]" value={documentType} onChange={(e) => setDocumentType(e.target.value)} options={[{ value: '', label: t('كل الأوراق') }, ...['RECEIPT', 'KITCHEN_TICKET', 'PRE_BILL', 'X_REPORT', 'Z_REPORT', 'FISCAL_DOCUMENT', 'TEST_PAGE', 'DRAWER_KICK'].map((d) => ({ value: d, label: docTypeLabel(d) }))]} />
+          <Toolbar.Spacer /><DensityToggle />
         </Toolbar>
-        {(
-          <Table loading={list.loading && !list.data} maxHeight={620}
-            align={[undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 'end']}
-            head={[t('الورقة'), t('النوع'), t('أصل / نسخة'), t('الجهاز'), t('الطابعة'), t('الحالة'), t('المحاولات'), t('المحاولة الجاية'), '']}
-            empty={<EmptyState compact icon={<Printer />} title={t('مفيش أوراق في الطابور')} text={t('بيع حاجة على الكاشير وهتظهر هنا.')} />}
-            rows={rows.map((j) => {
-              const errs = (j.attempts ?? []).filter((a: any) => a.error);
-              return [
-                <div key="l"><div className="font-bold">{tLabel(j.label)}</div><div className="text-[11px] text-dim">{dateTime(j.createdAt)}<Tech> <span className="num">· {j.id}</span></Tech></div>{j.reason && <div className="text-[11px] text-dim">{t('السبب')}: {tv(j.reason)}</div>}</div>,
-                docTypeLabel(j.documentType),
-                j.copyKind === 'REPRINT' ? <Pill tone="violet" title="REPRINT">{t('نسخة')}</Pill> : <Pill tone="neutral" title="ORIGINAL">{t('أصل')}</Pill>,
-                <span>{deviceName(j.terminalCode ?? j.terminalId)}<Tech><span className="num text-[10px] text-dim block">{j.terminalCode}</span></Tech></span>,
-                <span data-fb={`prints:printer:${j.id}`}>{j.printerName ? tv(j.printerName) : <span className="text-dim">—</span>}<Tech><span className="num text-[10px] text-dim block">{j.printerCode}</span></Tech></span>,
-                <PrintStatePill state={j.state} />,
-                <div className="text-xs space-y-0.5">
+        <DataTable rows={rows} rowKey={(j: any) => j.id} loading={list.loading && !list.data} maxHeight={620} label={t('طابور الطباعة')}
+          empty={<EmptyState compact icon={<Printer />} title={t('مفيش أوراق في الطابور')} text={t('بيع حاجة على الكاشير وهتظهر هنا.')} />}
+          columns={[
+            QC.text('label', t('الورقة'), (j) => tLabel(j.label), { cell: (j) => <div><div className="font-bold">{tLabel(j.label)}</div><div className="text-[11px] text-dim"><DateTime v={j.createdAt} /><Tech> <span className="num">· {j.id}</span></Tech></div>{j.reason && <div className="text-[11px] text-dim">{t('السبب')}: {tv(j.reason)}</div>}</div> }),
+            QC.text('type', t('النوع'), (j) => docTypeLabel(j.documentType), { maxChars: 18 }),
+            QC.status('copy', t('أصل / نسخة'), (j) => (j.copyKind === 'REPRINT' ? { label: t('نسخة'), tone: 'violet' } : { label: t('أصل'), tone: 'neutral' })),
+            QC.text('device', t('الجهاز'), (j) => deviceName(j.terminalCode ?? j.terminalId), { cell: (j) => <span>{deviceName(j.terminalCode ?? j.terminalId)}<Tech><span className="num text-[10px] text-dim block">{j.terminalCode}</span></Tech></span> }),
+            QC.text('printer', t('الطابعة'), (j) => (j.printerName ? tv(j.printerName) : null), { cell: (j) => <span data-fb={`prints:printer:${j.id}`}>{j.printerName ? tv(j.printerName) : <span className="text-dim">—</span>}<Tech><span className="num text-[10px] text-dim block">{j.printerCode}</span></Tech></span> }),
+            QC.status('state', t('الحالة'), (j) => ({ label: printStateLabel(j.state) }), { cell: (j) => <PrintStatePill state={j.state} /> }),
+            QC.number('attempts', t('المحاولات'), (j) => (j.attempts ?? []).length, { align: 'start', cell: (j) => { const errs = (j.attempts ?? []).filter((a: any) => a.error); return <div className="text-xs space-y-0.5">
                   <div><span className="num font-bold">{(j.attempts ?? []).length}</span> {t('محاولة')}{errs.length > 0 && <span className="text-dim"> · <span className="num">{errs.length}</span> {t('فشلت')}</span>}</div>
                   {errs.slice(-3).map((a: any, i: number) => <div key={i} className="text-[var(--error)]"><DateTime v={a.at} time /> · {printErrorLabel(a.error)}</div>)}
-                </div>,
-                <span className="text-xs">{j.state === 'FAILED' ? inTime(j.nextAtMs) : j.state === 'PENDING' ? t('دلوقتي') : j.state === 'DEAD' ? <span className="text-[var(--error)]">{t('خلصت المحاولات')}</span> : '—'}</span>,
-                <div className="flex gap-1.5 flex-wrap justify-end">
+                </div>; } }),
+            QC.custom('next', t('المحاولة الجاية'), (j) => <span className="text-xs">{j.state === 'FAILED' ? inTime(j.nextAtMs) : j.state === 'PENDING' ? t('دلوقتي') : j.state === 'DEAD' ? <span className="text-[var(--error)]">{t('خلصت المحاولات')}</span> : '—'}</span>),
+            QC.actions('act', (j) => <>
                   {(j.state === 'FAILED' || j.state === 'DEAD') && can('print:retry') && <Button size="sm" variant={j.state === 'DEAD' ? 'danger' : 'secondary'} loading={busy} data-fb={`prints:retry:${j.id}`} onClick={() => retry(j)} title={t('نفس المهمة ونفس النسخة')}><RefreshCw className="w-3.5 h-3.5" />{t('إعادة')}</Button>}
                   {REPRINTABLE.includes(j.documentType) && can('print:reprint') && <Button size="sm" variant="outline" data-fb={`prints:reprint:${j.id}`} onClick={() => setReprint(j)}><Copy className="w-3.5 h-3.5" />{t('اطبع نسخة')}</Button>}
                   {(j.documentType === 'RECEIPT' || j.documentType === 'PRE_BILL') && String(j.documentId).startsWith('ord') && <Button size="sm" variant="ghost" data-fb={`prints:view:${j.id}`} onClick={() => nav('receipt', { orderId: j.documentId, copy: j.copyKind === 'REPRINT', prebill: j.documentType === 'PRE_BILL' })}><Eye className="w-3.5 h-3.5" /></Button>}
-                </div>,
-              ];
-            })}
-          />
-        )}
+                </>),
+          ]} />
       </Card>
 
       <Tech>

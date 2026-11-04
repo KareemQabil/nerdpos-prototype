@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, ShoppingBag, Send, XCircle, Lock, PackageCheck, Pencil, Trash2, Save, MessageSquareText, Wand2, ShieldCheck, Undo2 } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
-import { Banner, Button, Card, DetailPane, Empty, EmptyState, Field, Input, KV, MasterDetail, Money, PageHeader, Pill, Popup, Section, Select, Spinner, StatCard, StatGrid, StateBadge, Table, Textarea, Toolbar } from '../../ui';
+import { Banner, Button, Card, DetailPane, Empty, EmptyState, Field, Input, KV, MasterDetail, Money, PageHeader, Pill, Popup, Section, Select, Spinner, StatCard, StatGrid, StateBadge, Table, DataTable, cols, DensityToggle, DayText, Textarea, Toolbar } from '../../ui';
 import { FullPage } from './purchasingLayout';
 import { BoardViewToggle } from '../../ui/board';
 import { useBoardView } from '../../app/useBoardView';
@@ -12,7 +12,7 @@ import PurchasingBoard from '../boards/PurchasingBoard';
 import { t, L, tv } from '../../i18n';
 import { dateTime, money } from '../../lib/format';
 import { sumAmounts, sumLines } from '../../lib/cash';
-import { BranchScope, ItemPicker, PO_STATE, Qty, StatePill, WarehouseSelect, fmtQty, unitLabel, useBranchScope, useItemsCatalog, useList, useWarehouses, Inp, Sel } from './common';
+import { BranchScope, ItemPicker, PO_STATE, Qty, StatePill, stateOf, WarehouseSelect, fmtQty, unitLabel, useBranchScope, useItemsCatalog, useList, useWarehouses, Inp, Sel } from './common';
 import { ReceiveDialog } from './Receipts';
 import { clock } from '../../mock/clock';
 import { personText } from '../../demo/people';
@@ -43,6 +43,7 @@ function PurchaseOrderList({ onBoard }: { onBoard: () => void }) {
   const openPos = all.items.filter((p) => ['DRAFT', 'PENDING_APPROVAL', 'ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state));
   const waiting = all.items.filter((p) => ['ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state));
   const today = new Date(clock.now()).toISOString().slice(0, 10);
+  const PC = cols<any>();
   const late = waiting.filter((p) => p.expectedDate && p.expectedDate < today);
   const loading = all.loading && !all.raw;
   return (
@@ -59,16 +60,20 @@ function PurchaseOrderList({ onBoard }: { onBoard: () => void }) {
         <Toolbar>
           <Sel className="w-52" data-fb="po:state" value={state} onChange={(e) => setState(e.target.value)} options={[{ value: '', label: t('كل الحالات') }, { value: 'DRAFT,ISSUED,PARTIALLY_RECEIVED', label: t('المفتوحة بس') }, { value: 'ISSUED,PARTIALLY_RECEIVED', label: t('مستنية الاستلام') }, ...Object.entries(PO_STATE).map(([k, v]) => ({ value: k, label: t(v.ar) }))]} />
           <Sel className="w-60" value={supplier} onChange={(e) => setSupplier(e.target.value)} options={[{ value: '', label: t('كل الموردين') }, ...suppliers.items.map((s) => ({ value: s.id, label: tv(s.name) }))]} />
+          <Toolbar.Spacer /><DensityToggle />
         </Toolbar>
-        <Table loading={q.loading && !q.raw} onRowClick={(i) => setOpen(q.items[i].id)} align={[undefined, undefined, undefined, undefined, 'end', 'end', undefined, 'end']}
+        <DataTable rows={q.items} rowKey={(p: any) => p.id} loading={q.loading && !q.raw} onRowOpen={(p) => setOpen(p.id)} label={t('أوامر الشراء')}
           empty={<EmptyState compact icon={<ShoppingBag />} title={t('مفيش أوامر شراء')} text={t('اعمل أمر شراء جديد، أو خلّي السيستم يجهّزه من النواقص.')} action={<Button variant="primary" onClick={() => setSuggest(true)}><Wand2 className="w-4 h-4" />{t('من النواقص')}</Button>} />}
-          head={[t('الرقم'), t('المورد'), t('يستلم في'), t('الحالة'), t('القيمة'), t('اتستلم'), t('ميعاد التوريد'), '']} rows={q.items.map((p) => [
-          <span className="num font-bold" data-fb={`po:open:${p.id}`}>{p.number}</span>,
-          <span className="font-bold">{tv(p.supplierName)}</span>, <span className="text-xs">{tv(p.warehouse.name)}</span>, <StatePill map={PO_STATE} state={p.state} />,
-          <Money v={p.total} className="text-xs" />, Number(p.receivedValue) > 0 ? <Money v={p.receivedValue} className="text-xs" tone="success" /> : <span className="text-dim text-xs">—</span>,
-          <span className={`num text-xs ${p.expectedDate && p.expectedDate < today && ['ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state) ? 'text-[var(--error)] font-bold' : ''}`}>{p.expectedDate ?? '—'}</span>,
-          <Button size="sm" variant={p.state === 'DRAFT' || ['ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state) ? 'outline' : 'ghost'} onClick={(e) => { e.stopPropagation(); setOpen(p.id); }}>{p.state === 'DRAFT' ? t('راجع وابعت') : ['ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state) ? t('استلم') : t('اعرض')}</Button>,
-        ])} />
+          columns={[
+            PC.text('number', t('الرقم'), (p) => p.number, { cell: (p) => <span className="num font-bold" data-fb={`po:open:${p.id}`}>{p.number}</span> }),
+            PC.text('supplier', t('المورد'), (p) => tv(p.supplierName), { maxChars: 24, className: 'font-bold' }),
+            PC.text('warehouse', t('يستلم في'), (p) => tv(p.warehouse.name), { maxChars: 16 }),
+            PC.status('state', t('الحالة'), (p) => stateOf(PO_STATE, p.state)),
+            PC.money('total', t('القيمة'), (p) => p.total),
+            PC.money('received', t('اتستلم'), (p) => (Number(p.receivedValue) > 0 ? p.receivedValue : null), { tone: () => 'success' }),
+            PC.day('expected', t('ميعاد التوريد'), (p) => p.expectedDate, { cell: (p) => <DayText v={p.expectedDate} className={p.expectedDate && p.expectedDate < today && ['ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state) ? 'text-[var(--error)] font-bold' : ''} /> }),
+            PC.actions('act', (p) => <Button size="sm" variant={p.state === 'DRAFT' || ['ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state) ? 'outline' : 'ghost'} onClick={() => setOpen(p.id)}>{p.state === 'DRAFT' ? t('راجع وابعت') : ['ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state) ? t('استلم') : t('اعرض')}</Button>),
+          ]} />
       </Card>
       {suggest && <Suggestions branchId={scope.branchId} onClose={() => setSuggest(false)} onDone={(id) => { setSuggest(false); if (id) setOpen(id); }} />}
       {editor && <PoEditor init={editor} onClose={() => setEditor(null)} onSaved={(id) => { setEditor(null); setOpen(id); }} />}

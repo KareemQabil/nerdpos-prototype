@@ -5,7 +5,7 @@
 import React from 'react';
 import { ArrowRight, ArrowLeft } from 'lucide-react';
 import { useDev, useQuery, errorText } from '../../app/hooks';
-import { Banner, Button, Pill, Card, Spinner, Field, Input, Money } from '../../ui';
+import { Banner, Button, Pill, Card, Spinner, Field, Input, Money, DataTable, type Column } from '../../ui';
 import { t, L, getLang } from '../../i18n';
 import { money } from '../../lib/format';
 import { clock, businessDate } from '../../mock/clock';
@@ -23,6 +23,15 @@ function LegacyCell({ v }: { v: unknown }) {
   if (/^[A-Z][A-Z_:]+$/.test(s)) return <span title={s}>{codeLabel(s)}</span>;
   return <span>{s}</span>;
 }
+/** ux-16: a quick report section on the one table — a column whose values are all money strings is a money column
+ *  (end-aligned, sortable as Decimal), numbers are number columns, the rest keep their cell. */
+function legacyColumns(cols: string[], rows: unknown[][]): Column<unknown[]>[] {
+  return cols.map((c, j) => {
+    const vals = rows.map((x) => x[j]).filter((v) => v !== null && v !== undefined && v !== '' && v !== 'CAPABILITY_NOT_AVAILABLE');
+    const kind = vals.length && vals.every((v) => typeof v === 'string' && MONEY_RE.test(v)) ? 'money' : vals.length && vals.every((v) => typeof v === 'number') ? 'number' : 'custom';
+    return { id: `c${j}`, header: metricLabel(c), headerText: metricLabel(c), kind, value: kind === 'custom' ? undefined : (x: unknown[]) => x[j] as string, cell: (x: unknown[]) => <LegacyCell v={x[j]} /> } as Column<unknown[]>;
+  });
+}
 function LegacyReport({ r }: { r: any }) {
   return (
     <div className="space-y-3">
@@ -33,10 +42,7 @@ function LegacyReport({ r }: { r: any }) {
           const cols: string[] = s.columns ?? SECTION_COLUMNS[s.id] ?? Array.from({ length: Math.max(0, ...rows.map((x) => x.length)) }, (_, i) => String(i + 1));
           return (
             <Card key={s.id} title={L(s.title)}>
-              {rows.length === 0 ? <div className="text-sm text-dim">{t('مفيش بيانات في الفترة دي')}</div> : (
-                <div className="overflow-x-auto rounded-xl border line"><table className="w-full text-sm"><thead className="surface-1"><tr>{cols.map((c, i) => <th key={i} className="text-start text-xs text-soft px-3 py-2">{metricLabel(c)}</th>)}</tr></thead>
-                  <tbody>{rows.map((x, i) => <tr key={i} className="border-t line">{cols.map((_, j) => <td key={j} className="px-3 py-1.5"><LegacyCell v={x[j]} /></td>)}</tr>)}</tbody></table></div>
-              )}
+              {rows.length === 0 ? <div className="text-sm text-dim">{t('مفيش بيانات في الفترة دي')}</div> : <DataTable dense rows={rows} rowKey={(_, i) => i} label={L(s.title)} columns={legacyColumns(cols, rows)} />}
             </Card>
           );
         })}

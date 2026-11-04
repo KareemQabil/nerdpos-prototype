@@ -4,7 +4,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, Package, Coins, TrendingDown, PackageX, ScanSearch } from 'lucide-react';
 import { useDev } from '../../app/hooks';
-import { Button, Card, EmptyState, FILL_BODY, FILL_CARD, FillPage, MasterDetail, Money, PageHeader, Pill, SearchInput, Select, StatCard, StatGrid, StateBadge, Switch, Table, Toolbar } from '../../ui';
+import { Button, Card, EmptyState, FILL_BODY, FILL_CARD, FillPage, MasterDetail, Money, PageHeader, Pill, SearchInput, Select, StatCard, StatGrid, StateBadge, Switch, DataTable, cols, DensityToggle, Toolbar } from '../../ui';
 import { Tech } from '../../app/tech';
 import { t, L, tv } from '../../i18n';
 import { D } from '../../mock/money';
@@ -35,6 +35,9 @@ export default function InventoryItems() {
     return s ? q.items.filter((i) => `${i.name.ar} ${i.name.en} ${i.sku}`.toLowerCase().includes(s)) : q.items;
   }, [q.items, text]);
   const totalValue = shown.reduce((a, i) => a.plus(D(i.value)), D(0));
+  const IC = cols<any>();
+  const stockOf = (i: any) => i.stock.reduce((a: any, x: any) => a.plus(D(x.quantity)), D(0)).toFixed(6);
+  const level = (i: any) => ({ label: t(LEVEL_TEXT[i.state]?.ar ?? '—') });
   const all = q.items;
   const low = all.filter((i) => i.state === 'LOW').length;
   const out = all.filter((i) => i.state === 'OUT' || i.state === 'NEGATIVE').length;
@@ -58,32 +61,28 @@ export default function InventoryItems() {
           {!compact && <Switch checked={showInactive} onChange={setShowInactive} label={t('اعرض الموقوف')} />}
           <Toolbar.Spacer />
           <span className="text-xs text-dim">{t('{n} صنف', { n: shown.length })} · {t('القيمة')} <Money v={totalValue.toFixed(4)} /></span>
+          {!compact && <DensityToggle dense />}
         </Toolbar>
-        {compact ? (
-          <Table fill loading={loading} dense onRowClick={(i) => setOpen(shown[i].id)} rowClassName={(i) => (shown[i].id === open ? 'row-selected' : undefined)} align={['start', 'end', 'start']}
-            head={[t('الصنف'), t('الرصيد'), t('الحالة')]} rows={shown.map((i) => [
-              <div data-fb={`items:open:${i.id}`} className="text-start min-w-[140px]"><div className="font-bold flex items-center gap-1.5">{L(i.name)}{!i.active && <Pill tone="neutral">{t('موقوف')}</Pill>}</div><div className="text-[11px] text-dim">{tv(i.category)}</div></div>,
-              <Qty v={i.stock.reduce((a: any, x: any) => a.plus(D(x.quantity)), D(0)).toFixed(6)} unit={i.unit} hint={false} />,
-              <LevelPill state={i.state} />,
-            ])} />
-        ) : (
-        <Table fill loading={loading} dense onRowClick={(i) => setOpen(shown[i].id)} rowClassName={(i) => (shown[i].id === open ? 'row-selected' : undefined)}
-          align={['start', 'start', ...whs.map(() => 'end' as const), 'end', 'start', 'start', 'end', 'end']}
+        <DataTable fill dense rows={shown} rowKey={(i: any) => i.id} selectedKey={open} onRowOpen={(i) => setOpen(i.id)} loading={loading} label={t('الخامات والأصناف')} pageSize={100}
           empty={<EmptyState compact icon={<Package />} title={q.items.length ? t('مفيش أصناف بالفلتر ده') : t('لسه مفيش أصناف في المخزن')} action={!q.items.length ? <Button variant="primary" onClick={() => setCreating(true)}>{t('صنف جديد')}</Button> : undefined} />}
-          head={[t('الصنف'), t('المجموعة'), ...whs.map((w) => <span key={w.id}>{tv(w.name)}{w.salesDefault ? ' ★' : ''}</span>), t('القيمة'), t('الحالة'), t('أقرب صلاحية'), t('في وصفات'), '']} rows={shown.map((i) => [
-          <div data-fb={`items:open:${i.id}`} className="text-start min-w-[150px]">
-            <div className="font-bold flex items-center gap-1.5">{L(i.name)}{!i.active && <Pill tone="neutral">{t('موقوف')}</Pill>}</div>
-            <div className="text-[11px] text-dim flex gap-1.5 items-center"><Tech><span className="num">{i.sku}</span></Tech>{i.kind !== 'RAW' && <Pill tone={i.kind === 'PREP' ? 'violet' : 'info'}>{t(KIND_LABEL[i.kind])}</Pill>}{i.packs?.length ? <span>{L(i.packs.find((p: any) => p.id === i.purchasePackId)?.name ?? i.packs[0].name)}</span> : null}</div>
-          </div>,
-          <span className="text-xs">{tv(i.category)}</span>,
-          ...i.stock.map((s: any) => <span key={s.warehouseId} className={s.state === 'LOW' || s.state === 'OUT' ? 'text-[var(--warning)]' : s.state === 'NEGATIVE' ? 'text-[var(--error)]' : ''}><Qty v={s.quantity} unit={i.unit} hint={false} /></span>),
-          <Money v={i.value} className="text-xs" />,
-          <LevelPill state={i.state} />,
-          i.nextExpiry ? <span className="num text-xs">{i.nextExpiry}</span> : <span className="text-dim text-xs">—</span>,
-          i.usedInRecipes ? <span className="num text-xs">{i.usedInRecipes}</span> : <span className="text-dim text-xs">—</span>,
-          <Button size="sm" variant="ghost" data-fb={`items:360:${i.id}`} title={t('صفحة الصنف كاملة')} onClick={(e) => { e.stopPropagation(); nav('item360', { kind: 'item', id: i.id }); }}><ScanSearch className="w-3.5 h-3.5" />{t('الرحلة')}</Button>,
-        ])} />
-        )}
+          columns={compact ? [
+            IC.text('name', t('الصنف'), (i) => L(i.name), { cell: (i) => <div data-fb={`items:open:${i.id}`} className="text-start min-w-[140px]"><div className="font-bold flex items-center gap-1.5">{L(i.name)}{!i.active && <Pill tone="neutral">{t('موقوف')}</Pill>}</div><div className="text-[11px] text-dim">{tv(i.category)}</div></div> }),
+            IC.qty('stock', t('الرصيد'), stockOf, { cell: (i) => <Qty v={stockOf(i)} unit={i.unit} hint={false} /> }),
+            IC.status('state', t('الحالة'), level, { cell: (i) => <LevelPill state={i.state} /> }),
+          ] : [
+            IC.text('name', t('الصنف'), (i) => L(i.name), { cell: (i) => (
+              <div data-fb={`items:open:${i.id}`} className="text-start min-w-[150px]">
+                <div className="font-bold flex items-center gap-1.5">{L(i.name)}{!i.active && <Pill tone="neutral">{t('موقوف')}</Pill>}</div>
+                <div className="text-[11px] text-dim flex gap-1.5 items-center"><Tech><span className="num">{i.sku}</span></Tech>{i.kind !== 'RAW' && <Pill tone={i.kind === 'PREP' ? 'violet' : 'info'}>{t(KIND_LABEL[i.kind])}</Pill>}{i.packs?.length ? <span>{L(i.packs.find((p: any) => p.id === i.purchasePackId)?.name ?? i.packs[0].name)}</span> : null}</div>
+              </div>) }),
+            IC.text('category', t('المجموعة'), (i) => tv(i.category), { maxChars: 16 }),
+            ...whs.map((w, k) => IC.qty(`wh:${w.id}`, <span>{tv(w.name)}{w.salesDefault ? ' ★' : ''}</span>, (i) => i.stock[k]?.quantity, { headerText: tv(w.name), cell: (i) => { const st = i.stock[k]; return st ? <span className={st.state === 'LOW' || st.state === 'OUT' ? 'text-[var(--warning)]' : st.state === 'NEGATIVE' ? 'text-[var(--error)]' : ''}><Qty v={st.quantity} unit={i.unit} hint={false} /></span> : <span className="text-dim">—</span>; } })),
+            IC.money('value', t('القيمة'), (i) => i.value),
+            IC.status('state', t('الحالة'), level, { cell: (i) => <LevelPill state={i.state} /> }),
+            IC.day('expiry', t('أقرب صلاحية'), (i) => i.nextExpiry),
+            IC.number('recipes', t('في وصفات'), (i) => i.usedInRecipes || null),
+            IC.actions('go', (i) => <Button size="sm" variant="ghost" data-fb={`items:360:${i.id}`} title={t('صفحة الصنف كاملة')} onClick={() => nav('item360', { kind: 'item', id: i.id })}><ScanSearch className="w-3.5 h-3.5" />{t('الرحلة')}</Button>),
+          ]} />
       </Card>
       <NewItemDialog open={creating} onClose={() => setCreating(false)} onCreated={(id) => setOpen(id)} />
     </FillPage>

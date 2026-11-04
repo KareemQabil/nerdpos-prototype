@@ -5,10 +5,10 @@ import React, { useState } from 'react';
 import { Plus, Pencil, Truck, Phone, ShoppingBag, Save } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
-import { Button, Card, DetailPane, EmptyState, FILL_BODY, FILL_CARD, Field, FillPage, Input, KV, MasterDetail, Money, PageHeader, Pill, Popup, SearchInput, Spinner, StateBadge, Switch, Table, Tabs, Textarea, Toolbar, useEnterSave } from '../../ui';
+import { Button, Card, DetailPane, EmptyState, FILL_BODY, FILL_CARD, Field, FillPage, Input, KV, MasterDetail, Money, PageHeader, Pill, Popup, SearchInput, Spinner, StateBadge, Switch, DataTable, cols, DensityToggle, DateTime, Tabs, Textarea, Toolbar, useEnterSave } from '../../ui';
 import { t, L, tv } from '../../i18n';
 import { cn, dateTime } from '../../lib/format';
-import { PO_STATE, StatePill, newKey, unitLabel, useList } from './common';
+import { PO_STATE, StatePill, stateOf, newKey, unitLabel, useList } from './common';
 
 const OPS = ['Supplier.Upsert', 'Supplier.List', 'Supplier.Get'];
 
@@ -21,6 +21,8 @@ export default function Suppliers() {
   const view: string | null = params?.open ?? null;
   const setView = (id: string | null) => nav('inv-suppliers', { ...params, open: id ?? undefined });
   const newPo = (s: any) => nav('inv-po', { supplierId: s.id, create: true });
+  const SC = cols<any>();
+  const phoneCell = (s: any) => (s.phone ? <span className="num text-xs inline-flex items-center gap-1" dir="ltr"><Phone className="w-3 h-3" />{s.phone}</span> : <span className="text-dim">—</span>);
   const list = (compact: boolean) => (
     <FillPage>
       <PageHeader className="!mb-0" icon={<Truck />} title={t('الموردين')} badge={<StateBadge ops={OPS} />}
@@ -31,36 +33,29 @@ export default function Suppliers() {
           <Switch checked={inactive} onChange={setInactive} label={t('اعرض الموقوفين')} />
           <Toolbar.Spacer />
           <span className="text-xs text-dim">{t('{n} مورد', { n: q.items.length })}</span>
+          {!compact && <DensityToggle dense />}
         </Toolbar>
         {q.loading && !q.raw ? <Spinner /> : q.items.length === 0 ? (
           <EmptyState compact icon={<Truck />} title={text || inactive ? t('لا يوجد موردون بهذا البحث.') : t('لا يوجد موردون.')} action={!text && !inactive ? <Button variant="primary" onClick={() => setForm({ active: true })}><Plus className="w-4 h-4" />{t('مورد جديد')}</Button> : undefined} />
-        ) : compact ? (
-          <Table fill dense onRowClick={(i) => setView(q.items[i].id)} rowClassName={(i) => (q.items[i].id === view ? 'row-selected' : undefined)} align={['start', 'start', 'end']}
-            head={[t('المورد'), t('التليفون'), t('أوامر مفتوحة')]} rows={q.items.map((s) => [
-              <div data-fb={`suppliers:view:${s.id}`} className={cn('min-w-[140px]', !s.active && 'opacity-60')}><div className="font-bold">{tv(s.name)}</div><div className="text-[11px] text-dim">{s.contactName ?? '—'}</div></div>,
-              s.phone ? <span className="num text-xs" dir="ltr">{s.phone}</span> : <span className="text-dim">—</span>,
-              s.openPurchaseOrders ? <Pill tone="info">{s.openPurchaseOrders}</Pill> : <span className="text-dim">—</span>,
-            ])} />
         ) : (
-          <div className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1 pb-1" data-scroll-region>
-            <div className="grid grid-cols-1 @2xl/list:grid-cols-2 @6xl/list:grid-cols-3 gap-3">
-              {q.items.map((s) => (
-                <Card key={s.id} interactive onClick={() => setView(s.id)} data-selected={s.id === view} className={cn(!s.active && 'opacity-60', s.id === view && 'ring-2 ring-[var(--primary)]')} title={tv(s.name)} badge={!s.active ? <Pill tone="neutral">{t('موقوف')}</Pill> : s.openPurchaseOrders ? <Pill tone="info">{t('{n} أمر مفتوح', { n: s.openPurchaseOrders })}</Pill> : undefined}
-                  actions={<><Button size="sm" variant="ghost" data-fb={`suppliers:view:${s.id}`} onClick={(e) => { e.stopPropagation(); setView(s.id); }}>{t('عرض')}</Button><Button size="sm" variant="ghost" title={t('تعديل')} data-fb={`suppliers:edit:${s.id}`} onClick={(e) => { e.stopPropagation(); setForm(s); }}><Pencil className="w-3.5 h-3.5" /></Button></>}>
-                  <KV rows={[
-                    [t('المسؤول'), s.contactName ?? '—'],
-                    [t('التليفون'), s.phone ? <span className="num inline-flex items-center gap-1" dir="ltr"><Phone className="w-3 h-3" />{s.phone}</span> : '—'],
-                    [t('الدفع'), tv(s.paymentTerms) ?? '—'],
-                    [t('اشترينا (30 يوم)'), <Money v={s.purchased30} />],
-                    [t('آخر استلام'), s.lastReceiptAt ? dateTime(s.lastReceiptAt) : '—'],
-                    [t('أصناف بيوردها'), s.itemCount],
-                  ]} />
-                  {s.active && <Button size="sm" variant="outline" className="mt-3 w-full" data-fb={`suppliers:po:${s.id}`} onClick={(e) => { e.stopPropagation(); newPo(s); }}><ShoppingBag className="w-3.5 h-3.5" />{t('أمر شراء جديد')}</Button>}
-                  <Tech><div className="text-[11px] num text-dim mt-1">{s.id} · v{s.version}{s.taxId ? ` · ${s.taxId}` : ''}</div></Tech>
-                </Card>
-              ))}
-            </div>
-          </div>
+          <DataTable fill dense={compact} rows={q.items} rowKey={(s: any) => s.id} selectedKey={view} onRowOpen={(s) => setView(s.id)} label={t('الموردين')} rowClassName={(s) => (!s.active ? 'opacity-60' : undefined)}
+            columns={compact ? [
+              SC.text('name', t('المورد'), (s) => tv(s.name), { cell: (s) => <div data-fb={`suppliers:view:${s.id}`} className="min-w-[140px]"><div className="font-bold">{tv(s.name)}</div><div className="text-[11px] text-dim">{s.contactName ?? '—'}</div></div> }),
+              SC.custom('phone', t('التليفون'), phoneCell),
+              SC.number('open', t('أوامر مفتوحة'), (s) => s.openPurchaseOrders || null, { cell: (s) => s.openPurchaseOrders ? <Pill tone="info">{s.openPurchaseOrders}</Pill> : <span className="text-dim">—</span> }),
+            ] : [
+              SC.text('name', t('المورد'), (s) => tv(s.name), { cell: (s) => <div data-fb={`suppliers:view:${s.id}`} className="min-w-[160px]"><div className="font-bold flex items-center gap-1.5">{tv(s.name)}{!s.active && <Pill tone="neutral">{t('موقوف')}</Pill>}</div><div className="text-[11px] text-dim">{s.contactName ?? '—'}</div><Tech><div className="text-[10px] num text-dim">{s.id} · v{s.version}{s.taxId ? ` · ${s.taxId}` : ''}</div></Tech></div> }),
+              SC.custom('phone', t('التليفون'), phoneCell),
+              SC.text('terms', t('الدفع'), (s) => tv(s.paymentTerms), { maxChars: 18 }),
+              SC.money('purchased', t('اشترينا (30 يوم)'), (s) => s.purchased30),
+              SC.date('last', t('آخر استلام'), (s) => s.lastReceiptAt),
+              SC.number('items', t('أصناف بيوردها'), (s) => s.itemCount),
+              SC.number('open', t('أوامر مفتوحة'), (s) => s.openPurchaseOrders || null, { cell: (s) => s.openPurchaseOrders ? <Pill tone="info">{t('{n} أمر مفتوح', { n: s.openPurchaseOrders })}</Pill> : <span className="text-dim">—</span> }),
+              SC.actions('act', (s) => <>
+                {s.active && <Button size="sm" variant="outline" data-fb={`suppliers:po:${s.id}`} onClick={() => newPo(s)}><ShoppingBag className="w-3.5 h-3.5" />{t('أمر شراء جديد')}</Button>}
+                <Button size="sm" variant="ghost" title={t('تعديل')} aria-label={t('تعديل')} data-fb={`suppliers:edit:${s.id}`} onClick={() => setForm(s)}><Pencil className="w-3.5 h-3.5" /></Button>
+              </>),
+            ]} />
         )}
       </Card>
     </FillPage>
@@ -105,6 +100,7 @@ function SupplierDetail({ id, onClose, onEdit, onNewPo }: { id: string; onClose:
   const q = useQuery<any>('Supplier.Get', { params: { supplierId: id } });
   const [tab, setTab] = useState<'po' | 'gr' | 'ret' | 'items'>('po');
   const s = q.data?.id === id ? q.data : null;
+  const DC = cols<any>();
   return (
     <DetailPane fb="supplier-detail" onClose={onClose} backLabel={t('الموردين')} icon={<Truck />}
       title={s ? tv(s.name) : t('مورد')}
@@ -127,10 +123,30 @@ function SupplierDetail({ id, onClose, onEdit, onNewPo }: { id: string; onClose:
             {tv(s.notes) && <div className="text-xs text-dim mt-2">{tv(s.notes)}</div>}
           </div>
           <Tabs value={tab} onChange={setTab} tabs={[{ id: 'po', label: t('أوامر الشراء ({n})', { n: s.purchaseOrders.length }), fb: 'supplier-tab:po' }, { id: 'gr', label: t('الاستلامات ({n})', { n: s.receipts.length }), fb: 'supplier-tab:gr' }, { id: 'ret', label: t('المرتجعات ({n})', { n: s.returns.length }), fb: 'supplier-tab:ret' }, { id: 'items', label: t('الأصناف ({n})', { n: s.items.length }), fb: 'supplier-tab:items' }]} />
-          {tab === 'po' && <Table empty={t('مفيش أوامر شراء')} head={[t('الرقم'), t('الحالة'), t('القيمة'), t('اتعمل')]} align={['start', 'start', 'end', 'start']} rows={s.purchaseOrders.map((p: any) => [<span className="num font-bold">{p.number}</span>, <StatePill map={PO_STATE} state={p.state} />, <Money v={p.total} className="text-xs" />, <span className="text-xs">{dateTime(p.createdAt)}</span>])} />}
-          {tab === 'gr' && <Table empty={t('مفيش استلامات')} head={[t('الرقم'), t('أمر الشراء'), t('فاتورة المورد'), t('القيمة'), t('إمتى')]} align={['start', 'start', 'start', 'end', 'start']} rows={s.receipts.map((r: any) => [<span className="num font-bold">{r.number}{r.state === 'REVERSED' && <Pill tone="error" className="ms-1">{t('اتلغى')}</Pill>}</span>, <span className="num text-xs">{r.purchaseOrderNumber ?? t('من غير أمر')}</span>, <span className="num text-xs">{r.supplierInvoiceNo ?? '—'}</span>, <Money v={r.total} className="text-xs" />, <span className="text-xs">{dateTime(r.at)}</span>])} />}
-          {tab === 'ret' && <Table empty={t('مفيش مرتجعات')} head={[t('الرقم'), t('السبب'), t('القيمة'), t('إمتى')]} align={['start', 'start', 'end', 'start']} rows={s.returns.map((r: any) => [<span className="num font-bold">{r.number}</span>, tv(r.reason), <Money v={r.total} className="text-xs" />, <span className="text-xs">{dateTime(r.at)}</span>])} />}
-          {tab === 'items' && <Table empty={t('مفيش أصناف مربوطة بالمورد ده')} head={[t('الصنف'), t('عبوة الشراء'), t('متوسط التكلفة')]} align={['start', 'start', 'end']} rows={s.items.map((i: any) => [<span className="font-bold">{L(i.name)}</span>, i.packs?.length ? L((i.packs.find((p: any) => p.id === i.purchasePackId) ?? i.packs[0]).name) : unitLabel(i.unit), <Money v={i.avgCost} className="text-xs" />])} />}
+          {tab === 'po' && <DataTable dense rows={s.purchaseOrders} rowKey={(p: any) => p.id ?? p.number} empty={t('مفيش أوامر شراء')} columns={[
+            DC.text('number', t('الرقم'), (p) => p.number, { cell: (p) => <span className="num font-bold">{p.number}</span> }),
+            DC.status('state', t('الحالة'), (p) => stateOf(PO_STATE, p.state)),
+            DC.money('total', t('القيمة'), (p) => p.total),
+            DC.date('at', t('اتعمل'), (p) => p.createdAt),
+          ]} />}
+          {tab === 'gr' && <DataTable dense rows={s.receipts} rowKey={(r: any) => r.id ?? r.number} empty={t('مفيش استلامات')} columns={[
+            DC.text('number', t('الرقم'), (r) => r.number, { cell: (r) => <span className="num font-bold">{r.number}{r.state === 'REVERSED' && <Pill tone="error" className="ms-1">{t('اتلغى')}</Pill>}</span> }),
+            DC.text('po', t('أمر الشراء'), (r) => r.purchaseOrderNumber ?? t('من غير أمر'), { cell: (r) => <span className="num text-xs">{r.purchaseOrderNumber ?? t('من غير أمر')}</span> }),
+            DC.text('invoice', t('فاتورة المورد'), (r) => r.supplierInvoiceNo, { cell: (r) => <span className="num text-xs">{r.supplierInvoiceNo ?? '—'}</span> }),
+            DC.money('total', t('القيمة'), (r) => r.total),
+            DC.date('at', t('إمتى'), (r) => r.at),
+          ]} />}
+          {tab === 'ret' && <DataTable dense rows={s.returns} rowKey={(r: any) => r.id ?? r.number} empty={t('مفيش مرتجعات')} columns={[
+            DC.text('number', t('الرقم'), (r) => r.number, { cell: (r) => <span className="num font-bold">{r.number}</span> }),
+            DC.text('reason', t('السبب'), (r) => tv(r.reason), { maxChars: 28 }),
+            DC.money('total', t('القيمة'), (r) => r.total),
+            DC.date('at', t('إمتى'), (r) => r.at),
+          ]} />}
+          {tab === 'items' && <DataTable dense rows={s.items} rowKey={(i: any) => i.id} empty={t('مفيش أصناف مربوطة بالمورد ده')} columns={[
+            DC.text('name', t('الصنف'), (i) => L(i.name), { maxChars: 28 }),
+            DC.text('pack', t('عبوة الشراء'), (i) => (i.packs?.length ? L((i.packs.find((p: any) => p.id === i.purchasePackId) ?? i.packs[0]).name) : unitLabel(i.unit)), { maxChars: 20 }),
+            DC.money('avg', t('متوسط التكلفة'), (i) => i.avgCost),
+          ]} />}
           <Tech><div className="text-[11px] num text-dim">{s.id} · v{s.version}{s.taxId ? ` · ${s.taxId}` : ''}</div></Tech>
         </div>
       )}

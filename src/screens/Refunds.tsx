@@ -8,7 +8,7 @@ import React, { useEffect, useState } from 'react';
 import { RotateCcw, Check, X, Receipt, Search, Wallet, Coffee, ShieldCheck, Lock, Undo2 } from 'lucide-react';
 import { useDev, useQuery, useCommand, useReasonMin } from '../app/hooks';
 import { policyFields } from '../mock/policies'; // ux-10b: RefundCancelPolicy
-import { PageHeader, Card, Input, Button, Field, Select, Money, Table, Pill, Textarea, Tabs, SearchInput, EmptyState, Skeleton, FilterChips, Toolbar, Banner, confirmDialog, DateTime, Popup, StateBadge } from '../ui';
+import { PageHeader, Card, Input, Button, Field, Select, Money, DataTable, cols, TruncText, DensityToggle, Pill, Textarea, Tabs, SearchInput, EmptyState, Skeleton, FilterChips, Toolbar, Banner, confirmDialog, DateTime, Popup, StateBadge } from '../ui';
 import { Tech } from '../app/tech';
 import { t, L } from '../i18n';
 import { cn, money, qty } from '../lib/format';
@@ -95,13 +95,19 @@ export function RefundForm({ orderId, onDone }: { orderId: string; onDone: () =>
     if (payNow && terminal?.drawer) await run('Refund.Approve', { params: { refundCaseId: r.id }, body: { expectedVersion: r.version, payoutMethod: method } }, { success: t('المرتجع اتصرف من الدرج') });
     onDone();
   };
+  const LC = cols<any>();
   return (
     <Card title={t('٢. تفاصيل المرتجع')} description={t('المبلغ لكل صنف شامل نصيبه من الخصم والخدمة والضريبة.')}>
       <div className="space-y-4">
         <StageBanner stage={d.stage} paidOn={d.paidBusinessDate} bookedOn={d.bookedOn} />
-        <Table dense align={['start', 'end', 'end', 'end', 'end', 'start']} head={[t('الصنف'), t('الكمية'), t('اترجع قبل كده'), t('للواحدة'), t('هيرجع'), t('الصنف هيروح فين')]} rows={d.lines.map((l: any) => [L(l.name), <span className="num">{qty(l.quantity)}</span>, <span className="num">{qty(l.refundedQuantity)}</span>, <Money v={l.unitRefundable} />,
-          <div className="flex items-center gap-1 justify-end"><Input data-fb={`refund-qty:${l.lineId}`} value={lineQty[l.lineId] ?? ''} onChange={(e) => setLineQty({ ...lineQty, [l.lineId]: e.target.value.replace(/[^0-9.]/g, '') })} className="!w-16 !py-1 text-center" inputMode="decimal" /><Button size="sm" variant="ghost" onClick={() => setLineQty({ ...lineQty, [l.lineId]: '1' })} data-fb={`refund-one:${l.lineId}`}>{t('واحدة')}</Button></div>,
-          <Select data-fb={`refund-disp:${l.lineId}`} className="!w-auto min-w-[150px] !py-1 text-xs" value={disp[l.lineId] ?? 'WASTE_HELD'} onChange={(e) => setDisp({ ...disp, [l.lineId]: e.target.value })} options={DISPOSITIONS.filter((x) => x !== 'NOT_PREPARED').map((x) => ({ value: x, label: t(DISPOSITION_TEXT[x].label) }))} />])} />
+        <DataTable dense rows={d.lines} rowKey={(l: any) => l.lineId} label={t('أصناف الشيك')} columns={[
+          LC.text('name', t('الصنف'), (l) => L(l.name), { maxChars: 32 }),
+          LC.qty('qty', t('الكمية'), (l) => l.quantity),
+          LC.qty('done', t('اترجع قبل كده'), (l) => l.refundedQuantity),
+          LC.money('unit', t('للواحدة'), (l) => l.unitRefundable),
+          LC.custom('refund', t('هيرجع'), (l) => <div className="flex items-center gap-1 justify-end"><Input data-fb={`refund-qty:${l.lineId}`} value={lineQty[l.lineId] ?? ''} onChange={(e) => setLineQty({ ...lineQty, [l.lineId]: e.target.value.replace(/[^0-9.]/g, '') })} className="!w-16 !py-1 text-center" inputMode="decimal" /><Button size="sm" variant="ghost" onClick={() => setLineQty({ ...lineQty, [l.lineId]: '1' })} data-fb={`refund-one:${l.lineId}`}>{t('واحدة')}</Button></div>, { align: 'end' }),
+          LC.custom('disp', t('الصنف هيروح فين'), (l) => <Select data-fb={`refund-disp:${l.lineId}`} className="!w-auto min-w-[150px] !py-1 text-xs" value={disp[l.lineId] ?? 'WASTE_HELD'} onChange={(e) => setDisp({ ...disp, [l.lineId]: e.target.value })} options={DISPOSITIONS.filter((x) => x !== 'NOT_PREPARED').map((x) => ({ value: x, label: t(DISPOSITION_TEXT[x].label) }))} />),
+        ]} />
         <div className="grid sm:grid-cols-3 gap-3">
           <Field label={t('المبلغ اللي هيرجع')} hint={`${t('اتدفع فعلًا')} ${money(d.effectivePaid)}${suggested.length ? ` · ${t('محسوب من الأصناف')}` : ''}`}><Input data-fb="refund-amount" value={amount} onChange={(e) => { setTouched(true); setAmount(e.target.value.replace(/[^0-9.]/g, '')); }} inputMode="decimal" className="h-12" style={{ fontSize: 20 }} /></Field>
           <Field label={t('هيرجع إزاي')}><Select value={method} onChange={(e) => setMethod(e.target.value)} options={['CASH', 'CARD', 'DIGITAL_WALLET'].map((m) => ({ value: m, label: methodText(m) }))} /></Field>
@@ -138,7 +144,8 @@ function StaffMealReturn({ order }: { order: any }) {
 
 function Cases({ q }: { q: any }) {
   const { run } = useCommand();
-  const { terminal, me, can, auth } = useDev();
+  const { terminal, me, can, auth, kind } = useDev();
+  const RC = cols<any>();
   const [f, setF] = useState<'ALL' | 'REQUESTED' | 'PAID' | 'S3'>('ALL');
   const [cancel, setCancel] = useState<any>(null);
   // ux-10: the requester withdraws a pending request (a refund:reject holder may too); the server decides
@@ -151,15 +158,17 @@ function Cases({ q }: { q: any }) {
   const list = f === 'ALL' ? all : f === 'S3' ? all.filter((r) => r.afterClose) : all.filter((r) => r.state === f);
   return (
     <div className="space-y-3">
-      <Toolbar className="!mb-0"><FilterChips value={f} onChange={setF} options={[{ id: 'ALL', label: t('الكل'), count: all.length }, { id: 'REQUESTED', label: t('مستني الصرف'), count: all.filter((r) => r.state === 'REQUESTED').length, tone: 'warning' }, { id: 'PAID', label: t('اتصرف'), count: all.filter((r) => r.state === 'PAID').length }, { id: 'S3', label: t('بعد قفل اليوم'), count: all.filter((r) => r.afterClose).length, tone: 'error' }]} /></Toolbar>
-      <Table align={['start', 'end', 'start', 'start', 'start', 'start', 'start', 'end']} loading={q.loading} head={[t('الشيك'), t('المبلغ'), t('هيرجع إزاي'), t('المرحلة'), t('السبب'), t('مين عمل ومين وافق'), t('الحالة'), '']} rows={list.map((r: any) => [
-        <span className="font-bold"><span className="num">#{r.orderNumber}</span><DateTime v={r.requestedAt} className="block text-[10px] text-dim font-normal" /></span>, <Money v={r.amount} />, methodText(r.method),
-        r.stage ? <Pill tone={r.stage === 'S3' ? 'error' : 'info'} data-fb={`refund-case-stage:${r.orderNumber}`}>{t(STAGE_TEXT[r.stage as 'S2'].short)}</Pill> : <span className="text-dim">—</span>,
-        <span className="text-soft">{r.reason}<Tech><span className="num text-[10px] ms-1">{r.reasonCode}</span></Tech></span>,
-        <span className="text-xs" data-fb={`refund-case-who:${r.orderNumber}`}>{t('طلب')}: {first(r.requestedByName)}{r.state === 'PAID' && <><br />{t('صرف')}: {first(r.paidByName)}{r.drawerOwnerName ? ` · ${t('من درج')} ${first(r.drawerOwnerName)}` : ''}<br /><ShieldCheck className="w-3 h-3 inline" /> {t('وافق')}: <b>{first(r.approverName)}</b></>}{r.afterClose && r.state === 'PAID' && <><br /><span className="text-[var(--error)]">{t('اتسجل يوم')} <span className="num">{r.businessDate}</span> ({t('الأصلي')} <span className="num">{r.originalBusinessDate}</span>)</span></>}{r.state === 'CANCELLED' && r.cancelledByName && <><br /><span data-fb={`refund-case-cancelled:${r.orderNumber}`}>{t('ألغاه')}: {first(r.cancelledByName)}{r.cancelReason ? ` — ${r.cancelReason}` : ''}</span></>}</span>,
-        <Pill tone={STATE[r.state]?.[1] ?? 'neutral'} dot>{t(STATE[r.state]?.[0] ?? '—')}</Pill>,
-        r.state === 'REQUESTED' ? <div className="flex gap-1 justify-end">{terminal?.drawer || r.method !== 'CASH' ? <Button size="sm" variant="success" onClick={() => approve(r)} data-fb={`refund-approve:${r.orderNumber}`}><Wallet className="w-3.5 h-3.5" />{t('اصرف (موافقة مدير)')}</Button> : <Pill tone="neutral"><Lock className="w-3 h-3" />{t('من جهاز الكاشير')}</Pill>}{canCancel(r) && <Button size="sm" variant="ghost" onClick={() => setCancel(r)} data-fb={`refund-cancel:${r.orderNumber}`} title={t('إلغاء الطلب')} aria-label={t('إلغاء الطلب')}><Undo2 className="w-3.5 h-3.5" /></Button>}{can('refund:reject') && <Button size="sm" variant="ghost" onClick={() => reject(r)} title={t('ارفض')} aria-label={t('ارفض')}><X className="w-3.5 h-3.5" /></Button>}</div> : null,
-      ])} empty={<EmptyState compact icon={<Receipt />} title={t('مفيش طلبات مرتجع')} text={t('اطلب مرتجع من التاب الأول.')} />} />
+      <Toolbar className="!mb-0"><FilterChips value={f} onChange={setF} options={[{ id: 'ALL', label: t('الكل'), count: all.length }, { id: 'REQUESTED', label: t('مستني الصرف'), count: all.filter((r) => r.state === 'REQUESTED').length, tone: 'warning' }, { id: 'PAID', label: t('اتصرف'), count: all.filter((r) => r.state === 'PAID').length }, { id: 'S3', label: t('بعد قفل اليوم'), count: all.filter((r) => r.afterClose).length, tone: 'error' }]} />{kind !== 'CASH' && <><Toolbar.Spacer /><DensityToggle /></>}</Toolbar>
+      <DataTable rows={list} rowKey={(r: any) => r.id ?? r.orderNumber} loading={q.loading} touch={kind === 'CASH'} label={t('طلبات المرتجع')} columns={[
+        RC.number('check', t('الشيك'), (r) => r.orderNumber, { align: 'start', cell: (r) => <span className="font-bold"><span className="num">#{r.orderNumber}</span><DateTime v={r.requestedAt} className="block text-[10px] text-dim font-normal" /></span> }),
+        RC.money('amount', t('المبلغ'), (r) => r.amount),
+        RC.text('method', t('هيرجع إزاي'), (r) => methodText(r.method), { maxChars: 16 }),
+        RC.status('stage', t('المرحلة'), (r) => r.stage ? { label: t(STAGE_TEXT[r.stage as 'S2'].short), tone: r.stage === 'S3' ? 'error' : 'info' } : null),
+        RC.text('reason', t('السبب'), (r) => r.reason, { maxChars: 26, cell: (r) => <TruncText text={r.reason ?? ''} maxChars={26} className="text-soft">{r.reason}<Tech><span className="num text-[10px] ms-1">{r.reasonCode}</span></Tech></TruncText> }),
+        RC.custom('who', t('مين عمل ومين وافق'), (r) => <span className="text-xs" data-fb={`refund-case-who:${r.orderNumber}`}>{t('طلب')}: {first(r.requestedByName)}{r.state === 'PAID' && <><br />{t('صرف')}: {first(r.paidByName)}{r.drawerOwnerName ? ` · ${t('من درج')} ${first(r.drawerOwnerName)}` : ''}<br /><ShieldCheck className="w-3 h-3 inline" /> {t('وافق')}: <b>{first(r.approverName)}</b></>}{r.afterClose && r.state === 'PAID' && <><br /><span className="text-[var(--error)]">{t('اتسجل يوم')} <span className="num">{r.businessDate}</span> ({t('الأصلي')} <span className="num">{r.originalBusinessDate}</span>)</span></>}{r.state === 'CANCELLED' && r.cancelledByName && <><br /><span data-fb={`refund-case-cancelled:${r.orderNumber}`}>{t('ألغاه')}: {first(r.cancelledByName)}{r.cancelReason ? ` — ${r.cancelReason}` : ''}</span></>}</span>),
+        RC.status('state', t('الحالة'), (r) => ({ label: t(STATE[r.state]?.[0] ?? '—'), tone: STATE[r.state]?.[1] ?? 'neutral' })),
+        RC.actions('act', (r) => r.state === 'REQUESTED' ? <>{terminal?.drawer || r.method !== 'CASH' ? <Button size="sm" variant="success" onClick={() => approve(r)} data-fb={`refund-approve:${r.orderNumber}`}><Wallet className="w-3.5 h-3.5" />{t('اصرف (موافقة مدير)')}</Button> : <Pill tone="neutral"><Lock className="w-3 h-3" />{t('من جهاز الكاشير')}</Pill>}{canCancel(r) && <Button size="sm" variant="ghost" onClick={() => setCancel(r)} data-fb={`refund-cancel:${r.orderNumber}`} title={t('إلغاء الطلب')} aria-label={t('إلغاء الطلب')}><Undo2 className="w-3.5 h-3.5" /></Button>}{can('refund:reject') && <Button size="sm" variant="ghost" onClick={() => reject(r)} title={t('ارفض')} aria-label={t('ارفض')}><X className="w-3.5 h-3.5" /></Button>}</> : null),
+      ]} empty={<EmptyState compact icon={<Receipt />} title={t('مفيش طلبات مرتجع')} text={t('اطلب مرتجع من التاب الأول.')} />} />
       <div className="text-[11px] text-dim">{t('الموافقة لازم تكون من مدير غير اللي طلب، والصرف الكاش بيطلع من الدرج المفتوح على الجهاز اللي بيصرف — عشان يتعرف الفلوس طلعت من درج مين.')}</div>
       {cancel && <CancelRefundPopup r={cancel} onClose={() => setCancel(null)} />}
     </div>

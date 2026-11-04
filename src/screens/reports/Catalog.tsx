@@ -5,7 +5,7 @@ import React, { useMemo, useState } from 'react';
 import { Database, Ruler, FileBarChart, LineChart, FileSearch, MessageCircleQuestion, ArrowLeft, Play, Layers } from 'lucide-react';
 import { useDev, useQuery, errorText } from '../../app/hooks';
 import { call } from '../../api/client';
-import { PageHeader, Card, Pill, Table, Button, StateBadge, Tabs, SearchInput, FilterChips, Banner, Spinner, Select } from '../../ui';
+import { PageHeader, Card, Pill, DataTable, cols, Button, StateBadge, Tabs, SearchInput, FilterChips, Banner, Spinner, Select } from '../../ui';
 import { t, L } from '../../i18n';
 import { cn } from '../../lib/format';
 import { Tech } from '../../app/tech';
@@ -89,37 +89,41 @@ function Layers6({ c, onReport, onAsk }: { c: any; onReport: () => void; onAsk: 
 }
 
 function Metrics({ metrics }: { metrics: any[] }) {
+  const MC = cols<any>();
   const [q, setQ] = useState('');
   const [st, setSt] = useState<'all' | 'AVAILABLE' | 'NOT_AVAILABLE' | 'CANONICAL' | 'PROPOSED' | 'MARKET'>('all');
   const rows = metrics.filter((m) => (st === 'all' || m.status === st || m.authority === st) && (!q || (L(m.label) + m.id + L(m.definition)).includes(q)));
   return (
     <Card padding="sm" data-fb="rcat-metrics">
       <div className="flex flex-wrap gap-2 mb-2"><SearchInput value={q} onChange={setQ} placeholder={t('دوّر على مقياس')} /><FilterChips value={st} onChange={setSt} options={[{ id: 'all', label: t('الكل'), count: metrics.length }, { id: 'AVAILABLE', label: t('متاح'), count: metrics.filter((m) => m.status === 'AVAILABLE').length, tone: 'success' }, { id: 'NOT_AVAILABLE', label: t('مش متاح'), count: metrics.filter((m) => m.status !== 'AVAILABLE').length, tone: 'warning' }, { id: 'CANONICAL', label: t('معتمد في العقد'), count: metrics.filter((m) => m.authority === 'CANONICAL').length }, { id: 'PROPOSED', label: t('مقترح'), count: metrics.filter((m) => m.authority === 'PROPOSED').length }]} /></div>
-      <Table dense maxHeight={620} head={[t('المقياس'), t('التعريف'), t('الوحدة / الجمع'), t('المصدر'), t('الحالة')]} rows={rows.map((m) => [
-        <div className="min-w-40"><div className="font-bold">{L(m.label)}</div><div className="text-[10px] text-dim">{t('نسخة {v}', { v: m.version })} · {authorityText(m.authority)}</div><Tech><div className="num text-[10px] text-dim" dir="ltr">{m.id}</div></Tech></div>,
-        <div className="text-xs max-w-md"><div>{L(m.definition)}</div>{m.pitfalls?.map((p: any, i: number) => <div key={i} className="text-[var(--warning-text)]">{t('تنبيه')}: {L(p)}</div>)}<Tech><div className="num text-[10px] text-dim mt-0.5" dir="ltr">{m.formula} · grain {m.grain}</div></Tech></div>,
-        <div className="text-xs"><div>{m.unit === 'EGP' ? currency() : m.unit === 'count' ? t('عدد') : m.unit === '%' ? '%' : m.unit === 'minutes' ? t('دقايق') : m.unit === 'unit' ? t('وحدة') : m.unit}</div><div className="text-dim">{additivityText(m.additivity)}</div></div>,
-        <div className="text-xs"><div>{t(FACT_AR[m.fact] ?? (m.fact === 'composite' ? 'مركب من مقاييس' : m.fact))}</div><div className="text-dim">{m.dimensions.length} {t('بُعد مسموح')}</div></div>,
-        m.status === 'AVAILABLE' ? <Pill size="sm" tone="success">{t('متاح')}</Pill> : <div className="max-w-xs"><Pill size="sm" tone="warning">{t('مش متاح')}</Pill><div className="text-[10px] text-dim mt-0.5">{L(m.reason)}</div></div>,
-      ])} />
+      <DataTable dense maxHeight={620} rows={rows} rowKey={(m: any) => m.id} label={t('المقاييس')} columns={[
+        MC.text('label', t('المقياس'), (m) => L(m.label), { cell: (m) => <div className="min-w-40"><div className="font-bold">{L(m.label)}</div><div className="text-[10px] text-dim">{t('نسخة {v}', { v: m.version })} · {authorityText(m.authority)}</div><Tech><div className="num text-[10px] text-dim" dir="ltr">{m.id}</div></Tech></div> }),
+        MC.custom('def', t('التعريف'), (m) => <div className="text-xs max-w-md"><div>{L(m.definition)}</div>{m.pitfalls?.map((p: any, i: number) => <div key={i} className="text-[var(--warning-text)]">{t('تنبيه')}: {L(p)}</div>)}<Tech><div className="num text-[10px] text-dim mt-0.5" dir="ltr">{m.formula} · grain {m.grain}</div></Tech></div>),
+        MC.custom('unit', t('الوحدة / الجمع'), (m) => <div className="text-xs"><div>{m.unit === 'EGP' ? currency() : m.unit === 'count' ? t('عدد') : m.unit === '%' ? '%' : m.unit === 'minutes' ? t('دقايق') : m.unit === 'unit' ? t('وحدة') : m.unit}</div><div className="text-dim">{additivityText(m.additivity)}</div></div>),
+        MC.custom('source', t('المصدر'), (m) => <div className="text-xs"><div>{t(FACT_AR[m.fact] ?? (m.fact === 'composite' ? 'مركب من مقاييس' : m.fact))}</div><div className="text-dim">{m.dimensions.length} {t('بُعد مسموح')}</div></div>),
+        MC.status('status', t('الحالة'), (m) => (m.status === 'AVAILABLE' ? { label: t('متاح'), tone: 'success' } : { label: t('مش متاح'), tone: 'warning' }), { cell: (m) => m.status === 'AVAILABLE' ? <Pill size="sm" tone="success">{t('متاح')}</Pill> : <div className="max-w-xs"><Pill size="sm" tone="warning">{t('مش متاح')}</Pill><div className="text-[10px] text-dim mt-0.5">{L(m.reason)}</div></div> }),
+      ]} />
     </Card>
   );
 }
 
 function Dimensions({ dims }: { dims: any[] }) {
+  const MC = cols<any>();
   return (
     <Card padding="sm" data-fb="rcat-dimensions">
-      <Table dense maxHeight={620} head={[t('البُعد'), t('الوصف'), t('تحذير'), t('الحالة')]} rows={dims.map((d) => [
-        <div><div className="font-bold">{L(d.label)}</div><div className="text-[10px] text-dim">{d.priority}{d.permission ? ` · ${t('للمدير')}` : ''}</div><Tech><span className="num text-[10px] text-dim">{d.id} · {d.source}</span></Tech></div>,
-        <span className="text-xs">{L(d.description)}</span>, <span className="text-xs text-[var(--warning-text)]">{L(d.warning)}</span>,
-        d.status === 'AVAILABLE' ? <Pill size="sm" tone="success">{t('متاح')}</Pill> : <div><Pill size="sm" tone="warning">{t('مش متاح')}</Pill><div className="text-[10px] text-dim">{L(d.reason)}</div></div>,
-      ])} />
+      <DataTable dense maxHeight={620} rows={dims} rowKey={(d: any) => d.id} label={t('الأبعاد')} columns={[
+        MC.text('label', t('البُعد'), (d) => L(d.label), { cell: (d) => <div><div className="font-bold">{L(d.label)}</div><div className="text-[10px] text-dim">{d.priority}{d.permission ? ` · ${t('للمدير')}` : ''}</div><Tech><span className="num text-[10px] text-dim">{d.id} · {d.source}</span></Tech></div> }),
+        MC.text('desc', t('الوصف'), (d) => L(d.description), { maxChars: 60 }),
+        MC.text('warn', t('تحذير'), (d) => L(d.warning), { maxChars: 40, className: 'text-[var(--warning-text)]' }),
+        MC.status('status', t('الحالة'), (d) => (d.status === 'AVAILABLE' ? { label: t('متاح'), tone: 'success' } : { label: t('مش متاح'), tone: 'warning' }), { cell: (d) => d.status === 'AVAILABLE' ? <Pill size="sm" tone="success">{t('متاح')}</Pill> : <div><Pill size="sm" tone="warning">{t('مش متاح')}</Pill><div className="text-[10px] text-dim">{L(d.reason)}</div></div> }),
+      ]} />
     </Card>
   );
 }
 
 /** The L3 builder: pick registered metrics × dimensions × period → the engine answers, refuses or says not available. */
 function Builder({ metrics, dims }: { metrics: any[]; dims: any[] }) {
+  const MC = cols<any>();
   const { auth } = useDev();
   const today = businessDate(clock.now());
   const y = new Date(Date.parse(today + 'T12:00:00Z') - 86_400_000).toISOString().slice(0, 10);
@@ -150,9 +154,12 @@ function Builder({ metrics, dims }: { metrics: any[]; dims: any[] }) {
         <Card>
           {res.meta.refused.map((x: any, i: number) => <Banner key={i} tone="warning" title={t('اترفض')}>{L(metrics.find((m) => m.id === x.metric)?.label)}: {L(x.reason)}</Banner>)}
           {res.meta.notAvailable.map((x: any, i: number) => <Banner key={i} tone="info" title={t('مش متاح')}>{L(metrics.find((m) => m.id === x.metric)?.label)}: {L(x.reason)}</Banner>)}
-          <Table dense maxHeight={460} align={[...res.dimensions.map(() => 'start' as const), ...res.metrics.map(() => 'end' as const)]}
-            head={[...res.dimensions.map((d: string) => L(dims.find((x: any) => x.id === d)?.label)), ...res.metrics.map((m: string) => L(metrics.find((x) => x.id === m)?.label))]}
-            rows={[...res.rows.map((r: any) => [...res.dimensions.map((d: string) => L(r.labels[d])), ...res.metrics.map((m: string) => <Val v={r.values[m]} unit={metrics.find((x) => x.id === m)?.unit} spec={{ metric: m, cell: r.dims, from, to }} />)]), [<b>{t('الإجمالي (محسوب من جديد)')}</b>, ...res.dimensions.slice(1).map(() => ''), ...res.metrics.map((m: string) => <Val v={res.totals[m]} unit={metrics.find((x) => x.id === m)?.unit} spec={{ metric: m, from, to }} />)]]} />
+          <DataTable dense maxHeight={460} rows={res.rows} rowKey={(r: any, i) => r.key ?? i} label={t('النتيجة')} pageSize={100}
+            columns={[
+              ...res.dimensions.map((d: string) => MC.text(`d:${d}`, L(dims.find((x: any) => x.id === d)?.label), (r) => L(r.labels[d]), { maxChars: 32 })),
+              ...res.metrics.map((m: string) => (metrics.find((x) => x.id === m)?.unit === 'EGP' ? MC.money : MC.number)(`m:${m}`, L(metrics.find((x) => x.id === m)?.label), (r) => r.values[m]?.value ?? null, { cell: (r) => <Val v={r.values[m]} unit={metrics.find((x) => x.id === m)?.unit} spec={{ metric: m, cell: r.dims, from, to }} /> })),
+            ]}
+            footer={(c, j) => (j === 0 ? <b>{t('الإجمالي (محسوب من جديد)')}</b> : c.id.startsWith('m:') ? <Val v={res.totals[c.id.slice(2)]} unit={metrics.find((x) => x.id === c.id.slice(2))?.unit} spec={{ metric: c.id.slice(2), from, to }} /> : null)} />
           <div className="text-[11px] text-dim mt-2">{res.meta.provisional ? t('مبدئي') + ': ' + res.meta.provisionalReasons.map((x: any) => L(x)).join(' ') : t('نهائي — الأيام مقفولة')}</div>
         </Card>
       )}

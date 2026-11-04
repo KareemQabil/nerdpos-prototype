@@ -4,7 +4,7 @@
 import React, { useMemo, useState } from 'react';
 import { Plus, Pencil, Save, Ticket, Timer, Radio as RadioIcon, Trash2, Gift, ShoppingBag, Percent, Layers, Package, History, Users } from 'lucide-react';
 import { useCommand, useReasonMin } from '../../app/hooks';
-import { Button, Card, DateTime, Field, Input, Modal, Money, Pill, Section, StateBadge, Switch, Table, Tabs, Textarea } from '../../ui';
+import { Button, Card, DateTime, Field, Input, Modal, Money, Pill, Section, StateBadge, Switch, DataTable, cols, Tabs, Textarea } from '../../ui';
 import { t, L } from '../../i18n';
 import { Tech } from '../../app/tech';
 import { dateTime, cn } from '../../lib/format';
@@ -89,6 +89,7 @@ export default function Promotions() {
     if (r) setToggling(null);
   };
   const shown = list.items.filter((p) => filter === 'all' || (filter === 'live' ? p.liveNow : !p.active));
+  const PC = cols<any>();
   const noStack = stacking?.mode === 'NO_STACKING' || !stacking;
   return (
     <div className="space-y-4">
@@ -101,22 +102,22 @@ export default function Promotions() {
         <span className="text-xs text-dim">{t('من الإعدادات: التسعير')}</span>
         <Tech><span className="num text-[10px]"> DiscountStackingPolicy {JSON.stringify(stacking)} · PromotionPolicy {JSON.stringify(rules)}</span></Tech>
       </div>
-      <Table head={[t('العرض'), t('بيدّي إيه'), t('إزاي'), t('إمتى'), t('الاستخدام'), t('شغال دلوقتي'), t('مفعّل'), '']} rows={shown.map((pr) => [
-        <div className="min-w-[190px] max-w-[240px]"><div className="font-bold">{L(pr.name)}</div>{pr.description?.ar && <div className="text-[11px] text-dim truncate">{L(pr.description)}</div>}<Tech><span className="num text-[10px] text-dim">{pr.id} v{pr.version} · {t('الأولوية')} {pr.priority ?? 100}</span></Tech></div>,
-        <div className="text-sm max-w-[260px]">{L(pr.summary)}{pr.minSubtotal && <div className="text-[11px] text-dim">{t('لو الشيك فوق')} <Money v={pr.minSubtotal} /></div>}{pr.maxDiscount && <div className="text-[11px] text-dim">{t('أقصى خصم')} <Money v={pr.maxDiscount} /></div>}{pr.maxPerCheck && <div className="text-[11px] text-dim">{t('حتى {n} في الشيك', { n: pr.maxPerCheck })}</div>}</div>,
-        <div className="flex flex-col gap-1 items-start">{pr.kind === 'CODED' ? <Pill tone="primary"><Ticket className="w-3 h-3" />{t('كود')} <span className="num">{(pr.codes ?? []).join(t('، '))}</span></Pill> : <Pill tone="info"><Timer className="w-3 h-3" />{t('أوتوماتيك')}</Pill>}<div className="flex flex-wrap gap-1">{pr.channels.map((c: string) => <Pill key={c} tone="neutral">{channelLabel(c)}</Pill>)}</div><span className="text-[11px] text-dim">{pr.branchIds.length ? pr.branchIds.map(branchName).join(t('، ')) : t('كل الفروع')}</span>{pr.stacking === 'STACKABLE' && <Pill tone="violet"><Layers className="w-3 h-3" />{t('بيتجمع')}</Pill>}{pr.customerScope && pr.customerScope !== 'ANY' && <Pill tone="violet"><Users className="w-3 h-3" />{pr.customerScope === 'TIERS' ? (pr.tierNames ?? []).map((n: any) => L(n)).join(t('، ')) : t('عملاء مسجلون')}</Pill>}</div>,
-        <div className="text-xs">
+      <DataTable rows={shown} rowKey={(pr: any) => pr.id} label={t('العروض')} empty={t('مفيش عروض')} columns={[
+        PC.text('name', t('العرض'), (pr) => L(pr.name), { cell: (pr) => <div className="min-w-[190px] max-w-[240px]"><div className="font-bold">{L(pr.name)}</div>{pr.description?.ar && <div className="text-[11px] text-dim truncate">{L(pr.description)}</div>}<Tech><span className="num text-[10px] text-dim">{pr.id} v{pr.version} · {t('الأولوية')} {pr.priority ?? 100}</span></Tech></div> }),
+        PC.custom('gives', t('بيدّي إيه'), (pr) => <div className="text-sm max-w-[260px]">{L(pr.summary)}{pr.minSubtotal && <div className="text-[11px] text-dim">{t('لو الشيك فوق')} <Money v={pr.minSubtotal} /></div>}{pr.maxDiscount && <div className="text-[11px] text-dim">{t('أقصى خصم')} <Money v={pr.maxDiscount} /></div>}{pr.maxPerCheck && <div className="text-[11px] text-dim">{t('حتى {n} في الشيك', { n: pr.maxPerCheck })}</div>}</div>),
+        PC.custom('how', t('إزاي'), (pr) => <div className="flex flex-col gap-1 items-start">{pr.kind === 'CODED' ? <Pill tone="primary"><Ticket className="w-3 h-3" />{t('كود')} <span className="num">{(pr.codes ?? []).join(t('، '))}</span></Pill> : <Pill tone="info"><Timer className="w-3 h-3" />{t('أوتوماتيك')}</Pill>}<div className="flex flex-wrap gap-1">{pr.channels.map((c: string) => <Pill key={c} tone="neutral">{channelLabel(c)}</Pill>)}</div><span className="text-[11px] text-dim">{pr.branchIds.length ? pr.branchIds.map(branchName).join(t('، ')) : t('كل الفروع')}</span>{pr.stacking === 'STACKABLE' && <Pill tone="violet"><Layers className="w-3 h-3" />{t('بيتجمع')}</Pill>}{pr.customerScope && pr.customerScope !== 'ANY' && <Pill tone="violet"><Users className="w-3 h-3" />{pr.customerScope === 'TIERS' ? (pr.tierNames ?? []).map((n: any) => L(n)).join(t('، ')) : t('عملاء مسجلون')}</Pill>}</div>),
+        PC.custom('when', t('إمتى'), (pr) => (<div className="text-xs">
           {pr.dayparts?.length ? pr.dayparts.map((dp: Daypart, i: number) => <div key={i} className="whitespace-nowrap">{dp.days.length === 7 ? t('كل يوم') : dp.days.map(dayLabel).join(t('، '))} <span className="num">{dp.start}–{dp.end}</span></div>) : <span className="text-dim">{t('طول الوقت')}</span>}
-          {(pr.validFrom || pr.validTo) && <div className="text-dim">{pr.validFrom ? dateTime(new Date(pr.validFrom).toISOString()) : '…'} ← {pr.validTo ? dateTime(new Date(pr.validTo).toISOString()) : '…'}</div>}
-        </div>,
-        <div className="text-xs whitespace-nowrap"><div>{t('النهارده')}: <b className="num">{pr.usage?.today ?? 0}</b>{pr.maxUsesPerDay ? <span className="text-dim"> / {pr.maxUsesPerDay}</span> : null}</div><div>{t('الإجمالي')}: <b className="num">{pr.usage?.total ?? 0}</b>{pr.maxUses ? <span className="text-dim"> / {pr.maxUses}</span> : null}</div>{pr.maxUsesPerCustomer && <div className="text-dim">{t('لكل عميل: {n}', { n: pr.maxUsesPerCustomer })}</div>}{pr.exhausted && <Pill tone="warning">{t('خلص')}</Pill>}</div>,
-        pr.liveNow && !pr.exhausted ? <Pill tone="success"><RadioIcon className="w-3 h-3" />{t('شغال')}</Pill> : <Pill tone="neutral">{t('لأ')}</Pill>,
-        <Switch checked={pr.active} onChange={(v) => toggle(pr, v)} />,
-        <div className="flex gap-1 justify-end">
+          {(pr.validFrom || pr.validTo) && <div className="text-dim">{pr.validFrom ? <DateTime v={new Date(pr.validFrom).toISOString()} /> : '…'} ← {pr.validTo ? <DateTime v={new Date(pr.validTo).toISOString()} /> : '…'}</div>}
+        </div>)),
+        PC.number('usage', t('الاستخدام'), (pr) => pr.usage?.total ?? 0, { align: 'start', cell: (pr) => <div className="text-xs whitespace-nowrap"><div>{t('النهارده')}: <b className="num">{pr.usage?.today ?? 0}</b>{pr.maxUsesPerDay ? <span className="text-dim"> / {pr.maxUsesPerDay}</span> : null}</div><div>{t('الإجمالي')}: <b className="num">{pr.usage?.total ?? 0}</b>{pr.maxUses ? <span className="text-dim"> / {pr.maxUses}</span> : null}</div>{pr.maxUsesPerCustomer && <div className="text-dim">{t('لكل عميل: {n}', { n: pr.maxUsesPerCustomer })}</div>}{pr.exhausted && <Pill tone="warning">{t('خلص')}</Pill>}</div> }),
+        PC.status('live', t('شغال دلوقتي'), (pr) => (pr.liveNow && !pr.exhausted ? { label: t('شغال'), tone: 'success' } : { label: t('لأ'), tone: 'neutral' }), { cell: (pr) => pr.liveNow && !pr.exhausted ? <Pill tone="success"><RadioIcon className="w-3 h-3" />{t('شغال')}</Pill> : <Pill tone="neutral">{t('لأ')}</Pill> }),
+        PC.custom('active', t('مفعّل'), (pr) => <Switch checked={pr.active} onChange={(v) => toggle(pr, v)} />),
+        PC.actions('act', (pr) => <>
           <Button size="sm" variant="ghost" data-fb={`promotion:history:${pr.id}`} onClick={() => setHistory(pr)} title={t('سجل العرض')}><History className="w-3.5 h-3.5" /></Button>
           <Button size="sm" data-fb={`promotion:edit:${pr.id}`} onClick={() => setForm(toDraft(pr))}><Pencil className="w-3.5 h-3.5" />{t('تعديل')}</Button>
-        </div>,
-      ])} empty={t('مفيش عروض')} />
+        </>),
+      ]} />
 
       <Modal open={!!form} onClose={() => setForm(null)} xwide title={form?.id ? t('تعديل العرض') : t('عرض جديد')} badge={<StateBadge ops={['Promotion.Upsert']} />}
         footer={<>{needReason && <Input data-fb="promotion-form:reason" value={form!.changeReason} onChange={(e) => setForm({ ...form!, changeReason: e.target.value })} placeholder={t('سبب التعديل ({n} أحرف على الأقل)', { n: min })} className="max-w-md" maxLength={200} />}<div className="flex-1" /><Button onClick={() => setForm(null)}>{t('إلغاء')}</Button><Button data-fb="promotion-form:save" variant="primary" loading={busy} onClick={save} disabled={!form?.name.ar.trim() || !form?.channels.length || (needReason && form!.changeReason.trim().length < min)}><Save className="w-4 h-4" />{t('حفظ')}</Button></>}>
@@ -127,13 +128,13 @@ export default function Promotions() {
         {toggling && <div className="space-y-3"><Pill tone="neutral">{t('استُخدم في {n} شيك', { n: toggling.pr.usage?.total ?? 0 })}</Pill><Field label={t('السبب')} required hint={t('{n} أحرف على الأقل', { n: min })}><Textarea value={toggling.reason} onChange={(e) => setToggling({ ...toggling, reason: e.target.value })} maxLength={200} data-fb="promotion-toggle:reason" /></Field></div>}
       </Modal>
       <Modal open={!!history} onClose={() => setHistory(null)} wide title={t('سجل «{n}»', { n: L(history?.name) })} badge={<StateBadge ops={['Promotion.Find']} />}>
-        {history && <Table head={[t('النسخة'), t('التغيير'), t('العرض'), t('السبب'), t('بواسطة')]} empty={t('لا يوجد سجل')} rows={(history.revisions ?? []).map((r: any) => [
-          <span className="num">v{r.version}</span>,
-          <Pill tone={r.change === 'DEACTIVATED' ? 'warning' : r.change === 'CREATED' ? 'success' : 'neutral'}>{t(REV[r.change] ?? r.change)}</Pill>,
-          <span className="text-xs">{L(r.summary)}</span>,
-          <span className="text-xs">{r.reason ?? '—'}</span>,
-          <span className="text-[11px] text-dim">{r.byName} · <DateTime v={r.at} /></span>,
-        ])} />}
+        {history && <DataTable dense rows={history.revisions ?? []} rowKey={(r: any) => r.version} empty={t('لا يوجد سجل')} defaultSort={{ id: 'version', dir: 'desc' }} columns={[
+          PC.number('version', t('النسخة'), (r) => r.version, { align: 'start', cell: (r) => <span className="num">v{r.version}</span> }),
+          PC.status('change', t('التغيير'), (r) => ({ label: t(REV[r.change] ?? r.change), tone: r.change === 'DEACTIVATED' ? 'warning' : r.change === 'CREATED' ? 'success' : 'neutral' })),
+          PC.text('summary', t('العرض'), (r) => L(r.summary), { maxChars: 40 }),
+          PC.text('reason', t('السبب'), (r) => r.reason, { maxChars: 32 }),
+          PC.date('at', t('بواسطة'), (r) => r.at, { cell: (r) => <span className="text-[11px] text-dim">{r.byName} · <DateTime v={r.at} /></span> }),
+        ]} />}
       </Modal>
     </div>
   );

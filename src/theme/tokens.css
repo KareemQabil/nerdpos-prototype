@@ -241,6 +241,10 @@ input, select, textarea { font: inherit; color: inherit; }
   .detail-side { background: color-mix(in srgb, var(--card) 55%, transparent); }
   .detail-page { background: transparent; }
   .table-row.row-selected > td { background: var(--primary-container); }
+  /* ux-16 the one table: focused row, touch-sized actions on cashier-facing tables, totals row */
+  .table-row:focus-visible > td { background: var(--row-hover); }
+  table[data-touch] td[data-kind="actions"] button { min-height: 2.75rem; min-width: 2.75rem; }
+  table[data-table="v2"] tfoot td { background: var(--table-head); }
   .overlay-footer { background: var(--overlay-footer); }
   .toast-card { background: var(--overlay-bg); border: 1px solid var(--glass-border); box-shadow: var(--shadow-pop); }
   .skeleton { background: linear-gradient(90deg, var(--skeleton-a) 0%, var(--skeleton-b) 50%, var(--skeleton-a) 100%); background-size: 200% 100%; animation: shimmer 1.4s ease-in-out infinite; }

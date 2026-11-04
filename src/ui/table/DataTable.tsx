@@ -162,7 +162,7 @@ function DefaultCell<T>({ c, row, i }: { c: Column<T>; row: T; i: number }) {
       return <span className="inline-flex items-baseline gap-1 whitespace-nowrap"><span className="num">{fmtQty(String(v))}</span>{u && <span className="text-[11px] text-dim">{u}</span>}</span>;
     }
     case 'number': return v === null || v === undefined || v === '' ? dash : <span className="num">{String(v)}</span>;
-    case 'status': { const s = c.status?.(row); return s ? <Pill size="sm" tone={s.tone ?? 'neutral'}>{s.label}</Pill> : dash; }
+    case 'status': { const s = c.status?.(row); return s ? <Pill size="sm" tone={s.tone ?? 'neutral'} dot>{s.label}</Pill> : dash; }
     case 'date': return <DateTime v={v as string} />;
     case 'time': return <DateTime v={v as string} time />;
     case 'day': return <DayText v={v as string} />;
@@ -203,6 +203,8 @@ export interface DataTableProps<T> {
   defaultSort?: { id: string; dir: SortDir };
   /** Rows per page for long lists (default 50); false shows every row. */
   pageSize?: number | false;
+  /** A footer row from the server (a report's own totals): one cell per column; replaces the computed totals. */
+  footer?: (c: Column<T>, index: number) => React.ReactNode;
   /** Footer label of the totals row (shown when a column has `total`). */
   totalLabel?: React.ReactNode;
   /** Accessible name of the table. */
@@ -213,7 +215,7 @@ export interface DataTableProps<T> {
 }
 
 /** The one table. */
-export function DataTable<T>({ columns, rows, rowKey, onRowOpen, rowClassName, rowAttrs, selectedKey, empty, loading, error, dense, touch, fill, maxHeight, className, wrapClassName, defaultSort, pageSize = 50, totalLabel, label, fb, plainEmpty }: DataTableProps<T>) {
+export function DataTable<T>({ columns, rows, rowKey, onRowOpen, rowClassName, rowAttrs, selectedKey, empty, loading, error, dense, touch, fill, maxHeight, className, wrapClassName, defaultSort, pageSize = 50, footer, totalLabel, label, fb, plainEmpty }: DataTableProps<T>) {
   const lang = getLang();
   const viewer = useDensity();
   const density = effectiveDensity(viewer, dense);
@@ -285,7 +287,7 @@ export function DataTable<T>({ columns, rows, rowKey, onRowOpen, rowClassName, r
   return (
     <div className={cn('flex flex-col min-w-0', fill && 'flex-1 min-h-0', className)} data-fb={fb}>
       <div ref={wrap} className={cn('rounded-xl border line table-wrap', flow ? 'overflow-visible' : 'overflow-auto', fill && 'flex-1 min-h-0', wrapClassName)} style={maxHeight ? { maxHeight } : undefined} data-table-fill={fill || undefined}>
-        <table ref={tbl} className="w-full text-sm border-separate border-spacing-0 tabular-nums" data-table="v2" data-density={density} aria-label={label} aria-busy={loading || undefined}>
+        <table ref={tbl} className="w-full text-sm border-separate border-spacing-0 tabular-nums" data-table="v2" data-density={density} data-touch={touch || undefined} aria-label={label} aria-busy={loading || undefined}>
           <colgroup>{columns.map((c, j) => <col key={c.id} style={widths[j] ? { width: `calc(${widths[j]}ch + 1.5rem)` } : undefined} />)}</colgroup>
           <thead>
             <tr>
@@ -331,7 +333,14 @@ export function DataTable<T>({ columns, rows, rowKey, onRowOpen, rowClassName, r
               );
             })}
           </tbody>
-          {totals && rows.length > 0 && (
+          {footer && rows.length > 0 && (
+            <tfoot>
+              <tr data-fb="table-totals">
+                {columns.map((c, j) => <td key={c.id} className={cn('table-head sticky bottom-0 px-3 py-2 border-t line font-bold', al(c))} data-kind={c.kind}>{footer(c, j)}</td>)}
+              </tr>
+            </tfoot>
+          )}
+          {!footer && totals && rows.length > 0 && (
             <tfoot>
               <tr data-fb="table-totals">
                 {columns.map((c, j) => (

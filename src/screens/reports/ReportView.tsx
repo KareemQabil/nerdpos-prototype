@@ -2,7 +2,7 @@
 // No finance logic here — every number comes from Report.Run and opens its evidence (Report.Explain).
 import React, { useState } from 'react';
 import { ArrowDown, Equal, Wallet, Scale, Layers, Info, FileText } from 'lucide-react';
-import { Card, Pill, Table, Banner, Button } from '../../ui';
+import { Card, Pill, Banner, Button, DataTable, cols, DayText } from '../../ui';
 import { t, L } from '../../i18n';
 import { cn } from '../../lib/format';
 import { Tech } from '../../app/tech';
@@ -37,13 +37,16 @@ function QTable({ run, b }: { run: any; b: any }) {
   const r = b.result;
   if (!r.rows.length) return <div className="text-sm text-dim py-2">{t('مفيش بيانات في الفترة دي')}</div>;
   const spec = (m: string, row?: any): EvidenceSpec => ({ metric: m, cell: row?.dims, from: run.period.from, to: run.period.to, branchIds: run.branchIds, filters: b.filters });
+  const C = cols<any>();
+  // ux-16: dimensions are text columns, metrics money / number columns (sorted as Decimal strings); the totals row is
+  // the server's own («محسوب من جديد»), pinned under the rows and never sorted with them
+  const columns = [
+    ...r.dimensions.map((d: string) => C.text(`d:${d}`, t(DIM_AR[d] ?? d), (row) => L(row.labels[d]), { maxChars: 32, cell: (row) => <span className="font-medium">{L(row.labels[d])}{row.source === 'HISTORY' && <Pill size="sm" tone="neutral" className="ms-1">{t('إجمالي مستورد')}</Pill>}</span> })),
+    ...r.metrics.map((m: string) => (unitOf(run, m) === 'money' ? C.money : C.number)(`m:${m}`, L(metaOf(run, m)?.label) || m, (row) => row.values[m]?.value ?? null, { cell: (row) => <Val v={row.values[m]} unit={unitOf(run, m)} spec={spec(m, row)} /> })),
+  ];
   return (
-    <Table dense align={[...r.dimensions.map(() => 'start' as const), ...r.metrics.map(() => 'end' as const)]}
-      head={[...r.dimensions.map((d: string) => t(DIM_AR[d] ?? d)), ...r.metrics.map((m: string) => L(metaOf(run, m)?.label) || m)]}
-      rows={[
-        ...r.rows.map((row: any) => [...r.dimensions.map((d: string) => <span className="font-medium">{L(row.labels[d])}{row.source === 'HISTORY' && <Pill size="sm" tone="neutral" className="ms-1">{t('إجمالي مستورد')}</Pill>}</span>), ...r.metrics.map((m: string) => <Val v={row.values[m]} unit={unitOf(run, m)} spec={spec(m, row)} />)]),
-        [<span className="font-bold text-soft">{t('الإجمالي')} <span className="text-[10px] font-normal text-dim">({t('محسوب من جديد')})</span></span>, ...r.dimensions.slice(1).map(() => ''), ...r.metrics.map((m: string) => <Val v={r.totals[m]} unit={unitOf(run, m)} spec={spec(m)} />)],
-      ]} />
+    <DataTable dense rows={r.rows} rowKey={(row: any) => row.key} columns={columns} pageSize={100}
+      footer={(c, j) => j === 0 ? <span className="font-bold text-soft">{t('الإجمالي')} <span className="text-[10px] font-normal text-dim">({t('محسوب من جديد')})</span></span> : c.id.startsWith('m:') ? <Val v={r.totals[c.id.slice(2)]} unit={unitOf(run, c.id.slice(2))} spec={spec(c.id.slice(2))} /> : null} />
   );
 }
 const DIM_AR: Record<string, string> = { business_date: 'اليوم', business_week: 'الأسبوع', daypart: 'الفترة', hour: 'الساعة', branch: 'الفرع', channel: 'القناة', staff: 'الموظف', product: 'الصنف', category: 'القسم', payment_method: 'طريقة الدفع', drawer: 'الوردية', void_reason: 'السبب', approval_actor: 'اللي وافق', stage: 'المرحلة', disposition: 'المصير', station: 'المحطة', inventory_item: 'الخامة', supplier: 'المورد', fiscal_status: 'حالة الإيصال', order: 'الأوردر', check: 'الشيك', table: 'الترابيزة' };
@@ -186,10 +189,15 @@ export function Matrix({ run, mm }: { run: any; mm: any }) {
 function EvidenceList({ b }: { b: any }) {
   const ev = b.evidence.parts.flatMap((p: any) => p.evidence);
   const open = useEvidence();
+  const EC = cols<any>();
   return (
-    <Table dense head={[t('السجل'), t('اليوم'), t('المبلغ')]} align={['start', 'start', 'end']} empty={<div className="text-sm text-dim p-2">{t('مفيش سجلات في الفترة دي')}</div>}
-      onRowClick={(i) => ev[i].orderId && open({ metric: '__list', label: ev[i].label, from: '', filters: { __evidence: [ev[i]] } })}
-      rows={ev.map((e: any) => [e.label, <span className="num text-xs">{e.businessDate}</span>, <Amt v={e.amount} />])} />
+    <DataTable dense rows={ev} rowKey={(_, i) => i} empty={<div className="text-sm text-dim p-2">{t('مفيش سجلات في الفترة دي')}</div>}
+      onRowOpen={(e) => e.orderId && open({ metric: '__list', label: e.label, from: '', filters: { __evidence: [e] } })}
+      columns={[
+        EC.text('label', t('السجل'), (e) => e.label, { maxChars: 40 }),
+        EC.day('day', t('اليوم'), (e) => e.businessDate),
+        EC.money('amount', t('المبلغ'), (e) => e.amount, { cell: (e) => <Amt v={e.amount} /> }),
+      ]} />
   );
 }
 

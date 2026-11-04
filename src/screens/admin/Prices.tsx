@@ -7,7 +7,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { CalendarClock, Clock, History, Save, AlertTriangle, Percent, Wand2, ListChecks, TrendingUp, TrendingDown, Eye, Pin, Ban, CheckCircle2, X } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../app/hooks';
-import { Banner, Button, Card, Field, Input, KV, Money, Pill, Section, Select, StateBadge, Switch, Table, Tabs } from '../../ui';
+import { Banner, Button, Card, Field, Input, KV, Money, Pill, Section, Select, StateBadge, Switch, DataTable, cols as tcols, DateTime, Tabs } from '../../ui';
+import { D } from '../../mock/money';
 import { Tech } from '../../app/tech';
 import { t, L } from '../../i18n';
 import { branchLabel, personText } from '../../demo/people';
@@ -87,6 +88,7 @@ export function ProductPrices({ branchId, branchName, sched, fixedProductId }: {
 
 function PriceScope({ product, variant, branchId, channel, effective, sched }: { product: any; variant: any | null; branchId: string; channel: SalesChannelView; effective: any; sched?: string }) {
   const hist = useItems<any>('Product.PriceHistory', { params: { productId: product.id }, query: { branchId, channel: channel.orderType, salesChannelId: channel.id, variantId: variant ? variant.id : 'BASE' } });
+  const HC = tcols<any>();
   const current = hist.items.find((r) => r.state === 'CURRENT');
   const next = [...hist.items].filter((r) => r.state === 'SCHEDULED').sort((a, b) => a.effectiveFrom - b.effectiveFrom)[0];
   return (
@@ -106,13 +108,13 @@ function PriceScope({ product, variant, branchId, channel, effective, sched }: {
           </Card>
         </div>
         <Card title={<span className="inline-flex items-center gap-2"><History className="w-4 h-4" />{t('سجل الأسعار')}</span>} badge={<StateBadge ops={['Product.PriceHistory']} />}>
-          <Table head={[t('الحالة'), t('السعر'), t('من'), t('لحد'), t('اتعمل')]} empty={t('مفيش أسعار هنا')} rows={hist.items.map((r) => [
-            <span className="inline-flex items-center gap-1"><Pill tone={stateTone(r.state)}>{stateLabel(r.state)}</Pill>{r.bulkChangeId && <Pill tone="violet">{t('جماعي')}</Pill>}{r.pinned && <Pill tone="violet"><Pin className="w-3 h-3" />{t('متثبت')}</Pill>}</span>,
-            <Money v={r.amount} />,
-            <span className="text-xs">{dateTime(r.effectiveFromIso)}</span>,
-            <span className="text-xs">{r.effectiveToIso ? dateTime(r.effectiveToIso) : t('مفتوح')}</span>,
-            <span className="text-[11px] text-dim">{dateTime(r.createdAt)}<Tech> · <span className="num">{r.createdBy} · v{r.version} · {r.id}</span></Tech></span>,
-          ])} />
+          <DataTable dense rows={hist.items} rowKey={(r: any) => r.id} empty={t('مفيش أسعار هنا')} label={t('سجل الأسعار')} columns={[
+            HC.status('state', t('الحالة'), (r) => ({ label: stateLabel(r.state), tone: stateTone(r.state) }), { cell: (r) => <span className="inline-flex items-center gap-1"><Pill tone={stateTone(r.state)} size="sm" dot>{stateLabel(r.state)}</Pill>{r.bulkChangeId && <Pill tone="violet" size="sm">{t('جماعي')}</Pill>}{r.pinned && <Pill tone="violet" size="sm"><Pin className="w-3 h-3" />{t('متثبت')}</Pill>}</span> }),
+            HC.money('amount', t('السعر'), (r) => r.amount),
+            HC.date('from', t('من'), (r) => r.effectiveFromIso),
+            HC.date('to', t('لحد'), (r) => r.effectiveToIso, { cell: (r) => (r.effectiveToIso ? <DateTime v={r.effectiveToIso} /> : <span className="text-dim">{t('مفتوح')}</span>) }),
+            HC.date('created', t('اتعمل'), (r) => r.createdAt, { cell: (r) => <span className="text-[11px] text-dim"><DateTime v={r.createdAt} /><Tech> · <span className="num">{r.createdBy} · v{r.version} · {r.id}</span></Tech></span> }),
+          ]} />
           
         </Card>
       </div>
@@ -203,34 +205,36 @@ function PriceGrid({ branchId, branchName, cats, data, loading, channels, onPick
   };
   return (
     <Card title={t('قايمة الأسعار — {b}', { b: branchName ?? '' })} badge={<StateBadge ops={['Catalog.PriceList']} />}>
-      <div className="overflow-x-auto rounded-xl border line" data-fb="prices:grid">
-        <table className="w-full text-sm">
-          <thead className="surface-1"><tr>
-            <th className="text-start text-xs text-soft px-3 py-2">{t('الصنف')}</th>
-            {cols.map((c) => <th key={c.id} className="text-start text-xs text-soft px-3 py-2 whitespace-nowrap"><span className="inline-flex items-center gap-1.5"><ChannelDot color={c.color} />{chName(c)}</span>{!c.isDefault && <div className="text-[10px] font-normal text-dim">{orderTypeLabel(c.orderType)}{c.priceMode === 'FOLLOW' && c.follow ? ` · ${Number(c.follow.percent) >= 0 ? '+' : ''}${c.follow.percent}%` : ''}</div>}</th>)}
-            {anyCost && <th className="text-start text-xs text-soft px-3 py-2">{t('التكلفة')}</th>}
+      {/* ux-16: a price matrix (category rows, size rows, a click target per cell) — not a list, so it keeps its own
+          markup with the one table's head, end-aligned tabular money and row hover */}
+      <div className="overflow-x-auto rounded-xl border line table-wrap" data-fb="prices:grid">
+        <table className="w-full text-sm border-separate border-spacing-0 tabular-nums">
+          <thead><tr>
+            <th className="table-head sticky top-0 z-[1] text-start text-[11px] font-bold text-soft px-3 py-2.5 border-b line">{t('الصنف')}</th>
+            {cols.map((c) => <th key={c.id} className="table-head sticky top-0 z-[1] text-end text-[11px] font-bold text-soft px-3 py-2.5 border-b line whitespace-nowrap"><span className="inline-flex items-center gap-1.5"><ChannelDot color={c.color} />{chName(c)}</span>{!c.isDefault && <div className="text-[10px] font-normal text-dim">{orderTypeLabel(c.orderType)}{c.priceMode === 'FOLLOW' && c.follow ? ` · ${Number(c.follow.percent) >= 0 ? '+' : ''}${c.follow.percent}%` : ''}</div>}</th>)}
+            {anyCost && <th className="table-head sticky top-0 z-[1] text-end text-[11px] font-bold text-soft px-3 py-2.5 border-b line">{t('التكلفة')}</th>}
           </tr></thead>
           <tbody>
-            {loading && !data && <tr><td colSpan={1 + cols.length} className="px-3 py-6 text-center text-dim">{t('بيحمّل…')}</td></tr>}
+            {loading && !data && <tr><td colSpan={1 + cols.length + (anyCost ? 1 : 0)} className="px-3 py-6 text-center text-dim">{t('بيحمّل…')}</td></tr>}
             {grouped.map(([catId, ps]) => (
               <React.Fragment key={catId}>
-                <tr className="border-t line"><td colSpan={1 + cols.length + (anyCost ? 1 : 0)} className="px-3 py-1.5 text-xs font-bold text-[var(--primary)] surface-1">{L(cats.find((c) => c.id === catId)?.name) || catId}</td></tr>
+                <tr><td colSpan={1 + cols.length + (anyCost ? 1 : 0)} className="px-3 py-1.5 text-xs font-bold text-[var(--primary)] surface-1 border-b line">{L(cats.find((c) => c.id === catId)?.name) || catId}</td></tr>
                 {ps.map((p) => (
                   <React.Fragment key={p.productId}>
-                    <tr onClick={() => onPick(p.productId)} className={'border-t line cursor-pointer hover:surface-1 ' + (selected === p.productId ? 'bg-[var(--primary-container)]' : '')} data-fb={`prices:grid:${p.productId}`}>
-                      <td className="px-3 py-1.5">{L(p.name)} <span className="num text-[11px] text-dim">{p.sku}</span></td>
-                      {cols.map((c) => <td key={c.id} className="px-3 py-1.5" data-fb={`prices:cell:${p.productId}:${c.id}`} onClick={(e) => { e.stopPropagation(); onPick(p.productId, undefined, c.id); }}>{cell(p.prices[`${c.id}:BASE`], c)}</td>)}
-                      {anyCost && <td className="px-3 py-1.5">{p.cost ? <Money v={p.cost} /> : '—'}</td>}
+                    <tr onClick={() => onPick(p.productId)} className={cn('table-row cursor-pointer', selected === p.productId && 'row-selected')} data-fb={`prices:grid:${p.productId}`}>
+                      <td className="px-3 py-1.5 border-b line">{L(p.name)} <span className="num text-[11px] text-dim">{p.sku}</span></td>
+                      {cols.map((c) => <td key={c.id} className="px-3 py-1.5 border-b line text-end" data-fb={`prices:cell:${p.productId}:${c.id}`} onClick={(e) => { e.stopPropagation(); onPick(p.productId, undefined, c.id); }}>{cell(p.prices[`${c.id}:BASE`], c)}</td>)}
+                      {anyCost && <td className="px-3 py-1.5 border-b line text-end">{p.cost ? <Money v={p.cost} /> : '—'}</td>}
                     </tr>
                     {p.variants.map((v: any) => (
-                      <tr key={v.id} onClick={() => onPick(p.productId, v.id)} className="border-t line cursor-pointer hover:surface-1 text-xs">
-                        <td className="px-3 py-1 ps-8 text-soft">↳ {L(v.name)} {v.sku && <span className="num text-dim">{v.sku}</span>}</td>
+                      <tr key={v.id} onClick={() => onPick(p.productId, v.id)} className="table-row cursor-pointer text-xs">
+                        <td className="px-3 py-1 ps-8 text-soft border-b line">↳ {L(v.name)} {v.sku && <span className="num text-dim">{v.sku}</span>}</td>
                         {cols.map((c) => {
                           const own = p.prices[`${c.id}:${v.id}`];
                           const base = p.prices[`${c.id}:BASE`]?.current?.amount;
-                          return <td key={c.id} className="px-3 py-1">{own ? cell(own, c) : base ? <span className="num text-dim">{(Number(base) + Number(v.priceDelta)).toFixed(2)}</span> : <span className="text-dim">—</span>}</td>;
+                          return <td key={c.id} className="px-3 py-1 border-b line text-end">{own ? cell(own, c) : base ? <span className="num text-dim">{money(D(base).plus(D(v.priceDelta ?? 0)).toFixed(4), false)}</span> : <span className="text-dim">—</span>}</td>;
                         })}
-                        {anyCost && <td />}
+                        {anyCost && <td className="border-b line" />}
                       </tr>
                     ))}
                   </React.Fragment>
@@ -295,6 +299,7 @@ function BulkChange({ branchId, branches, sched, onDone }: { branchId: string; b
   const allRows: any[] = preview?.rows ?? [];
   const rows: any[] = allRows.filter((r: any) => !onlyChanged || !r.skipped);
   const anyCost = allRows.some((r: any) => r.cost);
+  const BC = tcols<any>();
   const toggleRow = (r: any, on: boolean) => {
     if (r.pinned && !r.excluded) { setIncPinned(on ? [...incPinned, r.key] : incPinned.filter((k) => k !== r.key)); return; }
     if (r.excluded === 'ITEM' || r.excluded === 'CATEGORY') return; // un-exclude from the exception list instead
@@ -361,29 +366,19 @@ function BulkChange({ branchId, branches, sched, onDone }: { branchId: string; b
               </div>
               {(preview.summary.followNotes ?? []).length > 0 && <Banner tone="info">{t('قنوات ماشية بنسبة من قناة تانية بتتغير لوحدها مع القناة اللي ماشية وراها؛ هنا بيظهر بس الأسعار الخاصة بيها.')}</Banner>}
               {stale && <Banner tone="warning">{t('غيّرت الاختيارات بعد المعاينة — عاين تاني قبل التطبيق.')}</Banner>}
-              <div className="overflow-x-auto max-h-[460px] overflow-y-auto rounded-xl border line" data-fb="bulk:preview-table">
-                <table className="w-full text-sm">
-                  <thead className="surface-1 sticky top-0"><tr>{['', t('الصنف'), t('القناة'), t('القديم'), t('الجديد'), t('الفرق'), ...(anyCost ? [t('الهامش')] : []), ''].map((h, i) => <th key={i} className="text-start text-xs text-soft px-3 py-2">{h}</th>)}</tr></thead>
-                  <tbody>
-                    {rows.map((r: any) => {
-                      const on = !r.skipped || (r.skipped === 'UNCHANGED' || r.skipped === 'ZERO_NOT_ALLOWED' || r.skipped === 'SCHEDULE_CONFLICT' || r.skipped === 'INVALID');
-                      const lockedEx = r.excluded === 'ITEM' || r.excluded === 'CATEGORY';
-                      return (
-                        <tr key={r.key} className={cn('border-t line', r.skipped && 'opacity-60', r.excluded && 'bg-[color-mix(in_srgb,var(--warning)_7%,transparent)]')} data-fb={`bulk:row:${r.productId}:${r.salesChannelId}`}>
-                          <td className="px-2 py-1.5"><input type="checkbox" className="accent-[var(--primary)]" data-fb={`bulk:row-check:${r.key}`} checked={on && !r.excluded && r.skipped !== 'PINNED'} disabled={lockedEx} title={lockedEx ? t('شيله من قايمة الاستثناءات الأول') : undefined} onChange={(e) => toggleRow(r, e.target.checked)} /></td>
-                          <td className="px-3 py-1.5">{L(r.name)}{r.variantName ? <span className="text-dim"> · {L(r.variantName)}</span> : null}{branchIds.length > 1 && <div className="text-[10px] text-dim">{branchLabel(branches.find((b) => b.id === r.branchId))}</div>}</td>
-                          <td className="px-3 py-1.5 text-xs whitespace-nowrap">{L(r.salesChannelName) || channelLabel(r.channel)}</td>
-                          <td className="px-3 py-1.5 num">{money(r.oldAmount, false)}{!r.ownBefore && !['sch_dine_in', 'sch_takeaway', 'sch_delivery'].includes(r.salesChannelId) ? <div className="text-[10px] text-dim">{t('بسعر نوع الطلب')}</div> : null}</td>
-                          <td className={cn('px-3 py-1.5 num', r.skipped ? 'line-through text-dim' : 'font-bold')}>{money(r.newAmount, false)}</td>
-                          <td className={cn('px-3 py-1.5 num text-xs', Number(r.newAmount) > Number(r.oldAmount) ? 'text-[var(--success)]' : Number(r.newAmount) < Number(r.oldAmount) ? 'text-[var(--error)]' : 'text-dim')}>{r.changePercent ? `${Number(r.changePercent) > 0 ? '+' : ''}${r.changePercent}%` : '—'}</td>
-                          {anyCost && <td className="px-3 py-1.5 num text-xs">{r.marginOld ? `${r.marginOld}% → ${r.marginNew}%` : '—'}</td>}
-                          <td className="px-3 py-1.5 text-[11px] text-dim">{r.excluded ? <span className="text-[var(--warning-text)]">{t(EXCLUDED_TEXT[r.excluded] ?? 'مستثنى')}</span> : r.skipped ? t(SKIP_TEXT[r.skipped] ?? r.skipped) : r.pinned ? <span className="text-[var(--violet)]">{t('متثبت — هيتغير لأنك اخترته')}</span> : ''}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable dense rows={rows} rowKey={(r: any) => r.key} maxHeight={460} pageSize={false} fb="bulk:preview-table" label={t('المعاينة')}
+                rowClassName={(r) => cn(r.skipped && 'opacity-60', r.excluded && 'bg-[color-mix(in_srgb,var(--warning)_7%,transparent)]')}
+                rowAttrs={(r) => ({ 'data-fb': `bulk:row:${r.productId}:${r.salesChannelId}` })}
+                columns={[
+                  BC.custom('pick', '', (r) => { const on = !r.skipped || (r.skipped === 'UNCHANGED' || r.skipped === 'ZERO_NOT_ALLOWED' || r.skipped === 'SCHEDULE_CONFLICT' || r.skipped === 'INVALID'); const lockedEx = r.excluded === 'ITEM' || r.excluded === 'CATEGORY'; return <input type="checkbox" className="accent-[var(--primary)] w-4 h-4" data-fb={`bulk:row-check:${r.key}`} checked={on && !r.excluded && r.skipped !== 'PINNED'} disabled={lockedEx} title={lockedEx ? t('شيله من قايمة الاستثناءات الأول') : undefined} aria-label={L(r.name)} onChange={(e) => toggleRow(r, e.target.checked)} />; }, { width: 2 }),
+                  BC.text('name', t('الصنف'), (r) => `${L(r.name)}${r.variantName ? ' · ' + L(r.variantName) : ''}`, { maxChars: 30, sub: branchIds.length > 1 ? (r) => branchLabel(branches.find((b) => b.id === r.branchId)) : undefined }),
+                  BC.text('channel', t('القناة'), (r) => L(r.salesChannelName) || channelLabel(r.channel), { maxChars: 16 }),
+                  BC.money('old', t('القديم'), (r) => r.oldAmount, { cell: (r) => <span className="inline-flex flex-col items-end"><Money v={r.oldAmount} className="font-normal" />{!r.ownBefore && !['sch_dine_in', 'sch_takeaway', 'sch_delivery'].includes(r.salesChannelId) ? <span className="text-[10px] text-dim">{t('بسعر نوع الطلب')}</span> : null}</span> }),
+                  BC.money('new', t('الجديد'), (r) => r.newAmount, { cell: (r) => (r.skipped ? <span className="line-through text-dim"><Money v={r.newAmount} className="font-normal" /></span> : <Money v={r.newAmount} />) }),
+                  BC.number('diff', t('الفرق'), (r) => r.changePercent || null, { cell: (r) => { const c = D(r.newAmount ?? 0).comparedTo(D(r.oldAmount ?? 0)); return <span className={cn('num text-xs', c > 0 ? 'text-[var(--success)]' : c < 0 ? 'text-[var(--error)]' : 'text-dim')}>{r.changePercent ? `${D(r.changePercent).greaterThan(0) ? '+' : ''}${r.changePercent}%` : '—'}</span>; } }),
+                  ...(anyCost ? [BC.custom('margin', t('الهامش'), (r) => <span className="num text-xs">{r.marginOld ? `${r.marginOld}% → ${r.marginNew}%` : '—'}</span>, { align: 'end' })] : []),
+                  BC.custom('note', '', (r) => <span className="text-[11px] text-dim">{r.excluded ? <span className="text-[var(--warning-text)]">{t(EXCLUDED_TEXT[r.excluded] ?? 'مستثنى')}</span> : r.skipped ? t(SKIP_TEXT[r.skipped] ?? r.skipped) : r.pinned ? <span className="text-[var(--violet)]">{t('متثبت — هيتغير لأنك اخترته')}</span> : ''}</span>),
+                ]} />
               {!anyCost && <div className="text-[11px] text-dim">{t('الهامش بيظهر لما يبقى للصنف وصفة بتكلفة معروفة (من المخزون والوصفات).')}</div>}
               <div className="flex items-center gap-2 justify-end">
                 <span className="text-[11px] text-dim">{t('شيل علامة أي سطر عشان تستثنيه. لو السياسة بتطلب موافقة، المدير بيوافق مرة واحدة على التغيير كله.')}</span>
@@ -437,24 +432,25 @@ function Batches() {
   const cats = useItems<any>('Category.List');
   const channels = useSalesChannels(undefined, true);
   const [open, setOpen] = useState<string | null>(null);
+  const BC = tcols<any>();
   const pname = (id: string) => L(products.items.find((p) => p.id === id)?.name) || id;
   const vname = (id: string, vid: string) => L(products.items.find((p) => p.id === id)?.variants?.find((v: any) => v.id === vid)?.name) || vid;
   const scName = (r: any) => { const c = channels.items.find((x) => x.id === r.salesChannelId); return c ? L(c.name) : channelLabel(r.channel); };
-  const changeText = (b: any) => `${Number(b.change.value) > 0 ? t('زيادة') : t('تخفيض')} ${b.change.mode === 'PERCENT' ? `${Math.abs(Number(b.change.value))}%` : `${Math.abs(Number(b.change.value)).toFixed(2)} ${t('ج.م')}`}`;
+  const changeText = (b: any) => `${D(b.change.value).greaterThan(0) ? t('زيادة') : t('تخفيض')} ${b.change.mode === 'PERCENT' ? `${D(b.change.value).abs().toString()}%` : money(D(b.change.value).abs().toFixed(4))}`;
   const chText = (b: any) => (b.filter.salesChannelIds ?? []).map((id: string) => L(channels.items.find((c) => c.id === id)?.name) || id).join('، ') || (b.filter.channels ?? []).map(channelLabel).join('، ');
   const exCount = (b: any) => (b.exclusions?.productIds?.length ?? 0) + (b.exclusions?.categoryIds?.length ?? 0) + (b.exclusions?.rowKeys?.length ?? 0);
   return (
     <Card title={t('التغييرات الجماعية')} badge={<StateBadge ops={['Catalog.PriceChangeBatches']} />}>
-      <Table head={[t('اتعمل'), t('بواسطة'), t('التغيير'), t('القنوات'), t('اتغير'), t('مستثنى'), t('الحالة'), '']} empty={t('لسه مفيش تغييرات جماعية')} rows={list.items.map((b) => [
-        <span className="text-xs">{dateTime(b.createdAt)}</span>,
-        personText(b.createdByName),
-        changeText(b),
-        <span className="text-xs">{chText(b)}</span>,
-        <span className="num">{b.rows.filter((r: any) => !r.skipped).length}</span>,
-        exCount(b) ? <Pill tone="warning" size="sm">{b.rows.filter((r: any) => r.skipped === 'EXCLUDED').length}</Pill> : <span className="text-dim">—</span>,
-        b.status === 'SCHEDULED' ? <Pill tone="info">{t('مجدول من {d}', { d: dateTime(b.effectiveFromIso) })}</Pill> : <Pill tone="success">{t('اتطبق')}</Pill>,
-        <Button size="sm" variant="ghost" data-fb={`batch:open:${b.id}`} onClick={() => setOpen(open === b.id ? null : b.id)}>{open === b.id ? t('اخفي') : t('التفاصيل')}</Button>,
-      ])} />
+      <DataTable dense rows={list.items} rowKey={(b: any) => b.id} empty={t('لسه مفيش تغييرات جماعية')} label={t('التغييرات الجماعية')} defaultSort={{ id: 'at', dir: 'desc' }} columns={[
+        BC.date('at', t('اتعمل'), (b) => b.createdAt),
+        BC.text('by', t('بواسطة'), (b) => personText(b.createdByName), { maxChars: 18 }),
+        BC.text('change', t('التغيير'), changeText, { maxChars: 24 }),
+        BC.text('channels', t('القنوات'), chText, { maxChars: 28 }),
+        BC.number('changed', t('اتغير'), (b) => b.rows.filter((r: any) => !r.skipped).length),
+        BC.number('excluded', t('مستثنى'), (b) => (exCount(b) ? b.rows.filter((r: any) => r.skipped === 'EXCLUDED').length : null), { cell: (b) => (exCount(b) ? <Pill tone="warning" size="sm">{b.rows.filter((r: any) => r.skipped === 'EXCLUDED').length}</Pill> : <span className="text-dim">—</span>) }),
+        BC.status('status', t('الحالة'), (b) => (b.status === 'SCHEDULED' ? { label: t('مجدول'), tone: 'info' } : { label: t('اتطبق'), tone: 'success' }), { cell: (b) => (b.status === 'SCHEDULED' ? <Pill tone="info" size="sm" dot>{t('مجدول')} · <DateTime v={b.effectiveFromIso} /></Pill> : <Pill tone="success" size="sm" dot>{t('اتطبق')}</Pill>) }),
+        BC.actions('act', (b) => <Button size="sm" variant="ghost" data-fb={`batch:open:${b.id}`} onClick={() => setOpen(open === b.id ? null : b.id)}>{open === b.id ? t('اخفي') : t('التفاصيل')}</Button>),
+      ]} />
       {open && (() => {
         const b = list.items.find((x) => x.id === open);
         if (!b) return null;
@@ -463,10 +459,13 @@ function Batches() {
           <div className="mt-3 rounded-xl border line p-3 space-y-2" data-fb="batch:details">
             <div className="text-sm font-bold">{changeText(b)} · {chText(b)} · {dateTime(b.createdAt)}</div>
             {ex && exCount(b) > 0 && <div className="text-xs"><span className="font-bold">{t('الاستثناءات')}: </span>{[...(ex.productIds ?? []).map(pname), ...(ex.categoryIds ?? []).map((c: string) => `${t('قسم')} ${L(cats.items.find((x) => x.id === c)?.name) || c}`), ...(ex.rowKeys?.length ? [t('{n} سطر اتشال يدوي', { n: String(ex.rowKeys.length) })] : [])].join('، ')}</div>}
-            <Table head={[t('الصنف'), t('القناة'), t('القديم'), t('الجديد'), '']} rows={b.rows.filter((r: any) => !r.skipped || r.skipped === 'EXCLUDED' || r.skipped === 'PINNED').map((r: any) => [
-              `${pname(r.productId)}${r.variantId ? ' · ' + vname(r.productId, r.variantId) : ''}`, scName(r), <Money v={r.oldAmount} />, r.skipped ? <span className="text-dim line-through"><Money v={r.newAmount} /></span> : <Money v={r.newAmount} tone="primary" />,
-              r.skipped === 'EXCLUDED' ? <Pill tone="warning" size="sm">{t('مستثنى')}</Pill> : r.skipped === 'PINNED' ? <Pill tone="violet" size="sm">{t('متثبت')}</Pill> : <Pill tone="success" size="sm">{t('اتغير')}</Pill>,
-            ])} />
+            <DataTable dense rows={b.rows.filter((r: any) => !r.skipped || r.skipped === 'EXCLUDED' || r.skipped === 'PINNED')} rowKey={(r: any) => r.key ?? `${r.productId}|${r.variantId ?? ''}|${r.salesChannelId}|${r.branchId ?? ''}`} columns={[
+              BC.text('name', t('الصنف'), (r) => `${pname(r.productId)}${r.variantId ? ' · ' + vname(r.productId, r.variantId) : ''}`, { maxChars: 32 }),
+              BC.text('channel', t('القناة'), scName, { maxChars: 18 }),
+              BC.money('old', t('القديم'), (r) => r.oldAmount),
+              BC.money('new', t('الجديد'), (r) => r.newAmount, { cell: (r) => (r.skipped ? <span className="text-dim line-through"><Money v={r.newAmount} /></span> : <Money v={r.newAmount} tone="primary" />) }),
+              BC.status('state', '', (r) => (r.skipped === 'EXCLUDED' ? { label: t('مستثنى'), tone: 'warning' } : r.skipped === 'PINNED' ? { label: t('متثبت'), tone: 'violet' } : { label: t('اتغير'), tone: 'success' })),
+            ]} />
           </div>
         );
       })()}
