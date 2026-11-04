@@ -30,7 +30,12 @@ export interface Profile {
   input: 'touch' | 'keyboard' | 'mixed';
   /** areas kept out of this profile's way (plain words, UI only) */
   hidden: string[];
+  /** ux-05: first view of the boards this profile works with (each person can switch; the choice is remembered) */
+  boards?: Partial<Record<BoardId, 'board' | 'list'>>;
 }
+
+/** ux-05: the four boards. orders = «الشيكات», delivery = «لوحة الدليفري», purchasing = «أوامر الشراء», approvals = «الموافقات والمراجعات». */
+export type BoardId = 'orders' | 'delivery' | 'purchasing' | 'approvals';
 
 const ALL_QTY: Record<QuantityMethod, boolean> = { typedPrefix: true, repeatTap: true, stepper: true, swipe: true, longPress: true };
 const TOUCH_QTY: Record<QuantityMethod, boolean> = { typedPrefix: false, repeatTap: true, stepper: true, swipe: true, longPress: true };
@@ -40,11 +45,11 @@ const SALE_OVERFLOW: SaleAction[] = ['label', 'delivery', 'staffMeal', 'staffMea
 
 export const PROFILES: Profile[] = [
   // ── floor & counter
-  { id: 'cashier', group: g('الصالة والكاونتر', 'Floor & counter'), role: g('كاشير', 'Cashier'), workspaces: ['counter', 'checks', 'shift', 'receipt', 'refunds'], start: 'counter',
+  { id: 'cashier', group: g('الصالة والكاونتر', 'Floor & counter'), role: g('كاشير', 'Cashier'), workspaces: ['counter', 'checks', 'shift', 'receipt', 'refunds'], start: 'counter', boards: { orders: 'list' },
     actionBar: { secondary: ['new', 'held', 'customer', 'discount', 'orders'], overflow: SALE_OVERFLOW, primary: 'auto' }, quantity: ALL_QTY, input: 'mixed', hidden: ['expectedCash', 'reports'] },
   { id: 'waiter', group: g('الصالة والكاونتر', 'Floor & counter'), role: g('ويتر', 'Waiter'), workspaces: ['floor', 'order'], start: 'floor',
     actionBar: { secondary: ['guests', 'prebill', 'move', 'note'], overflow: ['customer', 'split', 'merge', 'history', 'cancel'], primary: 'send' }, quantity: TOUCH_QTY, input: 'touch', hidden: ['collection', 'drawer', 'reports'] },
-  { id: 'captain', group: g('الصالة والكاونتر', 'Floor & counter'), role: g('كابتن صالة', 'Floor captain'), workspaces: ['floor', 'order', 'reservations'], start: 'floor',
+  { id: 'captain', group: g('الصالة والكاونتر', 'Floor & counter'), role: g('كابتن صالة', 'Floor captain'), workspaces: ['floor', 'order', 'checks', 'reservations'], start: 'floor', boards: { orders: 'board' },
     actionBar: { secondary: ['guests', 'prebill', 'move', 'merge', 'split'], overflow: ['note', 'customer', 'history', 'cancel'], primary: 'send' }, quantity: TOUCH_QTY, input: 'touch', hidden: ['drawer', 'financialReports'] },
   { id: 'host', group: g('الصالة والكاونتر', 'Floor & counter'), role: g('مستقبل وحجوزات', 'Host & reservations'), workspaces: ['reservations', 'floor'], start: 'reservations',
     actionBar: { secondary: [], overflow: [], primary: 'seat' }, quantity: NO_QTY, input: 'touch', hidden: ['orders', 'payment'] },
@@ -57,32 +62,32 @@ export const PROFILES: Profile[] = [
   // ── kitchen
   { id: 'stationChef', group: g('المطبخ', 'Kitchen'), role: g('شيف محطة', 'Station chef'), workspaces: ['kitchen'], start: 'kitchen',
     actionBar: { secondary: [], overflow: [], primary: 'ready' }, quantity: NO_QTY, input: 'touch', hidden: ['prices', 'amounts'] },
-  { id: 'expediter', group: g('المطبخ', 'Kitchen'), role: g('منسق التسليم', 'Expediter'), workspaces: ['kitchen'], start: 'kitchen',
+  { id: 'expediter', group: g('المطبخ', 'Kitchen'), role: g('منسق التسليم', 'Expediter'), workspaces: ['kitchen', 'checks'], start: 'kitchen', boards: { orders: 'board' },
     actionBar: { secondary: [], overflow: [], primary: 'ready' }, quantity: NO_QTY, input: 'touch', hidden: ['amounts'] },
   { id: 'kitchenManager', group: g('المطبخ', 'Kitchen'), role: g('مدير مطبخ', 'Kitchen manager'), workspaces: ['kitchen', 'inv-waste', 'soldout'], start: 'kitchen',
     actionBar: { secondary: [], overflow: [], primary: 'ready' }, quantity: NO_QTY, input: 'mixed', hidden: ['drawer', 'financialReports'] },
   // ── management
-  { id: 'shiftManager', group: g('الإدارة', 'Management'), role: g('مدير وردية', 'Shift manager'), workspaces: ['approvals-inbox', 'counter', 'floor', 'shift'], start: 'approvals-inbox',
+  { id: 'shiftManager', group: g('الإدارة', 'Management'), role: g('مدير وردية', 'Shift manager'), workspaces: ['approvals-inbox', 'checks', 'counter', 'floor', 'shift'], start: 'approvals-inbox', boards: { approvals: 'board', orders: 'board' },
     actionBar: { secondary: ['new', 'held', 'customer', 'discount', 'orders'], overflow: SALE_OVERFLOW, primary: 'auto' }, quantity: ALL_QTY, input: 'mixed', hidden: [] },
-  { id: 'branchManager', group: g('الإدارة', 'Management'), role: g('مدير فرع', 'Branch manager'), workspaces: [], start: 'home',
+  { id: 'branchManager', group: g('الإدارة', 'Management'), role: g('مدير فرع', 'Branch manager'), workspaces: [], start: 'approvals-inbox', boards: { approvals: 'board', orders: 'board', delivery: 'board', purchasing: 'board' },
     actionBar: { secondary: ['new', 'held', 'customer', 'discount', 'orders'], overflow: SALE_OVERFLOW, primary: 'auto' }, quantity: ALL_QTY, input: 'keyboard', hidden: ['systemSettings', 'license'] },
-  { id: 'areaManager', group: g('الإدارة', 'Management'), role: g('مدير منطقة', 'Area manager'), workspaces: ['home', 'reports', 'approvals-inbox'], start: 'home',
+  { id: 'areaManager', group: g('الإدارة', 'Management'), role: g('مدير منطقة', 'Area manager'), workspaces: ['home', 'reports', 'approvals-inbox'], start: 'home', boards: { approvals: 'board' },
     actionBar: { secondary: [], overflow: [], primary: 'auto' }, quantity: NO_QTY, input: 'keyboard', hidden: ['dailyOperations'] },
-  { id: 'owner', group: g('الإدارة', 'Management'), role: g('مالك', 'Owner'), workspaces: [], start: 'home',
+  { id: 'owner', group: g('الإدارة', 'Management'), role: g('مالك', 'Owner'), workspaces: [], start: 'home', boards: { approvals: 'board', orders: 'board', delivery: 'board', purchasing: 'board' },
     actionBar: { secondary: ['new', 'held', 'customer', 'discount', 'orders'], overflow: SALE_OVERFLOW, primary: 'auto' }, quantity: ALL_QTY, input: 'keyboard', hidden: ['license'] },
   // ── back office
-  { id: 'accountant', group: g('المكتب', 'Back office'), role: g('محاسب', 'Accountant'), workspaces: ['reports', 'void-review', 'refunds'], start: 'reports',
+  { id: 'accountant', group: g('المكتب', 'Back office'), role: g('محاسب', 'Accountant'), workspaces: ['reports', 'approvals-inbox', 'void-review', 'refunds'], start: 'reports', boards: { approvals: 'board' },
     actionBar: { secondary: [], overflow: [], primary: 'confirm' }, quantity: NO_QTY, input: 'keyboard', hidden: ['sale'] },
   { id: 'auditor', group: g('المكتب', 'Back office'), role: g('مراجع داخلي', 'Internal auditor'), workspaces: ['reports', 'audit'], start: 'audit',
     actionBar: { secondary: [], overflow: [], primary: 'confirm' }, quantity: NO_QTY, input: 'keyboard', hidden: ['anyWrite'] },
-  { id: 'storekeeper', group: g('المكتب', 'Back office'), role: g('أمين مخزن', 'Storekeeper'), workspaces: ['inv-dashboard', 'inv-receipts', 'inv-counts', 'inv-transfers', 'inv-waste'], start: 'inv-dashboard',
+  { id: 'storekeeper', group: g('المكتب', 'Back office'), role: g('أمين مخزن', 'Storekeeper'), workspaces: ['inv-dashboard', 'inv-po', 'inv-receipts', 'inv-counts', 'inv-transfers', 'inv-waste'], start: 'inv-dashboard', boards: { purchasing: 'list' },
     actionBar: { secondary: [], overflow: [], primary: 'confirm' }, quantity: NO_QTY, input: 'mixed', hidden: ['sales', 'prices'] },
-  { id: 'purchasing', group: g('المكتب', 'Back office'), role: g('مسؤول مشتريات', 'Purchasing officer'), workspaces: ['inv-purchasing', 'inv-po', 'inv-suppliers'], start: 'inv-purchasing',
+  { id: 'purchasing', group: g('المكتب', 'Back office'), role: g('مسؤول مشتريات', 'Purchasing officer'), workspaces: ['inv-po', 'inv-purchasing', 'inv-suppliers'], start: 'inv-po', boards: { purchasing: 'board' },
     actionBar: { secondary: [], overflow: [], primary: 'confirm' }, quantity: NO_QTY, input: 'keyboard', hidden: ['sale'] },
   // ── delivery
-  { id: 'driver', group: g('الدليفري', 'Delivery'), role: g('طيار', 'Driver'), workspaces: ['delivery-board'], start: 'delivery-board',
+  { id: 'driver', group: g('الدليفري', 'Delivery'), role: g('طيار', 'Driver'), workspaces: ['delivery-board'], start: 'delivery-board', boards: { delivery: 'list' },
     actionBar: { secondary: [], overflow: [], primary: 'delivered' }, quantity: NO_QTY, input: 'touch', hidden: ['everythingButOwnOrders'] },
-  { id: 'dispatcher', group: g('الدليفري', 'Delivery'), role: g('موزع الدليفري', 'Delivery dispatcher'), workspaces: ['delivery-board', 'drivers'], start: 'delivery-board',
+  { id: 'dispatcher', group: g('الدليفري', 'Delivery'), role: g('موزع الدليفري', 'Delivery dispatcher'), workspaces: ['delivery-board', 'delivery-new', 'drivers'], start: 'delivery-board', boards: { delivery: 'board' },
     actionBar: { secondary: [], overflow: [], primary: 'dispatch' }, quantity: NO_QTY, input: 'mixed', hidden: ['financialReports'] },
   { id: 'callCenter', group: g('الدليفري', 'Delivery'), role: g('مركز الاتصال', 'Call center'), workspaces: ['delivery-new', 'customers'], start: 'delivery-new',
     actionBar: { secondary: ['customer'], overflow: [], primary: 'confirm' }, quantity: ALL_QTY, input: 'keyboard', hidden: ['drawer'] },

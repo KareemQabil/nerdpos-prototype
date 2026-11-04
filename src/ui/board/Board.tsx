@@ -41,6 +41,8 @@ export interface BoardProps<T> {
   cardActions?: (x: T) => CardAction[];
   renderDetail?: (x: T, close: () => void) => React.ReactNode;
   cardLabel?: (x: T) => string;
+  /** screen title shown at the start of the toolbar */
+  title?: React.ReactNode;
   toolbarStart?: React.ReactNode;
   toolbarEnd?: React.ReactNode;
   /** compact host (e.g. inside the cashier pane): no grouping switch, columns stack on narrow panes */
@@ -313,8 +315,9 @@ export function Board<T>(props: BoardProps<T>) {
     <div ref={rootRef} className="flex flex-col min-h-0 h-full gap-3" data-board={id} data-group={group} data-density={compact ? 'compact' : 'comfortable'} data-fb={props.fb}>
       {!fullDetail && (
         <div className="flex items-center gap-2 flex-wrap shrink-0" data-fb="board-toolbar">
+          {props.title && <h1 className="text-xl font-bold font-display me-1 whitespace-nowrap" data-fb="board-title">{props.title}</h1>}
           {props.toolbarStart}
-          <SearchInput value={q} onChange={setQ} placeholder={props.searchPlaceholder ?? t('بحث')} className={embedded ? 'w-56' : 'w-64'} data-fb="board-search" />
+          <SearchInput value={q} onChange={setQ} placeholder={props.searchPlaceholder ?? t('بحث')} className={embedded ? '!flex-none w-56' : '!flex-none w-64'} data-fb="board-search" />
           {filters.length > 0 && (
             <div className="flex items-center gap-1.5 flex-wrap" role="group" aria-label={t('عوامل التصفية')}>
               {filters.map((f) => {

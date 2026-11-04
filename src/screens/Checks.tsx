@@ -10,12 +10,22 @@ import { time, money, qty } from '../lib/format';
 import { StatusPill, HistoryDialog } from './order/CheckPanel';
 import { clock, businessDate } from '../mock/clock';
 import { personName } from '../demo/people';
+import { useBoardView } from '../app/useBoardView';
+import { BoardViewToggle } from '../ui/board';
+import OrdersBoard from './boards/OrdersBoard';
 
 type St = 'ALL' | 'DRAFT' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED,VOIDED';
 const placeOf = (o: any) => (o.kind === 'STAFF_MEAL' ? t('وجبة موظف') : o.tableName ? `${t('ترابيزة')} ${o.tableName} · ${t('شيك')} ${o.checkNo}` : o.channel === 'TAKEAWAY' ? t('تيك أواي') : o.channel === 'DELIVERY' ? t('دليفري') : t('صالة كاونتر'));
 const live = (o: any) => o.status === 'DRAFT' || o.status === 'CONFIRMED';
 
+// ux-05: the checks screen is the orders board or this list (board / list switch, remembered per user).
 export default function Checks() {
+  const { view, setView } = useBoardView('orders');
+  if (view === 'board') return <div data-screen="D2" className="h-full"><OrdersBoard onList={() => setView('list')} /></div>;
+  return <ChecksList onBoard={() => setView('board')} />;
+}
+
+function ChecksList({ onBoard }: { onBoard: () => void }) {
   const { nav, kind, can } = useDev();
   const [number, setNumber] = useState('');
   const [st, setSt] = useState<St>('ALL');
@@ -42,7 +52,7 @@ export default function Checks() {
   ]);
   return (
     <div data-screen="D2" className="space-y-4">
-      <PageHeader title={t('الشيكات')} ops={['Order.Find', 'Order.Get', 'Order.Timeline']} description={t('دوّر على أي شيك وافتحه تاني، حصّله، أو شوف إيصاله وسجله.')} className="!mb-0" />
+      <PageHeader title={t('الشيكات')} ops={['Order.Find', 'Order.Get', 'Order.Timeline']} description={t('دوّر على أي شيك وافتحه تاني، حصّله، أو شوف إيصاله وسجله.')} className="!mb-0" actions={<BoardViewToggle value="list" onChange={(v) => v === 'board' && onBoard()} />} />
       <Toolbar className="!mb-0">
         <SearchInput value={number} onChange={setNumber} placeholder={t('رقم الشيك')} data-fb="checks-search" />
         <FilterChips value={st} onChange={setSt} options={[{ id: 'ALL', label: t('الكل') }, { id: 'DRAFT', label: t('مفتوح') }, { id: 'CONFIRMED', label: t('مستني الدفع'), tone: 'warning' }, { id: 'COMPLETED', label: t('اتقفل') }, { id: 'CANCELLED,VOIDED', label: t('ملغي') }]} />
