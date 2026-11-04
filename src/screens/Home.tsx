@@ -5,15 +5,17 @@
 import React, { useMemo, useState } from 'react';
 import {
   CheckCircle2, Circle, ArrowLeft, AlertTriangle, TrendingUp, TrendingDown, Minus, Receipt, Wallet, Armchair, ChefHat, Bike, Clock3,
-  BellRing, PackageMinus, FileWarning, Printer, Scale, Banknote, ShieldCheck, ChevronDown, Sparkles, CalendarDays, Hourglass,
+  BellRing, PackageMinus, FileWarning, Printer, Scale, Banknote, ShieldCheck, ChevronDown, Sparkles, CalendarDays, Hourglass, FileBarChart,
 } from 'lucide-react';
 import { useDev, useQuery } from '../app/hooks';
 import { screenById } from '../app/registry';
 import { Banner, Button, Card, Money, Pill, StateBadge, PageHeader, StatGrid, StatCard, EmptyState, Skeleton } from '../ui';
 import { t, L, tv, useLang } from '../i18n';
 import { Tech } from '../app/tech';
-import { cn, money, dayLong, qty } from '../lib/format';
-import { pctChange, sign, sumAmounts, sumDecimals } from '../lib/cash';
+import { cn, money, dayLong, qty, currency } from '../lib/format';
+import { pctChange, sign } from '../lib/cash';
+import { D } from '../mock/money';
+import { DAY_HOURS } from '../reports/home';
 import { clock, businessDate } from '../mock/clock';
 import { branchLabel, personName, personText } from '../demo/people';
 import { useList } from './admin/org/common';
@@ -23,12 +25,9 @@ const n = (v: unknown) => Number(v ?? 0) || 0;
 const fmt = (v: number) => Math.round(v).toLocaleString('en-US');
 /** «الاتنين، 26 أكتوبر» with Western digits. */
 export const dayLabel = (iso: string | null | undefined) => (iso ? dayLong(iso) : '—');
-// business day runs 04:00 → 03:59: hours in that order
-const DAY_HOURS = [...Array.from({ length: 20 }, (_, i) => i + 4), 0, 1, 2, 3];
-const cairoHour = () => Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', hour: '2-digit', hourCycle: 'h23' }).format(new Date(clock.now())));
 
 export default function Home() {
-  const { me, auth } = useDev();
+  const { me, auth, can } = useDev();
   const branchId = me?.branchId ?? auth.branchId;
   const branch = useQuery<any>(branchId ? 'Branch.Get' : null, { params: { branchId } });
   // display of the server rule (branch timezone + cutoff); every command resolves its own business date on the server
@@ -37,24 +36,23 @@ export default function Home() {
   // a new install: something before the first sale is still missing (the demo restaurant is set up already)
   const fresh = setup.steps.some((s) => s.screen !== 'counter' && s.status === false);
   const first = personName(me?.user?.username, me?.user?.displayName) || me?.user?.displayName || '';
-  // ux-07: the certified daily report (the one «التقارير» shows) — not the legacy daily_sales summary
-  const eod = useQuery<any>(bd ? 'Report.Run' : null, { params: { reportId: 'eod_bridge' }, query: { fromBusinessDate: bd } });
+  // ux-17: Home's numbers are the certified reports' numbers (Report.Home: server business day, device branch)
+  const home = useQuery<any>(bd && can('report:run') ? 'Report.Home' : null, {});
   return (
     <div className="space-y-4 max-w-[1600px] mx-auto" data-fb="screen:HOME">
       <PageHeader
         title={first ? t('أهلًا يا {n}', { n: first }) : t('الرئيسية')}
-        description={fresh ? t('المطعم لسه بيتجهز: كمّل الخطوات بالترتيب، وبعد أول بيعة الأرقام هتظهر هنا.') : t('المطعم النهارده في نظرة: المبيعات، الشغل اللي ماشي دلوقتي، والحاجات اللي مستنية قرار منك.')}
         badge={<StateBadge ops={['Access.Me', 'Report.Run', 'Report.Query', 'Compliance.Find']} />}
         meta={<div className="flex items-center gap-2 flex-wrap">
-          {bd && <Pill tone="primary"><CalendarDays className="w-3 h-3" />{t('اليوم التجاري')}: {dayLabel(bd)}</Pill>}
+          {bd && <Pill tone="primary"><CalendarDays className="w-3 h-3" />{t('اليوم التجاري')}: {dayLabel(home.data?.businessDate ?? bd)}</Pill>}
           {branch.data && <Pill>{branchLabel(branch.data)}</Pill>}
-          {eod.data?.provisional && <Pill tone="warning" title={t('الأرقام بتتحدث لحد ما اليوم يتقفل')}>{t('اليوم لسه مفتوح — الأرقام مبدئية')}</Pill>}
+          {home.data?.provisional && <Pill tone="warning" title={home.data.provisionalReasons.map((x: any) => L(x)).join(' ')}>{t('اليوم ما زال مفتوحًا — الأرقام مبدئية')}</Pill>}
         </div>}
         actions={<QuickHeaderActions next={fresh ? setup.steps.find((s) => s.status === false) : undefined} />}
       />
       {!bd && !branch.loading && !fresh && <Banner tone="info">{t('الجهاز ده مش متربط بفرع — اختار فرع من فوق عشان تشوف أرقام اليوم.')}</Banner>}
       {fresh && <SetupPath setup={setup} />}
-      {bd && <SalesToday bd={bd} eod={eod} />}
+      {bd && can('report:run') && <SalesToday home={home} />}
       {bd && (
         <div className="grid min-[1400px]:grid-cols-[1fr_380px] gap-4 items-start">
           <div className="space-y-4 min-w-0">
@@ -92,96 +90,127 @@ function Delta({ now, before, label }: { now: string | null; before: string | nu
   return <span className={cn('text-[11px] inline-flex items-center gap-1', up ? 'text-[var(--success)]' : down ? 'text-[var(--error)]' : 'text-dim')}><Icon className="w-3 h-3" /><span className="num" dir="ltr">{up ? '+' : ''}{p}%</span><span className="text-dim">{label}</span></span>;
 }
 
-// ux-07: Home reads the certified report engine (the same numbers as «التقارير»), never a second engine, and keeps money
-// in Decimal strings. KPIs = the «eod_bridge» report's key numbers for the business day; the hour comparison and the
-// 14-day bars = Report.Query on the same engine (item net sales and checks by hour; net sales by business day).
-type Hourly = { cumNet: string[]; cumChecks: string[] };
+// ux-17: every Home number is a certified report's number for the server's business day and the device branch
+// (Report.Home runs eod_bridge, tender_settlement, top_items and hourly_daypart and returns each value with its source).
+// Nothing is summed here; each card opens the report — on the same day — that produced it.
+type Hourly = { cumNet: string[] };
+type Src = { reportId: string; from: string; to: string };
 const HOUR_IDX = (h: number) => DAY_HOURS.indexOf(h);
-const addDaysIso = (iso: string, d: number) => new Date(Date.parse(iso + 'T12:00:00Z') + d * 86_400_000).toISOString().slice(0, 10);
-const engineQ = (spec: Record<string, any>) => ({ query: { q: JSON.stringify(spec) } });
-/** Cumulative item net sales and checks over the business-day hours (04:00 → 03:59), as decimal strings. */
-function hourlyOf(res: any): Hourly | null {
-  if (!res?.rows) return null;
-  const at = (h: number, m: string) => res.rows.find((r: any) => Number(r.dims?.hour) === h)?.values?.[m]?.value ?? null;
-  const cumNet: string[] = [], cumChecks: string[] = [];
-  for (const h of DAY_HOURS) { cumNet.push(sumAmounts([cumNet.at(-1) ?? '0', at(h, 'item_net_sales')])); cumChecks.push(sumDecimals([cumChecks.at(-1) ?? '0', at(h, 'check_count')])); }
-  return { cumNet, cumChecks };
-}
-const mv = (totals: any, id: string): string | null => totals?.[id]?.value ?? null;
+const mv = (cards: any, id: string): string | null => { const v = cards?.[id]?.value; return v && v.availability === 'AVAILABLE' ? v.value : null; };
 const whole = (v: string | null | undefined) => (v == null ? '—' : money(v, false));
+/** Opens the report that produced a Home number, on the same business day / range. */
+function useOpenReport() { const { nav } = useDev(); return (s: Src | null | undefined) => s && nav('reports', { reportId: s.reportId, from: s.from, to: s.to }); }
+function SourceLink({ src, fb }: { src: Src | null | undefined; fb: string }) {
+  const open = useOpenReport();
+  if (!src) return null;
+  return <Button size="sm" variant="ghost" onClick={() => open(src)} data-fb={fb} data-report={src.reportId}><FileBarChart className="w-3.5 h-3.5" />{t('التقرير')}</Button>;
+}
 
-function SalesToday({ bd, eod }: { bd: string; eod: ReturnType<typeof useQuery<any>> }) {
-  const { nav } = useDev();
-  const yd = addDaysIso(bd, -1), lw = addDaysIso(bd, -7);
-  const hourSpec = (d: string) => engineQ({ metrics: ['item_net_sales', 'check_count'], dimensions: ['hour'], from: d, to: d });
-  const tQ = useQuery<any>('Report.Query', hourSpec(bd));
-  const yQ = useQuery<any>('Report.Query', hourSpec(yd));
-  const wQ = useQuery<any>('Report.Query', hourSpec(lw));
-  const ydTot = useQuery<any>('Report.Query', engineQ({ metrics: ['avg_check', 'check_count'], from: yd, to: yd }));
-  const lwTot = useQuery<any>('Report.Query', engineQ({ metrics: ['avg_check'], from: lw, to: lw }));
-  const days = useQuery<any>('Report.Query', engineQ({ metrics: ['net_item_sales'], dimensions: ['business_date'], from: addDaysIso(bd, -13), to: bd }));
-  const extra = useQuery<any>('Report.Query', engineQ({ metrics: ['service_charge', 'tax_amount', 'discount_amount', 'tender_refunded', 'outstanding_checks', 'outstanding_amount'], from: bd, to: bd }));
-  const kpis = eod.data?.blocks?.find((b: any) => b.id === 'kpis')?.result?.totals ?? null;
-  const netToday = mv(kpis, 'net_item_sales');
-  const checksToday = mv(kpis, 'check_count');
-  const avgToday = mv(kpis, 'avg_check');
-  const today = hourlyOf(tQ.data), yday = hourlyOf(yQ.data), lastWeek = hourlyOf(wQ.data);
-  const hour = cairoHour();
-  const k = HOUR_IDX(hour);
-  // same time yesterday / last week: cumulative item net sales and checks up to this hour of the business day
-  const ydSoFar = yday?.cumNet[k] ?? null, lwSoFar = lastWeek?.cumNet[k] ?? null;
-  const ydChecksSoFar = yday?.cumChecks[k] ?? null, lwChecksSoFar = lastWeek?.cumChecks[k] ?? null;
-  const tdSoFar = today?.cumNet[k] ?? null, tdChecksSoFar = today?.cumChecks[k] ?? null;
-  const ydAvg = mv(ydTot.data?.totals, 'avg_check'), lwAvg = mv(lwTot.data?.totals, 'avg_check');
-  const outN = Number(mv(extra.data?.totals, 'outstanding_checks') ?? 0) || 0;
-  const outAmount = mv(extra.data?.totals, 'outstanding_amount');
-  const loading = eod.loading && !eod.data;
+function SalesToday({ home }: { home: ReturnType<typeof useQuery<any>> }) {
+  const open = useOpenReport();
+  const h = home.data;
+  const c = h?.cards ?? {};
+  const netToday = mv(c, 'net_sales'), checksToday = mv(c, 'checks'), avgToday = mv(c, 'avg_check');
+  const cmp = h?.compare;
+  const outN = Number(mv(c, 'open_checks') ?? 0) || 0;
+  const loading = home.loading && !h;
   const has = (v: string | null) => sign(v) !== 0;
+  const src = (id: string) => c[id]?.source as Src | undefined;
+  const hourly: { today: Hourly | null; yday: Hourly | null; lastWeek: Hourly | null } = h?.hourly ? { today: { cumNet: h.hourly.today }, yday: { cumNet: h.hourly.yesterday }, lastWeek: { cumNet: h.hourly.lastWeek } } : { today: null, yday: null, lastWeek: null };
+  if (h && !Object.keys(c).length && !h.hourly) return null; // the viewer may run none of Home's reports
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-fb="home:sales" data-business-date={h?.businessDate ?? ''}>
       <StatGrid>
-        <StatCard fb="home:kpi:net_sales" label={t('صافي المبيعات النهارده')} tone="primary" icon={<TrendingUp className="w-4 h-4" />} onClick={() => nav('reports', { reportId: 'eod_bridge' })}
-          loading={loading} value={<span className="num" data-value={netToday ?? ''} data-business-date={bd}>{whole(netToday)}</span>} unit={t('ج.م')}
-          hint={has(netToday) ? <span className="flex flex-col gap-0.5"><Delta now={tdSoFar} before={ydSoFar} label={t('عن امبارح لحد نفس الساعة')} /><Delta now={tdSoFar} before={lwSoFar} label={t('عن نفس اليوم الأسبوع اللي فات')} /></span>
-            : <span className="flex flex-col gap-0.5"><span>{t('لسه مفيش بيع النهارده')}</span><span>{t('امبارح لحد نفس الساعة: {m}', { m: money(ydSoFar ?? '0') })}</span></span>} />
-        <StatCard fb="home:kpi:order_count" label={t('عدد الشيكات المقفولة')} icon={<Receipt className="w-4 h-4" />}
+        {(loading || c.net_sales) && <StatCard fb="home:kpi:net_sales" label={t('صافي المبيعات')} tone="primary" icon={<TrendingUp className="w-4 h-4" />} onClick={() => open(src('net_sales'))}
+          loading={loading} value={<span className="num" data-value={netToday ?? ''} data-business-date={h?.businessDate ?? ''}>{whole(netToday)}</span>} unit={currency()}
+          hint={cmp ? (has(netToday) ? <span className="flex flex-col gap-0.5"><Delta now={cmp.netSoFar.today} before={cmp.netSoFar.yesterday} label={t('مقارنة بالأمس حتى الساعة نفسها')} /><Delta now={cmp.netSoFar.today} before={cmp.netSoFar.lastWeek} label={t('مقارنة باليوم نفسه من الأسبوع الماضي')} /></span>
+            : <span>{t('الأمس حتى الساعة نفسها: {m}', { m: money(cmp.netSoFar.yesterday ?? '0') })}</span>) : undefined} />}
+        {(loading || c.checks) && <StatCard fb="home:kpi:order_count" label={t('الشيكات المغلقة')} icon={<Receipt className="w-4 h-4" />} onClick={() => open(src('checks'))}
           loading={loading} value={<span className="num" data-value={checksToday ?? ''}>{checksToday == null ? '—' : qty(checksToday)}</span>}
-          hint={has(checksToday) ? <span className="flex flex-col gap-0.5"><Delta now={tdChecksSoFar} before={ydChecksSoFar} label={t('عن امبارح لحد نفس الساعة')} /><Delta now={tdChecksSoFar} before={lwChecksSoFar} label={t('عن نفس اليوم الأسبوع اللي فات')} /></span>
-            : <span className="flex flex-col gap-0.5"><span>{t('امبارح لحد نفس الساعة: {n} شيك', { n: qty(ydChecksSoFar ?? '0') })}</span><span>{t('امبارح كله: {n} شيك', { n: qty(mv(ydTot.data?.totals, 'check_count') ?? '0') })}</span></span>} />
-        <StatCard fb="home:kpi:average_order_value" label={t('متوسط الشيك')} icon={<Wallet className="w-4 h-4" />}
-          loading={loading} value={<span className="num" data-value={avgToday ?? ''}>{whole(avgToday)}</span>} unit={t('ج.م')}
-          hint={has(avgToday) ? <span className="flex flex-col gap-0.5"><Delta now={avgToday} before={ydAvg} label={t('عن متوسط امبارح')} /><Delta now={avgToday} before={lwAvg} label={t('عن نفس اليوم الأسبوع اللي فات')} /></span>
-            : <span className="flex flex-col gap-0.5"><span>{t('متوسط امبارح: {m}', { m: money(ydAvg ?? '0') })}</span><span>{t('الأسبوع اللي فات: {m}', { m: money(lwAvg ?? '0') })}</span></span>} />
-        <StatCard fb="home:kpi:outstanding" label={t('شيكات مستنية الدفع')} icon={<Hourglass className="w-4 h-4" />} tone={outN ? 'warning' : 'neutral'} onClick={() => nav('checks')}
-          loading={extra.loading && !extra.data} value={outN}
-          hint={outN ? t('عليها {m} لسه ما اتدفعتش', { m: money(outAmount ?? '0') }) : t('كل الشيكات اللي اتأكدت اتدفعت')} />
+          hint={cmp ? (has(checksToday) ? <span className="flex flex-col gap-0.5"><Delta now={cmp.checksSoFar.today} before={cmp.checksSoFar.yesterday} label={t('مقارنة بالأمس حتى الساعة نفسها')} /><Delta now={cmp.checksSoFar.today} before={cmp.checksSoFar.lastWeek} label={t('مقارنة باليوم نفسه من الأسبوع الماضي')} /></span>
+            : <span>{t('الأمس كاملًا: {n} شيك', { n: qty(cmp.yesterdayChecks ?? '0') })}</span>) : undefined} />}
+        {(loading || c.avg_check) && <StatCard fb="home:kpi:average_order_value" label={t('متوسط الشيك')} icon={<Wallet className="w-4 h-4" />} onClick={() => open(src('avg_check'))}
+          loading={loading} value={<span className="num" data-value={avgToday ?? ''}>{whole(avgToday)}</span>} unit={currency()}
+          hint={cmp ? (has(avgToday) ? <span className="flex flex-col gap-0.5"><Delta now={avgToday} before={cmp.avg.yesterday} label={t('مقارنة بمتوسط الأمس')} /><Delta now={avgToday} before={cmp.avg.lastWeek} label={t('مقارنة باليوم نفسه من الأسبوع الماضي')} /></span>
+            : <span>{t('متوسط الأمس: {m}', { m: money(cmp.avg.yesterday ?? '0') })}</span>) : undefined} />}
+        {(loading || c.open_checks) && <StatCard fb="home:kpi:outstanding" label={t('شيكات بانتظار الدفع')} icon={<Hourglass className="w-4 h-4" />} tone={outN ? 'warning' : 'neutral'} onClick={() => open(src('open_checks'))}
+          loading={loading} value={<span className="num" data-value={mv(c, 'open_checks') ?? ''}>{outN}</span>}
+          hint={outN ? t('عليها {m} لم تُدفع بعد', { m: money(mv(c, 'open_amount') ?? '0') }) : undefined} />}
       </StatGrid>
-      <div className="grid xl:grid-cols-[1.5fr_1fr] gap-4">
-        <Card title={t('المبيعات على مدار اليوم')} badge={<StateBadge ops={['Report.Query']} />}>
-          {tQ.loading && !tQ.data ? <Skeleton className="h-52 w-full" /> : <HourChart today={today} yday={yday} lastWeek={lastWeek} hour={hour} />}
-        </Card>
-        <Card title={t('آخر 14 يوم')} actions={<Button size="sm" variant="ghost" onClick={() => nav('reports')}>{t('التفاصيل')}</Button>}>
-          {days.loading && !days.data ? <Skeleton className="h-52 w-full" /> : <DaysChart items={Array.from({ length: 14 }, (_, i) => addDaysIso(bd, i - 13)).map((d) => ({ businessDate: d, netSales: days.data?.rows?.find((r: any) => r.dims?.business_date === d)?.values?.net_item_sales?.value ?? '0' }))} />}
-          <TodayBreakdown totals={extra.data?.totals ?? null} />
-        </Card>
-      </div>
-      {eod.error && <Banner tone="warning">{t('أرقام اليوم مش متاحة للحساب ده.')}<Tech> <span className="num text-xs">{eod.error.code}</span></Tech></Banner>}
+      {h?.hourly && (
+        <div className="grid xl:grid-cols-[1.5fr_1fr] gap-4">
+          <Card title={t('المبيعات على مدار اليوم')} actions={<SourceLink src={h.hourly.source} fb="home:source:hourly" />} data-fb="home:card:hourly">
+            <HourChart today={hourly.today} yday={hourly.yday} lastWeek={hourly.lastWeek} hour={h.hour} />
+          </Card>
+          <Card title={t('آخر 14 يومًا')} actions={<SourceLink src={h.days?.source} fb="home:source:days" />} data-fb="home:card:days">
+            <DaysChart items={(h.days?.rows ?? []).map((x: any) => ({ businessDate: x.date, netSales: x.value ?? '0' }))} />
+            <TodayBreakdown cards={c} />
+          </Card>
+        </div>
+      )}
+      {(h?.paymentMix || h?.topItems) && (
+        <div className="grid xl:grid-cols-2 gap-4">
+          {h.paymentMix && <Card title={t('طرق الدفع')} actions={<SourceLink src={h.paymentMix.source} fb="home:source:payments" />} data-fb="home:card:payments"><PaymentMix mix={h.paymentMix} /></Card>}
+          {h.topItems && <Card title={t('الأصناف الأعلى مبيعًا')} actions={<SourceLink src={h.topItems.source} fb="home:source:top-items" />} data-fb="home:card:top-items"><TopItems top={h.topItems} /></Card>}
+        </div>
+      )}
+      {home.error && <Banner tone="warning">{t('أرقام اليوم غير متاحة لهذا الحساب.')}<Tech> <span className="num text-xs">{home.error.code}</span></Tech></Banner>}
     </div>
   );
 }
 
-const BREAKDOWN: [string, string][] = [['service_charge', 'الخدمة'], ['tax_amount', 'الضريبة'], ['discount_amount', 'الخصومات'], ['tender_refunded', 'مرتجعات اتصرفت']];
-function TodayBreakdown({ totals }: { totals: any }) {
-  if (!totals) return null;
+const BREAKDOWN: [string, string][] = [['service', 'الخدمة'], ['tax', 'الضريبة'], ['discounts', 'الخصومات'], ['refunded', 'المرتجعات المصروفة']];
+function TodayBreakdown({ cards }: { cards: any }) {
+  const open = useOpenReport();
+  const shown = BREAKDOWN.filter(([k]) => cards[k]);
+  if (!shown.length) return null;
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3 pt-3 border-t line">
-      {BREAKDOWN.map(([k, label]) => (
-        <div key={k} className="min-w-0" data-fb={`home:kpi:${k}`}>
+      {shown.map(([k, label]) => (
+        <button type="button" key={k} className="min-w-0 text-start rounded-lg hover:surface-1 px-1" data-fb={`home:kpi:${k}`} onClick={() => open(cards[k].source)}>
           <div className="text-[11px] text-dim truncate">{t(label)}</div>
-          <div className="text-sm"><Money v={mv(totals, k) ?? '0'} /></div>
-        </div>
+          <div className="text-sm"><Money v={mv(cards, k) ?? '0'} /></div>
+        </button>
       ))}
     </div>
+  );
+}
+
+function PaymentMix({ mix }: { mix: any }) {
+  const rows: any[] = mix.rows.filter((r: any) => r.value !== null);
+  if (!rows.length) return <div className="text-sm text-dim py-6 text-center" data-fb="home:payments:empty">{t('لا مدفوعات اليوم')}</div>;
+  const total = D(mix.total ?? '0');
+  return (
+    <div className="space-y-2" data-fb="home:payments">
+      {rows.map((r) => {
+        const pct = total.isZero() ? 0 : Number(D(r.value).div(total).times(100).toFixed(1));
+        return (
+          <div key={r.method} className="grid grid-cols-[minmax(0,9rem)_1fr_auto] items-center gap-3 text-sm" data-method={r.method} data-value={r.value}>
+            <span className="truncate">{L(r.label)}</span>
+            <span className="h-2 rounded-full surface-2 overflow-hidden"><span className="block h-full rounded-full bg-[var(--primary)]" style={{ width: `${pct}%` }} /></span>
+            <span className="flex items-baseline gap-2 justify-end"><Money v={r.value} /><span className="num text-[11px] text-dim w-12 text-end">{pct.toFixed(1)}%</span></span>
+          </div>
+        );
+      })}
+      <div className="flex items-center justify-between border-t line pt-2 text-sm font-bold"><span>{t('الإجمالي')}</span><Money v={mix.total ?? '0'} /></div>
+    </div>
+  );
+}
+
+function TopItems({ top }: { top: any }) {
+  const rows: any[] = top.rows;
+  if (!rows.length) return <div className="text-sm text-dim py-6 text-center" data-fb="home:top-items:empty">{t('لا مبيعات اليوم')}</div>;
+  return (
+    <ol className="space-y-1.5" data-fb="home:top-items">
+      {rows.map((r, i) => (
+        <li key={r.product} className="grid grid-cols-[1.5rem_minmax(0,1fr)_auto_auto] items-center gap-3 text-sm" data-product={r.product} data-value={r.net}>
+          <span className="num text-dim text-center">{i + 1}</span>
+          <span className="truncate">{L(r.label)}</span>
+          <span className="num text-dim text-xs">{r.qty == null ? '—' : qty(r.qty)}</span>
+          <Money v={r.net ?? '0'} />
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -277,7 +306,7 @@ function LiveService() {
   const ds = delivery.data?.summary;
   const anyLoaded = tables.data || kitchen.data || delivery.data || sessions.data;
   return (
-    <Card title={<span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[var(--success)] animate-pulse" />{t('الشغل دلوقتي')}</span>} description={t('بيتحدث لوحده مع كل حركة على أي جهاز.')}>
+    <Card title={<span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[var(--success)] animate-pulse" />{t('الشغل دلوقتي')}</span>}>
       {!anyLoaded ? <div className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-24" />)}</div> : (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3">
           {tables.data && <LiveTile fb="home:live:tables" icon={<Armchair className="w-4 h-4" />} label={t('الترابيزات المشغولة')} onClick={() => nav('floor')}
@@ -472,7 +501,6 @@ function SetupPath({ setup, collapsed }: { setup: ReturnType<typeof useSetupStep
           })}
         </div>
       ) : null}
-      {open && <div className="text-[11px] text-dim mt-3">{t('العلامة بتتحسب لوحدها من اللي اتعمل فعلًا (عدد الفروع والأجهزة والموظفين والضرايب والأصناف…). الدايرة الفاضية = خطوة بتتراجع بالعين، أو الحساب ده مش مسموح له يشوفها.')}</div>}
     </Card>
   );
 }

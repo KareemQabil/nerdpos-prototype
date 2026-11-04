@@ -1,6 +1,6 @@
 // Reports engine public surface (layers L0–L4 + assistant). Importing this module registers the reconciliation source.
 import './recon';
-export { query, explain, metricList, launchDate, dimLabel, ReportRefusal, type Caller } from './engine';
+export { query, explain, metricList, launchDate, dimLabel, ReportRefusal, scopeBranches, type Caller } from './engine';
 export { eodBridge } from './recon';
 export { compare, trend, decompose, menuMatrix, previousPeriod, CLASS_LABEL } from './analysis';
 export { runManifest, catalog, venueOf } from './run';
@@ -10,3 +10,4 @@ export { DIMENSIONS, dimensionById } from './registry/dimensions';
 export { CHECKLIST } from './expert';
 export { LEGACY_REPORTS, runLegacyReport } from './legacy';
 export { pivot, flatten, outputColumns, resolvePeriod, comparePeriod, calcFormula, READY_CALCS, businessDayEndMs, type PivotSpec, type PivotResult, type PivotNode, type MeasureMeta, type FlatRow } from './pivot';
+export { homeSummary, HOME_CARDS, DAY_HOURS, type HomeSummary } from './home';

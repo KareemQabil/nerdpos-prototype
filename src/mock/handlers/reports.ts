@@ -9,7 +9,7 @@ import { hasPermission } from '../types-channels';
 import { need, requireBranch, userName } from './util';
 import {
   query, explain, metricList, eodBridge, compare, trend, decompose, menuMatrix, runManifest, catalog, MANIFESTS, manifestById,
-  DIMENSIONS, CHECKLIST, LEGACY_REPORTS, runLegacyReport, ReportRefusal, type Caller,
+  DIMENSIONS, CHECKLIST, LEGACY_REPORTS, runLegacyReport, ReportRefusal, homeSummary, scopeBranches, type Caller,
 } from '../../reports';
 import { ask, QUESTION_BANK_SIZE } from '../../reports/assistant';
 import { nextRun } from '../seed-ops';
@@ -76,6 +76,12 @@ export const reportHandlers: Record<string, Handler> = {
     const lines = ['section,metric,value', ...(r as any).sections[0].rows.map((x: any[]) => `summary,${x[0]},${x[1]}`), ...(t as any).sections[0].rows.map((x: any[]) => `tenders,${x[0]},${x[3]}`)];
     return { filename: `nerdpos-${ctx.db.branches.find((b) => b.id === ctx.branchId)?.code}-${from}_${to}.csv`, csv: lines.join('\n') };
   },
+  // ux-17: Home's numbers from the certified reports, for the business day resolved here (never the browser's)
+  'Report.Home': (ctx) => guard(() => {
+    const c = callerOf(ctx);
+    const branchIds = scopeBranches(ctx.db, c, branchList(ctx));
+    return homeSummary(ctx.db, c, { businessDate: ctx.businessDate(branchIds[0]), branchIds: branchList(ctx) ? branchIds : undefined });
+  }),
   'Report.Query': (ctx) => guard(() => query(ctx.db, callerOf(ctx), parseQ(ctx))),
   'Report.Explain': (ctx) => guard(() => explain(ctx.db, callerOf(ctx), parseQ(ctx))),
   'Report.Bridge': (ctx) => guard(() => { const s = runSpec(ctx); return eodBridge(ctx.db, callerOf(ctx), s); }),

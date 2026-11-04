@@ -322,3 +322,10 @@ export function applyUx15Extensions(ops: OperationDef[]) {
     op.note = `${op.note ? op.note + ' · ' : ''}${ext.note}`;
   }
 }
+
+// ux-17 (reports restructure, Home from report numbers, real-text PDF): one read is PROPOSED — Home's figures are the
+// certified reports' own numbers for the server's business day and the viewer's branch scope (PROTOTYPE_GAPS §15n).
+// The Home card of a report the viewer may not run is left out and listed in `refused` (never shown as 0).
+export const UX17_PROPOSED_OPERATIONS: OperationDef[] = [
+  { id: 'Report.Home', module: 'reporting', kind: 'QRY', method: 'GET', path: '/reports/home', permission: 'report:run', input: { branchIds: { type: 'List<Ref<organization.Branch>>', required: false } }, output: 'HomeSummaryView', errors: ['REPORT_SCOPE_DENIED'], approval: null, backend_state: 'PROPOSED', note: 'ux-17: the business day is resolved on the server (branch timezone + cutoff); runs eod_bridge, tender_settlement, top_items and hourly_daypart for that day and scope (the device branch unless branchIds, each checked against the caller\'s report:run branches) and returns every Home number with its source {reportId, block, metric, from, to}: net sales, checks, average check, open checks and their amount, refunds, service, tax, discounts, collected, the payment mix, the top five items, the same-hour comparison with yesterday and the same day last week (engine totals over the hours up to now), the hourly running totals and the last 14 days. A report whose permission the caller lacks is skipped (refused: [reportId]); metric-level permissions stay REFUSED values' },
+];
