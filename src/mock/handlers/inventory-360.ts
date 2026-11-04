@@ -217,7 +217,7 @@ function statusOf(ctx: Ctx, type: RefType, id: string): StatusView {
   const db = ctx.db;
   const inv = invOf(db);
   const branchId = branchOf(ctx);
-  const gone = (title: Loc): StatusView => ({ type, id, title, sub: null, status: { text: L2('مش موجود دلوقتي', 'No longer available'), tone: 'neutral' }, missing: true });
+  const gone = (title: Loc): StatusView => ({ type, id, title, sub: null, status: { text: L2('غير موجود حاليًا', 'No longer available'), tone: 'neutral' }, missing: true });
   switch (type) {
     case 'product': {
       const p = db.products.find((x) => x.id === id);
@@ -226,12 +226,12 @@ function statusOf(ctx: Ctx, type: RefType, id: string): StatusView {
       const today = soldOf(db, p.id, ctx.now - 18 * 3600_000, branchId).qty;
       const price = branchId ? priceRuleAt(db, p.id, branchId, 'DINE_IN', ctx.now) ?? priceRuleAt(db, p.id, branchId, 'TAKEAWAY', ctx.now) : null;
       const cat = db.categories.find((c) => c.id === p.categoryId)?.name;
-      const sub = L2(`${cat?.ar ?? ''}${price ? ` · ${money2(price.amount)} ج` : ''}`, `${cat?.en ?? ''}${price ? ` · EGP ${money2(price.amount)}` : ''}`);
+      const sub = L2(`${cat?.ar ?? ''}${price ? ` · ${money2(price.amount)} ج.م` : ''}`, `${cat?.en ?? ''}${price ? ` · ${money2(price.amount)} ج.م` : ''}`);
       if (!p.active) return { type, id, title: p.name, sub, status: { text: L2('مؤرشف', 'Archived'), tone: 'neutral' } };
-      if (a?.state === 'SOLD_OUT') return { type, id, title: p.name, sub, status: { text: L2('خلص النهارده', 'Sold out today'), tone: 'warning' } };
+      if (a?.state === 'SOLD_OUT') return { type, id, title: p.name, sub, status: { text: L2('نفد اليوم', 'Sold out today'), tone: 'warning' } };
       if (a?.state === 'BLOCKED') return { type, id, title: p.name, sub, status: { text: L2('موقوف', 'Blocked'), tone: 'error' } };
       if (!price) return { type, id, title: p.name, sub, status: { text: L2('مالوش سعر في الفرع ده', 'No price in this branch'), tone: 'warning' } };
-      return { type, id, title: p.name, sub, status: { text: L2(`متاح · اتباع ${fmt(today)} النهارده`, `Available · ${fmt(today)} sold today`), tone: 'success' } };
+      return { type, id, title: p.name, sub, status: { text: L2(`متاح · بيع ${fmt(today)} اليوم`, `Available · ${fmt(today)} sold today`), tone: 'success' } };
     }
     case 'item': {
       const it = inv.items.find((x) => x.id === id);
@@ -246,7 +246,7 @@ function statusOf(ctx: Ctx, type: RefType, id: string): StatusView {
       const onOrder = inv.purchaseOrders.some((p) => ['ISSUED', 'PARTIALLY_RECEIVED'].includes(p.state) && p.lines.some((l) => l.itemId === it.id) && whs.some((w) => w.id === p.warehouseId));
       if (bad) {
         const lv = it.levels[bad.w.id];
-        const txt = bad.s === 'LOW' ? L2(`تحت الحد الأدنى في ${bad.w.name} (${fmt(bad.q)} من ${fmt(lv.min)} ${uAr})`, `Below minimum in ${bad.w.name} (${fmt(bad.q)} of ${fmt(lv.min)})`) : L2(`خلص في ${bad.w.name}`, `Out in ${bad.w.name}`);
+        const txt = bad.s === 'LOW' ? L2(`تحت الحد الأدنى في ${bad.w.name} (${fmt(bad.q)} من ${fmt(lv.min)} ${uAr})`, `Below minimum in ${bad.w.name} (${fmt(bad.q)} of ${fmt(lv.min)})`) : L2(`نفد في ${bad.w.name}`, `Out in ${bad.w.name}`);
         if (onOrder) { txt.ar += ' · عليه أمر شراء'; txt.en += ' · on order'; }
         return { type, id, title: it.name, sub, status: { text: txt, tone: bad.s === 'LOW' ? 'warning' : 'error' } };
       }
@@ -259,23 +259,23 @@ function statusOf(ctx: Ctx, type: RefType, id: string): StatusView {
       const pend = inv.receipts.filter((r) => r.supplierId === s.id && r.state === 'POSTED' && !r.invoiceId).length;
       const sub = L2(`${s.phone ?? ''}${s.contactName ? ' · ' + s.contactName : ''}`, `${s.phone ?? ''}${s.contactName ? ' · ' + s.contactName : ''}`);
       if (!s.active) return { type, id, title: L2(s.name, s.name), sub, status: { text: L2('موقوف', 'Inactive'), tone: 'neutral' } };
-      if (open || pend) return { type, id, title: L2(s.name, s.name), sub, status: { text: L2(`${open} أمر مستني الاستلام · ${pend} استلام من غير فاتورة`, `${open} PO awaiting receipt · ${pend} receipt(s) not invoiced`), tone: 'info' } };
-      return { type, id, title: L2(s.name, s.name), sub, status: { text: L2('مفيش حاجة مفتوحة', 'Nothing open'), tone: 'success' } };
+      if (open || pend) return { type, id, title: L2(s.name, s.name), sub, status: { text: L2(`${open} أمر بانتظار الاستلام · ${pend} استلام بلا فاتورة`, `${open} PO awaiting receipt · ${pend} receipt(s) not invoiced`), tone: 'info' } };
+      return { type, id, title: L2(s.name, s.name), sub, status: { text: L2('لا يوجد شيء مفتوح', 'Nothing open'), tone: 'success' } };
     }
     case 'po': {
       const p = inv.purchaseOrders.find((x) => x.id === id);
       if (!p) return gone(L2(id, id));
       const v = poView(db, p);
       const title = L2(`أمر شراء ${p.number}`, `Purchase order ${p.number}`);
-      const sub = L2(`${v.supplierName} · ${money2(v.total)} ج`, `${v.supplierName} · EGP ${money2(v.total)}`);
+      const sub = L2(`${v.supplierName} · ${money2(v.total)} ج.م`, `${v.supplierName} · ${money2(v.total)} ج.م`);
       const left = v.lines.filter((l) => D(l.outstandingQuantity).gt(0)).length;
       const notInvoiced = inv.receipts.some((r) => r.purchaseOrderId === p.id && r.state === 'POSTED' && !r.invoiceId);
       const map: Record<string, StatusView['status']> = {
-        DRAFT: { text: L2('مسودة — لسه ما اتبعتش للمورد', 'Draft — not sent'), tone: 'neutral' },
+        DRAFT: { text: L2('مسودة — لم تُرسل للمورد بعد', 'Draft — not sent'), tone: 'neutral' },
         ISSUED: { text: L2('مستني الاستلام', 'Waiting for receipt'), tone: 'info' },
-        PARTIALLY_RECEIVED: { text: L2(`اتستلم جزء — باقي ${left} صنف`, `Partly received — ${left} line(s) left`), tone: 'warning' },
-        RECEIVED: { text: notInvoiced ? L2('اتستلم — مستني فاتورة المورد', 'Received — invoice pending') : L2('اتستلم كله', 'Fully received'), tone: notInvoiced ? 'warning' : 'success' },
-        CLOSED: { text: notInvoiced ? L2('مقفول — مستني فاتورة المورد', 'Closed — invoice pending') : L2('مقفول', 'Closed'), tone: notInvoiced ? 'warning' : 'neutral' },
+        PARTIALLY_RECEIVED: { text: L2(`استُلم جزء — المتبقي ${left} صنف`, `Partly received — ${left} line(s) left`), tone: 'warning' },
+        RECEIVED: { text: notInvoiced ? L2('استُلم — بانتظار فاتورة المورد', 'Received — invoice pending') : L2('استُلم بالكامل', 'Fully received'), tone: notInvoiced ? 'warning' : 'success' },
+        CLOSED: { text: notInvoiced ? L2('مغلق — بانتظار فاتورة المورد', 'Closed — invoice pending') : L2('مقفول', 'Closed'), tone: notInvoiced ? 'warning' : 'neutral' },
         CANCELLED: { text: L2('ملغي', 'Cancelled'), tone: 'error' },
       };
       return { type, id, title, sub, status: map[p.state] };
@@ -285,24 +285,24 @@ function statusOf(ctx: Ctx, type: RefType, id: string): StatusView {
       if (!r) return gone(L2(id, id));
       const sname = inv.suppliers.find((s) => s.id === r.supplierId)?.name ?? '';
       const title = L2(`إذن استلام ${r.number}`, `Goods receipt ${r.number}`);
-      const sub = L2(`${sname} · ${money2(r.total)} ج`, `${sname} · EGP ${money2(r.total)}`);
-      if (r.state === 'REVERSED') return { type, id, title, sub, status: { text: L2('اتلغى', 'Reversed'), tone: 'error' } };
+      const sub = L2(`${sname} · ${money2(r.total)} ج.م`, `${sname} · ${money2(r.total)} ج.م`);
+      if (r.state === 'REVERSED') return { type, id, title, sub, status: { text: L2('مُلغى', 'Reversed'), tone: 'error' } };
       const x = r.invoiceId ? invoices(inv).find((i) => i.id === r.invoiceId) : null;
-      return { type, id, title, sub, status: x ? { text: L2(`عليه فاتورة ${x.number}`, `Invoiced ${x.number}`), tone: 'success' } : { text: L2('مستني فاتورة المورد', 'Invoice pending'), tone: 'warning' } };
+      return { type, id, title, sub, status: x ? { text: L2(`عليه فاتورة ${x.number}`, `Invoiced ${x.number}`), tone: 'success' } : { text: L2('بانتظار فاتورة المورد', 'Invoice pending'), tone: 'warning' } };
     }
     case 'invoice': {
       const x = invoices(inv).find((i) => i.id === id);
       if (!x) return gone(L2(id, id));
       const sname = inv.suppliers.find((s) => s.id === x.supplierId)?.name ?? '';
       const late = x.dueDate && x.dueDate < new Date(ctx.now).toISOString().slice(0, 10) && x.state !== 'PAID';
-      return { type, id, title: L2(`فاتورة مورد ${x.number}`, `Supplier invoice ${x.number}`), sub: L2(`${sname} · ${money2(x.total)} ج`, `${sname} · EGP ${money2(x.total)}`),
-        status: x.state === 'PAID' ? { text: L2('اتدفعت', 'Paid'), tone: 'success' } : late ? { text: L2(`ميعاد دفعها عدّى (${x.dueDate})`, `Overdue (${x.dueDate})`), tone: 'error' } : { text: L2(x.dueDate ? `اتسجلت · تتدفع ${x.dueDate}` : 'اتسجلت', x.dueDate ? `Posted · due ${x.dueDate}` : 'Posted'), tone: 'info' } };
+      return { type, id, title: L2(`فاتورة مورد ${x.number}`, `Supplier invoice ${x.number}`), sub: L2(`${sname} · ${money2(x.total)} ج.م`, `${sname} · ${money2(x.total)} ج.م`),
+        status: x.state === 'PAID' ? { text: L2('مدفوعة', 'Paid'), tone: 'success' } : late ? { text: L2(`ميعاد دفعها عدّى (${x.dueDate})`, `Overdue (${x.dueDate})`), tone: 'error' } : { text: L2(x.dueDate ? `اتسجلت · تتدفع ${x.dueDate}` : 'اتسجلت', x.dueDate ? `Posted · due ${x.dueDate}` : 'Posted'), tone: 'info' } };
     }
     case 'storeRequest': {
       const s = srs(inv).find((x) => x.id === id);
       if (!s) return gone(L2(id, id));
       const wn = inv.warehouses.find((w) => w.id === s.warehouseId)?.name ?? '';
-      const map: Record<string, StatusView['status']> = { DRAFT: { text: L2('مسودة', 'Draft'), tone: 'neutral' }, SUBMITTED: { text: L2('مستنية مسؤول المشتريات', 'Waiting for purchasing'), tone: 'warning' }, ORDERED: { text: L2('اتعمل منها أمر شراء', 'Ordered'), tone: 'success' }, CANCELLED: { text: L2('ملغية', 'Cancelled'), tone: 'error' } };
+      const map: Record<string, StatusView['status']> = { DRAFT: { text: L2('مسودة', 'Draft'), tone: 'neutral' }, SUBMITTED: { text: L2('بانتظار مسؤول المشتريات', 'Waiting for purchasing'), tone: 'warning' }, ORDERED: { text: L2('أُنشئ منها أمر شراء', 'Ordered'), tone: 'success' }, CANCELLED: { text: L2('ملغية', 'Cancelled'), tone: 'error' } };
       return { type, id, title: L2(`طلبية مخزن ${s.number}`, `Store request ${s.number}`), sub: L2(`${wn} · ${s.lines.length} صنف`, `${wn} · ${s.lines.length} item(s)`), status: map[s.state] };
     }
     case 'order': {
@@ -312,13 +312,13 @@ function statusOf(ctx: Ctx, type: RefType, id: string): StatusView {
       const ch: Record<string, Loc> = { DINE_IN: L2('صالة', 'Dine-in'), TAKEAWAY: L2('تيك أواي', 'Takeaway'), DELIVERY: L2('دليفري', 'Delivery') };
       const totals = computeTotals(o);
       const title = L2(`شيك #${o.number}`, `Check #${o.number}`);
-      const sub = L2(`${ch[o.channel].ar}${tbl ? ' · ترابيزة ' + tbl : ''}${o.customerName ? ' · ' + o.customerName : ''} · ${money2(totals.payable)} ج`, `${ch[o.channel].en}${tbl ? ' · table ' + tbl : ''}${o.customerName ? ' · ' + o.customerName : ''} · EGP ${money2(totals.payable)}`);
-      if (o.status === 'DRAFT') return { type, id, title, sub, status: { text: L2('لسه بيتكتب', 'Being written'), tone: 'info' } };
-      if (o.status === 'VOIDED' || o.status === 'CANCELLED') return { type, id, title, sub, status: { text: L2('اتلغى', 'Voided'), tone: 'error' } };
-      if (o.status === 'MERGED') return { type, id, title, sub, status: { text: L2('اتدمج في شيك تاني', 'Merged'), tone: 'neutral' } };
+      const sub = L2(`${ch[o.channel].ar}${tbl ? ' · ترابيزة ' + tbl : ''}${o.customerName ? ' · ' + o.customerName : ''} · ${money2(totals.payable)} ج.م`, `${ch[o.channel].en}${tbl ? ' · table ' + tbl : ''}${o.customerName ? ' · ' + o.customerName : ''} · ${money2(totals.payable)} ج.م`);
+      if (o.status === 'DRAFT') return { type, id, title, sub, status: { text: L2('قيد التحرير', 'Being written'), tone: 'info' } };
+      if (o.status === 'VOIDED' || o.status === 'CANCELLED') return { type, id, title, sub, status: { text: L2('مُلغى', 'Voided'), tone: 'error' } };
+      if (o.status === 'MERGED') return { type, id, title, sub, status: { text: L2('دُمج في شيك آخر', 'Merged'), tone: 'neutral' } };
       const st = settlementOf(db, o);
-      if (!st.settled) return { type, id, title, sub, status: { text: L2(`مش مدفوع — باقي ${money2(st.remaining)} ج`, `Unpaid — EGP ${money2(st.remaining)} left`), tone: 'warning' } };
-      return { type, id, title, sub, status: { text: o.status === 'COMPLETED' ? L2('اتقفل ومدفوع', 'Closed and paid') : L2('مدفوع', 'Paid'), tone: 'success' } };
+      if (!st.settled) return { type, id, title, sub, status: { text: L2(`غير مدفوع — المتبقي ${money2(st.remaining)} ج.م`, `Unpaid — ${money2(st.remaining)} ج.م left`), tone: 'warning' } };
+      return { type, id, title, sub, status: { text: o.status === 'COMPLETED' ? L2('مغلق ومدفوع', 'Closed and paid') : L2('مدفوع', 'Paid'), tone: 'success' } };
     }
     case 'customer': {
       const c = (db.customers ?? []).find((x) => x.id === id);
@@ -327,7 +327,7 @@ function statusOf(ctx: Ctx, type: RefType, id: string): StatusView {
       const last = db.orders.filter((o) => o.customerId === c.id).sort((a, b) => b.createdAtMs - a.createdAtMs)[0];
       const sub = L2(`${c.phone}${c.addresses[0]?.area ? ' · ' + c.addresses[0].area : ''}`, `${c.phone}${c.addresses[0]?.area ? ' · ' + c.addresses[0].area : ''}`);
       if (open) return { type, id, title: L2(c.name, c.name), sub, status: { text: L2(`عنده ${open} طلب مفتوح`, `${open} open order(s)`), tone: 'info' } };
-      return { type, id, title: L2(c.name, c.name), sub, status: { text: last ? L2(`آخر طلب #${last.number}`, `Last order #${last.number}`) : (c.allergies.length ? L2('عنده حساسية — راجع ملفه', 'Has allergies') : L2('مفيش طلبات مفتوحة', 'No open orders')), tone: c.allergies.length ? 'warning' : 'neutral' } };
+      return { type, id, title: L2(c.name, c.name), sub, status: { text: last ? L2(`آخر طلب #${last.number}`, `Last order #${last.number}`) : (c.allergies.length ? L2('عنده حساسية — راجع ملفه', 'Has allergies') : L2('لا توجد طلبات مفتوحة', 'No open orders')), tone: c.allergies.length ? 'warning' : 'neutral' } };
     }
     case 'person': {
       const u = db.users.find((x) => x.id === id);
@@ -335,7 +335,7 @@ function statusOf(ctx: Ctx, type: RefType, id: string): StatusView {
       const name = userName(db, u.id);
       const shift = db.sessions.find((s) => s.userId === u.id && s.state === 'OPEN');
       const term = shift ? db.terminals.find((x) => x.id === shift.terminalId) : null;
-      const status: StatusView['status'] = !u.active ? { text: L2('موقوف', 'Inactive'), tone: 'neutral' } : shift ? { text: L2(`فاتح وردية على ${term?.name ?? 'جهاز'}`, `Shift open on ${term?.name ?? 'a terminal'}`), tone: 'info' } : { text: L2('مفيش وردية مفتوحة', 'No open shift'), tone: 'neutral' };
+      const status: StatusView['status'] = !u.active ? { text: L2('موقوف', 'Inactive'), tone: 'neutral' } : shift ? { text: L2(`لديه وردية مفتوحة على ${term?.name ?? 'جهاز'}`, `Shift open on ${term?.name ?? 'a terminal'}`), tone: 'info' } : { text: L2('لا توجد وردية مفتوحة', 'No open shift'), tone: 'neutral' };
       return { type, id, title: L2(name, name), sub: null, status };
     }
   }
@@ -378,7 +378,7 @@ export const item360Handlers: Record<string, Handler> = {
   'Search.Global': (ctx) => search(ctx),
   'Search.Status': (ctx) => {
     const refs = String(ctx.query.refs ?? '').split(',').filter(Boolean).slice(0, 40);
-    return { items: refs.map((r) => { const [type, ...rest] = r.split(':'); const id = rest.join(':'); return canType(ctx, type as RefType) ? statusOf(ctx, type as RefType, id) : { type, id, title: L2('—', '—'), sub: null, status: { text: L2('الحساب ده مش مسموح له يشوفها', 'Not allowed for this account'), tone: 'neutral' }, missing: true }; }) };
+    return { items: refs.map((r) => { const [type, ...rest] = r.split(':'); const id = rest.join(':'); return canType(ctx, type as RefType) ? statusOf(ctx, type as RefType, id) : { type, id, title: L2('—', '—'), sub: null, status: { text: L2('غير مسموح لهذا الحساب بعرضها', 'Not allowed for this account'), tone: 'neutral' }, missing: true }; }) };
   },
 };
 

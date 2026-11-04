@@ -6922,4 +6922,5 @@ export const en: Record<string, string> = {
   // ux-08: MSA wording, currency
   "عجز": "Short",
   "الرصيد الافتتاحي (ج.م)": "Opening float (ج.م)",
+  "إلغاء صنف ظهر للعميل أو أُرسل (قبل الدفع)": "Void an item the customer saw or that was sent (before payment)",
 };

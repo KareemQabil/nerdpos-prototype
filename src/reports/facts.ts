@@ -129,7 +129,7 @@ const buildPayment: Builder = (db, s) => db.captures.filter((c) => branchOk(s, c
     dims: { ...dayDims(db, c.businessDate), branch: c.branchId, hour: String(cairoHour(c.atMs)).padStart(2, '0'), payment_method: TENDER[c.method] ?? c.method, drawer: c.sessionId, staff: c.by, device: c.terminalId, check: c.orderId },
     n: { amount: c.amount, rounding: c.rounding ?? '0.0000', positive: D(c.amount).gt(0) && !c.correctionOf ? '1' : '0', correction: c.correctionOf && D(c.amount).gt(0) ? '1' : '0', rounded: D(c.rounding ?? 0).isZero() ? '0' : '1' },
     key: { orderBd: o?.completedBusinessDate ?? '' },
-    ref: { kind: 'PAYMENT', id: c.id, orderId: c.orderId, label: `${o ? '#' + o.number : c.orderId} — ${c.method === 'CASH' ? 'كاش' : c.method === 'CARD' ? 'كارت' : c.method === 'DIGITAL_WALLET' ? 'محفظة' : c.method}${c.correctionOf ? ' (تصحيح)' : ''}${c.reference ? ' · ' + c.reference : ''}`, businessDate: c.businessDate, at: c.at, amount: c.amount, note: !D(c.rounding ?? 0).isZero() ? `rounding ${c.rounding}` : null },
+    ref: { kind: 'PAYMENT', id: c.id, orderId: c.orderId, label: `${o ? '#' + o.number : c.orderId} — ${c.method === 'CASH' ? 'نقدي' : c.method === 'CARD' ? 'بطاقة' : c.method === 'DIGITAL_WALLET' ? 'محفظة' : c.method}${c.correctionOf ? ' (تصحيح)' : ''}${c.reference ? ' · ' + c.reference : ''}`, businessDate: c.businessDate, at: c.at, amount: c.amount, note: !D(c.rounding ?? 0).isZero() ? `rounding ${c.rounding}` : null },
   } satisfies Fact;
 });
 
@@ -152,7 +152,7 @@ const buildRefund: Builder = (db, s) => db.refunds.filter((r) => r.state === 'PA
     dims: { ...dayDims(db, r.businessDate!), branch: o.branchId, payment_method: TENDER[r.method] ?? r.method, drawer: r.paidSessionId ?? null, staff: r.paidBy ?? session?.userId ?? r.decidedBy ?? null, approval_actor: r.approverId ?? db.grants.find((g) => g.id === r.approvalGrantId)?.approverUserId ?? r.decidedBy ?? null, void_reason: r.reasonCode, stage: st.stage, check: o.id, channel: o.channel },
     n: { amount: r.amount, net: m4(ratio(p.net)), tax: m4(ratio(p.tax)), service: m4(ratio(p.service)), one: '1' },
     key: { originalBd: st.originalBd ?? '', stageDerived: st.derived ? '1' : '0' },
-    ref: { kind: 'REFUND', id: r.id, orderId: o.id, label: `مرتجع على #${o.number} (يوم ${st.originalBd}) — ${({ CASH: 'كاش', CARD: 'كارت', DIGITAL_WALLET: 'محفظة' } as Record<string, string>)[r.method] ?? r.method}`, businessDate: r.businessDate, at: r.paidAt, amount: r.amount, note: st.derived ? 'stage-derived' : null },
+    ref: { kind: 'REFUND', id: r.id, orderId: o.id, label: `مرتجع على #${o.number} (يوم ${st.originalBd}) — ${({ CASH: 'نقدي', CARD: 'بطاقة', DIGITAL_WALLET: 'محفظة' } as Record<string, string>)[r.method] ?? r.method}`, businessDate: r.businessDate, at: r.paidAt, amount: r.amount, note: st.derived ? 'stage-derived' : null },
   } satisfies Fact];
 });
 
@@ -187,7 +187,7 @@ const buildCashEntry: Builder = (db, s) => db.cashEntries.flatMap((e) => {
     ref: { kind: 'CASH_ENTRY', id: e.id, label: `${CASH_KIND_AR[e.kind] ?? e.kind}${e.ref ? ' · ' + e.ref : ''}${e.reason ? ' · ' + e.reason : ''}`, businessDate: x.businessDate, at: e.at, amount: m4(D(e.amount).times(SIGN[e.kind] ?? 0)) },
   } satisfies Fact];
 });
-export const CASH_KIND_AR: Record<string, string> = { OPENING_FLOAT: 'فلوس أول الوردية', TENDER_IN: 'كاش من شيك', REFUND_OUT: 'مرتجع كاش', PAY_IN: 'إيداع في الدرج', PAY_OUT: 'صرف من الدرج', SAFE_DROP: 'توريد للخزنة', NO_SALE: 'فتح الدرج من غير بيع', TIP_IN: 'بقشيش كاش', TIP_OUT: 'صرف بقشيش', DEPOSIT_IN: 'عربون', TENDER_CORRECTION_IN: 'تصحيح طريقة دفع (داخل)', TENDER_CORRECTION_OUT: 'تصحيح طريقة دفع (خارج)' };
+export const CASH_KIND_AR: Record<string, string> = { OPENING_FLOAT: 'الرصيد الافتتاحي', TENDER_IN: 'نقد من شيك', REFUND_OUT: 'مرتجع نقدي', PAY_IN: 'إيداع في الدرج', PAY_OUT: 'صرف من الدرج', SAFE_DROP: 'توريد للخزنة', NO_SALE: 'فتح الدرج بلا بيع', TIP_IN: 'بقشيش نقدي', TIP_OUT: 'صرف بقشيش', DEPOSIT_IN: 'عربون', TENDER_CORRECTION_IN: 'تصحيح طريقة دفع (داخل)', TENDER_CORRECTION_OUT: 'تصحيح طريقة دفع (خارج)' };
 
 /**
  * Removals at every stage. Source of truth: db.reversals (r3A trace: stage, disposition, approver, review). Lines

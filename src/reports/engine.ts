@@ -152,7 +152,7 @@ export function datesOf(from: string, to: string) { const out: string[] = []; fo
 
 // ───────── labels
 const CH: Record<string, Loc> = { DINE_IN: { ar: 'صالة', en: 'Dine-in' }, TAKEAWAY: { ar: 'تيك أواي', en: 'Takeaway' }, DELIVERY: { ar: 'دليفري', en: 'Delivery' } };
-export const TENDER_LABEL: Record<string, Loc> = { CASH: { ar: 'كاش', en: 'Cash' }, CARD: { ar: 'كارت', en: 'Card' }, WALLET: { ar: 'محفظة (إنستاباي/فودافون كاش)', en: 'Wallet' }, PREPAID: { ar: 'مدفوع مسبقًا', en: 'Prepaid' }, POINTS: { ar: 'نقاط', en: 'Points' } };
+export const TENDER_LABEL: Record<string, Loc> = { CASH: { ar: 'نقدي', en: 'Cash' }, CARD: { ar: 'بطاقة', en: 'Card' }, WALLET: { ar: 'محفظة (إنستاباي/فودافون كاش)', en: 'Wallet' }, PREPAID: { ar: 'مدفوع مسبقًا', en: 'Prepaid' }, POINTS: { ar: 'نقاط', en: 'Points' } };
 export const STAGE_LABEL: Record<string, Loc> = { S0: { ar: 'S0 قبل ما يظهر (لسه ما اتبعتش)', en: 'S0 unsent' }, S1: { ar: 'S1 ظاهر (شيك مبدئي/المطبخ) ومش مدفوع', en: 'S1 visible, unpaid' }, S2: { ar: 'S2 مدفوع واليوم مفتوح', en: 'S2 paid, day open' }, S3: { ar: 'S3 مدفوع بعد قفل اليوم', en: 'S3 paid, day closed' } };
 export const DISP_LABEL: Record<string, Loc> = { NOT_PREPARED: { ar: 'ما اتعملش', en: 'Not prepared' }, RETURN_TO_STOCK: { ar: 'رجع المخزن', en: 'Back to stock' }, WASTE_HELD: { ar: 'هالك محجوز للمراجعة', en: 'Waste held' } };
 const FISCAL_LABEL: Record<string, Loc> = { PENDING_DATA: { ar: 'ناقصه بيانات', en: 'Pending data' }, BUILT: { ar: 'اتجهز', en: 'Built' }, SUBMITTED: { ar: 'اتبعت', en: 'Submitted' }, ACCEPTED: { ar: 'اتقبل', en: 'Accepted' }, REJECTED: { ar: 'اترفض', en: 'Rejected' }, SUPERSEDED: { ar: 'اتصحح بإيصال جديد', en: 'Superseded' } };
