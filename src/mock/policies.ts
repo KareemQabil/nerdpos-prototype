@@ -50,3 +50,17 @@ export function selfApprovalAllowed(action: string): boolean {
   const map = policy<Record<string, { mode: string }>>('SelfApprovalPolicy') ?? {};
   return map[action]?.mode === 'ALLOW';
 }
+
+/** ux-10b: an object policy with every field: the canonical default under the stored value (a value stored before a field
+ *  existed keeps working and gets the field's default — the strictest one). */
+export function policyFields<T extends object>(policyId: string, ctx: PolicyCtx = {}): T {
+  const d = (policyMeta.get(policyId)?.canonicalDefault ?? {}) as T;
+  const v = policy<T>(policyId, ctx);
+  return v && typeof v === 'object' ? ({ ...structuredClone(d), ...v } as T) : structuredClone(d);
+}
+
+/** ux-10b: the least number of characters a written reason must have (ReasonTextPolicy.minLength, default 3). */
+export function reasonMinLength(ctx: PolicyCtx = {}): number {
+  const n = Number(policyFields<{ minLength: number }>('ReasonTextPolicy', ctx).minLength);
+  return Number.isInteger(n) && n >= 1 ? n : 3;
+}

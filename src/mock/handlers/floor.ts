@@ -7,6 +7,7 @@ import { m4 } from '../money';
 import type { TableVisit } from '../types';
 import type { FloorPlan, TableLayout, TableTurn } from '../types-ops';
 import { policy } from '../policies';
+import { reasonText } from '../drawer-count'; // ux-10b: ReasonTextPolicy
 import '../ops-registry';
 import { reservationRules, tableConflict, depositBalances, depositView, depVersion, resVersion, pushResEvent, forfeitDeposit, cancelOutcome, blockMs } from '../reservation-rules';
 import type { Reservation } from '../types';
@@ -243,9 +244,7 @@ export const floorHandlers: Record<string, Handler> = {
   'Reservation.Cancel': (ctx) => {
     const r = getReservation(ctx, ctx.params.reservationId);
     if (r.state !== 'BOOKED') throw new ApiError('RESERVATION_NOT_BOOKED', { state: r.state }, 409);
-    const reason = String(ctx.body.reason ?? '').trim();
-    if (reason.length < 3) throw new ApiError('REASON_REQUIRED', { field: 'reason', rule: 'at least 3 characters' });
-    need(reason.length <= 200, 'VALIDATION_FAILED', { field: 'reason', rule: 'at most 200 characters' });
+    const reason = reasonText(ctx, ctx.body.reason); // ux-10b: ReasonTextPolicy.minLength (default 3), ≤ 200
     casRes(r, ctx.body.expectedVersion);
     const rules = reservationRules(r.branchId);
     const d = r.depositId ? ctx.db.deposits.find((x) => x.id === r.depositId) : null;

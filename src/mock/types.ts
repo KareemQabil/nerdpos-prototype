@@ -134,9 +134,27 @@ export interface KitchenTicket {
 export interface KitchenDelivery { id: string; orderId: string; round: number; state: 'PENDING' | 'DELIVERED' | 'FAILED'; attempts: number; lastError: string | null; createdAt: string; deliveredAt: string | null; ticketIds: string[]; nextAt: number }
 
 export interface Session {
-  id: string; terminalId: string; branchId: string; userId: string; state: 'OPEN' | 'CLOSED'; openingFloat: Money;
+  /** ux-10b: HANDOVER_PENDING = the outgoing cashier confirmed the blind count of a handover; nothing moves until it is accepted or cancelled */
+  id: string; terminalId: string; branchId: string; userId: string; state: 'OPEN' | 'HANDOVER_PENDING' | 'CLOSED'; openingFloat: Money;
   openedAt: string; openedAtMs: number; businessDate: string; closedAt: string | null; closedBy: string | null; version: number;
-  close: { countedCash: Money; expectedCash: Money; variance: Money; approvalGrantId?: string; reason?: string; z: ZReport } | null;
+  close: { countedCash: Money; expectedCash: Money; variance: Money; approvalGrantId?: string; reason?: string; z: ZReport; handoverId?: string; outgoingCount?: Money; incomingCount?: Money | null; recounts?: number } | null;
+  /** ux-10b: every confirmed blind count of this drawer (append-only); the last one locks while no cash moved after it */
+  counts?: DrawerCount[];
+  /** ux-10b: the handover that ends this session (pending or accepted) / the handover this session was opened by */
+  handoverId?: string | null; handoverFromId?: string | null;
+}
+/** ux-10b: a confirmed blind count. `entries` = how many cash entries the drawer had when it was counted. */
+export interface DrawerCount { id: string; kind: 'CLOSE' | 'HANDOVER' | 'RECOUNT'; counted: Money; at: string; by: string; entries: number; reason?: string | null; approvalGrantId?: string | null; replaces?: string | null }
+/** ux-10b: one shift handover on a terminal (immutable once ACCEPTED or CANCELLED). */
+export interface Handover {
+  id: string; number: string; branchId: string; terminalId: string; outgoingSessionId: string; outgoingUserId: string;
+  mode: 'DUAL_COUNT' | 'DIRECT_SWAP'; tolerance: Money; recountsAllowed: number; state: 'PENDING' | 'ACCEPTED' | 'CANCELLED';
+  startedAt: string; startedAtMs: number; outgoingCount: Money; outgoingNote: string | null; expectedCash: Money;
+  incomingCounts: { counted: Money; at: string; by: string; mismatch: boolean }[];
+  incomingUserId: string | null; incomingCount: Money | null; acceptedAt: string | null; incomingSessionId: string | null;
+  variance: Money | null; outgoingVariance: Money | null; countDifference: Money | null;
+  approvalGrantId: string | null; approverUserId: string | null; reason: string | null;
+  cancelledAt: string | null; cancelledBy: string | null; cancelReason: string | null; version: number;
 }
 export interface CashEntry { id: string; sessionId: string; kind: 'OPENING_FLOAT' | 'TENDER_IN' | 'REFUND_OUT' | 'PAY_IN' | 'PAY_OUT' | 'SAFE_DROP' | 'NO_SALE' | 'TIP_IN' | 'TIP_OUT' | 'DEPOSIT_IN' | 'TENDER_CORRECTION_IN' | 'TENDER_CORRECTION_OUT'; amount: Money; at: string; by: string; reasonCode?: string; reason?: string; ref?: string; approvalGrantId?: string }
 export interface ZReport {
@@ -144,6 +162,9 @@ export interface ZReport {
   openingFloat: Money; tenderBreakdown: Record<string, Money>; refundBreakdown: Record<string, Money>; cashByKind: Record<string, Money>;
   expectedCash: Money; countedCash: Money; variance: Money; orderCounts: Record<string, number>; outstandingChecks: { orderId: string; number: string; payable: Money; table: string | null }[];
   tips: Money; snapshotAt: string;
+  /** ux-10b: the handover that opened this session / that ended it */
+  handoverIn?: { handoverId: string; number: string; fromCashier: string; at: string; mode: string; openingFromCount: Money } | null;
+  handoverOut?: { handoverId: string; number: string; toCashier: string; at: string; mode: string; outgoingCount: Money; incomingCount: Money | null; expectedCash: Money; variance: Money; countDifference: Money | null; approver: string | null; reason: string | null } | null;
 }
 export interface Capture {
   id: string; orderId: string; method: TenderMethod; amount: Money; tendered: Money | null; change: Money; reference: string | null; walletProvider?: string | null;
@@ -249,6 +270,7 @@ export interface DB extends CrmCollections {
   idem: Record<string, Idem>;
   alerts: Alert[];
   deposits: Deposit[];
+  handovers?: Handover[]; // ux-10b: shift handovers (read through handoversOf)
   reservations: Reservation[];
   tips: TipEntry[];
   events: { id: string; at: string; type: string; ref: string; text: string }[];

@@ -4,7 +4,8 @@
 import { ApiError } from '../errors';
 import type { Handler, Ctx } from '../kernel';
 import { nextId, event, hist } from '../store';
-import { policy } from '../policies';
+import { policy, policyFields } from '../policies';
+import { reasonText } from '../drawer-count'; // ux-10b: ReasonTextPolicy
 import { computeLiveTotals, computeTotals, activeLines } from '../pricing';
 import { D, m4, isMoney, sub } from '../money';
 import { checkVersion, getOrder, need, openSessionOn, page, requireFields, settlementOf, userName } from './util';
@@ -428,8 +429,9 @@ export const deliveryHandlers: Record<string, Handler> = {
     const amount = m4(ctx.body.amount);
     const owed = m4(drv.owed);
     if (D(amount).gt(D(owed))) throw new ApiError('DRIVER_OWED_OVER_SETTLE', { owed, amount }, 409);
-    const reason = String(ctx.body.reason ?? '').trim();
-    if (mode !== 'COLLECT_CASH' && reason.length < 3) throw new ApiError('REASON_REQUIRED', { mode });
+    const raw = String(ctx.body.reason ?? '').trim();
+    // ux-10b: deduct and waive need a reason of ReasonTextPolicy.minLength (default 3); collect takes an optional note
+    const reason = mode !== 'COLLECT_CASH' ? reasonText(ctx, raw) : raw;
     need(reason.length <= 200, 'VALIDATION_FAILED', { field: 'reason', rule: 'at most 200 characters' });
     let sessionId: string | null = null;
     if (mode === 'COLLECT_CASH') {
@@ -466,6 +468,10 @@ export const deliveryHandlers: Record<string, Handler> = {
     if (D(pv.net).lt(0)) throw new ApiError('DRIVER_PAYOUT_INSUFFICIENT', { gross: pv.gross, deductions: pv.deductions }, 409);
     const session = D(pv.net).gt(0) ? openSessionOn(db, ctx.terminal?.id) : null;
     if (D(pv.net).gt(0) && !session) throw new ApiError('SESSION_NOT_OPEN', { reason: 'the rider is paid out of a terminal with an open drawer' });
+    // ux-10b DriverPayPolicy.payoutDrawer: OWN_DRAWER (default) — only the cashier who holds this drawer's open shift pays out of it;
+    // TERMINAL_DRAWER — any delivery:payout holder pays out of this terminal's open drawer
+    const payoutDrawer = policyFields<{ payoutDrawer: string }>('DriverPayPolicy', { branchId: drv.branchId }).payoutDrawer;
+    if (session && payoutDrawer !== 'TERMINAL_DRAWER' && session.userId !== ctx.user!.id) throw new ApiError('DRIVER_PAYOUT_NOT_DRAWER_HOLDER', { drawerHolder: userName(db, session.userId), policy: 'DriverPayPolicy.payoutDrawer OWN_DRAWER' }, 403);
     const g = ctx.requireApproval({ action: 'DRIVER_PAYOUT', targetType: 'delivery.Driver', targetId: drv.id, context: { driverId: drv.id, periodTo: pv.periodTo, gross: pv.gross, deductions: pv.deductions, net: pv.net }, grantId: ctx.body.approvalGrantId });
     db.seq['driver_payout_no'] = (db.seq['driver_payout_no'] ?? 0) + 1;
     const note = String(ctx.body.note ?? '').trim().slice(0, 200) || null;
@@ -520,8 +526,7 @@ export const deliveryHandlers: Record<string, Handler> = {
         // ux-11: deactivation keeps the record (it is listed under «المتوقفون» and can be reactivated); a reason is required
         if (deliveriesOf(db).some((x) => x.driverId === drv!.id && ON_ROAD.includes(x.state))) throw new ApiError('DRIVER_HAS_ACTIVE_DELIVERIES');
         if (D(driverCash(db, drv.id).amount).gt(0)) throw new ApiError('DRIVER_CASH_NOT_SETTLED', { cashInHand: driverCash(db, drv.id).amount });
-        const reason = String(b.reason ?? '').trim();
-        if (reason.length < 3) throw new ApiError('REASON_REQUIRED', { field: 'reason' });
+        const reason = reasonText(ctx, b.reason); // ux-10b: ReasonTextPolicy.minLength (default 3)
         if (drv.onShift) endShift(ctx, drv);
         drv.active = false; drv.deactivatedAt = ctx.nowIso; drv.deactivatedBy = ctx.user!.id; drv.deactivationReason = reason.slice(0, 200);
         what = `deactivated: ${drv.deactivationReason}`;

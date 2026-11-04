@@ -31,7 +31,7 @@ export function runLegacyReport(ctx: Ctx, id: string, from: string, to: string, 
   const T = (o: Order) => computeTotals(o);
   const caps = db.captures.filter((c) => branchIds.includes(c.branchId) && inRange(c.businessDate, from, to));
   const refunds = db.refunds.filter((r) => r.state === 'PAID' && inRange(r.businessDate, from, to) && branchIds.includes(db.orders.find((o) => o.id === r.orderId)!.branchId));
-  const provisional = db.sessions.some((s) => branchIds.includes(s.branchId) && s.state === 'OPEN') || to >= ctx.businessDate();
+  const provisional = db.sessions.some((s) => branchIds.includes(s.branchId) && s.state !== 'CLOSED') || to >= ctx.businessDate();
   const base = { reportId: id, period: { from, to }, branchIds, provisional, asOf: ctx.nowIso };
   const netOf = (o: Order) => { const t = T(o); return t.comp ? '0.0000' : m4(D(t.itemsSubtotal).minus(t.itemDiscount).minus(t.discountAfterTax)); };
   switch (id) {

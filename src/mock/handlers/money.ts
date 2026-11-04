@@ -11,8 +11,10 @@ import { authorizationForCapture } from './extpay'; // crm area: external author
 import { paidStage, paidDateOf, recordReversal, stockForReturn, checkDisposition, approvedText, DISP_AR } from './reversals'; // r3A: refund stages S2/S3
 import { checkTenderReference, prepaidAllowed, referenceRule } from '../r3b'; // round 3: tender taxonomy + reference policy
 import { depositBalances, depositView, depVersion, pushResEvent, refundBlock } from '../reservation-rules'; // ux-12: deposits applied in parts and refunded
+import { policyFields } from '../policies';
+import { assertCountLock, handoversOf, handoverView, keepWrites, liveCount, liveSessionOn, pushCount, reasonText } from '../drawer-count'; // ux-10b: count lock, handover, reason length
 
-function cashEntry(ctx: Ctx, sessionId: string, kind: CashEntry['kind'], amount: string, extra: Partial<CashEntry> = {}) {
+export function cashEntry(ctx: Ctx, sessionId: string, kind: CashEntry['kind'], amount: string, extra: Partial<CashEntry> = {}) {
   const e: CashEntry = { id: nextId('ce'), sessionId, kind, amount: m4(amount), at: ctx.nowIso, by: ctx.user!.id, ...extra };
   ctx.db.cashEntries.push(e);
   const s = ctx.db.sessions.find((x) => x.id === sessionId);
@@ -33,6 +35,7 @@ function cashDue(remaining: string) {
   return { due: m4(due), rounding: m4(D(remaining).minus(due)), increment: cr.increment };
 }
 
+export { report as sessionReport };
 function report(ctx: Ctx, s: Session, frozenAt?: string): Omit<ZReport, 'countedCash' | 'variance'> & { countedCash?: string; variance?: string } {
   const db = ctx.db;
   const caps = db.captures.filter((c) => c.sessionId === s.id);
@@ -51,9 +54,15 @@ function report(ctx: Ctx, s: Session, frozenAt?: string): Omit<ZReport, 'counted
   for (const o of orders) counts[o.status] = (counts[o.status] ?? 0) + 1;
   const outstanding = db.orders.filter((o) => o.branchId === s.branchId && o.status === 'CONFIRMED' && !settlementOf(db, o).settled).map((o) => ({ orderId: o.id, number: o.number, payable: settlementOf(db, o).remaining, table: o.tableId ? db.tables.find((t) => t.id === o.tableId)?.name ?? null : null }));
   const tips = m4(db.tips.filter((t) => t.sessionId === s.id).reduce((a, t) => a.plus(D(t.amount)), D(0)));
+  // ux-10b: the handover that opened this session and the one that ended it
+  const hin = s.handoverFromId ? handoversOf(db).find((h) => h.id === s.handoverFromId) : null;
+  const hout = s.handoverId ? handoversOf(db).find((h) => h.id === s.handoverId && h.state === 'ACCEPTED') : null;
+  const handoverIn = hin ? { handoverId: hin.id, number: hin.number, fromCashier: userName(db, hin.outgoingUserId), at: hin.acceptedAt ?? hin.startedAt, mode: hin.mode, openingFromCount: s.openingFloat } : null;
+  const handoverOut = hout ? { handoverId: hout.id, number: hout.number, toCashier: userName(db, hout.incomingUserId), at: hout.acceptedAt ?? '', mode: hout.mode, outgoingCount: hout.outgoingCount, incomingCount: hout.incomingCount, expectedCash: hout.expectedCash, variance: hout.variance ?? '0.0000', countDifference: hout.countDifference, approver: hout.approverUserId ? userName(db, hout.approverUserId) : null, reason: hout.reason } : null;
   return {
     sessionId: s.id, terminalCode: db.terminals.find((t) => t.id === s.terminalId)?.code ?? s.terminalId, cashierName: userName(db, s.userId), openedAt: s.openedAt, closedAt: s.closedAt ?? '', businessDate: s.businessDate,
     openingFloat: s.openingFloat, tenderBreakdown: tender, refundBreakdown: refunds, cashByKind: byKind, expectedCash: expectedCash(ctx, s.id), orderCounts: counts, outstandingChecks: outstanding, tips, snapshotAt: frozenAt ?? ctx.nowIso,
+    handoverIn, handoverOut,
   };
 }
 
@@ -176,23 +185,35 @@ export const moneyHandlers: Record<string, Handler> = {
     need(t, 'TERMINAL_NOT_FOUND');
     need(t!.lifecycle === 'ACTIVE', 'TERMINAL_NOT_ACTIVE');
     if (!t!.drawer) throw new ApiError('CAPABILITY_NOT_AVAILABLE', { reason: 'this terminal has no cash drawer' });
+    const pend = liveSessionOn(db, t!.id);
+    if (pend?.state === 'HANDOVER_PENDING') throw new ApiError('SESSION_HANDOVER_PENDING', { terminal: t!.code, sessionId: pend.id, handoverId: pend.handoverId ?? null }, 409); // ux-10b
     if (openSessionOn(db, t!.id)) throw new ApiError('SESSION_ALREADY_OPEN', { terminal: t!.code });
     need(isMoney(ctx.body.openingFloat) && D(ctx.body.openingFloat).gte(0), 'VALIDATION_FAILED', { field: 'openingFloat' });
-    const s: Session = { id: nextId('sess'), terminalId: t!.id, branchId: t!.branchId, userId: ctx.user!.id, state: 'OPEN', openingFloat: m4(ctx.body.openingFloat), openedAt: ctx.nowIso, openedAtMs: ctx.now, businessDate: ctx.businessDate(t!.branchId), closedAt: null, closedBy: null, version: 1, close: null };
+    // ux-10b OpeningFloatPolicy: the standard float; another amount is refused (LOCKED) or needs a manager (APPROVAL, default)
+    const fp = policyFields<{ standardFloat: string; change: string }>('OpeningFloatPolicy', { branchId: t!.branchId });
+    const std = isMoney(fp.standardFloat) ? m4(fp.standardFloat) : '0.0000';
+    const float = m4(ctx.body.openingFloat);
+    let fg: ReturnType<Ctx['requireApproval']> = null;
+    if (!D(float).eq(D(std))) {
+      if (fp.change === 'LOCKED') throw new ApiError('OPENING_FLOAT_LOCKED', { standardFloat: std, openingFloat: float, policy: 'OpeningFloatPolicy' }, 409);
+      if (fp.change !== 'FREE') fg = ctx.requireApproval({ action: 'OPENING_FLOAT_OVERRIDE', targetType: 'organization.Terminal', targetId: t!.id, context: { terminalId: t!.id, standardFloat: std, openingFloat: float, absDifference: m4(D(float).minus(D(std)).abs()) }, grantId: ctx.body.approvalGrantId });
+    }
+    const s: Session = { id: nextId('sess'), terminalId: t!.id, branchId: t!.branchId, userId: ctx.user!.id, state: 'OPEN', openingFloat: float, openedAt: ctx.nowIso, openedAtMs: ctx.now, businessDate: ctx.businessDate(t!.branchId), closedAt: null, closedBy: null, version: 1, close: null };
     db.sessions.push(s);
-    cashEntry(ctx, s.id, 'OPENING_FLOAT', s.openingFloat);
+    cashEntry(ctx, s.id, 'OPENING_FLOAT', s.openingFloat, fg ? { approvalGrantId: fg.id } : {});
     s.version = 1;
-    ctx.audit(`session opened on ${t!.code} float ${s.openingFloat}`, s.id);
+    ctx.audit(`session opened on ${t!.code} float ${s.openingFloat}${fg ? ` (standard ${std}, approved)` : ''}`, s.id, !!fg, fg?.id);
     event('SessionOpened', s.id, `${t!.code} by ${ctx.user!.username}`);
     return { status: 201, body: s };
   },
-  'Session.Find': (ctx) => page(ctx.db.sessions.filter((s) => s.branchId === ctx.branchId && (!ctx.query.state || s.state === ctx.query.state)).sort((a, b) => b.openedAtMs - a.openedAtMs).map((s) => ({ ...s, cashierName: userName(ctx.db, s.userId), terminalCode: ctx.db.terminals.find((t) => t.id === s.terminalId)?.code })), ctx.query),
+  'Session.Find': (ctx) => page(ctx.db.sessions.filter((s) => s.branchId === ctx.branchId && (!ctx.query.state || s.state === ctx.query.state)).sort((a, b) => b.openedAtMs - a.openedAtMs).map((s) => ({ ...s, cashierName: userName(ctx.db, s.userId), terminalCode: ctx.db.terminals.find((t) => t.id === s.terminalId)?.code, ...handoverLinks(ctx, s) })), ctx.query),
   'Session.Get': (ctx) => {
     const s = ctx.db.sessions.find((x) => x.id === ctx.params.sessionId && x.branchId === ctx.branchId);
     need(s, 'SESSION_NOT_FOUND');
     const sp = policy<{ maxHours: number; warningHours: number }>('SessionDurationPolicy') ?? { maxHours: 24, warningHours: 12 };
     const hours = (ctx.now - s!.openedAtMs) / 3_600_000;
-    return { ...s, cashierName: userName(ctx.db, s!.userId), terminalCode: ctx.db.terminals.find((t) => t.id === s!.terminalId)?.code, hoursOpen: Number(hours.toFixed(1)), durationWarning: s!.state === 'OPEN' && hours >= sp.warningHours, durationExceeded: s!.state === 'OPEN' && hours >= sp.maxHours, cashEntries: ctx.db.cashEntries.filter((e) => e.sessionId === s!.id) };
+    const live = liveCount(ctx.db, s!); // ux-10b: the confirmed count that still locks the drawer (the expected cash is never here)
+    return { ...s, cashierName: userName(ctx.db, s!.userId), terminalCode: ctx.db.terminals.find((t) => t.id === s!.terminalId)?.code, hoursOpen: Number(hours.toFixed(1)), durationWarning: s!.state === 'OPEN' && hours >= sp.warningHours, durationExceeded: s!.state === 'OPEN' && hours >= sp.maxHours, cashEntries: ctx.db.cashEntries.filter((e) => e.sessionId === s!.id), confirmedCount: live ? { id: live.id, kind: live.kind, counted: live.counted, at: live.at } : null, ...handoverLinks(ctx, s!) };
   },
   'Session.XReport': (ctx) => {
     const s = ctx.db.sessions.find((x) => x.id === ctx.params.sessionId && x.branchId === ctx.branchId);
@@ -207,21 +228,32 @@ export const moneyHandlers: Record<string, Handler> = {
     const db = ctx.db;
     const s = db.sessions.find((x) => x.id === ctx.params.sessionId && x.branchId === ctx.branchId);
     need(s, 'SESSION_NOT_FOUND');
+    if (s!.state === 'HANDOVER_PENDING') throw new ApiError('SESSION_HANDOVER_PENDING', { sessionId: s!.id, handoverId: s!.handoverId ?? null }, 409); // ux-10b
     need(s!.state === 'OPEN', 'SESSION_NOT_OPEN');
     checkVersion(s!, ctx.body.expectedVersion);
     const open = db.orders.filter((o) => o.sessionId === s!.id && (o.status === 'DRAFT' || o.status === 'CONFIRMED'));
     if (open.length) throw new ApiError('SESSION_HAS_OPEN_ORDERS', { orders: open.map((o) => o.number), rule: 'counter/takeaway checks of this drawer must end first; floor checks never block' });
     need(isMoney(ctx.body.countedCash), 'VALIDATION_FAILED', { field: 'countedCash' });
     const counted = m4(ctx.body.countedCash);
+    // ux-10b: a confirmed blind count stays locked (BlindRecountPolicy): another amount is refused until Session.Recount
+    const live = assertCountLock(db, s!, counted);
     const exp = expectedCash(ctx, s!.id);
     const variance = sub(counted, exp);
-    const g = ctx.requireApproval({ action: 'SESSION_VARIANCE', targetType: 'sessions.Session', targetId: s!.id, context: { countedCash: counted, expectedCash: exp, absVariance: m4(D(variance).abs()) }, grantId: ctx.body.approvalGrantId });
+    let g: ReturnType<Ctx['requireApproval']>;
+    try {
+      g = ctx.requireApproval({ action: 'SESSION_VARIANCE', targetType: 'sessions.Session', targetId: s!.id, context: { countedCash: counted, expectedCash: exp, absVariance: m4(D(variance).abs()) }, grantId: ctx.body.approvalGrantId });
+    } catch (e) {
+      // the count is confirmed once the approval is asked for: it is recorded (and kept) so a different amount is a recount
+      if (e instanceof ApiError && e.code === 'APPROVAL_REQUIRED' && !live) { pushCount(ctx, s!, 'CLOSE', counted); throw keepWrites(e); }
+      throw e;
+    }
+    if (!live) pushCount(ctx, s!, 'CLOSE', counted);
     s!.state = 'CLOSED';
     s!.closedAt = ctx.nowIso;
     s!.closedBy = ctx.user!.id;
     s!.version++;
     const z = { ...report(ctx, s!, ctx.nowIso), countedCash: counted, variance } as ZReport;
-    s!.close = { countedCash: counted, expectedCash: exp, variance, approvalGrantId: g?.id, reason: ctx.body.reason, z };
+    s!.close = { countedCash: counted, expectedCash: exp, variance, approvalGrantId: g?.id, reason: ctx.body.reason, z, recounts: (s!.counts ?? []).filter((c) => c.kind === 'RECOUNT').length };
     ctx.audit(`session closed counted ${counted} expected ${exp} variance ${variance}`, s!.id, true, g?.id);
     event('SessionClosed', s!.id, `variance ${variance}`);
     return { session: s, variance, expectedCash: exp, countedCash: counted, z };
@@ -256,7 +288,7 @@ export const moneyHandlers: Record<string, Handler> = {
     ctx.audit('drawer no-sale open', s!.id, true, g?.id);
     return { status: 201, body: { ...e, drawerKick: 'queued' } };
   },
-  'Session.Handover': () => { throw new ApiError('CAPABILITY_NOT_AVAILABLE', { reason: 'PD-held: a shift handover is a counted close then a new open (J-R1 steps 17–18)' }); },
+  'Session.Handover': () => { throw new ApiError('CAPABILITY_NOT_AVAILABLE', { reason: 'PD-held single command; ux-10b proposes Session.HandoverStart / HandoverAccept / HandoverCancel (ShiftHandoverPolicy)' }); },
 
   // ───────── refunds
   'Refund.Refundable': (ctx) => {
@@ -356,10 +388,12 @@ export const moneyHandlers: Record<string, Handler> = {
     const r = ctx.db.refunds.find((x) => x.id === ctx.params.refundCaseId);
     need(r, 'REFUNDS_REFUNDCASE_NOT_FOUND');
     const o = getOrder(ctx, r!.orderId, 'REFUNDS_REFUNDCASE_NOT_FOUND'); // another branch's case is "not found"
-    if (r!.requestedBy !== ctx.user!.id && !ctx.can('refund:reject')) throw new ApiError('REFUND_CANCEL_NOT_REQUESTER', { reason: 'only the requester (or a refund:reject holder) withdraws a refund request' }, 403);
-    const reason = typeof ctx.body.reason === 'string' ? ctx.body.reason.trim() : '';
-    if (!reason) throw new ApiError('VALIDATION_FAILED', { field: 'reason', rule: 'required' });
-    if (reason.length > 200) throw new ApiError('VALIDATION_FAILED', { field: 'reason', rule: 'max 200 characters' });
+    // ux-10b RefundCancelPolicy: requester or refund:reject holder (default) / requester only / refund:reject holder only
+    const cancelBy = policyFields<{ cancelBy: string }>('RefundCancelPolicy', { branchId: o.branchId }).cancelBy;
+    const isReq = r!.requestedBy === ctx.user!.id, isDec = ctx.can('refund:reject');
+    const allowed = cancelBy === 'REQUESTER_ONLY' ? isReq : cancelBy === 'DECIDER_ONLY' ? isDec : isReq || isDec;
+    if (!allowed) throw new ApiError('REFUND_CANCEL_NOT_REQUESTER', { reason: 'RefundCancelPolicy decides who withdraws a refund request', cancelBy }, 403);
+    const reason = reasonText(ctx, ctx.body.reason, 'VALIDATION_FAILED'); // ReasonTextPolicy.minLength, ≤ 200
     if (r!.state !== 'REQUESTED') throw new ApiError('REFUND_CASE_NOT_PENDING', { state: r!.state });
     checkVersion(r!, ctx.body.expectedVersion);
     r!.state = 'CANCELLED';
@@ -445,9 +479,7 @@ export const moneyHandlers: Record<string, Handler> = {
   'Deposit.Refund': (ctx) => {
     const d = ctx.db.deposits.find((x) => x.id === ctx.params.depositId && x.branchId === ctx.branchId);
     if (!d) throw new ApiError('DEPOSIT_NOT_FOUND', { depositId: ctx.params.depositId }, 404);
-    const reason = String(ctx.body.reason ?? '').trim();
-    if (reason.length < 3) throw new ApiError('REASON_REQUIRED', { field: 'reason', rule: 'at least 3 characters' });
-    need(reason.length <= 200, 'VALIDATION_FAILED', { field: 'reason', rule: 'at most 200 characters' });
+    const reason = reasonText(ctx, ctx.body.reason); // ux-10b: ReasonTextPolicy.minLength (default 3), ≤ 200
     checkVersion({ version: depVersion(d) }, ctx.body.expectedVersion);
     const block = refundBlock(ctx.db, d);
     const b = depositBalances(d);
@@ -516,4 +548,13 @@ export function refundable(ctx: Ctx, o: Order) {
   const st = settlementOf(db, o);
   // r3A: the stage tells the screen who must authorise (same day vs after the day closed) and where it is booked
   return { captures, lines, effectivePaid: st.effectivePaid, payable: t.payable, stage: paidStage(db, o), paidBusinessDate: paidDateOf(db, o), bookedOn: ctx.businessDate(o.branchId), kind: o.kind };
+}
+
+/** ux-10b: the handover links of a session for the history and the reports (the counts only once it is accepted). */
+function handoverLinks(ctx: Ctx, s: Session) {
+  const hs = handoversOf(ctx.db);
+  const out = s.handoverId ? hs.find((h) => h.id === s.handoverId) : null;
+  const inn = s.handoverFromId ? hs.find((h) => h.id === s.handoverFromId) : null;
+  const cancelled = hs.filter((h) => h.outgoingSessionId === s.id && h.state === 'CANCELLED').length;
+  return { handover: out ? handoverView(ctx.db, out) : null, handoverFrom: inn ? handoverView(ctx.db, inn) : null, cancelledHandovers: cancelled };
 }

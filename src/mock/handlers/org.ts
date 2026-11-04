@@ -5,6 +5,8 @@ import { policy } from '../policies';
 import { policyMeta, POLICIES, startingValue } from '../policyRegistry';
 import { checkVersion, need, page, requireFields, openSessionOn } from './util';
 import { egProfile } from '../contracts';
+import { handoversOf, handoverView, liveSessionOn } from '../drawer-count'; // ux-10b
+import { isMoney, D } from '../money';
 
 export const orgHandlers: Record<string, Handler> = {
   'Health.Live': () => ({ status: 'ok' }),
@@ -155,17 +157,30 @@ export const orgHandlers: Record<string, Handler> = {
   'Session.Current': (ctx) => {
     const tid = ctx.query.terminalId ?? ctx.terminal?.id;
     need(ctx.db.terminals.some((t) => t.id === tid), 'TERMINAL_NOT_FOUND');
-    const s = openSessionOn(ctx.db, tid);
+    // ux-10b: a drawer waiting for its handover is still the terminal's session (the sale screen shows the waiting state)
+    const s = liveSessionOn(ctx.db, tid);
     need(s, 'SESSION_NOT_FOUND');
-    return s;
+    const h = s!.state === 'HANDOVER_PENDING' && s!.handoverId ? handoversOf(ctx.db).find((x) => x.id === s!.handoverId) : null;
+    return h ? { ...s, handover: { ...handoverView(ctx.db, h), mode: h.mode } } : s;
   },
 };
 
+const FIELD_CHECKED = new Set(['ShiftHandoverPolicy', 'OpeningFloatPolicy', 'BlindRecountPolicy', 'RefundCancelPolicy', 'ReasonTextPolicy', 'DriverPayPolicy']);
 export function validatePolicyValue(id: string, value: unknown) {
   const meta = policyMeta.get(id)!;
   if (value === undefined) return;
   if (meta.editor.kind === 'enum' && !meta.editor.options.includes(value as string)) throw new ApiError('VALIDATION_FAILED', { policyId: id, allowed: meta.editor.options });
   if (meta.editor.kind === 'bool' && typeof value !== 'boolean') throw new ApiError('VALIDATION_FAILED', { policyId: id, rule: 'boolean' });
+  // ux-10b: the fields of the policies this slice added or extended are checked one by one (option, amount, whole number in range)
+  if (FIELD_CHECKED.has(id) && meta.editor.kind === 'object' && value !== null && typeof value === 'object') {
+    for (const f of meta.editor.fields) {
+      const v = (value as Record<string, unknown>)[f.key];
+      if (v === undefined) continue;
+      if (f.kind === 'enum' && !f.options.includes(v as string)) throw new ApiError('VALIDATION_FAILED', { policyId: id, field: f.key, allowed: f.options });
+      if (f.kind === 'money' && !(isMoney(v) && D(v as string).gte(0))) throw new ApiError('VALIDATION_FAILED', { policyId: id, field: f.key, rule: 'an amount ≥ 0' });
+      if (f.kind === 'number' && !(Number.isInteger(v) && (f.min === undefined || (v as number) >= f.min) && (f.max === undefined || (v as number) <= f.max))) throw new ApiError('VALIDATION_FAILED', { policyId: id, field: f.key, rule: `whole number ${f.min ?? ''}..${f.max ?? ''}` });
+    }
+  }
   if (id === 'ServiceChargePolicy') {
     const v = value as any;
     const positive = Object.values(v?.byChannel ?? {}).some((r) => Number(r) > 0);

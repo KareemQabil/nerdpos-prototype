@@ -15,6 +15,7 @@ import { personaDisplayName, userLabel, deviceName, branchLabel } from './people
 import { CONTROL_JOURNEY } from './journey-control'; // r3A: who did it vs who allowed it
 import { RIDERS_JOURNEY } from './journey-riders'; // ux-11: the riders system
 import { RESERVATIONS_JOURNEY } from './journey-reservations'; // ux-12: reservations complete
+import { HANDOVER_JOURNEY } from './journey-handover'; // ux-10b: shift handover and the remaining settings
 
 export interface StepText { who: string; do_ar: string; do_en: string; expect_ar: string; expect_en: string; note?: string; operations: { op: string; http: string; actor: string; expected: string }[] }
 export interface StepDef { before?: () => void; id: string; device: string; user: string; screen?: string | (() => [string, Record<string, any>]); run: (log: Logger) => Promise<void>; text?: StepText }
@@ -414,7 +415,7 @@ const A1: StepDef[] = [
   { id: 'J-A1-14', device: 'CASH-1', user: 'cashier-1', screen: 'counter', run: async (log) => {
     const dev = term('CASH-1');
     const c = await as(dev, 'cashier-1', log);
-    if (!openSession(dev)) await api(c, 'Session.Open', { body: { terminalId: dev, openingFloat: '300.00' } }, log, 'float 300');
+    if (!openSession(dev)) await withApproval(c, 'Session.Open', { body: { terminalId: dev, openingFloat: '300.00' } }, 'manager-1', log, 'float 300 (ux-10b: another amount than the standard float needs a manager)');
     const o = await api<any>(c, 'Order.Create', { body: { channel: 'TAKEAWAY' } }, log, 'takeaway');
     const kosh = store.db.products.find((p) => p.name.en === 'Koshari')!;
     await api(c, 'Order.AddLines', { params: { orderId: o.id }, body: { expectedVersion: order(o.id).version, lines: [{ productId: kosh.id, quantity: '2' }] } }, log, 'koshari ×2');
@@ -564,4 +565,5 @@ export const JOURNEYS: Journey[] = [
   CONTROL_JOURNEY, // r3A
   RIDERS_JOURNEY, // ux-11
   RESERVATIONS_JOURNEY, // ux-12
+  HANDOVER_JOURNEY, // ux-10b
 ];

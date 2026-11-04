@@ -9,6 +9,7 @@ import { floorHandlers } from './floor';
 import { orderHandlers } from './orders';
 import { kitchenHandlers } from './kitchen';
 import { moneyHandlers } from './money';
+import { handoverHandlers } from './handover'; // ux-10b: shift handover and the approved blind recount
 import { outputHandlers } from './output';
 import { customerHandlers } from './customers';
 import { deliveryHandlers } from './delivery';
@@ -31,6 +32,7 @@ export const handlers: Record<string, Handler> = {
   ...orderHandlers,
   ...kitchenHandlers,
   ...moneyHandlers,
+  ...handoverHandlers,
   ...outputHandlers,
   ...customerHandlers, ...deliveryHandlers, ...loyaltyHandlers, ...channelHandlers, ...extPayHandlers, // crm area
   ...menuHandlers,

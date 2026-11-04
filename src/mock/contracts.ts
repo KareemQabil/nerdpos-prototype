@@ -11,7 +11,7 @@ import { R3B_PROPOSED_OPERATIONS } from './r3b-contracts'; // round 3 r3B: kitch
 import { CHANNELS_PROPOSED_OPERATIONS } from './channels-contracts'; // sales channels & per-user permissions
 import { CONTROL_PROPOSED_OPERATIONS } from './control-contracts'; // r3A: who did it vs who allowed it
 import { REPORT_PROPOSED_OPERATIONS } from '../reports/contracts'; // reports engine (layers L1–L4 + assistant)
-import { UX04_PROPOSED_OPERATIONS, applyUx04Extensions, UX05_PROPOSED_OPERATIONS, applyUx05Extensions, UX09_PROPOSED_OPERATIONS, applyUx10Extensions, UX11_PROPOSED_OPERATIONS, applyUx11Extensions, UX12_PROPOSED_OPERATIONS, applyUx12Extensions } from './ux-contracts'; // ux-04: call board, customer display, input extensions
+import { UX04_PROPOSED_OPERATIONS, applyUx04Extensions, UX05_PROPOSED_OPERATIONS, applyUx05Extensions, UX09_PROPOSED_OPERATIONS, applyUx10Extensions, UX11_PROPOSED_OPERATIONS, applyUx11Extensions, UX12_PROPOSED_OPERATIONS, applyUx12Extensions, UX10B_PROPOSED_OPERATIONS, applyUx10bExtensions } from './ux-contracts'; // ux-04: call board, customer display, input extensions
 
 export interface OperationDef {
   id: string; module: string; kind: 'CMD' | 'QRY' | string; method: string; path: string; permission: string;
@@ -63,12 +63,13 @@ export const PROPOSED_OPERATIONS: OperationDef[] = [
   { id: 'Payment.AuthorizationFind', module: 'payments', kind: 'QRY', method: 'GET', path: '/payments/authorizations', permission: 'payment:read', input: {}, output: 'Page<AuthorizationView>', errors: [], approval: null, backend_state: 'PROPOSED', note: 'card terminal / wallet authorizations of an order' },
 ];
 
-export const operations: OperationDef[] = [...(operationsJson as unknown as OperationDef[]), ...PROPOSED_OPERATIONS, ...MENU_PROPOSED_OPERATIONS, ...INVENTORY_PROPOSED_OPERATIONS, ...R3B_PROPOSED_OPERATIONS, ...CHANNELS_PROPOSED_OPERATIONS, ...CONTROL_PROPOSED_OPERATIONS, ...REPORT_PROPOSED_OPERATIONS, ...UX04_PROPOSED_OPERATIONS, ...UX05_PROPOSED_OPERATIONS, ...UX09_PROPOSED_OPERATIONS, ...UX11_PROPOSED_OPERATIONS, ...UX12_PROPOSED_OPERATIONS];
+export const operations: OperationDef[] = [...(operationsJson as unknown as OperationDef[]), ...PROPOSED_OPERATIONS, ...MENU_PROPOSED_OPERATIONS, ...INVENTORY_PROPOSED_OPERATIONS, ...R3B_PROPOSED_OPERATIONS, ...CHANNELS_PROPOSED_OPERATIONS, ...CONTROL_PROPOSED_OPERATIONS, ...REPORT_PROPOSED_OPERATIONS, ...UX04_PROPOSED_OPERATIONS, ...UX05_PROPOSED_OPERATIONS, ...UX09_PROPOSED_OPERATIONS, ...UX11_PROPOSED_OPERATIONS, ...UX12_PROPOSED_OPERATIONS, ...UX10B_PROPOSED_OPERATIONS];
 applyUx04Extensions(operations);
 applyUx05Extensions(operations);
 applyUx10Extensions(operations); // ux-10: Refund.Cancel requester rule
 applyUx11Extensions(operations); // ux-11: riders (cash limit, rider scope, RETURNED, deactivation)
 applyUx12Extensions(operations); // ux-12: reservations (customer link, conflicts, one seating path, deposit balances)
+applyUx10bExtensions(operations); // ux-10b: shift handover, opening float, blind recount, refund cancel, rider payout drawer, reason length
 export const opsById = new Map(operations.map((o) => [o.id, o]));
 export const errorsByCode = new Map((errorsJson as ErrorDef[]).map((e) => [e.code, e]));
 export const policyDefs = policiesJson as { id: string; owner: string; type: string; allowed: unknown; default: unknown; scope_dimensions: unknown; note: string | null }[];

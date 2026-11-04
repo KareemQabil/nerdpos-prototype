@@ -409,7 +409,7 @@ export function query(db: DB, caller: Caller, q: QuerySpec, opts: QueryOpts = {}
   else if (sortM) rows.sort((a, b) => (q.sort?.dir === 'asc' ? 1 : -1) * D(a.values[sortM]?.value ?? -1e15).comparedTo(D(b.values[sortM]?.value ?? -1e15)));
   if (q.limit) rows = rows.slice(0, q.limit);
   const days = datesOf(from, to).map((d) => ({ date: d, status: dayStatus(db, branchIds, d, caller.nowMs), source: (d < c.launch ? ((db.salesHistory ?? []).some((h) => h.businessDate === d && branchIds.includes(h.branchId)) ? 'HISTORY' : 'NONE') : 'EVENTS') as 'EVENTS' | 'HISTORY' | 'NONE' }));
-  const openSessions = db.sessions.filter((s) => branchIds.includes(s.branchId) && s.state === 'OPEN' && inRange(s.businessDate, from, to));
+  const openSessions = db.sessions.filter((s) => branchIds.includes(s.branchId) && s.state !== 'CLOSED' && inRange(s.businessDate, from, to));
   const provisionalReasons: Loc[] = [];
   if (days.some((d) => d.status === 'OPEN')) provisionalReasons.push({ ar: 'اليوم التجاري لسه ما خلصش (بيخلص 4 الفجر).', en: 'The business day has not ended (04:00).' });
   if (openSessions.length) provisionalReasons.push({ ar: `فيه ${openSessions.length} وردية مفتوحة.`, en: `${openSessions.length} open session(s).` });
