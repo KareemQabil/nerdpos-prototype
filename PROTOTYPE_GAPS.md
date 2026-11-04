@@ -234,7 +234,7 @@ Principle kept from round 3: the depth sits in the engine, the screens stay simp
 - No new server reads or commands: details read the existing `Supplier.Get`, `InventoryItem.Get`, `Recipe.Get`/`Recipe.Cost`, `StockCount.Get`, `Approval.Get`, `Audit.Get`, `Product.Get`, `Report.Explain`; nothing added to `src/mock/ux-contracts.ts`.
 - **[ASSUMED]** The selected record of a master-detail screen (and an open full-page editor) lives in the device's route params (`open`, `edit`, `role`, `grant`, `event`, `openProduct` + `ptab`, `newProduct`, `quickProduct`), persisted with the device state, so refresh keeps it; "back" is the in-page back button (the prototype has no browser-history routing).
 - **[UI]** Detail beside the list when the screen area (window minus the sidebar) is ≥ 1040 px — about a 1280 px wide window — otherwise a full page with back; long forms (product, quick add, new-product wizard, recipe editor, count sheet, role editor) are always full pages.
-- **[OBSERVED, not changed]** The in-browser mock keeps `User.Create` / `Credential.Reset` secrets as given (`db.users[].password`, `pin`); the real backend hashes credentials. The UI never shows or logs them.
+- **[OBSERVED, not changed]** The in-browser mock keeps `User.Create` / `Credential.Reset` secrets as given (`db.users[].password`, `pin`); the real backend hashes credentials.
 - `Drawer` stays exported (deprecated) only for the purchasing screens owned by ux-05; remove it once they are converted.
 
 ## 16. Prototype limitations
