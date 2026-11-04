@@ -1,9 +1,10 @@
 // L4 evidence: the exact checks / lines / payments / refunds / drawer entries behind one number, with the proof that
 // they add up to it, and a link to open each check. Calls Report.Explain (server) — never recomputed in the browser.
+// ux-06: a centered popup over the report (sized to the evidence, header fixed, body scrolls), never a side sheet.
 import React from 'react';
 import { Receipt, CheckCircle2, AlertTriangle, ExternalLink, FileSearch } from 'lucide-react';
 import { useDev, useQuery, errorText } from '../../app/hooks';
-import { Drawer, Spinner, Banner, Pill, Table, Button, StateBadge } from '../../ui';
+import { Popup, Spinner, Banner, Pill, Table, Button, StateBadge } from '../../ui';
 import { t, L, getLang } from '../../i18n';
 import { rangeText } from '../../reports/format';
 import { dateTime } from '../../lib/format';
@@ -15,7 +16,7 @@ const NOTE: Record<string, string> = { 'stage-derived': 'المرحلة مستن
 
 function Rows({ rows, unit, onOpen }: { rows: any[]; unit?: string; onOpen: (orderId: string) => void }) {
   return (
-    <Table dense maxHeight={420} head={[t('السجل'), t('النوع'), t('اليوم'), t('المبلغ'), '']} align={['start', 'start', 'start', 'end', 'end']}
+    <Table dense head={[t('السجل'), t('النوع'), t('اليوم'), t('المبلغ'), '']} align={['start', 'start', 'start', 'end', 'end']}
       rows={rows.map((e) => [
         <div className="min-w-0"><div className="truncate">{e.label}</div>{e.note && <div className="text-[10px] text-dim">{t(NOTE[e.note] ?? e.note)}</div>}<Tech><span className="num text-[10px] text-dim">{e.id}</span></Tech></div>,
         <Pill size="sm" tone="neutral">{t(KIND[e.kind] ?? e.kind)}</Pill>,
@@ -26,18 +27,16 @@ function Rows({ rows, unit, onOpen }: { rows: any[]; unit?: string; onOpen: (ord
   );
 }
 
-export function EvidenceDrawer({ spec, onClose }: { spec: EvidenceSpec | null; onClose: () => void }) {
+export function EvidencePopup({ spec, onClose }: { spec: EvidenceSpec | null; onClose: () => void }) {
   const { nav } = useDev();
   const list = spec?.metric === '__list';
   const q = useQuery<any>(spec && !list ? 'Report.Explain' : null, { query: { q: JSON.stringify(spec ? { metric: spec.metric, cell: spec.cell, filters: spec.filters, exclude: spec.exclude, from: spec.from, to: spec.to, branchIds: spec.branchIds, asOf: spec.asOf } : {}) } });
   const r = q.data;
   const open = (orderId: string) => { onClose(); nav('receipt', { orderId }); };
   return (
-    <Drawer open={!!spec} onClose={onClose} width="xl" icon={<FileSearch className="w-5 h-5" />} badge={<StateBadge ops={['Report.Explain']} />}
-      title={list ? spec?.label : r ? L(r.metric.label) : t('الإثبات')}
-      description={t('السجلات الأصلية اللي ورا الرقم — مش متغيرة. دوس «افتح الشيك» تشوف الشيك نفسه.')}>
+    <Popup open={!!spec} onClose={onClose} size="xl" fb="evidence-popup" title={<span className="flex items-center gap-2 flex-wrap"><FileSearch className="w-5 h-5 text-[var(--primary)]" />{list ? spec?.label : r ? L(r.metric.label) : t('الإثبات')}<StateBadge ops={['Report.Explain']} /></span>}>
       {list ? <Rows rows={spec!.filters!.__evidence} onOpen={open} /> : q.loading && !r ? <Spinner /> : q.error ? <Banner tone="error">{errorText(q.error)}</Banner> : r && (
-        <div className="space-y-3" data-fb="evidence-drawer">
+        <div className="space-y-3" data-fb="evidence-body">
           <div className="rounded-xl surface-1 p-3 space-y-1">
             <div className="text-2xl font-extrabold num">{r.value.availability === 'AVAILABLE' ? fmt(r.value.value, r.metric.unit) : <span className="text-base">{L(r.value.reason) || t('مش متاح')}</span>}</div>
             <div className="text-sm text-soft">{L(r.metric.definition)}</div>
@@ -57,6 +56,6 @@ export function EvidenceDrawer({ spec, onClose }: { spec: EvidenceSpec | null; o
           <Tech><div className="num text-[10px] text-dim" dir="ltr">{r.metric.id}: {r.metric.formula} <ExternalLink className="w-3 h-3 inline" /></div></Tech>
         </div>
       )}
-    </Drawer>
+    </Popup>
   );
 }

@@ -10,7 +10,7 @@ import { Banner, Button, Card, Field, FillPage, Input, MasterDetail, Modal, Mone
 import { Tech } from '../../app/tech';
 import { t, L, tv } from '../../i18n';
 import { LocInputs, PolicyChip, Radio, Swatch, allergenLabel, availabilityLabel, availabilityTone, useItems, usePolicy } from './catalog/common';
-import { ProductCreate, ProductPage, type DrawerTab } from './catalog/ProductEditor';
+import { ProductCreate, ProductPage, type ProductTab } from './catalog/ProductEditor';
 import { NewProductWizard } from './catalog/NewProductWizard';
 import { useDev } from '../../app/hooks';
 import { MenusAdmin } from '../menu/MenusAdmin';
@@ -24,7 +24,7 @@ export default function Menu() {
   const [tab, setTab] = useState<Tab>('products');
   const go = (p: Record<string, any>) => nav('menu', p);
   const productId: string | undefined = params?.openProduct;
-  const ptab = (params?.ptab === 'direction' ? 'sizes' : params?.ptab ?? 'data') as DrawerTab;
+  const ptab = (params?.ptab === 'direction' ? 'sizes' : params?.ptab ?? 'data') as ProductTab;
   const sku = usePolicy<any>('SkuGenerationPolicy');
   const names = usePolicy<any>('ProductNameUniquenessPolicy');
   const reasons = usePolicy<Record<string, string>>('AvailabilityReasonPolicy');
@@ -60,12 +60,12 @@ export default function Menu() {
 }
 
 // ───────── products
-function Products({ onOpen, onQuick, onWizard }: { onOpen: (id: string, tab?: DrawerTab) => void; onQuick: () => void; onWizard: () => void }) {
+function Products({ onOpen, onQuick, onWizard }: { onOpen: (id: string, tab?: ProductTab) => void; onQuick: () => void; onWizard: () => void }) {
   const [cat, setCat] = useState('');
   const [active, setActive] = useState<'all' | 'true' | 'false'>('true');
   const [qText, setQ] = useState('');
   const { nav } = useDev();
-  const setOpen = (o: { id: string; tab?: DrawerTab }) => onOpen(o.id, o.tab);
+  const setOpen = (o: { id: string; tab?: ProductTab }) => onOpen(o.id, o.tab);
   const cats = useItems<any>('Category.List');
   const units = useItems<any>('Unit.List');
   const list = useItems<any>('Catalog.Search', { query: { categoryId: cat || undefined, active: active === 'all' ? undefined : active, q: qText.trim() || undefined } });

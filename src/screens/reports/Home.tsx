@@ -13,16 +13,16 @@ import { cn, dateTime } from '../../lib/format';
 import { Tech } from '../../app/tech';
 import { REPORT_CATEGORIES } from '../../reports/studio';
 import { EvidenceCtx, type EvidenceSpec } from './parts';
-import { EvidenceDrawer } from './EvidenceDrawer';
+import { EvidencePopup } from './Evidence';
 import { ReportView } from './ReportView';
 import { ExpertReview } from './ExpertReview';
-import { AskFab } from './Assistant';
+import { AskDock } from './Assistant';
 import { usePivot, designSpec, useRegistry, PERIODS, periodText, lang, today, useClickAway, EMPTY_TEXT } from './studio/common';
 import { PivotGrid, initialExpanded } from './studio/PivotGrid';
 import { Kpis, MiniChart, StatusLine, LeftOut, DefinitionsList } from './studio/Summary';
 import { PrintStudio, type PrintSource } from './studio/PrintStudio';
 import { SchedulesPanel, ScheduleDialog } from './studio/Schedules';
-import { HistoryDrawer, shareText, actionText } from './studio/SaveHistory';
+import { HistoryPopup, shareText, actionText } from './studio/SaveHistory';
 import { exportPivot, exportCertified } from './studio/exports';
 import { MenuRow } from './Designer';
 import { SalesOverview } from '../ops/ReportExtras';
@@ -63,6 +63,7 @@ export function ReportsHome({ legacy, onLegacy }: { legacy: any[]; onLegacy: (id
   const favCards = cards.filter((c) => favs.includes(c.id));
   const recentCards = recent.map((r) => cards.find((c) => c.id === r.id)).filter(Boolean).slice(0, 4) as typeof cards;
   return (
+    <AskDock>
     <div className="space-y-4 pb-16" data-screen-id="H1" data-fb="reports-home">
       <PageHeader title={t('التقارير')} icon={<FileBarChart className="w-5 h-5" />} badge={<StateBadge ops={['Report.List', 'SavedReport.Find', 'Report.Pivot', 'Report.Run']} />}
         description={t('كل أرقام المطعم في مكان واحد. دوس على أي رقم يوريك الشيكات اللي وراه.')}
@@ -135,8 +136,8 @@ export function ReportsHome({ legacy, onLegacy }: { legacy: any[]; onLegacy: (id
           <div className="flex items-center gap-2 text-xs text-dim"><Layers className="w-3.5 h-3.5" />{t('عايز تشوف إزاي الأرقام بتتحسب من أولها؟')}<button type="button" className="text-[var(--primary)] underline" onClick={() => nav('report-catalog')} data-fb="reports:engine">{t('محرك التقارير')}</button></div>
         </>}
       </>}
-      <AskFab />
     </div>
+    </AskDock>
   );
 }
 function Shelf({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
@@ -149,7 +150,7 @@ function MiniRow({ c, at, onOpen }: { c: { kind: string; id: string; title: stri
 // ─────────────────────────── shared report page chrome
 function BackTitle({ title, badge, sub, onBack, star, onStar }: { title: string; badge: React.ReactNode; sub?: React.ReactNode; onBack: () => void; star: boolean; onStar: () => void }) {
   return (
-    <div className="flex items-start gap-2 min-w-0 flex-1">
+    <div className="flex items-start gap-2 min-w-0 flex-1 basis-[22rem]">
       <Button size="icon" variant="ghost" onClick={onBack} aria-label={t('كل التقارير')} data-fb="report:back">{getLang() === 'en' ? <ArrowLeft className="w-5 h-5" /> : <ArrowRight className="w-5 h-5" />}</Button>
       <div className="min-w-0">
         <div className="flex items-center gap-2 flex-wrap"><h1 className="text-xl font-extrabold leading-tight">{title}</h1>{badge}<button type="button" onClick={onStar} aria-label={star ? t('شيل من المفضلة') : t('ضيف للمفضلة')} data-fb="report:star" className="p-1 rounded-lg hover:surface-2"><Star className={cn('w-4 h-4', star ? 'text-amber-400 fill-amber-400' : 'text-dim')} /></button></div>
@@ -244,6 +245,7 @@ export function CertifiedPage({ id }: { id: string }) {
   if (!def && !list.loading) return <EmptyState title={t('التقرير ده مش موجود أو مش مسموح لك تشوفه')} action={<Button onClick={() => nav('reports', {})}>{t('كل التقارير')}</Button>} />;
   return (
     <EvidenceCtx.Provider value={setEv}>
+      <AskDock>
       <div className="space-y-3 pb-16" data-screen-id="H1" data-fb="certified-page">
         <div className="flex items-start gap-2 flex-wrap">
           <BackTitle title={def ? L(def.title) : '…'} onBack={() => nav('reports', {})} star={favs.includes(id)} onStar={() => toggle(id)} badge={<Pill size="sm" tone="success"><ShieldCheck className="w-3 h-3 inline me-0.5" />{t('معتمد')}</Pill>} sub={def ? L(def.purpose) : null} />
@@ -261,10 +263,10 @@ export function CertifiedPage({ id }: { id: string }) {
         {r && <ReportView run={r} hidePurpose />}
         {expert && r && <ExpertReview reportId={r.reportId} reportTitle={L(r.title)} checklist={r.checklist} />}
       </div>
-      <EvidenceDrawer spec={ev} onClose={() => setEv(null)} />
+      </AskDock>
+      <EvidencePopup spec={ev} onClose={() => setEv(null)} />
       {print && r && <PrintStudio source={{ kind: 'certified', run: { ...r, kpis: kpisOfRun(r) }, templateId: 'tpl_accountant_a4' }} onClose={() => setPrint(false)} />}
       {sched && <ScheduleDialog certified={certifiedRows} prefill={{ kind: 'certified', id }} onClose={() => setSched(false)} onDone={() => toast('success', t('اتجدول'), t('هتلاقيه في «بتتبعت لوحدها»'), auth.label)} />}
-      <AskFab />
     </EvidenceCtx.Provider>
   );
 }
@@ -318,6 +320,7 @@ export function SavedPage({ id }: { id: string }) {
   const addable = rep ? reg.dims.filter((d) => d.status === 'AVAILABLE' && !dimsTaken.includes(d.id) && rep.design.metrics.every((m: string) => reg.metric(m)?.dimensions.includes(d.id))).slice(0, 30) : [];
   return (
     <EvidenceCtx.Provider value={setEv}>
+      <AskDock>
       <div className="space-y-3 pb-16" data-screen-id="H1" data-fb="saved-page">
         <div className="flex items-start gap-2 flex-wrap">
           <BackTitle title={rep?.name ?? '…'} onBack={() => nav('reports', {})} star={favs.includes(id)} onStar={() => toggle(id)} badge={<Pill size="sm" tone="violet"><Sparkles className="w-3 h-3 inline me-0.5" />{t('مخصص')}</Pill>}
@@ -361,11 +364,11 @@ export function SavedPage({ id }: { id: string }) {
         </>}
         {expert && rep && <ExpertReview reportId={id} reportTitle={rep.name} checklist={CORE_CHECKLIST.map((c) => ({ id: c, ...checklistItem(c) })).filter((x) => x.question)} />}
       </div>
-      <EvidenceDrawer spec={ev} onClose={() => setEv(null)} />
+      </AskDock>
+      <EvidencePopup spec={ev} onClose={() => setEv(null)} />
       {print && r && rep && <PrintStudio source={{ kind: 'pivot', result: r, title: rep.name, view: rep.design.view.columns, chart: rep.design.view.chart, savedId: changed ? null : id, spec, templateId: rep.templateId }} onClose={() => setPrint(false)} />}
       {sched && <ScheduleDialog certified={(list.data?.items ?? []).filter((x: any) => x.certified)} prefill={{ kind: 'saved', id }} onClose={() => setSched(false)} onDone={() => toast('success', t('اتجدول'), t('هتلاقيه في «بتتبعت لوحدها»'), auth.label)} />}
-      {rep && <HistoryDrawer id={id} open={hist} onClose={() => setHist(false)} current={rep.design} onRestored={() => sq.refetch()} />}
-      <AskFab />
+      {rep && <HistoryPopup id={id} open={hist} onClose={() => setHist(false)} current={rep.design} onRestored={() => sq.refetch()} />}
     </EvidenceCtx.Provider>
   );
 }
@@ -426,7 +429,7 @@ function ActivityPanel() {
       <div className="flex items-center gap-2 flex-wrap"><Activity className="w-4 h-4 text-[var(--primary)]" /><div className="min-w-0 flex-1"><div className="font-bold">{t('مين فتح ونزّل وعدّل إيه')}<StateBadge ops={['ReportAudit.Find']} /></div><div className="text-xs text-dim">{q.data?.scope === 'MINE' ? t('بتشوف حركاتك انت بس.') : t('كل حركات التقارير في المطعم: الفترة والفروع وعدد السطور.')}</div></div>
         <FilterChips value={f} onChange={setF} options={[{ id: 'all', label: t('الكل'), count: items.length }, { id: 'RUN', label: t('فتح') }, { id: 'EXPORT', label: t('تنزيل') }, { id: 'EDIT', label: t('تعديل') }, { id: 'SCHEDULE_RUN', label: t('إرسال') }]} />
       </div>
-      <Table dense maxHeight={560} loading={q.loading && !q.data} head={[t('إمتى'), t('مين'), t('عمل إيه'), t('التقرير'), t('الفترة والفرع'), t('السطور')]} align={['start', 'start', 'start', 'start', 'start', 'end']}
+      <Table dense loading={q.loading && !q.data} head={[t('إمتى'), t('مين'), t('عمل إيه'), t('التقرير'), t('الفترة والفرع'), t('السطور')]} align={['start', 'start', 'start', 'start', 'start', 'end']}
         empty={<EmptyState compact icon={<Activity className="w-5 h-5" />} title={t('لسه مفيش حركة')} text={t('افتح أي تقرير أو نزّله وهيظهر هنا.')} />}
         rows={shown.map((a) => [
           <span className="num text-xs whitespace-nowrap">{dateTime(a.at)}</span>,

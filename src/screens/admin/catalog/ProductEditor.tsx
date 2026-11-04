@@ -46,10 +46,10 @@ function AllergenPicker({ value, onChange, fb }: { value: string[]; onChange: (v
 }
 
 type Kind = 'SIMPLE' | 'SIZES' | 'COMBO' | 'HALF';
-const KIND_TAB: Record<Kind, DrawerTab> = { SIMPLE: 'data', SIZES: 'sizes', COMBO: 'combo', HALF: 'half' };
+const KIND_TAB: Record<Kind, ProductTab> = { SIMPLE: 'data', SIZES: 'sizes', COMBO: 'combo', HALF: 'half' };
 
 // ───────── create
-export function ProductCreate({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (id: string, tab?: DrawerTab) => void }) {
+export function ProductCreate({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (id: string, tab?: ProductTab) => void }) {
   const { run, busy } = useCommand();
   const { me, auth } = useDev();
   const cats = useItems<any>('Category.List');
@@ -156,8 +156,8 @@ export function ProductCreate({ open, onClose, onCreated }: { open: boolean; onC
 }
 
 // ───────── product page (was a drawer)
-export type DrawerTab = 'data' | 'sizes' | 'combo' | 'half' | 'modifiers' | 'tax' | 'availability';
-export function ProductPage({ productId, onClose, tab, onTab }: { productId: string; onClose: () => void; tab: DrawerTab; onTab: (t: DrawerTab) => void }) {
+export type ProductTab = 'data' | 'sizes' | 'combo' | 'half' | 'modifiers' | 'tax' | 'availability';
+export function ProductPage({ productId, onClose, tab, onTab }: { productId: string; onClose: () => void; tab: ProductTab; onTab: (t: ProductTab) => void }) {
   const q = useQuery<any>('Product.Get', { params: { productId } });
   const setTab = onTab;
   const p = q.data?.id === productId ? q.data : null;
@@ -167,7 +167,7 @@ export function ProductPage({ productId, onClose, tab, onTab }: { productId: str
       {!p ? <Spinner /> : (
         <div className="space-y-4 max-w-[1200px]">
           <Readiness p={p} />
-          <Tabs<DrawerTab> value={tab} onChange={setTab} tabs={[
+          <Tabs<ProductTab> value={tab} onChange={setTab} tabs={[
             { id: 'data', label: t('البيانات'), fb: 'product-tab:data' },
             { id: 'sizes', label: <span className="inline-flex items-center gap-1">{t('الأحجام')}{p.variants?.length ? <span className="num text-xs opacity-70">{p.variants.filter((v: any) => v.active).length}</span> : null}</span> },
             { id: 'combo', label: <span className="inline-flex items-center gap-1">{t('الوجبة')}{p.combo?.length ? <span className="num text-xs opacity-70">{p.combo.length}</span> : null}</span> },

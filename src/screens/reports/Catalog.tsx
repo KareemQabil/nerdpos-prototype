@@ -11,7 +11,7 @@ import { cn } from '../../lib/format';
 import { Tech } from '../../app/tech';
 import { clock, businessDate } from '../../mock/clock';
 import { EvidenceCtx, Val, additivityText, authorityText, type EvidenceSpec } from './parts';
-import { EvidenceDrawer } from './EvidenceDrawer';
+import { EvidencePopup } from './Evidence';
 
 const FACT_AR: Record<string, string> = { check: 'الشيكات المقفولة', line: 'سطور البيع', payment: 'الدفعات', refund: 'المرتجعات المصروفة', drawer: 'ورديات الدرج', cash_entry: 'حركات الدرج', removal: 'الإلغاءات بالمراحل', discount: 'الخصومات', comp: 'الضيافة', staff_meal: 'وجبات الموظفين', kitchen: 'تذاكر المطبخ', fiscal: 'الإيصالات الإلكترونية', approval: 'موافقات المدير', stock: 'أرصدة المخزن (لقطة)', count: 'الجرد', waste: 'الهالك', po: 'أوامر الشراء', grn: 'الاستلام', visit: 'قعدات الترابيزات', delivery: 'الدليفري', reservation: 'الحجوزات', open_check: 'الشيكات المفتوحة دلوقتي' };
 const ICONS = [Database, Ruler, FileBarChart, LineChart, FileSearch, MessageCircleQuestion];
@@ -37,7 +37,7 @@ export default function ReportCatalog() {
         {tab === 'dimensions' && reg.data && <Dimensions dims={reg.data.dimensions} />}
         {tab === 'builder' && reg.data && <Builder metrics={reg.data.metrics} dims={reg.data.dimensions} />}
       </div>
-      <EvidenceDrawer spec={ev} onClose={() => setEv(null)} />
+      <EvidencePopup spec={ev} onClose={() => setEv(null)} />
     </EvidenceCtx.Provider>
   );
 }

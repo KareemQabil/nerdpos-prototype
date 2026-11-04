@@ -14,12 +14,12 @@ import { Tech } from '../../app/tech';
 import { READY_CALCS, type PivotResult } from '../../reports/pivot';
 import { emptyDesign, type ReportDesign, type ColumnView, type FormatPreset } from '../../reports/studio';
 import { EvidenceCtx, type EvidenceSpec } from './parts';
-import { EvidenceDrawer } from './EvidenceDrawer';
+import { EvidencePopup } from './Evidence';
 import { useRegistry, usePivot, designSpec, whyNot, PERIODS, periodText, today, lang, useClickAway, EMPTY_TEXT, type Registry } from './studio/common';
 import { PivotGrid, initialExpanded } from './studio/PivotGrid';
 import { Kpis, MiniChart, StatusLine, LeftOut } from './studio/Summary';
 import { MetricPicker, DimPicker } from './studio/Pickers';
-import { SaveDialog, HistoryDrawer, shareText } from './studio/SaveHistory';
+import { SaveDialog, HistoryPopup, shareText } from './studio/SaveHistory';
 import { PrintStudio } from './studio/PrintStudio';
 import { exportPivot } from './studio/exports';
 
@@ -200,9 +200,9 @@ export default function ReportDesigner() {
         initial={{ name, description: meta?.description ?? params?.description ?? '', category: meta?.category ?? params?.category ?? 'sales', view: meta?.view, edit: meta?.edit, basedOn: params?.basedOn ?? null }}
         existing={meta ? { id: meta.id, version: meta.version, canEdit: meta.canEdit, canShare: meta.canShare } : null}
         onSaved={(x) => { loadedKey.current = `${x.id}:${x.version}`; setMeta({ id: x.id, version: x.version, canEdit: x.canEdit, canShare: x.canShare, description: x.description, category: x.category, view: x.view, edit: x.edit, templateId: x.templateId, ownerName: x.ownerName }); setName(x.name); setDirty(false); if (savedId !== x.id) nav('report-designer', { savedId: x.id }); }} />
-      {meta && <HistoryDrawer id={meta.id} open={historyOpen} onClose={() => setHistoryOpen(false)} current={design} onRestored={(x) => { loadedKey.current = ''; savedQ.refetch(); void x; }} />}
+      {meta && <HistoryPopup id={meta.id} open={historyOpen} onClose={() => setHistoryOpen(false)} current={design} onRestored={(x) => { loadedKey.current = ''; savedQ.refetch(); void x; }} />}
       {print && r && <PrintStudio source={{ kind: 'pivot', result: r, title: name, view: design.view.columns, chart: design.view.chart, savedId: meta && !dirty ? meta.id : null, spec, templateId: meta?.templateId ?? null }} onClose={() => setPrint(false)} />}
-      <EvidenceDrawer spec={ev} onClose={() => setEv(null)} />
+      <EvidencePopup spec={ev} onClose={() => setEv(null)} />
     </EvidenceCtx.Provider>
   );
 }

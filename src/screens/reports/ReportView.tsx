@@ -38,7 +38,7 @@ function QTable({ run, b }: { run: any; b: any }) {
   if (!r.rows.length) return <div className="text-sm text-dim py-2">{t('مفيش بيانات في الفترة دي')}</div>;
   const spec = (m: string, row?: any): EvidenceSpec => ({ metric: m, cell: row?.dims, from: run.period.from, to: run.period.to, branchIds: run.branchIds, filters: b.filters });
   return (
-    <Table dense maxHeight={420} align={[...r.dimensions.map(() => 'start' as const), ...r.metrics.map(() => 'end' as const)]}
+    <Table dense align={[...r.dimensions.map(() => 'start' as const), ...r.metrics.map(() => 'end' as const)]}
       head={[...r.dimensions.map((d: string) => t(DIM_AR[d] ?? d)), ...r.metrics.map((m: string) => L(metaOf(run, m)?.label) || m)]}
       rows={[
         ...r.rows.map((row: any) => [...r.dimensions.map((d: string) => <span className="font-medium">{L(row.labels[d])}{row.source === 'HISTORY' && <Pill size="sm" tone="neutral" className="ms-1">{t('إجمالي مستورد')}</Pill>}</span>), ...r.metrics.map((m: string) => <Val v={row.values[m]} unit={unitOf(run, m)} spec={spec(m, row)} />)]),
@@ -187,7 +187,7 @@ function EvidenceList({ b }: { b: any }) {
   const ev = b.evidence.parts.flatMap((p: any) => p.evidence);
   const open = useEvidence();
   return (
-    <Table dense maxHeight={360} head={[t('السجل'), t('اليوم'), t('المبلغ')]} align={['start', 'start', 'end']} empty={<div className="text-sm text-dim p-2">{t('مفيش سجلات في الفترة دي')}</div>}
+    <Table dense head={[t('السجل'), t('اليوم'), t('المبلغ')]} align={['start', 'start', 'end']} empty={<div className="text-sm text-dim p-2">{t('مفيش سجلات في الفترة دي')}</div>}
       onRowClick={(i) => ev[i].orderId && open({ metric: '__list', label: ev[i].label, from: '', filters: { __evidence: [ev[i]] } })}
       rows={ev.map((e: any) => [e.label, <span className="num text-xs">{e.businessDate}</span>, <span className="num">{fmt(e.amount)}</span>])} />
   );

@@ -5,13 +5,13 @@ import React, { useMemo, useRef, useState } from 'react';
 import { Wand2, Send, MessageCircleQuestion, ShieldX, HelpCircle, Ban, CheckCircle2, Sparkles, BookOpen, Calendar, Filter, Clock, AlertTriangle, FileSearch, Info } from 'lucide-react';
 import { useDev, errorText } from '../../app/hooks';
 import { call } from '../../api/client';
-import { Button, Card, Pill, Table, Spinner, StateBadge, PageHeader, Drawer, Banner } from '../../ui';
+import { Button, Card, DetailPane, MasterDetail, Pill, Table, Spinner, StateBadge, PageHeader, Banner } from '../../ui';
 import { t, L, getLang } from '../../i18n';
 import { cn } from '../../lib/format';
 import { Tech } from '../../app/tech';
 import bank from '../../reports/assistant/question-bank.json';
 import { EvidenceCtx, fmt, type EvidenceSpec, ReconList } from './parts';
-import { EvidenceDrawer } from './EvidenceDrawer';
+import { EvidencePopup } from './Evidence';
 import { Bridge, Matrix } from './ReportView';
 
 const STATUS: Record<string, { label: string; tone: any; icon: any }> = {
@@ -28,7 +28,7 @@ function QueryResult({ r }: { r: any }) {
   if (!r.dimensions.length) return null;
   const unit = (m: string) => r.meta.metrics.find((x: any) => x.id === m)?.unit;
   return (
-    <Table dense maxHeight={300} align={[...r.dimensions.map(() => 'start' as const), ...r.metrics.map(() => 'end' as const)]}
+    <Table dense align={[...r.dimensions.map(() => 'start' as const), ...r.metrics.map(() => 'end' as const)]}
       head={[...r.dimensions.map((d: string) => d), ...r.metrics.map((m: string) => L(r.meta.metrics.find((x: any) => x.id === m)?.label))]}
       rows={r.rows.map((row: any) => [...r.dimensions.map((d: string) => L(row.labels[d])), ...r.metrics.map((m: string) => {
         const v = row.values[m];
@@ -57,7 +57,7 @@ function AnswerCard({ a, onClarify, busy }: { a: any; onClarify: (id: string, la
       {a.shape === 'recon' && <ReconList checks={a.data.checks} />}
       {a.shape === 'compare' && <Table dense head={[t('المقياس'), t('الفترة'), t('المقارنة'), t('الفرق')]} align={['start', 'end', 'end', 'end']} rows={a.data.rows.map((r: any) => [L(r.label), fmt(r.current.value), fmt(r.base.value), r.delta !== null ? `${fmt(r.delta)}${r.pct ? ` (${Number(r.pct).toFixed(1)}%)` : ''}` : '—'])} />}
       {a.shape === 'decompose' && <div className="space-y-1">{a.data.effects.map((e: any) => <div key={e.id} className="flex items-center gap-2 text-sm rounded-md surface-1 px-2 py-1"><span className="flex-1">{L(e.label)}<span className="block text-[10px] text-dim">{L(e.note)}</span></span><span className={cn('num font-bold', Number(e.amount) < 0 && 'text-[var(--error)]')}>{fmt(e.amount)}</span></div>)}</div>}
-      {a.shape === 'evidence' && <Table dense maxHeight={260} head={[t('السجل'), t('اليوم'), t('المبلغ')]} align={['start', 'start', 'end']} rows={a.data.parts.flatMap((p: any) => p.evidence).map((e: any) => [e.label, <span className="num text-xs">{e.businessDate}</span>, <span className="num">{fmt(e.amount)}</span>])} />}
+      {a.shape === 'evidence' && <Table dense head={[t('السجل'), t('اليوم'), t('المبلغ')]} align={['start', 'start', 'end']} rows={a.data.parts.flatMap((p: any) => p.evidence).map((e: any) => [e.label, <span className="num text-xs">{e.businessDate}</span>, <span className="num">{fmt(e.amount)}</span>])} />}
       {a.data?.items && Array.isArray(a.data.items) && a.shape === 'table' && !a.data.rows && <Table dense head={Object.keys(a.data.items[0] ?? {}).filter((k) => !['item', 'id'].includes(k))} rows={a.data.items.map((x: any) => Object.entries(x).filter(([k]) => !['item', 'id'].includes(k)).map(([, v]: any) => (typeof v === 'object' ? L(v) : String(v))))} />}
       {a.chips?.length > 0 && (
         <div className="flex flex-wrap gap-1.5 pt-1">
@@ -94,7 +94,6 @@ export function AskPanel({ compact }: { compact?: boolean }) {
       <div className="space-y-3" data-fb="ask-panel">
         {items.length === 0 && (
           <div className="space-y-2">
-            <div className="text-sm text-soft">{t('اسأل بالعامية أو بالإنجليزي. الإجابة من نفس المقاييس المعتمدة اللي في التقارير، ومعاها التعريف والفترة ولحد إمتى والشيكات اللي ورا الرقم. لو السؤال مش واضح هسألك سؤال واحد، ولو المصدر مش موجود هقول «مش متاح» مش صفر.')}</div>
             <div className="flex flex-wrap gap-1.5">{SUGGEST.slice(0, compact ? 6 : 12).map((s) => <Button key={s} size="sm" variant="ghost" className="border border-[var(--glass-border)]" onClick={() => ask(s)} data-fb={`ask-suggest:${s}`}><Sparkles className="w-3.5 h-3.5" />{s}</Button>)}</div>
           </div>
         )}
@@ -107,7 +106,7 @@ export function AskPanel({ compact }: { compact?: boolean }) {
         {busy && <Spinner />}
         <div ref={endRef} />
         <form className="flex gap-2 sticky bottom-0 surface-1 p-2 rounded-xl border line" onSubmit={(e) => { e.preventDefault(); ask(q); }}>
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('مثلًا: صافي المبيعات امبارح، مين أكتر ويتر بيلغي، الخامات الناقصة…')} className="flex-1 bg-transparent outline-none px-2 text-sm" data-fb="ask-input" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('مثلًا: صافي المبيعات امبارح، مين أكتر ويتر بيلغي، الخامات الناقصة…')} className="flex-1 min-w-0 bg-transparent outline-none px-2 text-sm" data-fb="ask-input" />
           <Button variant="primary" size="sm" loading={busy} type="submit" data-fb="ask-send"><Send className="w-4 h-4" />{t('اسأل')}</Button>
         </form>
         {!compact && (
@@ -117,7 +116,7 @@ export function AskPanel({ compact }: { compact?: boolean }) {
           </Card>
         )}
       </div>
-      <EvidenceDrawer spec={ev} onClose={() => setEv(null)} />
+      <EvidencePopup spec={ev} onClose={() => setEv(null)} />
     </EvidenceCtx.Provider>
   );
 }
@@ -125,20 +124,22 @@ export function AskPanel({ compact }: { compact?: boolean }) {
 export default function AssistantScreen() {
   return (
     <div className="space-y-4 max-w-[1100px] mx-auto" data-screen-id="ASK">
-      <PageHeader title={t('اسأل التقارير')} icon={<MessageCircleQuestion className="w-5 h-5" />} badge={<StateBadge ops={['Report.Ask', 'Report.Explain']} />}
-        description={t('مساعد بقواعد ثابتة (من غير ذكاء اصطناعي) — بيترجم سؤالك لاستعلام على قاموس المقاييس ويجاوب بالأرقام المعتمدة ومصدرها.')} />
+      <PageHeader title={t('اسأل التقارير')} icon={<MessageCircleQuestion className="w-5 h-5" />} badge={<StateBadge ops={['Report.Ask', 'Report.Explain']} />} />
       <AskPanel />
     </div>
   );
 }
 
-/** Floating entry on report pages: opens the assistant in a side panel. */
-export function AskFab() {
+/**
+ * Report pages with the assistant docked in the page (ux-06): the floating button opens it beside the report on a
+ * wide screen (the report stays visible) and as a full page with "back to the report" on a narrow one — never a
+ * panel sliding over the report.
+ */
+export function AskDock({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
-    <>
-      <button type="button" onClick={() => setOpen(true)} data-fb="ask-fab" className="fixed bottom-6 end-6 z-40 rounded-full shadow-lg bg-[var(--primary)] text-[var(--primary-foreground)] h-12 px-4 flex items-center gap-2 font-bold hover:opacity-90"><MessageCircleQuestion className="w-5 h-5" />{t('اسأل التقارير')}</button>
-      <Drawer open={open} onClose={() => setOpen(false)} width="lg" title={t('اسأل التقارير')} icon={<MessageCircleQuestion className="w-5 h-5" />} badge={<StateBadge ops={['Report.Ask']} />}><AskPanel compact /></Drawer>
-    </>
+    <MasterDetail fb="ask-dock" open={open} detailWidth="clamp(380px, 38%, 580px)" list={children}
+      extra={!open && <button type="button" onClick={() => setOpen(true)} data-fb="ask-fab" className="absolute bottom-6 end-6 z-20 rounded-full shadow-lg bg-[var(--primary)] text-[var(--primary-foreground)] h-12 px-4 flex items-center gap-2 font-bold hover:opacity-90"><MessageCircleQuestion className="w-5 h-5" />{t('اسأل التقارير')}</button>}
+      detail={open && <DetailPane fb="ask-panel" onClose={() => setOpen(false)} backLabel={t('رجوع للتقرير')} icon={<MessageCircleQuestion />} title={t('اسأل التقارير')} badge={<StateBadge ops={['Report.Ask']} />}><AskPanel compact /></DetailPane>} />
   );
 }

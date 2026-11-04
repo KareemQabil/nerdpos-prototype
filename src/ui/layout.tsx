@@ -46,7 +46,7 @@ const inert = (on: boolean) => (on ? ({ inert: '' } as Record<string, string>) :
  * List + detail in the page (never an overlay). Fills the screen area: the list and the detail each scroll on their own.
  * `open` = a record is selected (its id lives in the route params, so refresh and back keep it).
  */
-export function MasterDetail({ list, detail, open, side = true, detailWidth = 'clamp(440px, 48%, 820px)', fb, className }: { list: React.ReactNode | ((compact: boolean) => React.ReactNode); detail: React.ReactNode; open: boolean; side?: boolean; detailWidth?: string; fb?: string; className?: string }) {
+export function MasterDetail({ list, detail, open, side = true, detailWidth = 'clamp(440px, 48%, 820px)', fb, className, extra }: { list: React.ReactNode | ((compact: boolean) => React.ReactNode); detail: React.ReactNode; open: boolean; side?: boolean; detailWidth?: string; fb?: string; className?: string; extra?: React.ReactNode }) {
   const [ref, w] = useWidth<HTMLDivElement>();
   const split = side && w >= SPLIT_MIN;
   const covered = open && !split;
@@ -65,6 +65,7 @@ export function MasterDetail({ list, detail, open, side = true, detailWidth = 'c
           <ModeCtx.Provider value={split ? 'side' : 'page'}>{detail}</ModeCtx.Provider>
         </div>
       )}
+      {extra}
     </div>
   );
 }

@@ -4,7 +4,7 @@
 import React, { useEffect, useState } from 'react';
 import { Save, History, RotateCcw, GitCompare, Lock, Users, Globe2 } from 'lucide-react';
 import { useQuery, useCommand } from '../../../app/hooks';
-import { Modal, Button, Field, Input, Textarea, Select, SegmentedControl, Switch, Drawer, Timeline, Pill, Spinner, Banner } from '../../../ui';
+import { Modal, Button, Field, Input, Textarea, Select, SegmentedControl, Switch, Popup, Timeline, Pill, Spinner, Banner } from '../../../ui';
 import { t, L } from '../../../i18n';
 import { dateTime } from '../../../lib/format';
 import { REPORT_CATEGORIES, type ReportDesign, type Audience } from '../../../reports/studio';
@@ -81,7 +81,8 @@ const ACTION: Record<string, () => string> = {
 };
 export const actionText = (a: string) => (ACTION[a] ?? (() => a))();
 
-export function HistoryDrawer({ id, open, onClose, current, onRestored }: { id: string; open: boolean; onClose: () => void; current: ReportDesign; onRestored: (r: any) => void }) {
+/** Versions and activity of a saved report: a centered popup (ux-06, never a side sheet). */
+export function HistoryPopup({ id, open, onClose, current, onRestored }: { id: string; open: boolean; onClose: () => void; current: ReportDesign; onRestored: (r: any) => void }) {
   const q = useQuery<any>(open ? 'SavedReport.Get' : null, { params: { savedReportId: id } });
   const reg = useRegistry();
   const { run, busy } = useCommand();
@@ -93,9 +94,9 @@ export function HistoryDrawer({ id, open, onClose, current, onRestored }: { id: 
     if (res) { q.refetch(); onRestored(res); }
   };
   return (
-    <Drawer open={open} onClose={onClose} width="lg" icon={<History className="w-5 h-5" />} title={t('السجل والنسخ')} description={t('كل حفظ نسخة. تقدر تقارن أي نسخة بالحالية أو ترجّعها (بتتحفظ كنسخة جديدة، ومفيش حاجة بتتمسح).')}>
+    <Popup open={open} onClose={onClose} size="lg" fb="history-popup" title={<span className="flex items-center gap-2"><History className="w-5 h-5 text-[var(--primary)]" />{t('السجل والنسخ')}</span>}>
       {q.loading && !r ? <Spinner /> : !r ? null : (
-        <div className="space-y-5" data-fb="history-drawer">
+        <div className="space-y-5" data-fb="history-body">
           <div>
             <div className="text-sm font-bold mb-2">{t('النسخ')}</div>
             <div className="space-y-2">
@@ -121,7 +122,7 @@ export function HistoryDrawer({ id, open, onClose, current, onRestored }: { id: 
           </div>
         </div>
       )}
-    </Drawer>
+    </Popup>
   );
 }
 function VersionDiff({ id, version, current, reg }: { id: string; version: number; current: ReportDesign; reg: Registry }) {
