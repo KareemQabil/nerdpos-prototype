@@ -15,6 +15,7 @@ import React, { createContext, useContext, useEffect, useLayoutEffect, useRef, u
 import { ArrowRight, X } from 'lucide-react';
 import { cn } from '../lib/format';
 import { t } from '../i18n';
+import { keyPane } from '../app/devices';
 
 /** Width of the screen area (main minus sidebar) from which a detail sits beside its list (≈ a 1280 px wide window). */
 export const SPLIT_MIN = 1040;
@@ -75,15 +76,22 @@ export function DetailPane({ title, icon, badge, actions, onClose, backLabel, fo
   const mode = useDetailMode();
   const close = useRef(onClose);
   close.current = onClose;
+  const self = useRef<HTMLElement>(null);
   useEffect(() => {
     if (!escape) return;
-    // document (bubble) runs before the popups' window listeners, so an open popup/menu takes Esc first
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && !e.defaultPrevented && !document.querySelector('[role="dialog"], [role="menu"]')) close.current(); };
+    // document (bubble) runs before the popups' window listeners, so an open popup/menu takes Esc first;
+    // with two devices side by side only the pane last touched reacts
+    const h = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || document.querySelector('[role="dialog"], [role="menu"]')) return;
+      const dev = self.current?.closest('[data-device]')?.getAttribute('data-device');
+      if (dev && dev !== keyPane()) return;
+      close.current();
+    };
     document.addEventListener('keydown', h);
     return () => document.removeEventListener('keydown', h);
   }, [escape]);
   return (
-    <section className="flex flex-col h-full min-h-0 min-w-0" data-fb={fb} data-detail-pane={mode}>
+    <section ref={self} className="flex flex-col h-full min-h-0 min-w-0" data-fb={fb} data-detail-pane={mode}>
       <header className="shrink-0 px-5 pt-4 pb-3 border-b line">
         {mode === 'page' && (
           <button type="button" onClick={onClose} data-fb="detail:back" className="mb-2 -ms-1 inline-flex items-center gap-1.5 h-8 px-2 rounded-lg text-sm font-bold text-soft hover:text-[var(--foreground)] hover:bg-[var(--surface-2)]">
