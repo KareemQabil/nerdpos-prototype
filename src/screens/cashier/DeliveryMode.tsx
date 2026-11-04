@@ -200,7 +200,7 @@ export function DeliveryQueue({ list, onOpenCheck, current }: { list: any[]; onO
   return (
     <div className="h-full min-h-0 flex flex-col gap-2 rounded-2xl border border-[var(--glass-border)] surface-1 p-2" data-fb="delivery-queue">
       <div className="flex items-center gap-2 px-1"><span className="font-bold text-sm flex-1">{t('الطلبات النشطة')} <span className="num text-dim">{shown.length}</span></span></div>
-      <SearchInput value={q} onChange={setQ} placeholder={t('الرقم أو الهاتف أو الاسم')} className="!max-w-none" data-fb="delivery-queue-search" />
+      <SearchInput value={q} onChange={setQ} placeholder={t('الرقم أو الهاتف أو الاسم')} className="!max-w-none !flex-none" data-fb="delivery-queue-search" />
       <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pe-0.5">
         {groups.map(([id, title]) => {
           const items = shown.filter((d) => deliveryStage(d) === id).sort((a, b) => a.promisedAtMs - b.promisedAtMs);

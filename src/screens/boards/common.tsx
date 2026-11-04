@@ -37,7 +37,7 @@ export function AgeChip({ a, className }: { a: Aging; className?: string }) {
   if (!a.timer) return null;
   return (
     <span className={cn('inline-flex items-center gap-1 text-[11px] font-bold num whitespace-nowrap', a.late ? 'text-[var(--error)]' : a.heat >= 2 ? 'text-[var(--warning-text)]' : 'text-dim', className)} title={a.title} data-fb="board-age">
-      <Clock className="w-3 h-3" />{a.timer}{a.late ? ` · ${t('متأخر')}` : ''}
+      <Clock className="w-3 h-3" /><span dir="auto">{a.timer}</span>{a.late && <span>· {t('متأخر')}</span>}
     </span>
   );
 }
