@@ -8,6 +8,8 @@ import type { TableVisit } from '../types';
 import type { FloorPlan, TableLayout, TableTurn } from '../types-ops';
 import { policy } from '../policies';
 import '../ops-registry';
+import { reservationRules, tableConflict, depositBalances, depositView, depVersion, resVersion, pushResEvent, forfeitDeposit, cancelOutcome, blockMs } from '../reservation-rules';
+import type { Reservation } from '../types';
 
 export const openVisitOn = (ctx: Ctx, tableId: string) => ctx.db.visits.find((v) => v.state === 'OPEN' && (v.tableId === tableId || v.joinedTableIds.includes(tableId)));
 const openChecks = (ctx: Ctx, visitId: string) => ctx.db.orders.filter((o) => o.visitId === visitId && (o.status === 'DRAFT' || o.status === 'CONFIRMED'));
@@ -42,8 +44,8 @@ export const floorHandlers: Record<string, Handler> = {
     const tables = ctx.db.tables.filter((t) => t.branchId === branchId && (ctx.query.active === undefined || String(t.active) === ctx.query.active));
     return page(tables.map((t) => {
       const v = openVisitOn(ctx, t.id);
-      const res = ctx.db.reservations.find((r) => r.tableId === t.id && r.state === 'BOOKED');
-      return { ...t, ...placeOf(ctx, t), occupancy: v ? { visitId: v.id, primary: v.tableId === t.id, guestCount: v.guestCount, serverUserId: v.serverUserId, serverName: userName(ctx.db, v.serverUserId), openedAt: v.openedAt, minutesSeated: Math.floor((ctx.now - v.openedAtMs) / 60000), checks: openChecks(ctx, v.id).length, payable: m4(openChecks(ctx, v.id).reduce((a, o) => a + Number(computeTotals(o).payable), 0)) } : null, reservation: res ? { id: res.id, at: res.at, customer: res.customer, partySize: res.partySize } : null };
+      const res = upcomingOn(ctx, t.id);
+      return { ...t, ...placeOf(ctx, t), occupancy: v ? { visitId: v.id, primary: v.tableId === t.id, guestCount: v.guestCount, serverUserId: v.serverUserId, serverName: userName(ctx.db, v.serverUserId), openedAt: v.openedAt, minutesSeated: Math.floor((ctx.now - v.openedAtMs) / 60000), checks: openChecks(ctx, v.id).length, payable: m4(openChecks(ctx, v.id).reduce((a, o) => a + Number(computeTotals(o).payable), 0)) } : null, reservation: res ? upcomingView(ctx, res) : null };
     }), ctx.query);
   },
   'Table.Create': (ctx) => {
@@ -75,20 +77,14 @@ export const floorHandlers: Record<string, Handler> = {
   'TableVisit.List': (ctx) => page(ctx.db.visits.filter((v) => v.branchId === ctx.branchId && (!ctx.query.state || v.state === ctx.query.state) && (!ctx.query.tableId || v.tableId === ctx.query.tableId)).map((v) => visitView(ctx, v)), ctx.query),
   'TableVisit.Open': (ctx) => {
     const t = getTable(ctx, ctx.params.tableId);
-    if (!t.active) throw new ApiError('TABLE_INACTIVE', { tableId: t.id });
-    const existing = openVisitOn(ctx, t.id);
-    if (existing) throw new ApiError('TABLE_OCCUPIED', { tableId: t.id, visitId: existing.id });
-    const guests = Number(ctx.body.guestCount ?? 0);
-    need(guests >= 1, 'VALIDATION_FAILED', { field: 'guestCount', rule: '>= 1' });
-    seatOnTurn(ctx, t.id);
-    const v: TableVisit = { id: nextId('visit'), tableId: t.id, branchId: t.branchId, state: 'OPEN', guestCount: guests, serverUserId: ctx.user!.id, openedAt: ctx.nowIso, openedAtMs: ctx.now, closedAt: null, version: 1, joinedTableIds: [], history: [hist(ctx.user!.id, 'OPENED', { ar: `فُتحت لـ ${guests} أفراد`, en: `opened for ${guests}` }, null, ctx.terminal?.code)] };
+    // ux-12: opening a table for a reservation IS seating it — the one path (Reservation.Seat) with the same result
     if (ctx.body.reservationId) {
-      const r = ctx.db.reservations.find((x) => x.id === ctx.body.reservationId);
-      if (r) { r.state = 'SEATED'; r.visitId = v.id; }
+      const r = getReservation(ctx, ctx.body.reservationId);
+      if (ctx.body.reservationVersion !== undefined) casRes(r, ctx.body.reservationVersion, 'reservationVersion');
+      const { visit } = seatReservation(ctx, r, t.id, ctx.body.guestCount);
+      return { status: 201, body: visit };
     }
-    ctx.db.visits.push(v);
-    ctx.audit(`visit opened on table ${t.name}`, v.id);
-    event('TableVisitOpened', v.id, `table ${t.name}`);
+    const v = openVisit(ctx, t, ctx.body.guestCount);
     return { status: 201, body: visitView(ctx, v) };
   },
   'TableVisit.Close': (ctx) => {
@@ -146,32 +142,251 @@ export const floorHandlers: Record<string, Handler> = {
     v!.history.push(hist(ctx.user!.id, 'SERVER', { ar: `تغيّر الويتر من ${userName(ctx.db, before)} إلى ${userName(ctx.db, ctx.body.userId)}`, en: 'server changed' }));
     return visitView(ctx, v!);
   },
-  // Direction D14 (PD-held): reservations with deposit and no-show fee.
-  'Reservation.Find': (ctx) => page(ctx.db.reservations.filter((r) => r.branchId === ctx.branchId).sort((a, b) => a.at.localeCompare(b.at)).map((r) => ({ ...r, deposit: ctx.db.deposits.find((d) => d.id === r.depositId) ?? null, tableName: ctx.db.tables.find((t) => t.id === r.tableId)?.name ?? null })), ctx.query),
+  // Direction D14 (PD-held): reservations with deposit and no-show fee. ux-12: linked to a customer, updated (time,
+  // table, party size, notes) with CAS and the table-conflict rule, cancelled with a reason (deposit outcome by
+  // ReservationPolicy), seated through one path, every change in the append-only history and the audit.
+  'Reservation.Find': (ctx) => {
+    const q = ctx.query;
+    let list = ctx.db.reservations.filter((r) => r.branchId === ctx.branchId);
+    if (q.customerId) list = list.filter((r) => r.customerId === q.customerId);
+    if (q.state) list = list.filter((r) => String(q.state).split(',').includes(r.state));
+    if (q.from) list = list.filter((r) => r.at >= String(q.from));
+    if (q.to) list = list.filter((r) => r.at < String(q.to));
+    const rules = reservationRules(ctx.branchId);
+    return { ...page([...list].sort((a, b) => a.at.localeCompare(b.at)).map((r) => reservationView(ctx, r)), q), rules };
+  },
   'Reservation.Create': (ctx) => {
-    requireFields(ctx, 'customer', 'phone', 'partySize', 'at');
     const branchId = requireBranch(ctx);
-    if (ctx.body.tableId) getTable(ctx, ctx.body.tableId);
-    const r = { id: nextId('resv'), branchId, customer: ctx.body.customer, phone: ctx.body.phone, partySize: Number(ctx.body.partySize), at: ctx.body.at, tableId: ctx.body.tableId ?? null, depositId: ctx.body.depositId ?? null, noShowFee: m4(ctx.body.noShowFee ?? '0'), state: 'BOOKED' as const, createdAt: ctx.nowIso, visitId: null };
+    const b = ctx.body ?? {};
+    const who = guestOf(ctx, b);
+    const partySize = Number(b.partySize);
+    need(Number.isInteger(partySize) && partySize >= 1 && partySize <= 200, 'VALIDATION_FAILED', { field: 'partySize', rule: 'whole number 1..200' });
+    const atMs = Date.parse(String(b.at ?? ''));
+    need(b.at && Number.isFinite(atMs), 'VALIDATION_FAILED', { field: 'at', rule: 'required ISO time' });
+    if (atMs < ctx.now) throw new ApiError('RESERVATION_TIME_PAST', { at: b.at }, 409);
+    const rules = reservationRules(branchId);
+    if (b.tableId) {
+      const t = getTable(ctx, b.tableId);
+      if (!t.active) throw new ApiError('TABLE_INACTIVE', { tableId: t.id });
+      const c = tableConflict(ctx.db, rules, branchId, t.id, atMs, null);
+      if (c) throw new ApiError('RESERVATION_TABLE_CONFLICT', conflictDetails(ctx, c, rules), 409);
+    }
+    let dep: any = null;
+    if (b.depositId) {
+      dep = ctx.db.deposits.find((x) => x.id === b.depositId && x.branchId === branchId);
+      need(dep && dep.state === 'HELD', 'VALIDATION_FAILED', { field: 'depositId', rule: 'a held deposit of this branch' });
+      need(!dep.reservationId || !ctx.db.reservations.some((x) => x.id === dep.reservationId), 'VALIDATION_FAILED', { field: 'depositId', rule: 'already linked to another reservation' });
+    }
+    const notes = String(b.notes ?? '').trim().slice(0, 200) || null;
+    need(b.noShowFee === undefined || b.noShowFee === '' || isAmount(b.noShowFee), 'VALIDATION_FAILED', { field: 'noShowFee' });
+    const r: Reservation = { id: nextId('resv'), branchId, customer: who.name, phone: who.phone, customerId: who.customerId, partySize, at: new Date(atMs).toISOString(), tableId: b.tableId ?? null, depositId: dep?.id ?? null, noShowFee: m4(b.noShowFee || '0'), state: 'BOOKED', createdAt: ctx.nowIso, createdBy: ctx.user!.id, visitId: null, notes, version: 1, history: [] };
+    pushResEvent(r, { at: ctx.nowIso, by: ctx.user!.id, kind: 'CREATED', ref: dep?.id ?? null, amount: dep?.amount });
     ctx.db.reservations.push(r);
-    return r;
+    if (dep) { dep.reservationId = r.id; if (!dep.customerId && who.customerId) dep.customerId = who.customerId; dep.version = depVersion(dep) + 1; }
+    ctx.audit(`reservation ${r.customer} × ${r.partySize} at ${r.at}${r.tableId ? ` table ${tableName(ctx, r.tableId)}` : ''}${dep ? ` deposit ${dep.amount}` : ''}`, r.id);
+    event('ReservationCreated', r.id, `${r.customer} ${r.at}`);
+    return { status: 201, body: reservationView(ctx, r) };
+  },
+  // ux-12: change the time, the table, the party size, the notes (or link a legacy reservation to a customer). CAS.
+  'Reservation.Update': (ctx) => {
+    const r = getReservation(ctx, ctx.params.reservationId);
+    if (r.state !== 'BOOKED') throw new ApiError('RESERVATION_NOT_BOOKED', { state: r.state }, 409);
+    casRes(r, ctx.body.expectedVersion);
+    const b = ctx.body ?? {};
+    const rules = reservationRules(r.branchId);
+    const changes: { field: string; from: unknown; to: unknown }[] = [];
+    let atMs = Date.parse(r.at);
+    if (b.at !== undefined) {
+      const n = Date.parse(String(b.at));
+      need(Number.isFinite(n), 'VALIDATION_FAILED', { field: 'at', rule: 'ISO time' });
+      if (n !== atMs) {
+        if (n < ctx.now) throw new ApiError('RESERVATION_TIME_PAST', { at: b.at }, 409);
+        changes.push({ field: 'at', from: r.at, to: new Date(n).toISOString() }); atMs = n;
+      }
+    }
+    let tableId = r.tableId;
+    if (b.tableId !== undefined && (b.tableId || null) !== r.tableId) {
+      if (b.tableId) { const t = getTable(ctx, b.tableId); if (!t.active) throw new ApiError('TABLE_INACTIVE', { tableId: t.id }); }
+      changes.push({ field: 'tableId', from: r.tableId, to: b.tableId || null }); tableId = b.tableId || null;
+    }
+    let partySize = r.partySize;
+    if (b.partySize !== undefined && Number(b.partySize) !== r.partySize) {
+      const n = Number(b.partySize);
+      need(Number.isInteger(n) && n >= 1 && n <= 200, 'VALIDATION_FAILED', { field: 'partySize', rule: 'whole number 1..200' });
+      changes.push({ field: 'partySize', from: r.partySize, to: n }); partySize = n;
+    }
+    let notes = r.notes ?? null;
+    if (b.notes !== undefined) { const n = String(b.notes ?? '').trim().slice(0, 200) || null; if (n !== notes) { changes.push({ field: 'notes', from: notes, to: n }); notes = n; } }
+    let who: { name: string; phone: string; customerId: string | null } | null = null;
+    if (b.customerId !== undefined && (b.customerId || null) !== (r.customerId ?? null)) {
+      need(b.customerId, 'VALIDATION_FAILED', { field: 'customerId', rule: 'a reservation linked to a customer stays linked (pick another customer)' });
+      who = guestOf(ctx, { customerId: b.customerId });
+      changes.push({ field: 'customerId', from: r.customerId ?? null, to: who.customerId });
+    }
+    if (!changes.length) return reservationView(ctx, r);
+    if (tableId && (changes.some((c) => c.field === 'at' || c.field === 'tableId'))) {
+      const c = tableConflict(ctx.db, rules, r.branchId, tableId, atMs, r.id);
+      if (c) throw new ApiError('RESERVATION_TABLE_CONFLICT', conflictDetails(ctx, c, rules), 409);
+    }
+    Object.assign(r, { at: new Date(atMs).toISOString(), tableId, partySize, notes });
+    if (who) Object.assign(r, { customerId: who.customerId, customer: who.name, phone: who.phone });
+    r.version = resVersion(r) + 1;
+    pushResEvent(r, { at: ctx.nowIso, by: ctx.user!.id, kind: 'UPDATED', changes });
+    const txt = (c: { field: string; from: unknown; to: unknown }) => c.field === 'tableId' ? `table ${c.from ? tableName(ctx, String(c.from)) : '—'} → ${c.to ? tableName(ctx, String(c.to)) : '—'}` : `${c.field} ${c.from ?? '—'} → ${c.to ?? '—'}`;
+    ctx.audit(`reservation ${r.customer} updated: ${changes.map(txt).join('; ')}`, r.id);
+    event('ReservationUpdated', r.id, changes.map((c) => c.field).join(','));
+    return reservationView(ctx, r);
+  },
+  // ux-12: cancel with a required reason. The deposit is never refunded here: ReservationPolicy decides whether the held
+  // remainder is forfeited now (ALWAYS_FORFEIT, or FORFEIT_IF_LATE within lateCancelHours) or stays to be refunded
+  // through Deposit.Refund (drawer PAY_OUT with a manager's approval).
+  'Reservation.Cancel': (ctx) => {
+    const r = getReservation(ctx, ctx.params.reservationId);
+    if (r.state !== 'BOOKED') throw new ApiError('RESERVATION_NOT_BOOKED', { state: r.state }, 409);
+    const reason = String(ctx.body.reason ?? '').trim();
+    if (reason.length < 3) throw new ApiError('REASON_REQUIRED', { field: 'reason', rule: 'at least 3 characters' });
+    need(reason.length <= 200, 'VALIDATION_FAILED', { field: 'reason', rule: 'at most 200 characters' });
+    casRes(r, ctx.body.expectedVersion);
+    const rules = reservationRules(r.branchId);
+    const d = r.depositId ? ctx.db.deposits.find((x) => x.id === r.depositId) : null;
+    const co = cancelOutcome(rules, r, d, ctx.now);
+    r.state = 'CANCELLED';
+    r.cancel = { at: ctx.nowIso, by: ctx.user!.id, reason, late: co.late, mode: rules.cancelDepositMode, depositOutcome: co.outcome };
+    r.version = resVersion(r) + 1;
+    pushResEvent(r, { at: ctx.nowIso, by: ctx.user!.id, kind: 'CANCELLED', reason });
+    if (d && co.outcome === 'FORFEITED') {
+      const amount = forfeitDeposit(d, ctx.user!.id, ctx.nowIso, co.late && rules.cancelDepositMode === 'FORFEIT_IF_LATE' ? 'LATE_CANCEL' : 'CANCEL_POLICY', r.id, reason);
+      pushResEvent(r, { at: ctx.nowIso, by: ctx.user!.id, kind: 'DEPOSIT_FORFEITED', amount, ref: d.id, reason: co.late ? 'LATE_CANCEL' : 'CANCEL_POLICY' });
+    }
+    ctx.audit(`reservation ${r.customer} at ${r.at} cancelled (${co.late ? 'late' : 'early'}, ${rules.cancelDepositMode}; deposit ${co.outcome}${co.outcome !== 'NONE' ? ` ${co.amount}` : ''}): ${reason}`, r.id, true);
+    event('ReservationCancelled', r.id, `${co.outcome}`);
+    return reservationView(ctx, r);
   },
   'Reservation.MarkNoShow': (ctx) => {
-    const r = ctx.db.reservations.find((x) => x.id === ctx.params.reservationId && x.branchId === ctx.branchId);
-    need(r, 'VALIDATION_FAILED', { reason: 'reservation not found' });
-    need(r!.state === 'BOOKED', 'VALIDATION_FAILED', { reason: 'not booked' });
-    r!.state = 'NO_SHOW';
-    const d = ctx.db.deposits.find((x) => x.id === r!.depositId);
-    if (d && d.state === 'HELD') d.state = 'FORFEITED'; // the no-show fee keeps the deposit (liability → income) — expert question
-    return r;
+    const r = getReservation(ctx, ctx.params.reservationId);
+    if (r.state !== 'BOOKED') throw new ApiError('RESERVATION_NOT_BOOKED', { state: r.state }, 409);
+    if (ctx.body?.expectedVersion !== undefined) casRes(r, ctx.body.expectedVersion);
+    r.state = 'NO_SHOW';
+    r.noShowAt = ctx.nowIso;
+    r.version = resVersion(r) + 1;
+    pushResEvent(r, { at: ctx.nowIso, by: ctx.user!.id, kind: 'NO_SHOW' });
+    const d = ctx.db.deposits.find((x) => x.id === r.depositId);
+    // the no-show fee keeps the deposit (liability → income) — unchanged; ux-12 records the outcome
+    if (d && d.state === 'HELD') {
+      const amount = forfeitDeposit(d, ctx.user!.id, ctx.nowIso, 'NO_SHOW', r.id, null);
+      pushResEvent(r, { at: ctx.nowIso, by: ctx.user!.id, kind: 'DEPOSIT_FORFEITED', amount, ref: d.id, reason: 'NO_SHOW' });
+    }
+    ctx.audit(`reservation ${r.customer} at ${r.at} no-show${d ? ` (deposit ${d.state})` : ''}`, r.id, true);
+    event('ReservationNoShow', r.id, r.customer);
+    return reservationView(ctx, r);
   },
+  // ux-12: the one seating path — opens the table visit for the reservation (TableVisit.Open with reservationId runs it too)
   'Reservation.Seat': (ctx) => {
-    const r = ctx.db.reservations.find((x) => x.id === ctx.params.reservationId && x.branchId === ctx.branchId);
-    need(r && r.state === 'BOOKED', 'VALIDATION_FAILED', { reason: 'not booked' });
-    return r;
+    const r = getReservation(ctx, ctx.params.reservationId);
+    if (r.state !== 'BOOKED') throw new ApiError('RESERVATION_NOT_BOOKED', { state: r.state }, 409);
+    casRes(r, ctx.body.expectedVersion);
+    const tableId = ctx.body.tableId ?? r.tableId;
+    need(tableId, 'VALIDATION_FAILED', { field: 'tableId', rule: 'choose a table' });
+    const out = seatReservation(ctx, r, tableId, ctx.body.guestCount);
+    return { status: 201, body: out };
   },
   ...floorPlanHandlers(),
 };
+
+// ───────── ux-12: reservations — helpers shared by the reservation commands, TableVisit.Open and Table.List
+function casRes(r: Reservation, expected: unknown, field = 'expectedVersion') {
+  resVersion(r);
+  checkVersion(r as { version: number }, expected, field);
+}
+function getReservation(ctx: Ctx, id: string) {
+  const r = ctx.db.reservations.find((x) => x.id === id && x.branchId === ctx.branchId);
+  if (!r) throw new ApiError('RESERVATION_NOT_FOUND', { reservationId: id }, 404);
+  return r;
+}
+const tableName = (ctx: Ctx, id: string) => ctx.db.tables.find((t) => t.id === id)?.name ?? id;
+const isAmount = (v: unknown) => /^\d{1,9}(\.\d{1,4})?$/.test(String(v));
+/** The guest: a customer record (name and phone come from it), or the legacy free-text name and phone. */
+function guestOf(ctx: Ctx, b: any): { name: string; phone: string; customerId: string | null } {
+  if (b.customerId) {
+    const c = (ctx.db.customers ?? []).find((x) => x.id === b.customerId);
+    if (!c) throw new ApiError('CUSTOMER_NOT_FOUND', { customerId: b.customerId }, 404);
+    if (c.active === false) throw new ApiError('VALIDATION_FAILED', { field: 'customerId', rule: 'customer merged into another (use the main record)', mergedInto: (c as any).mergedInto ?? null });
+    return { name: c.name, phone: c.phone, customerId: c.id };
+  }
+  const name = String(b.customer ?? '').trim();
+  const phone = String(b.phone ?? '').trim();
+  if (!name || !phone) throw new ApiError('VALIDATION_FAILED', { field: !name ? 'customer' : 'phone', rule: 'customerId, or the guest name and phone' });
+  return { name: name.slice(0, 80), phone: phone.slice(0, 20), customerId: null };
+}
+function conflictDetails(ctx: Ctx, c: Reservation, rules: ReturnType<typeof reservationRules>) {
+  return { conflictWith: c.id, customer: c.customer, at: c.at, tableId: c.tableId, tableName: c.tableId ? tableName(ctx, c.tableId) : null, windowMinutes: rules.seatMinutes + rules.bufferMinutes };
+}
+function reservationView(ctx: Ctx, r: Reservation) {
+  const d = r.depositId ? ctx.db.deposits.find((x) => x.id === r.depositId) ?? null : null;
+  const cust = r.customerId ? (ctx.db.customers ?? []).find((c) => c.id === r.customerId) ?? null : null;
+  const rules = reservationRules(r.branchId);
+  const co = r.state === 'BOOKED' ? cancelOutcome(rules, r, d, ctx.now) : null;
+  const atMs = Date.parse(r.at);
+  return {
+    ...r, version: resVersion(r), history: (r.history ?? []).map((e) => ({ ...e, byName: userName(ctx.db, e.by) })),
+    customerName: cust?.name ?? r.customer, phone: cust?.phone ?? r.phone, legacy: !r.customerId,
+    customerRef: cust ? { id: cust.id, code: (cust as any).code ?? null, tags: (cust as any).tags ?? [], allergies: (cust as any).allergies ?? [] } : null,
+    deposit: d ? depositView(ctx.db, d) : null, tableName: r.tableId ? ctx.db.tables.find((t) => t.id === r.tableId)?.name ?? null : null,
+    endsAt: new Date(atMs + rules.seatMinutes * 60_000).toISOString(), cancelPreview: co,
+    visitOpen: !!(r.visitId && ctx.db.visits.some((v) => v.id === r.visitId && v.state === 'OPEN')),
+    cancelledByName: r.cancel ? userName(ctx.db, r.cancel.by) : null,
+  };
+}
+/** The reservation a table shows on the floor plan: booked, from upcomingMinutes before its time until its seat ends. */
+function upcomingOn(ctx: Ctx, tableId: string) {
+  const rules = reservationRules(ctx.branchId);
+  return ctx.db.reservations.filter((r) => r.tableId === tableId && r.state === 'BOOKED' && r.branchId === ctx.branchId)
+    .filter((r) => { const at = Date.parse(r.at); return ctx.now >= at - rules.upcomingMinutes * 60_000 && ctx.now <= at + rules.seatMinutes * 60_000; })
+    .sort((a, b) => a.at.localeCompare(b.at))[0] ?? null;
+}
+function upcomingView(ctx: Ctx, r: Reservation) {
+  const d = r.depositId ? ctx.db.deposits.find((x) => x.id === r.depositId) : null;
+  const cust = r.customerId ? (ctx.db.customers ?? []).find((c) => c.id === r.customerId) : null;
+  const atMs = Date.parse(r.at);
+  return { id: r.id, version: resVersion(r), at: r.at, customer: cust?.name ?? r.customer, phone: cust?.phone ?? r.phone, customerId: r.customerId ?? null, partySize: r.partySize, notes: r.notes ?? null,
+    minutesTo: Math.round((atMs - ctx.now) / 60_000), late: ctx.now > atMs, deposit: d ? depositBalances(d).remaining : null, depositState: d?.state ?? null };
+}
+
+/** Open a visit on a free table (shared by TableVisit.Open and the reservation seating path). */
+function openVisit(ctx: Ctx, t: { id: string; name: string; branchId: string; active: boolean }, guestCount: unknown, reservationId: string | null = null): TableVisit {
+  if (!t.active) throw new ApiError('TABLE_INACTIVE', { tableId: t.id });
+  const existing = openVisitOn(ctx, t.id);
+  if (existing) throw new ApiError('TABLE_OCCUPIED', { tableId: t.id, visitId: existing.id });
+  const guests = Number(guestCount ?? 0);
+  need(Number.isInteger(guests) && guests >= 1, 'VALIDATION_FAILED', { field: 'guestCount', rule: '>= 1' });
+  seatOnTurn(ctx, t.id);
+  const v: TableVisit = { id: nextId('visit'), tableId: t.id, branchId: t.branchId, state: 'OPEN', guestCount: guests, serverUserId: ctx.user!.id, openedAt: ctx.nowIso, openedAtMs: ctx.now, closedAt: null, version: 1, joinedTableIds: [], history: [hist(ctx.user!.id, 'OPENED', { ar: `فُتحت لـ ${guests} أفراد`, en: `opened for ${guests}` }, null, ctx.terminal?.code)], reservationId };
+  ctx.db.visits.push(v);
+  ctx.audit(`visit opened on table ${t.name}${reservationId ? ` (reservation ${reservationId})` : ''}`, v.id);
+  event('TableVisitOpened', v.id, `table ${t.name}`);
+  return v;
+}
+
+/** ux-12: seat a booked reservation — open its table visit and mark it SEATED, in the same transaction. */
+function seatReservation(ctx: Ctx, r: Reservation, tableId: string, guestCount: unknown) {
+  if (r.state !== 'BOOKED') throw new ApiError('RESERVATION_NOT_BOOKED', { state: r.state }, 409);
+  const t = getTable(ctx, tableId);
+  const guests = guestCount === undefined || guestCount === null || guestCount === '' ? r.partySize : guestCount;
+  if (t.id !== r.tableId) {
+    // seating on another table than booked: it must not take a table another reservation holds now
+    const rules = reservationRules(r.branchId);
+    const c = tableConflict(ctx.db, rules, r.branchId, t.id, ctx.now, r.id);
+    if (c && Math.abs(Date.parse(c.at) - ctx.now) < blockMs(rules) && c.state === 'BOOKED') throw new ApiError('RESERVATION_TABLE_CONFLICT', conflictDetails(ctx, c, rules), 409);
+  }
+  const v = openVisit(ctx, t, guests, r.id);
+  const changes = t.id !== r.tableId ? [{ field: 'tableId', from: r.tableId, to: t.id }] : undefined;
+  r.state = 'SEATED'; r.visitId = v.id; r.tableId = t.id; r.seatedAt = ctx.nowIso; r.seatedBy = ctx.user!.id;
+  r.version = resVersion(r) + 1;
+  pushResEvent(r, { at: ctx.nowIso, by: ctx.user!.id, kind: 'SEATED', changes, ref: v.id });
+  ctx.audit(`reservation ${r.customer} seated on table ${t.name} (${v.guestCount} guests)`, r.id);
+  event('ReservationSeated', r.id, `table ${t.name}`);
+  return { reservation: reservationView(ctx, r), visit: visitView(ctx, v) };
+}
 
 export function closeVisit(ctx: Ctx, v: TableVisit, how: 'MANUAL' | 'AUTO') {
   v.state = 'CLOSED';

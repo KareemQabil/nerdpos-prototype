@@ -10,6 +10,7 @@ import type { Capture, CashEntry, Session, ZReport, Order, TenderMethod } from '
 import { authorizationForCapture } from './extpay'; // crm area: external authorizations
 import { paidStage, paidDateOf, recordReversal, stockForReturn, checkDisposition, approvedText, DISP_AR } from './reversals'; // r3A: refund stages S2/S3
 import { checkTenderReference, prepaidAllowed, referenceRule } from '../r3b'; // round 3: tender taxonomy + reference policy
+import { depositBalances, depositView, depVersion, pushResEvent, refundBlock } from '../reservation-rules'; // ux-12: deposits applied in parts and refunded
 
 function cashEntry(ctx: Ctx, sessionId: string, kind: CashEntry['kind'], amount: string, extra: Partial<CashEntry> = {}) {
   const e: CashEntry = { id: nextId('ce'), sessionId, kind, amount: m4(amount), at: ctx.nowIso, by: ctx.user!.id, ...extra };
@@ -376,32 +377,92 @@ export const moneyHandlers: Record<string, Handler> = {
   },
 
   // ───────── direction: deposits (D10) and tips (D6)
-  'Deposit.Find': (ctx) => page(ctx.db.deposits.filter((d) => d.branchId === ctx.branchId), ctx.query),
+  'Deposit.Find': (ctx) => {
+    let list = ctx.db.deposits.filter((d) => d.branchId === ctx.branchId);
+    if (ctx.query.customerId) list = list.filter((d) => d.customerId === ctx.query.customerId);
+    if (ctx.query.state) list = list.filter((d) => String(ctx.query.state).split(',').includes(d.state));
+    return page(list.map((d) => depositView(ctx.db, d)), ctx.query);
+  },
   'Deposit.Create': (ctx) => {
     requireFields(ctx, 'customer', 'amount', 'method', 'purpose');
     const s = openSessionOn(ctx.db, ctx.terminal?.id);
     if (!s) throw new ApiError('SESSION_NOT_OPEN');
+    need(isMoney(ctx.body.amount) && D(ctx.body.amount).gt(0), 'VALIDATION_FAILED', { field: 'amount', rule: 'positive amount' });
     if ((ctx.body.method === 'CARD' || ctx.body.method === 'DIGITAL_WALLET') && !ctx.body.reference) throw new ApiError('TENDER_REFERENCE_REQUIRED');
-    const d = { id: nextId('dep'), branchId: ctx.branchId!, customer: ctx.body.customer, phone: ctx.body.phone, amount: m4(ctx.body.amount), method: ctx.body.method, reference: ctx.body.reference, purpose: ctx.body.purpose, state: 'HELD' as const, reservationId: ctx.body.reservationId, createdAt: ctx.nowIso, sessionId: s.id, by: ctx.user!.id };
+    // ux-12: the customer record when the screen picked one (the name stays as written for legacy readers)
+    const cust = ctx.body.customerId ? (ctx.db.customers ?? []).find((c) => c.id === ctx.body.customerId) : null;
+    if (ctx.body.customerId && !cust) throw new ApiError('CUSTOMER_NOT_FOUND', { customerId: ctx.body.customerId }, 404);
+    const d = { id: nextId('dep'), branchId: ctx.branchId!, customer: cust?.name ?? ctx.body.customer, phone: cust?.phone ?? ctx.body.phone, customerId: cust?.id ?? null, amount: m4(ctx.body.amount), method: ctx.body.method, reference: ctx.body.reference, purpose: ctx.body.purpose, state: 'HELD' as const, reservationId: ctx.body.reservationId, createdAt: ctx.nowIso, sessionId: s.id, by: ctx.user!.id, version: 1, applications: [], refunds: [], forfeit: null };
     ctx.db.deposits.push(d);
     if (d.method === 'CASH') cashEntry(ctx, s.id, 'DEPOSIT_IN', d.amount, { ref: d.id });
     if (ctx.body.reservationId) { const r = ctx.db.reservations.find((x) => x.id === ctx.body.reservationId); if (r) r.depositId = d.id; }
-    return { status: 201, body: d };
+    ctx.audit(`deposit ${d.amount} ${d.method} from ${d.customer}`, d.id);
+    return { status: 201, body: depositView(ctx.db, d) };
   },
+  // ux-12: a deposit is applied up to what remains of it and of the check (amount optional: the smaller of the two).
+  // Each application is an append-only record with its DEPOSIT capture; the deposit is APPLIED when nothing remains.
   'Deposit.Apply': (ctx) => {
     const d = ctx.db.deposits.find((x) => x.id === ctx.params.depositId && x.branchId === ctx.branchId);
     need(d && d.state === 'HELD', 'VALIDATION_FAILED', { reason: 'deposit not held' });
+    if (ctx.body.expectedVersion !== undefined) checkVersion({ version: depVersion(d!) }, ctx.body.expectedVersion);
     const o = getOrder(ctx, ctx.body.orderId);
     if (o.status !== 'CONFIRMED') throw new ApiError('ORDER_NOT_CONFIRMED');
     const st = settlementOf(ctx.db, o);
-    if (D(d!.amount).gt(st.remaining)) throw new ApiError('OVERPAYMENT', { remaining: st.remaining, deposit: d!.amount });
+    const left = depositBalances(d!).remaining;
+    const amount = ctx.body.amount !== undefined && ctx.body.amount !== null && ctx.body.amount !== '' ? m4(ctx.body.amount) : m4(D(left).lt(D(st.remaining)) ? left : st.remaining);
+    need(isMoney(ctx.body.amount ?? amount) && D(amount).gt(0), 'VALIDATION_FAILED', { field: 'amount', rule: 'positive amount' });
+    if (D(amount).gt(D(st.remaining))) throw new ApiError('OVERPAYMENT', { remaining: st.remaining, deposit: d!.amount, amount });
+    if (D(amount).gt(D(left))) throw new ApiError('DEPOSIT_OVER_REMAINING', { remaining: left, amount }, 409);
     const s = openSessionOn(ctx.db, ctx.terminal?.id) ?? ctx.db.sessions.find((x) => x.id === d!.sessionId)!;
-    ctx.db.captures.push({ id: nextId('cap'), orderId: o.id, method: 'DEPOSIT', amount: d!.amount, tendered: null, change: '0.0000', reference: d!.id, sessionId: s.id, terminalId: ctx.terminal?.id ?? '', branchId: o.branchId, at: ctx.nowIso, atMs: ctx.now, businessDate: ctx.businessDate(o.branchId), by: ctx.user!.id, commandId: ctx.commandId ?? '', tip: '0.0000', depositId: d!.id });
-    d!.state = 'APPLIED';
+    const cap = { id: nextId('cap'), orderId: o.id, method: 'DEPOSIT' as TenderMethod, amount, tendered: null, change: '0.0000', reference: d!.id, sessionId: s.id, terminalId: ctx.terminal?.id ?? '', branchId: o.branchId, at: ctx.nowIso, atMs: ctx.now, businessDate: ctx.businessDate(o.branchId), by: ctx.user!.id, commandId: ctx.commandId ?? '', tip: '0.0000', depositId: d!.id };
+    ctx.db.captures.push(cap as Capture);
+    // a deposit applied before ux-12 records keeps its whole amount as one application
+    (d!.applications ??= []).push({ id: nextId('dap'), orderId: o.id, orderNumber: o.number, amount, captureId: cap.id, at: ctx.nowIso, by: ctx.user!.id });
+    const after = depositBalances(d!).remaining;
+    if (D(after).lte(0)) d!.state = 'APPLIED';
     d!.appliedOrderId = o.id;
+    d!.version = depVersion(d!) + 1;
+    const r = d!.reservationId ? ctx.db.reservations.find((x) => x.id === d!.reservationId) : null;
+    if (r) pushResEvent(r, { at: ctx.nowIso, by: ctx.user!.id, kind: 'DEPOSIT_APPLIED', amount, ref: o.id });
     o.version++;
-    o.history.push({ at: ctx.nowIso, by: ctx.user!.id, kind: 'DEPOSIT_APPLIED', text: { ar: `خُصم عربون ${d!.amount} ج.م (كان التزامًا، وأصبح مبيعات الآن)`, en: `deposit ${d!.amount} applied` } });
-    return { deposit: d, settlement: settlementOf(ctx.db, o) };
+    o.history.push({ at: ctx.nowIso, by: ctx.user!.id, kind: 'DEPOSIT_APPLIED', text: { ar: `خُصم عربون ${D(amount).toFixed(2)} ج.م (كان التزامًا، وأصبح مبيعات الآن)`, en: `deposit ${D(amount).toFixed(2)} applied` } });
+    ctx.audit(`deposit ${d!.id} applied ${amount} to ${o.number}${D(after).gt(0) ? ` (${after} remains)` : ''}`, d!.id);
+    return { deposit: depositView(ctx.db, d!), settlement: settlementOf(ctx.db, o) };
+  },
+  // ux-12: refund what remains of a deposit out of THIS terminal's drawer (PAY_OUT, reason code DEPOSIT_REFUND) in an
+  // open shift, with a required reason and a manager's approval (DEPOSIT_REFUND). Never more than the unapplied,
+  // unrefunded remainder; refused while its reservation is still booked (cancel first) or after it was forfeited. The
+  // refund is an immutable record; the deposit becomes REFUNDED when nothing remains. CAS on the deposit version.
+  'Deposit.Refund': (ctx) => {
+    const d = ctx.db.deposits.find((x) => x.id === ctx.params.depositId && x.branchId === ctx.branchId);
+    if (!d) throw new ApiError('DEPOSIT_NOT_FOUND', { depositId: ctx.params.depositId }, 404);
+    const reason = String(ctx.body.reason ?? '').trim();
+    if (reason.length < 3) throw new ApiError('REASON_REQUIRED', { field: 'reason', rule: 'at least 3 characters' });
+    need(reason.length <= 200, 'VALIDATION_FAILED', { field: 'reason', rule: 'at most 200 characters' });
+    checkVersion({ version: depVersion(d) }, ctx.body.expectedVersion);
+    const block = refundBlock(ctx.db, d);
+    const b = depositBalances(d);
+    if (block === 'RESERVATION_ACTIVE') throw new ApiError('DEPOSIT_RESERVATION_ACTIVE', { reservationId: d.reservationId }, 409);
+    if (block) throw new ApiError('DEPOSIT_NOT_REFUNDABLE', { state: d.state, remaining: b.remaining, why: block }, 409);
+    const raw = ctx.body.amount === undefined || ctx.body.amount === null || ctx.body.amount === '' ? b.remaining : ctx.body.amount;
+    need(isMoney(raw) && D(raw).gt(0), 'VALIDATION_FAILED', { field: 'amount', rule: 'positive amount' });
+    const amount = m4(raw);
+    if (D(amount).gt(D(b.remaining))) throw new ApiError('DEPOSIT_REFUND_OVER_REMAINING', { remaining: b.remaining, amount, applied: b.applied, refunded: b.refunded }, 409);
+    const s = openSessionOn(ctx.db, ctx.terminal?.id);
+    if (!s) throw new ApiError('SESSION_NOT_OPEN', { reason: 'a deposit is refunded out of a terminal with an open drawer' });
+    const g = ctx.requireApproval({ action: 'DEPOSIT_REFUND', targetType: 'payments.Deposit', targetId: d.id, context: { depositId: d.id, reservationId: d.reservationId ?? null, amount, remaining: b.remaining }, grantId: ctx.body.approvalGrantId });
+    ctx.db.seq['deposit_refund_no'] = (ctx.db.seq['deposit_refund_no'] ?? 0) + 1;
+    const rf = { id: nextId('drf'), number: `DR-${String(ctx.db.seq['deposit_refund_no']).padStart(4, '0')}`, amount, remainingBefore: b.remaining, reason, at: ctx.nowIso, by: ctx.user!.id, sessionId: s.id, terminalId: ctx.terminal!.id, approvalGrantId: g?.id ?? null, approverUserId: g?.approverUserId ?? null };
+    (d.refunds ??= []).push(rf);
+    cashEntry(ctx, s.id, 'PAY_OUT', amount, { reasonCode: 'DEPOSIT_REFUND', reason: `رد عربون ${d.customer} (${rf.number}) — ${reason}`, ref: rf.number, approvalGrantId: g?.id });
+    const after = depositBalances(d).remaining;
+    if (D(after).lte(0)) d.state = 'REFUNDED';
+    d.version = depVersion(d) + 1;
+    const r = d.reservationId ? ctx.db.reservations.find((x) => x.id === d.reservationId) : null;
+    if (r) { pushResEvent(r, { at: ctx.nowIso, by: ctx.user!.id, kind: 'DEPOSIT_REFUNDED', amount, reason, ref: rf.number }); r.version = (r.version ?? 1) + 1; }
+    ctx.audit(`deposit ${d.id} (${d.customer}) refunded ${amount} of ${b.remaining} from the drawer (${rf.number}): ${reason}`, d.id, true, g?.id);
+    event('DepositRefunded', d.id, `${rf.number} ${amount}`);
+    return { status: 201, body: { refund: rf, deposit: depositView(ctx.db, d) } };
   },
   'Tip.Distribute': (ctx) => {
     const db = ctx.db;

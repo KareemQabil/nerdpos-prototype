@@ -67,7 +67,7 @@ export function permsOf(db: DB, user: User, branchId: string | null): Set<string
  */
 export const DIRECTION_PERMISSION: Record<string, string> = {
   'Order.Split': 'order:updateline', 'Order.Merge': 'order:updateline', 'Order.OverrideLinePrice': 'order:updateline',
-  'Table.Merge': 'table:assign', 'Table.AssignWaiter': 'table:assign', 'Reservation.Create': 'table:assign', 'Reservation.Find': 'table:read',
+  'Table.Merge': 'table:assign', 'Table.AssignWaiter': 'table:assign', 'Reservation.Create': 'reservation:manage' /* ux-12 (was table:assign) */, 'Reservation.Find': 'table:read',
   'Ticket.Recall': 'kitchen:advanceticket', 'TicketItem.Bump': 'kitchen:advanceticket', 'Ticket.SetPriority': 'kitchen:advanceticket', 'Ticket.TransferStation': 'kitchen:advanceticket', 'Ticket.Refire': 'kitchen:advanceticket',
   'Compliance.VerifyChain': 'compliance:read',
   // operations & system area (ops.ts, floor.ts, kitchen.ts, catalog.ts promotions)

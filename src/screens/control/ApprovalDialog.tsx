@@ -56,6 +56,7 @@ const SHORT: Record<string, string> = {
   REFUND_APPROVE: 'اعتماد مرتجع', RETURN_AFTER_CLOSE: 'مرتجع بعد الإغلاق', SESSION_VARIANCE: 'فرق الدرج', CASH_MOVE: 'حركة نقدية', DRAWER_NO_SALE: 'فتح الدرج',
   TENDER_CORRECTION: 'تصحيح وسيلة الدفع', PRICE_OVERRIDE: 'تعديل سعر', RECEIPT_REPRINT: 'إعادة طباعة إيصال', STAFF_MEAL: 'وجبة موظف', DELIVERY_CANCEL: 'إلغاء طلب دليفري',
   DRIVER_CASH_VARIANCE: 'فرق نقدية الطيار', DRIVER_CASH_LIMIT_OVERRIDE: 'طيار فوق حد النقد', DRIVER_OWED_SETTLE: 'تسوية عجز طيار', DRIVER_PAYOUT: 'صرف مستحقات طيار', // ux-11
+  DEPOSIT_REFUND: 'رد عربون', // ux-12
 };
 /** The item a line action is about: «حمص ×1». */
 function lineText(ctx: any): string | null {

@@ -62,6 +62,7 @@ export interface Table { id: string; branchId: string; name: string; area: strin
 export interface TableVisit {
   id: string; tableId: string; branchId: string; state: 'OPEN' | 'CLOSED'; guestCount: number; serverUserId: string;
   openedAt: string; openedAtMs: number; closedAt: string | null; version: number; joinedTableIds: string[]; history: HistoryEntry[];
+  /** ux-12: the reservation seated on this visit (Reservation.Seat — TableVisit.Open with reservationId runs the same path) */ reservationId?: string | null;
 }
 
 export interface HistoryEntry { at: string; by: string; byName?: string; terminal?: string; kind: string; text: Loc | string; data?: unknown }
@@ -187,8 +188,24 @@ export interface Idem { opId: string; hash: string; status: number; body: unknow
 export interface Alert { id: string; at: string; kind: string; severity: 'info' | 'warning' | 'error'; text: Loc; ref?: string; ack: boolean }
 
 // direction (مقترح)
-export interface Deposit { id: string; branchId: string; customer: string; phone?: string; amount: Money; method: TenderMethod; reference?: string; purpose: 'BOOKING' | 'PRE_ORDER' | 'CAKE'; state: 'HELD' | 'APPLIED' | 'REFUNDED' | 'FORFEITED'; reservationId?: string; appliedOrderId?: string; createdAt: string; sessionId: string | null; by: string }
-export interface Reservation { id: string; branchId: string; customer: string; phone: string; partySize: number; at: string; tableId: string | null; depositId: string | null; noShowFee: Money; state: 'BOOKED' | 'SEATED' | 'NO_SHOW' | 'CANCELLED'; createdAt: string; visitId?: string | null }
+export interface Deposit { id: string; branchId: string; customer: string; phone?: string; amount: Money; method: TenderMethod; reference?: string; purpose: 'BOOKING' | 'PRE_ORDER' | 'CAKE'; state: 'HELD' | 'APPLIED' | 'REFUNDED' | 'FORFEITED'; reservationId?: string; appliedOrderId?: string; createdAt: string; sessionId: string | null; by: string;
+  /** ux-12: the customer record (legacy deposits keep only the free-text name) */ customerId?: string | null;
+  /** ux-12: CAS for refunds and applications (absent on records older than ux-12 = 1) */ version?: number;
+  /** ux-12: append-only applications to checks (a deposit can be applied in parts) */ applications?: DepositApplication[];
+  /** ux-12: append-only refunds paid out of a drawer (immutable records) */ refunds?: DepositRefund[];
+  /** ux-12: why and when the held remainder became income (no-show / late cancellation / policy) */ forfeit?: { at: string; by: string; amount: Money; cause: 'NO_SHOW' | 'LATE_CANCEL' | 'CANCEL_POLICY'; reservationId: string | null; reason: string | null } | null }
+/** ux-12: one application of a deposit to a check (a DEPOSIT capture) */
+export interface DepositApplication { id: string; orderId: string; orderNumber: string; amount: Money; captureId: string; at: string; by: string }
+/** ux-12: one refund of a deposit, paid out of the drawer of an open shift (PAY_OUT, reason code DEPOSIT_REFUND) */
+export interface DepositRefund { id: string; number: string; amount: Money; remainingBefore: Money; reason: string; at: string; by: string; sessionId: string; terminalId: string; approvalGrantId: string | null; approverUserId: string | null }
+export interface Reservation { id: string; branchId: string; customer: string; phone: string; partySize: number; at: string; tableId: string | null; depositId: string | null; noShowFee: Money; state: 'BOOKED' | 'SEATED' | 'NO_SHOW' | 'CANCELLED'; createdAt: string; visitId?: string | null;
+  /** ux-12: the customer record; null on legacy free-text reservations (still readable by customer / phone) */ customerId?: string | null;
+  notes?: string | null;
+  /** ux-12: CAS (absent on records older than ux-12 = 1) */ version?: number;
+  /** ux-12: append-only lifecycle (created, each update with old → new, seated, cancelled, no-show, deposit outcome) */ history?: ReservationEvent[];
+  cancel?: { at: string; by: string; reason: string; late: boolean; mode: string; depositOutcome: 'NONE' | 'REFUNDABLE' | 'FORFEITED' } | null;
+  seatedAt?: string | null; seatedBy?: string | null; noShowAt?: string | null; createdBy?: string | null }
+export interface ReservationEvent { at: string; by: string; kind: 'CREATED' | 'UPDATED' | 'SEATED' | 'CANCELLED' | 'NO_SHOW' | 'DEPOSIT_FORFEITED' | 'DEPOSIT_REFUNDED' | 'DEPOSIT_APPLIED'; changes?: { field: string; from: unknown; to: unknown }[]; reason?: string | null; amount?: Money; ref?: string | null }
 export interface TipEntry { id: string; captureId: string; orderId: string; amount: Money; method: TenderMethod; serverUserId: string; sessionId: string; at: string; businessDate: string; distributed: boolean }
 
 export interface DB extends CrmCollections {

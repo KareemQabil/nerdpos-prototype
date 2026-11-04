@@ -14,6 +14,7 @@ import { egp } from './humanLog';
 import { personaDisplayName, userLabel, deviceName, branchLabel } from './people';
 import { CONTROL_JOURNEY } from './journey-control'; // r3A: who did it vs who allowed it
 import { RIDERS_JOURNEY } from './journey-riders'; // ux-11: the riders system
+import { RESERVATIONS_JOURNEY } from './journey-reservations'; // ux-12: reservations complete
 
 export interface StepText { who: string; do_ar: string; do_en: string; expect_ar: string; expect_en: string; note?: string; operations: { op: string; http: string; actor: string; expected: string }[] }
 export interface StepDef { before?: () => void; id: string; device: string; user: string; screen?: string | (() => [string, Record<string, any>]); run: (log: Logger) => Promise<void>; text?: StepText }
@@ -562,4 +563,5 @@ export const JOURNEYS: Journey[] = [
   { id: 'J-F1', title: 'سيناريوهات الأعطال', titleEn: 'Failure journeys', reset: null, intro: 'رد ضايع في الدفع، جهازين على نفس الشيك، طابعة واقعة، شاشة مطبخ واقعة وإعادة إرسال، ومنصة الإيصال الإلكتروني واقعة يوم كامل.', steps: F1 },
   CONTROL_JOURNEY, // r3A
   RIDERS_JOURNEY, // ux-11
+  RESERVATIONS_JOURNEY, // ux-12
 ];
