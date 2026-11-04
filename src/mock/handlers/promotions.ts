@@ -124,7 +124,7 @@ export function upsertPromotion(ctx: Ctx) {
   if (existing && used > 0 && !changeReason) throw new ApiError('REASON_REQUIRED', { field: 'changeReason', rule: 'the promotion has been used on checks', used });
   const rec: PromotionX = {
     id, name: { ar: String(b.name.ar).trim(), en: String(b.name.en || b.name.ar).trim() }, kind, code: codes[0] ?? null, codes,
-    benefitType: mechanic === 'BUY_X_GET_Y' ? 'PERCENTAGE' : benefitType, benefitValue: mechanic === 'BUY_X_GET_Y' ? getPercent : benefitValue,
+    benefitType: mechanic === 'BUY_X_GET_Y' ? 'PERCENTAGE' : mechanic === 'BUNDLE' ? 'FIXED_AMOUNT' : benefitType, benefitValue: mechanic === 'BUY_X_GET_Y' ? getPercent : mechanic === 'BUNDLE' ? bundlePrice! : benefitValue,
     branchIds, channels, minSubtotal: b.minSubtotal ? m4(b.minSubtotal) : null, schedule: dp[0] ?? null, dayparts: dp, validFrom, validTo,
     active, version: (existing?.version ?? 0) + 1,
     mechanic, productIds, categoryIds, buyQty, getQty, getPercent, getProductIds: (b.getProductIds ?? []).filter((x: string) => ctx.db.products.some((p) => p.id === x)), getCategoryIds: (b.getCategoryIds ?? []).filter((x: string) => ctx.db.categories.some((c) => c.id === x)),

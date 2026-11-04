@@ -332,6 +332,14 @@ ok(revs.length === 2 && revs[0].change === 'EDITED' && revs[0].reason === 'رف�
 ok(await code(call(MGR, 'Promotion.Upsert', { params: { promotionId: pOrder }, body: { name: { ar: 'عرض 1' }, kind: 'AUTOMATIC', channels: ['TAKEAWAY'], mechanic: 'ORDER', benefitType: 'PERCENTAGE', benefitValue: '25', active: false, expectedVersion: promoRec(pOrder).version, changeReason: 'انتهى الموسم' } })) === 'OK' && promoRec(pOrder).revisions.at(-1).change === 'DEACTIVATED', 'switched off: a DEACTIVATED revision; the promotion is kept');
 ok(store.db.promotions.some((p) => p.id === pOrder) && store.db.audit.some((a) => a.sensitive && new RegExp(`promotion .* v\\d deactivated: انتهى الموسم`).test(a.summary)), 'never deleted; a sensitive audit line with the reason');
 
+console.log('\n== the customer display shows what a promotion gives');
+const cdv = (await call(CASH, 'CustomerDisplay.View', {})).data;
+const bx = cdv.promos?.find((x: any) => x.id === 'promo_bxgy'), wl = cdv.promos?.find((x: any) => x.id === 'promo_2');
+ok(bx?.benefit.kind === 'SUMMARY' && /اشترِ 2 .* واحصل على 1 .* مجانًا/.test(bx.benefit.summary.ar) && /Buy 2 .*get 1 .*free/.test(bx.benefit.summary.en), `buy-and-get on the display: «${bx?.benefit.summary?.ar}» (was «خصم 100%»)`);
+ok(wl?.benefit.kind === 'AMOUNT' && wl.benefit.value === '50.0000', 'a whole-check amount stays an amount (50.00)');
+const bundleOnDisplay = cdv.promos?.find((x: any) => x.id === pBundle);
+ok(bundleOnDisplay?.benefit.kind === 'SUMMARY' && /بسعر 50 ج\.م/.test(bundleOnDisplay.benefit.summary.ar), `a bundle on the display: «${bundleOnDisplay?.benefit.summary?.ar}»`);
+
 console.log('\n== promotion validation');
 const bad = async (body: any) => (await fail(promo(body))).code;
 ok(await bad({ mechanic: 'BUNDLE', bundleParts: [{ productIds: [PT], qty: 1 }], bundlePrice: '50' }) === 'VALIDATION_FAILED', 'a bundle with one part → VALIDATION_FAILED');

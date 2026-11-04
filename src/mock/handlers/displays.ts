@@ -5,9 +5,18 @@ import type { Handler } from '../kernel';
 import { need, orderView, settlementOf, m4, D } from './util';
 import { docTemplateOf } from '../r3b';
 import { activeLines } from '../pricing';
-import { displayFor, displayContentNow } from './devices'; // ux-14: server-owned display settings and content
+import { displayFor, displayContentNow } from './devices';
+import { promoSummary } from '../promo-engine'; // ux-14: server-owned display settings and content
 
-const benefitText = (p: { benefitType: string; benefitValue: string }) => (p.benefitType === 'PERCENTAGE' ? { kind: 'PERCENT', value: p.benefitValue } : { kind: 'AMOUNT', value: m4(D(p.benefitValue)) });
+// ux-15: a whole-check promotion shows its percentage / amount; an item, buy-and-get or bundle promotion shows the
+// server's one-line summary (before, «اشترِ 2 واحصل على 1» showed as «خصم 100%» and a bundle as a percentage)
+const benefitText = (db: any) => (p: any) => {
+  if (p.mechanic && p.mechanic !== 'ORDER') {
+    const pn = (id: string) => db.products.find((x: any) => x.id === id)?.name.ar ?? id, cn = (id: string) => db.categories.find((x: any) => x.id === id)?.name.ar ?? id;
+    return { kind: 'SUMMARY', value: null, summary: promoSummary(p, pn, cn, (id) => db.products.find((x: any) => x.id === id)?.name.en ?? pn(id), (id) => db.categories.find((x: any) => x.id === id)?.name.en ?? cn(id)) };
+  }
+  return p.benefitType === 'PERCENTAGE' ? { kind: 'PERCENT', value: p.benefitValue } : { kind: 'AMOUNT', value: m4(D(p.benefitValue)) };
+};
 
 export const displayHandlers: Record<string, Handler> = {
   'CustomerDisplay.View': (ctx) => {
@@ -20,11 +29,11 @@ export const displayHandlers: Record<string, Handler> = {
     // ux-14: a registered display reads its own settings and only the content assigned to it (its playlist, inside each
     // item's schedule); the automatic promotions / dishes only under CustomerDisplayPolicy.idleContent ASSIGNED_AND_PROMOTIONS
     const display = ctx.query.displayId ? displayFor(ctx, ctx.query.displayId, 'CUSTOMER_DISPLAY') : null;
-    const content = display?.enabled ? displayContentNow(ctx, display.playlist, benefitText) : [];
+    const content = display?.enabled ? displayContentNow(ctx, display.playlist, benefitText(ctx.db)) : [];
     const auto = !display || (display.enabled && display.idleContent === 'ASSIGNED_AND_PROMOTIONS');
     const promos = !auto ? [] : ctx.db.promotions
       .filter((p) => p.active && (!p.branchIds.length || p.branchIds.includes(ctx.branchId ?? '')) && (!p.validTo || p.validTo > ctx.now))
-      .map((p) => ({ id: p.id, name: p.name, kind: p.kind, code: p.kind === 'CODED' ? p.code : null, benefit: benefitText(p), schedule: p.schedule ? { start: p.schedule.start, end: p.schedule.end } : null, minSubtotal: p.minSubtotal }));
+      .map((p) => ({ id: p.id, name: p.name, kind: p.kind, code: p.kind === 'CODED' ? p.code : null, benefit: benefitText(ctx.db)(p), schedule: p.schedule ? { start: p.schedule.start, end: p.schedule.end } : null, minSubtotal: p.minSubtotal }));
     const featured = !auto ? [] : ctx.db.products.filter((p) => p.active !== false && p.imageUrl && !(p as any).direction).slice(0, 6).map((p) => ({ id: p.id, name: p.name, imageUrl: p.imageUrl }));
     let order = null;
     if (ctx.query.orderId && (!display || display.enabled)) {

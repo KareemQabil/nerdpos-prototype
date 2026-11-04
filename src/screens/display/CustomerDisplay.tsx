@@ -197,7 +197,7 @@ function useRotate(n: number, ms: number) {
   useEffect(() => { if (n < 2) return; const iv = setInterval(() => setI((x) => (x + 1) % n), ms); return () => clearInterval(iv); }, [n, ms]);
   return n ? i % n : 0;
 }
-const benefit = (p: any) => <>{t('خصم')} <span className="num">{p.benefit.kind === 'PERCENT' ? `${qty(p.benefit.value)}%` : money(p.benefit.value, false)}</span>{p.benefit.kind === 'PERCENT' ? null : <> {currency()}</>}</>;
+const benefit = (p: any) => (p.benefit.kind === 'SUMMARY' ? <>{L(p.benefit.summary)}</> : <>{t('خصم')} <span className="num">{p.benefit.kind === 'PERCENT' ? `${qty(p.benefit.value)}%` : money(p.benefit.value, false)}</span>{p.benefit.kind === 'PERCENT' ? null : <> {currency()}</>}</>);
 
 function PromoCard({ view, slideMs }: { view: any; slideMs: number }) {
   const slides = slidesOf(view).filter((s): s is Extract<Slide, { kind: 'promo' }> => s.kind === 'promo');
