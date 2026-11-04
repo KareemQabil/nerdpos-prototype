@@ -74,3 +74,14 @@ export function validQty(v: string, decimals: number): boolean {
 export function sumQty(xs: string[]): string {
   return xs.reduce<ReturnType<typeof D>>((a, x) => a.plus(D(x || '0')), D(0)).toString();
 }
+
+// ux-07: Home's figures come from the certified report engine as decimal strings; comparisons stay in Decimal.
+/** Percent change of `now` against `before` (whole percent, a string such as "12" or "-3"), or null when before is 0/missing. */
+export function pctChange(now: string | null | undefined, before: string | null | undefined): string | null {
+  if (!isNum(now ?? '') || !isNum(before ?? '') || D(before!).isZero()) return null;
+  return D(now!).minus(D(before!)).div(D(before!)).times(100).toDecimalPlaces(0).toFixed(0);
+}
+/** Sum of decimal strings (null / non-numeric ignored), full precision as a string. */
+export function sumDecimals(xs: (string | null | undefined)[]): string {
+  return xs.filter((x) => isNum(x ?? '')).reduce((a, x) => a.plus(D(x!)), D(0)).toString();
+}

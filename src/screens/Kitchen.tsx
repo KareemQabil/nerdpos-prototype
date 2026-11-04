@@ -176,7 +176,7 @@ export default function Kitchen() {
     kdsNext: t('التذكرة التالية'), kdsPrev: t('التذكرة السابقة'), kdsBump: dispatch ? t('جاهز / تسليم المحددة') : t('جاهز للتذكرة المحددة'), kdsBumpItem: t('تجهيز الصنف التالي'), kdsStart: t('بدء التحضير'),
     kdsPriority: t('أولوية'), kdsUndo: t('تراجع عن آخر خطوة'), kdsRecall: t('استعادة تذكرة'), kdsCall: t('نداء الرقم'), kdsView: t('تبديل العرض'), kdsHelp: t('عرض الاختصارات'),
   };
-  const title = single && !dispatch ? t('شاشة {s}', { s: stationLabel(single.name) }) : dispatch && screen.isKds ? t('شاشة التسليم') : t('شاشة المطبخ');
+  const title = single && !dispatch ? t('محطة {s}', { s: stationLabel(single.name) }) /* ux-07: a station screen is named «محطة …» (the device «محطة المشويات») */ : dispatch && screen.isKds ? t('شاشة التسليم') : t('شاشة المطبخ');
   return (
     <div data-screen="F1" data-kds-dispatch={dispatch ? '1' : '0'} data-kds-start={startPolicy} data-kds-view={v} data-profile={profile.id} className="relative -m-5 h-[calc(100%+2.5rem)] flex flex-col min-h-0 p-3 gap-3">
       <div className="flex items-center gap-2.5 flex-wrap shrink-0">

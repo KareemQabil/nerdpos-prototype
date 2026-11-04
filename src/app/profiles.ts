@@ -53,7 +53,7 @@ const SALE_OVERFLOW: SaleAction[] = ['label', 'staffMeal', 'staffMeals', 'prebil
 
 export const PROFILES: Profile[] = [
   // ── floor & counter
-  { id: 'cashier', group: g('الصالة والكاونتر', 'Floor & counter'), role: g('كاشير', 'Cashier'), workspaces: ['counter', 'shift', 'receipt', 'refunds'], start: 'counter', /* ux-07: the cashier's checks list is inside the sale screen (F7) */ saleModes: ['takeaway', 'dinein', 'delivery'], defaultMode: 'takeaway',
+  { id: 'cashier', group: g('الصالة والكاونتر', 'Floor & counter'), role: g('كاشير', 'Cashier'), workspaces: ['counter', 'shift', 'receipt', 'refunds'], start: 'counter', boards: { orders: 'list' }, /* ux-07: the cashier's checks list is inside the sale screen (F7); the checks page (sidenav until ux-09) stays a list */ saleModes: ['takeaway', 'dinein', 'delivery'], defaultMode: 'takeaway',
     actionBar: { secondary: ['new', 'held', 'customer', 'discount', 'orders'], overflow: SALE_OVERFLOW, primary: 'auto' }, quantity: ALL_QTY, input: 'mixed', hidden: ['expectedCash', 'reports'] },
   { id: 'waiter', group: g('الصالة والكاونتر', 'Floor & counter'), role: g('ويتر', 'Waiter'), workspaces: ['floor', 'order'], start: 'floor',
     actionBar: { secondary: ['guests', 'prebill', 'move', 'note'], overflow: ['customer', 'split', 'merge', 'history', 'cancel'], primary: 'send' }, quantity: TOUCH_QTY, input: 'touch', hidden: ['collection', 'drawer', 'reports'] },

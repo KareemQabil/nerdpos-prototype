@@ -252,9 +252,16 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
 
   // ── primary button: follows the check state
   const openPay = () => { if (order && active.length && can('payment:capture')) setPayOpen(true); };
-  // ux-07: the old «pay» route lands here with ?pay=1 — the one payment UI opens over the sale screen
+  // ux-07: redirected entry points land here with a flag (?pay=1 · ?staffMeal=1 · ?soldOut=1 · ?startDelivery=…) and
+  // open the one popup for the job over the sale screen — on first render and on every later navigation here
   const payAsked = useRef(params.pay === '1');
-  useEffect(() => { if (payAsked.current && order && openStatus) { payAsked.current = false; openPay(); } }, [order?.id, openStatus]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (params.pay === '1') payAsked.current = true;
+    if (params.staffMeal === '1') setStaffMeal(true);
+    if (params.soldOut === '1') setSoldOutOpen(true);
+    if (params.startDelivery && allowed.includes('delivery')) setStartOpen('new');
+  }, [params]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (payAsked.current && order && openStatus) { payAsked.current = false; openPay(); } }, [order?.id, openStatus, params]); // eslint-disable-line react-hooks/exhaustive-deps
   const fire = () => order && run('Order.Fire', { params: { orderId: order.id }, body: { expectedVersion: order.version } }, { success: t('تم الإرسال للمطبخ') });
   const sendDelivery = async () => {
     if (!order) return;

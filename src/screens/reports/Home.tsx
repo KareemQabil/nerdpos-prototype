@@ -133,7 +133,8 @@ export function ReportsHome({ legacy, onLegacy }: { legacy: any[]; onLegacy: (id
               <div className="flex flex-wrap gap-1.5 pt-2">{legacy.map((x) => <Button key={x.id} size="sm" variant="ghost" onClick={() => onLegacy(x.id)} data-fb={`reports:pick:${x.id}`}>{L(x.title)}</Button>)}</div>
             </details>
           )}
-          <div className="flex items-center gap-2 text-xs text-dim"><Layers className="w-3.5 h-3.5" />{t('عايز تشوف إزاي الأرقام بتتحسب من أولها؟')}<button type="button" className="text-[var(--primary)] underline" onClick={() => nav('report-catalog')} data-fb="reports:engine">{t('محرك التقارير')}</button></div>
+          {/* ux-07: the reports-engine page is a demo / engineering page */}
+          <Tech><div className="flex items-center gap-2 text-xs text-dim"><Layers className="w-3.5 h-3.5" />{t('عايز تشوف إزاي الأرقام بتتحسب من أولها؟')}<button type="button" className="text-[var(--primary)] underline" onClick={() => nav('report-catalog')} data-fb="reports:engine">{t('محرك التقارير')}</button></div></Tech>
         </>}
       </>}
     </div>

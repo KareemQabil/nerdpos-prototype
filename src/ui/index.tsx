@@ -47,7 +47,7 @@ export function Button({ variant = 'secondary', size = 'md', className, loading,
   };
   const s: Record<BtnSize, string> = { sm: 'h-8 px-3 text-xs rounded-lg', md: 'h-10 px-4 text-sm rounded-xl', lg: 'h-12 px-5 text-base rounded-xl', xl: 'h-14 px-6 text-lg rounded-2xl', icon: 'h-10 w-10 p-0 rounded-xl' };
   return (
-    <button {...rest} aria-busy={loading || undefined} disabled={rest.disabled || loading} className={cn('inline-flex items-center justify-center gap-2 transition-[background,border-color,color,filter,transform,box-shadow] duration-150 active:scale-[.97] disabled:opacity-45 disabled:saturate-50 disabled:active:scale-100 disabled:pointer-events-none select-none whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]', v[variant], s[size], className)}>
+    <button data-variant={variant} {...rest} aria-busy={loading || undefined} disabled={rest.disabled || loading} className={cn('inline-flex items-center justify-center gap-2 transition-[background,border-color,color,filter,transform,box-shadow] duration-150 active:scale-[.97] disabled:opacity-45 disabled:saturate-50 disabled:active:scale-100 disabled:pointer-events-none select-none whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]', v[variant], s[size], className)}>
       {loading && <Loader2 className="w-4 h-4 animate-spin shrink-0" />}
       {children}
     </button>
@@ -95,58 +95,56 @@ function useFocusIn(open: boolean) {
   return ref;
 }
 
+/**
+ * Legacy dialog API, rendered by the Popup atom (ux-07): the same scroll lock, size to content, Enter (saves from a
+ * text field or the panel — the footer's primary action), Esc closes, the same header and footer. Call sites are
+ * unchanged: `size` sm / md / lg / xl (or `wide` / `xwide`) keep their widths.
+ */
 export function Modal({ open, onClose, title, children, footer, wide, xwide, badge, description, size }: { open: boolean; onClose: () => void; title: React.ReactNode; children: React.ReactNode; footer?: React.ReactNode; wide?: boolean; xwide?: boolean; badge?: React.ReactNode; description?: React.ReactNode; size?: 'sm' | 'md' | 'lg' | 'xl' }) {
-  useEscape(open, onClose);
-  useScrollLock(open);
-  const { ctx, anchor } = useOverlayCtx();
-  const panel = useFocusIn(open);
-  const titleId = useId();
-  if (!open) return null;
   const w = size === 'sm' ? 'max-w-md' : size === 'lg' || (!size && wide) ? 'max-w-3xl' : size === 'xl' || (!size && xwide) ? 'max-w-6xl' : 'max-w-lg';
-  // Portaled to <body>: a backdrop-filter (.glass) ancestor would otherwise clip a fixed overlay to that card.
-  return <><span ref={anchor} hidden />{createPortal(
-    <div className="fixed inset-x-0 bottom-0 top-12 z-[70] flex items-center justify-center p-3 sm:p-4" role="dialog" aria-modal aria-labelledby={titleId} data-device={ctx.device} data-screen={ctx.screen}>
-      <div className="absolute inset-0 glass-overlay animate-fade-in" onClick={onClose} />
-      <div ref={panel} tabIndex={-1} className={cn('relative overlay-panel rounded-2xl w-full max-h-[calc(100vh-5rem)] flex flex-col animate-scale-in outline-none', w)}>
-        <div className="flex items-start justify-between gap-3 px-5 pt-4 pb-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 min-w-0 flex-wrap"><h2 id={titleId} className="text-lg font-bold leading-snug min-w-0">{title}</h2>{badge}</div>
-            {description && <p className="text-sm text-dim mt-1 leading-relaxed">{description}</p>}
-          </div>
-          <IconButton onClick={onClose} title={t('إغلاق')} className="-me-2 -mt-0.5 shrink-0"><X className="w-4 h-4" /></IconButton>
-        </div>
-        <div className="px-5 pb-5 pt-1 overflow-y-auto overscroll-contain flex-1 min-h-0">{children}</div>
-        {footer && <div className="px-5 py-3.5 border-t line flex flex-wrap gap-2 justify-end items-center overlay-footer rounded-b-2xl">{footer}</div>}
-      </div>
-    </div>,
-    document.body,
-  )}</>;
+  return <Popup open={open} onClose={onClose} title={title} badge={badge} description={description} footer={footer} widthClass={w} legacy>{children}</Popup>;
 }
 
 /**
  * Smart centered popup: sized to its content (sm…2xl), never a side sheet. Primary action is clear, Enter is
  * handled by the content, Esc closes. `bare` leaves header/footer to the content (payment, approval).
  */
-export function Popup({ open, onClose, title, children, footer, size = 'md', bare, className, fb, labelledBy, closeOnBackdrop = true }: { open: boolean; onClose: () => void; title?: React.ReactNode; children: React.ReactNode; footer?: React.ReactNode; size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl'; bare?: boolean; className?: string; fb?: string; labelledBy?: string; closeOnBackdrop?: boolean }) {
+export function Popup({ open, onClose, title, children, footer, size = 'md', bare, className, fb, labelledBy, closeOnBackdrop = true, badge, description, widthClass, legacy }: { open: boolean; onClose: () => void; title?: React.ReactNode; children: React.ReactNode; footer?: React.ReactNode; size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl'; bare?: boolean; className?: string; fb?: string; labelledBy?: string; closeOnBackdrop?: boolean; badge?: React.ReactNode; description?: React.ReactNode; widthClass?: string; legacy?: boolean }) {
   useEscape(open, onClose);
   useScrollLock(open);
   const { ctx, anchor } = useOverlayCtx();
   const panel = useFocusIn(open);
   const titleId = useId();
   if (!open) return null;
-  const w = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-3xl', xl: 'max-w-5xl', '2xl': 'max-w-6xl' }[size];
+  const w = widthClass ?? { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-3xl', xl: 'max-w-5xl', '2xl': 'max-w-6xl' }[size];
+  // Enter saves: from a text field (or the panel itself) Enter runs the footer's primary action. Content that handles
+  // Enter itself (useEnterSave, numpads) prevents the default first; textareas, selects and buttons keep their own Enter.
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (bare || !footer || e.key !== 'Enter' || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey || e.defaultPrevented || e.nativeEvent.isComposing) return;
+    const el = e.target as HTMLElement;
+    const textInput = el.tagName === 'INPUT' && !['checkbox', 'radio', 'button', 'submit', 'color', 'file', 'range'].includes((el as HTMLInputElement).type);
+    if (!textInput && el !== panel.current) return;
+    const btns = [...(panel.current?.querySelectorAll<HTMLButtonElement>('[data-popup-footer] button[data-variant]:not([disabled])') ?? [])];
+    const primary = [...btns].reverse().find((b) => b.dataset.variant === 'primary') ?? [...btns].reverse().find((b) => ['success', 'danger', 'warning'].includes(b.dataset.variant ?? ''));
+    if (!primary) return;
+    e.preventDefault();
+    primary.click();
+  };
   return <><span ref={anchor} hidden />{createPortal(
-    <div className="fixed inset-x-0 bottom-0 top-12 z-[70] flex items-center justify-center p-2 sm:p-4" role="dialog" aria-modal aria-labelledby={labelledBy ?? (title ? titleId : undefined)} data-device={ctx.device} data-screen={ctx.screen} data-fb={fb}>
+    <div className="fixed inset-x-0 bottom-0 top-12 z-[70] flex items-center justify-center p-2 sm:p-4" role="dialog" aria-modal aria-labelledby={labelledBy ?? (title ? titleId : undefined)} data-device={ctx.device} data-screen={ctx.screen} data-fb={fb} data-popup={legacy ? 'modal' : 'popup'}>
       <div className="absolute inset-0 glass-overlay animate-fade-in" onClick={closeOnBackdrop ? onClose : undefined} />
-      <div ref={panel} tabIndex={-1} className={cn('relative overlay-panel rounded-3xl w-full max-h-[calc(100vh-4.5rem)] flex flex-col animate-scale-in outline-none', w, className)}>
+      <div ref={panel} tabIndex={-1} onKeyDown={onKeyDown} className={cn('relative overlay-panel rounded-3xl w-full max-h-[calc(100vh-4.5rem)] flex flex-col animate-scale-in outline-none', w, className)}>
         {!bare && title && (
-          <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-3">
-            <h2 id={titleId} className="text-lg font-bold leading-snug min-w-0">{title}</h2>
-            <IconButton onClick={onClose} title={t('إغلاق')} className="-me-2 shrink-0"><X className="w-4 h-4" /></IconButton>
+          <div className="flex items-start justify-between gap-3 px-5 pt-4 pb-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 min-w-0 flex-wrap"><h2 id={titleId} className="text-lg font-bold leading-snug min-w-0">{title}</h2>{badge}</div>
+              {description && <p className="text-sm text-dim mt-1 leading-relaxed">{description}</p>}
+            </div>
+            <IconButton onClick={onClose} title={t('إغلاق')} className="-me-2 -mt-0.5 shrink-0"><X className="w-4 h-4" /></IconButton>
           </div>
         )}
         {bare ? children : <div className="px-5 pb-5 pt-1 overflow-y-auto overscroll-contain flex-1 min-h-0">{children}</div>}
-        {footer && <div className="px-5 py-3.5 border-t line flex flex-wrap gap-2 justify-end items-center overlay-footer rounded-b-3xl">{footer}</div>}
+        {footer && <div className="px-5 py-3.5 border-t line flex flex-wrap gap-2 justify-end items-center overlay-footer rounded-b-3xl" data-popup-footer>{footer}</div>}
       </div>
     </div>,
     document.body,
