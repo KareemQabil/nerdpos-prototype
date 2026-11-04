@@ -91,13 +91,13 @@ function Overview({ branchId }: { branchId?: string }) {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <Card title={<span className="flex items-center gap-2"><TriangleAlert className="w-4 h-4 text-[var(--warning)]" />{t('النواقص')}</span>} badge={<StateBadge ops={['Inventory.LowStock']} />} actions={<Button size="sm" variant="primary" data-fb="inv-dash:order-low" onClick={() => nav('inv-po', { fromLowStock: true })}>{t('اعمل أمر شراء')}</Button>}>
           <Table empty={t('مفيش نواقص — كله فوق الحد الأدنى')} head={[t('الصنف'), t('المخزن'), t('الموجود'), t('الحد'), t('نطلب'), '']} rows={low.items.slice(0, 8).map((r) => [
-            <button className="font-bold hover:text-[var(--primary)]" onClick={() => setItem(r.item.id)}>{L(r.item.name)}</button>, <span className="text-xs">{tv(r.warehouse.name)}</span>, <Qty v={r.onHand} unit={r.item.unit} />, <span className="num text-xs">{fmtQty(r.min)}</span>,
+            <button className="font-bold hover:text-[var(--primary)]" data-fb={`inv-dash:item:${r.item.id}`} onClick={() => setItem(r.item.id)}>{L(r.item.name)}</button>, <span className="text-xs">{tv(r.warehouse.name)}</span>, <Qty v={r.onHand} unit={r.item.unit} />, <span className="num text-xs">{fmtQty(r.min)}</span>,
             <span className="text-xs">{r.suggestedPacks ? `${fmtQty(r.suggestedPacks)} × ${L(r.pack.name)}` : <Qty v={r.suggestedQuantity} unit={r.item.unit} />}</span>, <LevelPill state={r.state} />,
           ])} />
         </Card>
         <Card title={<span className="flex items-center gap-2"><CalendarClock className="w-4 h-4 text-[var(--error)]" />{t('الصلاحية قربت أو خلصت')}</span>} badge={<StateBadge ops={['Inventory.Expiring']} />}>
           <Table empty={t('مفيش حاجة صلاحيتها قربت')} head={[t('الصنف'), t('المخزن'), t('الكمية'), t('الصلاحية'), '']} rows={exp.items.slice(0, 8).map((l) => [
-            <button className="font-bold hover:text-[var(--primary)]" onClick={() => setItem(l.item.id)}>{L(l.item.name)}</button>, <span className="text-xs">{tv(l.warehouse.name)}</span>, <Qty v={l.remaining} unit={l.item.unit} />,
+            <button className="font-bold hover:text-[var(--primary)]" data-fb={`inv-dash:item:${l.item.id}`} onClick={() => setItem(l.item.id)}>{L(l.item.name)}</button>, <span className="text-xs">{tv(l.warehouse.name)}</span>, <Qty v={l.remaining} unit={l.item.unit} />,
             l.status === 'EXPIRED' ? <Pill tone="error">{t('انتهت')}</Pill> : l.status === 'TODAY' ? <Pill tone="error">{t('النهارده')}</Pill> : <Pill tone="warning">{t('فاضل {n} يوم', { n: l.daysLeft })}</Pill>,
             <Button size="sm" variant="warning" data-fb={`inv-dash:waste-lot:${l.id}`} onClick={() => setWaste({ itemId: l.item.id, wh: l.warehouse.id })}>{t('هالك')}</Button>,
           ])} />
