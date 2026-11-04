@@ -20,7 +20,8 @@ export function money(v: string | number | null | undefined, withCurrency = true
   }
   const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   const out = `${neg ? '-' : ''}${grouped}.${fracPart}`;
-  return withCurrency ? `${out} ${CURRENCY}` : out;
+  // English: the Arabic currency is isolated (FSI…PDI) so a number that follows it in a sentence keeps its place
+  return withCurrency ? (getLang() === 'ar' ? `${out} ${CURRENCY}` : `${out} \u2068${CURRENCY}\u2069`) : out;
 }
 
 export function qty(v: string | number): string {

@@ -91,8 +91,8 @@ function approvalsEg(): Record<string, Rule> {
 
 export const POLICY_GROUPS = [
   { id: 'orders', title: 'الطلبات والصالة', titleEn: 'Orders & floor' },
-  { id: 'pricing', title: 'التسعير والضرايب والخدمة', titleEn: 'Pricing, tax & service' },
-  { id: 'catalog', title: 'المنيو', titleEn: 'Catalog' },
+  { id: 'pricing', title: 'التسعير والضرائب والخدمة', titleEn: 'Pricing, tax & service' },
+  { id: 'catalog', title: 'قائمة الطعام', titleEn: 'Catalog' },
   { id: 'payments', title: 'الدفع والدرج والوردية', titleEn: 'Payments, drawer & shift' },
   { id: 'approvals', title: 'الموافقات', titleEn: 'Approvals' },
   { id: 'kitchen', title: 'المطبخ والطباعة والأسباب', titleEn: 'Kitchen, printing & reasons' },

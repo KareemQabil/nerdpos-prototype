@@ -33,9 +33,10 @@ function fmtVal(v: string | null | undefined, unit?: string): string {
   if (unit === 'count' || unit === 'unit') return (Number.isInteger(n) ? n : Number(n.toFixed(2))).toLocaleString('en-US');
   if (unit === '%') return `${n.toFixed(1)}%`;
   if (unit === 'minutes') return `${n.toFixed(1)} دقيقة`;
-  return `${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} جنيه`;
+  return `${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م`; // owner rule: «ج.م» after the number
 }
-const fmtValEn = (v: string | null | undefined, unit?: string) => fmtVal(v, unit).replace('جنيه', 'EGP').replace('دقيقة', 'min');
+// English: the Arabic currency is isolated (FSI…PDI) so a number after it in the sentence keeps its place
+const fmtValEn = (v: string | null | undefined, unit?: string) => fmtVal(v, unit).replace(' ج.م', ' \u2068ج.م\u2069').replace('دقيقة', 'min');
 
 interface Period { from: string; to: string; label: Loc; defaulted: boolean }
 function parsePeriod(q: string, today: string, fallback: 'TODAY' | 'LAST_7', rules: string[]): Period | { clarify: 'ramadan' } {
@@ -144,7 +145,7 @@ export function ask(db: DB, caller: Caller, input: { question: string; clarify?:
   const today = bdOf(caller.nowMs);
 
   // ───── 1. safety refusals (never negotiable)
-  if (has(q, 'نمسح', 'امسح', 'مسح مبيعات', 'نخفي', 'erase', 'delete real sales', 'hide sales')) { rules.push('refuse:erase'); return refuse(question, rules, 'لأ. المبيعات الحقيقية عمرها ما بتتمسح ولا بتتخبى قبل الضرايب — ده مخالف للقانون (E20). أي تصحيح بيتعمل بمرتجع أو إيصال تصحيح مربوط بالأصل.', 'No. Genuine sales are never erased or hidden before tax reporting (E20). Corrections are linked return/correction documents.'); }
+  if (has(q, 'نمسح', 'امسح', 'مسح مبيعات', 'نخفي', 'حذف مبيعات', 'نحذف', 'احذف', 'اخفاء المبيعات', 'erase', 'delete real sales', 'hide sales')) { rules.push('refuse:erase'); return refuse(question, rules, 'لأ. المبيعات الحقيقية عمرها ما بتتمسح ولا بتتخبى قبل الضرايب — ده مخالف للقانون (E20). أي تصحيح بيتعمل بمرتجع أو إيصال تصحيح مربوط بالأصل.', 'No. Genuine sales are never erased or hidden before tax reporting (E20). Corrections are linked return/correction documents.'); }
   if (has(q, 'من غير موافقه', 'without approval', 'نفذه', 'execute it') && !has(q, 'متنفذوش', 'do not execute')) { rules.push('refuse:action'); return refuse(question, rules, 'لأ. المساعد بيقرا بس — مفيش أي حركة (أمر شراء، سعر، مرتجع) بتتعمل منه. أي مسودة بتعدي على الموافقات العادية.', 'No. The assistant is read-only; any draft goes through normal approvals.'); }
   if (has(q, ' sql', 'select ', 'raw query')) { rules.push('refuse:sql'); return refuse(question, rules, 'لأ. المساعد بيستخدم المقاييس المعتمدة بس، مش استعلامات حرة على قاعدة البيانات.', 'No raw SQL: only certified metrics.'); }
   if (has(q, 'فرع مش بتاعي', 'branch i am not authorized', 'not authorized for')) { rules.push('refuse:scope'); return refuse(question, rules, `لأ. التقارير بتطلع بس للفروع المسموح لك بيها (${caller.accessibleBranchIds.map((b) => dimLabel(db, 'branch', b).ar).join('، ')}) — والسيرفر هو اللي بيرفض، مش الشاشة.`, 'No. Only branches you are granted; enforced by the server.', 'SAFE_REFUSAL'); }

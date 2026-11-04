@@ -11,7 +11,7 @@ import type { PaymentAuthorization } from '../types-crm';
 const auths = (db: Ctx['db']) => (db.paymentAuthorizations ??= []);
 export const PROVIDERS: Record<string, { method: 'CARD' | 'DIGITAL_WALLET'; ar: string }> = {
   CARD_TERMINAL: { method: 'CARD', ar: 'مكنة الكارت' },
-  ONLINE_CARD: { method: 'CARD', ar: 'كارت أونلاين (لينك دفع)' },
+  ONLINE_CARD: { method: 'CARD', ar: 'بطاقة إلكترونيًا (رابط دفع)' },
   INSTAPAY: { method: 'DIGITAL_WALLET', ar: 'إنستاباي' },
   WALLET: { method: 'DIGITAL_WALLET', ar: 'محفظة موبايل' },
 };

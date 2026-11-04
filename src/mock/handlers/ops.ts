@@ -60,7 +60,7 @@ function summaryOf(ctx: Ctx, action: string, context: Record<string, unknown>, t
   const o = ctx.db.orders.find((x) => x.id === (context.orderId ?? targetId));
   const amt = (context.amount ?? context.lineAmount ?? context.payable ?? context.absVariance) as string | undefined;
   const where = o ? (o.tableId ? `ترابيزة ${ctx.db.tables.find((t) => t.id === o.tableId)?.name} · شيك #${o.number}` : `شيك #${o.number}`) : '';
-  const money = amt ? ` · ${Number(amt).toFixed(2)} ج.م` : '';
+  const money = amt ? ` · ${D(amt).toFixed(2)} ج.م` : '';
   const pct = context.discountPercent ? ` · ${context.discountPercent}%` : '';
   return { ar: `${where}${money}${pct}`.replace(/^ · /, ''), en: `${o ? '#' + o.number : targetId}${amt ? ' · ' + amt : ''}` };
 }
@@ -93,34 +93,34 @@ function readiness(ctx: Ctx, branchId: string, date: string) {
   const br = db.branches.find((b) => b.id === branchId);
   const current = bdOf(ctx.now, br?.timezone ?? 'Africa/Cairo', br?.businessDayCutoff ?? '04:00');
   const checks: Check[] = [];
-  const OK_TITLE: Record<string, string> = { OPEN_SESSIONS: 'كل الأدراج اتقفلت', OPEN_CHECKS: 'مفيش شيكات مفتوحة', PENDING_DELIVERIES: 'مفيش دليفري في الطريق', KITCHEN: 'شاشة المطبخ فاضية', KITCHEN_FAILED: 'كل الطلبات وصلت المطبخ', FAILED_PRINTS: 'الطباعة كلها تمام', ERECEIPTS: 'كل الإيصالات الإلكترونية اتقبلت', REFUNDS: 'مفيش مرتجعات مستنية', APPROVALS: 'مفيش طلبات موافقة مستنية', OFFLINE: 'مفيش عمليات أوفلاين مستنية قرار', RECON: 'كل فروقات المطابقة متفسرة' };
+  const OK_TITLE: Record<string, string> = { OPEN_SESSIONS: 'أُغلقت كل الأدراج', OPEN_CHECKS: 'لا توجد شيكات مفتوحة', PENDING_DELIVERIES: 'لا يوجد دليفري في الطريق', KITCHEN: 'شاشة المطبخ فارغة', KITCHEN_FAILED: 'وصلت كل الطلبات إلى المطبخ', FAILED_PRINTS: 'كل أوامر الطباعة سليمة', ERECEIPTS: 'قُبلت كل الإيصالات الإلكترونية', REFUNDS: 'لا توجد مرتجعات معلّقة', APPROVALS: 'لا توجد طلبات موافقة معلّقة', OFFLINE: 'لا توجد عمليات دون اتصال تنتظر قرارًا', RECON: 'كل فروقات المطابقة مفسَّرة' };
   const add = (c: Omit<Check, 'level'> & { level?: Check['level'] }, bad: 'BLOCKER' | 'WARNING') => checks.push({ ...c, level: c.count ? bad : 'OK', title: c.count || !OK_TITLE[c.id] ? c.title : { ar: OK_TITLE[c.id], en: c.title.en } } as Check);
-  if (date > current) checks.push({ id: 'NOT_STARTED', level: 'BLOCKER', title: { ar: 'اليوم ده لسه ما بدأش', en: 'This day has not started' }, detail: { ar: `اليوم التجاري الحالي ${current}`, en: `current business day is ${current}` }, count: 1, items: [] });
+  if (date > current) checks.push({ id: 'NOT_STARTED', level: 'BLOCKER', title: { ar: 'لم يبدأ هذا اليوم بعد', en: 'This day has not started' }, detail: { ar: `اليوم التجاري الحالي ${current}`, en: `current business day is ${current}` }, count: 1, items: [] });
   const sessions = db.sessions.filter((s) => s.branchId === branchId && s.state === 'OPEN' && s.businessDate <= date);
-  add({ id: 'OPEN_SESSIONS', title: { ar: 'أدراج لسه مفتوحة', en: 'Open drawers' }, detail: { ar: 'كل كاشير يقفل ورديته ويعد الدرج الأول', en: 'each cashier closes the shift and counts the drawer' }, count: sessions.length, screen: 'shift',
+  add({ id: 'OPEN_SESSIONS', title: { ar: 'أدراج ما زالت مفتوحة', en: 'Open drawers' }, detail: { ar: 'يغلق كل كاشير ورديته ويعدّ الدرج أولًا', en: 'each cashier closes the shift and counts the drawer' }, count: sessions.length, screen: 'shift',
     items: sessions.map((s) => ({ id: s.id, label: `${deviceName(s.terminalId)} · ${userName(db, s.userId)}`, sub: `من ${new Date(s.openedAt).toLocaleTimeString('ar-EG-u-nu-latn', { timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit' })}` })) }, 'BLOCKER');
   const open = db.orders.filter((o) => o.branchId === branchId && OPEN(o) && o.businessDate <= date);
-  add({ id: 'OPEN_CHECKS', title: { ar: 'شيكات مفتوحة', en: 'Open checks' }, detail: { ar: 'اتحصلت أو اتلغت أو اتنقلت قبل القفل', en: 'pay, cancel or move them before closing' }, count: open.length, screen: 'checks',
+  add({ id: 'OPEN_CHECKS', title: { ar: 'شيكات مفتوحة', en: 'Open checks' }, detail: { ar: 'حصّلها أو ألغِها أو انقلها قبل الإغلاق', en: 'pay, cancel or move them before closing' }, count: open.length, screen: 'checks',
     items: open.map((o) => ({ id: o.id, label: `#${o.number}${o.tableId ? ' · ترابيزة ' + (db.tables.find((t) => t.id === o.tableId)?.name ?? '') : o.channel === 'TAKEAWAY' ? ' · تيك أواي' : o.channel === 'DELIVERY' ? ' · دليفري' : ''}`, sub: userName(db, o.serverUserId), amount: computeTotals(o).payable })) }, 'BLOCKER');
   const deliveries = ((db as any).deliveries ?? []).filter((d: any) => d.branchId === branchId && !['DELIVERED', 'CANCELLED', 'COMPLETED', 'FAILED'].includes(d.state));
-  add({ id: 'PENDING_DELIVERIES', title: { ar: 'طلبات دليفري لسه في الطريق', en: 'Deliveries still out' }, detail: { ar: 'استنى الطيار يرجع ويسلّم الفلوس', en: 'wait for drivers to return' }, count: deliveries.length, screen: 'delivery', items: deliveries.slice(0, 10).map((d: any) => ({ id: d.id, label: d.orderNumber ? `#${d.orderNumber}` : d.id, sub: d.state })) }, 'WARNING');
+  add({ id: 'PENDING_DELIVERIES', title: { ar: 'طلبات دليفري ما زالت في الطريق', en: 'Deliveries still out' }, detail: { ar: 'انتظر عودة الطيار وتسليم النقدية', en: 'wait for drivers to return' }, count: deliveries.length, screen: 'delivery', items: deliveries.slice(0, 10).map((d: any) => ({ id: d.id, label: d.orderNumber ? `#${d.orderNumber}` : d.id, sub: d.state })) }, 'WARNING');
   const tickets = db.tickets.filter((t) => t.state !== 'DONE' && db.stations.find((s) => s.id === t.stationId)?.branchId === branchId && !(db.ticketMeta ?? []).some((m) => m.ticketId === t.id && m.transferredFrom === 'MERGED'));
-  add({ id: 'KITCHEN', title: { ar: 'تذاكر لسه على شاشة المطبخ', en: 'Tickets still on the kitchen screen' }, detail: { ar: 'المطبخ يسلّمها أو يقفلها', en: 'kitchen should bump them' }, count: tickets.length, screen: 'kitchen', items: tickets.slice(0, 10).map((t) => ({ id: t.id, label: `#${t.orderNumber} · جولة ${t.round}`, sub: db.stations.find((s) => s.id === t.stationId)?.name })) }, 'WARNING');
+  add({ id: 'KITCHEN', title: { ar: 'تذاكر ما زالت على شاشة المطبخ', en: 'Tickets still on the kitchen screen' }, detail: { ar: 'يسلّمها المطبخ أو يغلقها', en: 'kitchen should bump them' }, count: tickets.length, screen: 'kitchen', items: tickets.slice(0, 10).map((t) => ({ id: t.id, label: `#${t.orderNumber} · جولة ${t.round}`, sub: db.stations.find((s) => s.id === t.stationId)?.name })) }, 'WARNING');
   const kd = db.kitchenDeliveries.filter((d) => d.state === 'FAILED' && db.orders.find((o) => o.id === d.orderId)?.branchId === branchId);
-  add({ id: 'KITCHEN_FAILED', title: { ar: 'طلبات ما وصلتش المطبخ', en: 'Kitchen sends that failed' }, detail: { ar: 'من "صحة النظام" ابعتها تاني', en: 'redrive from System health' }, count: kd.length, screen: 'health', items: kd.map((d) => ({ id: d.id, label: `#${db.orders.find((o) => o.id === d.orderId)?.number} · جولة ${d.round}` })) }, 'WARNING');
+  add({ id: 'KITCHEN_FAILED', title: { ar: 'طلبات لم تصل إلى المطبخ', en: 'Kitchen sends that failed' }, detail: { ar: 'أعد إرسالها من «صحة النظام»', en: 'redrive from System health' }, count: kd.length, screen: 'health', items: kd.map((d) => ({ id: d.id, label: `#${db.orders.find((o) => o.id === d.orderId)?.number} · جولة ${d.round}` })) }, 'WARNING');
   const prints = db.printJobs.filter((j) => (j.state === 'FAILED' || j.state === 'DEAD') && db.terminals.find((t) => t.id === j.terminalId)?.branchId === branchId);
-  add({ id: 'FAILED_PRINTS', title: { ar: 'طباعة فشلت', en: 'Failed prints' }, detail: { ar: 'راجع الطابعة وابعتها تاني', en: 'check the printer and retry' }, count: prints.length, screen: 'prints', items: prints.slice(0, 10).map((j) => ({ id: j.id, label: j.label, sub: j.state === 'DEAD' ? 'وقفت خالص' : 'بتتعاد' })) }, 'WARNING');
+  add({ id: 'FAILED_PRINTS', title: { ar: 'طباعة فاشلة', en: 'Failed prints' }, detail: { ar: 'راجع الطابعة وأعد الإرسال', en: 'check the printer and retry' }, count: prints.length, screen: 'prints', items: prints.slice(0, 10).map((j) => ({ id: j.id, label: j.label, sub: j.state === 'DEAD' ? 'متوقفة نهائيًا' : 'قيد الإعادة' })) }, 'WARNING');
   const docs = db.fiscalDocuments.filter((d) => d.branchId === branchId && !['ACCEPTED', 'SUPERSEDED'].includes(d.state) && (db.orders.find((o) => o.id === d.orderId)?.completedBusinessDate ?? '') <= date);
-  add({ id: 'ERECEIPTS', title: { ar: 'إيصالات إلكترونية لسه ما اتقبلتش', en: 'E-receipts not accepted yet' }, detail: { ar: 'آخر ميعاد 24 ساعة من البيع', en: '24 hour deadline' }, count: docs.length, screen: 'ereceipts', items: docs.slice(0, 10).map((d) => ({ id: d.id, label: `#${d.orderNumber}`, sub: d.state === 'PENDING_DATA' ? 'بيانات ناقصة' : d.state === 'REJECTED' ? 'اترفض' : 'مستني المنصة', amount: d.total })) }, 'WARNING');
+  add({ id: 'ERECEIPTS', title: { ar: 'إيصالات إلكترونية لم تُقبل بعد', en: 'E-receipts not accepted yet' }, detail: { ar: 'المهلة 24 ساعة من البيع', en: '24 hour deadline' }, count: docs.length, screen: 'ereceipts', items: docs.slice(0, 10).map((d) => ({ id: d.id, label: `#${d.orderNumber}`, sub: d.state === 'PENDING_DATA' ? 'بيانات ناقصة' : d.state === 'REJECTED' ? 'مرفوض' : 'بانتظار المنصة', amount: d.total })) }, 'WARNING');
   const refunds = db.refunds.filter((r) => (r.state === 'REQUESTED' || r.state === 'APPROVED') && db.orders.find((o) => o.id === r.orderId)?.branchId === branchId);
-  add({ id: 'REFUNDS', title: { ar: 'مرتجعات لسه ما اتصرفتش', en: 'Refunds not paid out' }, detail: { ar: 'اعتمدها واصرفها أو ارفضها', en: 'approve and pay, or reject' }, count: refunds.length, screen: 'refunds', items: refunds.map((r) => ({ id: r.id, label: `#${db.orders.find((o) => o.id === r.orderId)?.number}`, sub: r.state === 'REQUESTED' ? 'مستني اعتماد' : 'مستني الصرف', amount: r.amount })) }, 'WARNING');
+  add({ id: 'REFUNDS', title: { ar: 'مرتجعات لم تُصرف بعد', en: 'Refunds not paid out' }, detail: { ar: 'اعتمدها واصرفها أو ارفضها', en: 'approve and pay, or reject' }, count: refunds.length, screen: 'refunds', items: refunds.map((r) => ({ id: r.id, label: `#${db.orders.find((o) => o.id === r.orderId)?.number}`, sub: r.state === 'REQUESTED' ? 'بانتظار الاعتماد' : 'بانتظار الصرف', amount: r.amount })) }, 'WARNING');
   const reqs = (db.approvalRequests ?? []).filter((r) => r.state === 'PENDING' && r.branchId === branchId);
-  add({ id: 'APPROVALS', title: { ar: 'طلبات موافقة مستنية', en: 'Approval requests waiting' }, detail: { ar: 'وافق أو ارفض من صندوق الموافقات', en: 'decide them in the inbox' }, count: reqs.length, screen: 'approvals-inbox', items: reqs.map((r) => ({ id: r.id, label: r.actionTitle, sub: userName(db, r.requesterUserId) })) }, 'WARNING');
+  add({ id: 'APPROVALS', title: { ar: 'طلبات موافقة معلّقة', en: 'Approval requests waiting' }, detail: { ar: 'وافق أو ارفض من صندوق الموافقات', en: 'decide them in the inbox' }, count: reqs.length, screen: 'approvals-inbox', items: reqs.map((r) => ({ id: r.id, label: r.actionTitle, sub: userName(db, r.requesterUserId) })) }, 'WARNING');
   const conflicts = (db.offlineItems ?? []).filter((x) => x.state === 'CONFLICT' && db.terminals.find((t) => t.id === x.terminalId)?.branchId === branchId);
-  add({ id: 'OFFLINE', title: { ar: 'عمليات أوفلاين محتاجة قرار', en: 'Offline items needing a decision' }, detail: { ar: 'من شاشة المزامنة', en: 'from the Sync screen' }, count: conflicts.length, screen: 'sync', items: conflicts.map((x) => ({ id: x.offlineCommandId, label: x.label, sub: deviceName(x.terminalId) })) }, 'WARNING');
+  add({ id: 'OFFLINE', title: { ar: 'عمليات دون اتصال تحتاج إلى قرار', en: 'Offline items needing a decision' }, detail: { ar: 'من شاشة المزامنة', en: 'from the Sync screen' }, count: conflicts.length, screen: 'sync', items: conflicts.map((x) => ({ id: x.offlineCommandId, label: x.label, sub: deviceName(x.terminalId) })) }, 'WARNING');
   const recon = (db.reconResults ?? []).filter((r) => r.status === 'UNEXPLAINED_DIFFERENCE' && r.businessDate <= date && (db.reconRuns ?? []).find((x) => x.id === r.runId)?.branchId === branchId);
-  add({ id: 'RECON', title: { ar: 'فروقات مطابقة من غير تفسير', en: 'Unexplained reconciliation differences' }, detail: { ar: 'اكتب سبب كل فرق من شاشة المطابقة', en: 'explain them in Reconciliation' }, count: recon.length, screen: 'reconciliation', items: recon.map((r) => ({ id: r.id, label: r.title.ar, amount: r.difference })) }, 'WARNING');
-  if (date === current) checks.push({ id: 'CUTOFF', level: 'WARNING', title: { ar: 'اليوم التجاري لسه شغال لحد 4 الفجر', en: 'The business day runs until 04:00' }, detail: { ar: 'أي بيع بعد القفل وقبل 4 الفجر هيتسجل على اليوم ده ويظهر "بعد القفل" في الملخص', en: 'sales after closing and before 04:00 still belong to this day and show as late' }, count: 1, items: [] });
+  add({ id: 'RECON', title: { ar: 'فروقات مطابقة بلا تفسير', en: 'Unexplained reconciliation differences' }, detail: { ar: 'أدخل سبب كل فرق من شاشة المطابقة', en: 'explain them in Reconciliation' }, count: recon.length, screen: 'reconciliation', items: recon.map((r) => ({ id: r.id, label: r.title.ar, amount: r.difference })) }, 'WARNING');
+  if (date === current) checks.push({ id: 'CUTOFF', level: 'WARNING', title: { ar: 'يستمر اليوم التجاري حتى الساعة 4 فجرًا', en: 'The business day runs until 04:00' }, detail: { ar: 'البيع حتى 4 فجرًا يُسجَّل على هذا اليوم ويظهر «بعد الإغلاق»', en: 'sales after closing and before 04:00 still belong to this day and show as late' }, count: 1, items: [] });
   const closed = (db.businessDays ?? []).find((d) => d.branchId === branchId && d.date === date) ?? null;
   return { date, branchId, branchName: br?.name, currentBusinessDate: current, cutoff: br?.businessDayCutoff ?? '04:00', timezone: br?.timezone ?? 'Africa/Cairo', closed: closed ? dayView(ctx, closed) : null, checks, blockers: checks.filter((c) => c.level === 'BLOCKER').length, warnings: checks.filter((c) => c.level === 'WARNING').length, summary: daySummary(db, branchId, date), nextBusinessDate: addDays(date, 1) };
 }
@@ -165,11 +165,11 @@ function offlineView(ctx: Ctx, x: OfflineItem) {
 const REFERENCE_OPS: [RegExp, { ar: string; en: string }][] = [
   [/^(Catalog\.SetPrice|Product\.PriceHistory)/, { ar: 'الأسعار', en: 'Prices' }],
   [/^Product\.SetAvailability/, { ar: 'الأصناف المتاحة', en: 'Availability' }],
-  [/^(Product|Category|ModifierGroup|ModifierOption|Catalog\.Import)/, { ar: 'المنيو', en: 'Menu' }],
+  [/^(Product|Category|ModifierGroup|ModifierOption|Catalog\.Import)/, { ar: 'قائمة الطعام', en: 'Menu' }],
   [/^(Settings\.UpdatePolicy|Profile\.SetCapability)/, { ar: 'الإعدادات', en: 'Settings' }],
   [/^ReasonCode/, { ar: 'الأسباب', en: 'Reasons' }],
   [/^(Table\.|Floor\.)/, { ar: 'الترابيزات', en: 'Tables' }],
-  [/^(TaxPolicy)/, { ar: 'الضرايب', en: 'Taxes' }],
+  [/^(TaxPolicy)/, { ar: 'الضرائب', en: 'Taxes' }],
   [/^(Promotion)/, { ar: 'العروض', en: 'Promotions' }],
 ];
 const auditSeq = (id: string) => Number(id.split('_').pop()) || 0;
@@ -177,17 +177,17 @@ const auditSeq = (id: string) => Number(id.split('_').pop()) || 0;
 // ───────── outbox (consumer deliveries)
 type DeliveryView = { id: string; consumerId: string; consumerName: { ar: string; en: string }; event: { type: string; label: string; ref: string }; state: 'PENDING' | 'DELIVERED' | 'FAILED' | 'DEAD'; attempts: number; lastError: string | null; lastErrorText: { ar: string; en: string } | null; createdAt: string; lastAttemptAt: string | null; nextAttemptAt: string | null; version: number; history: { at: string; error: string | null }[] };
 const ERROR_TEXT: Record<string, { ar: string; en: string }> = {
-  KDS_DOWN: { ar: 'شاشة المطبخ مش واصلة — الطلب مستني يتبعت', en: 'Kitchen screen unreachable' },
-  PRINTER_UNREACHABLE: { ar: 'الطابعة مش بترد (مقفولة أو الكابل مفصول)', en: 'Printer not responding' },
-  PAPER_OUT: { ar: 'ورق الطابعة خلص', en: 'Printer out of paper' },
-  ETA_DOWN: { ar: 'منصة الإيصال الإلكتروني مش متاحة دلوقتي', en: 'E-receipt platform unavailable' },
-  ETA_REJECTED: { ar: 'منصة الضرايب رفضت الإيصال (كود صنف غلط)', en: 'Tax platform rejected the receipt' },
+  KDS_DOWN: { ar: 'شاشة المطبخ غير متصلة — الطلب بانتظار الإرسال', en: 'Kitchen screen unreachable' },
+  PRINTER_UNREACHABLE: { ar: 'الطابعة لا تستجيب (مغلقة أو الكابل مفصول)', en: 'Printer not responding' },
+  PAPER_OUT: { ar: 'نفد ورق الطابعة', en: 'Printer out of paper' },
+  ETA_DOWN: { ar: 'منصة الإيصال الإلكتروني غير متاحة حاليًا', en: 'E-receipt platform unavailable' },
+  ETA_REJECTED: { ar: 'رفضت منصة الضرائب الإيصال (كود صنف خاطئ)', en: 'Tax platform rejected the receipt' },
   PENDING_DATA: { ar: 'بيانات ناقصة قبل الإرسال (كود صنف أو جهاز ضريبي)', en: 'Missing data before sending' },
-  WEBHOOK_401: { ar: 'البرنامج التاني رفض الدخول — مفتاح الربط محتاج يتجدد', en: 'The other system refused the key' },
-  WEBHOOK_TIMEOUT: { ar: 'البرنامج التاني ما ردش في الوقت', en: 'The other system timed out' },
-  WEBHOOK_DOWN: { ar: 'البرنامج التاني واقع', en: 'The other system is down' },
+  WEBHOOK_401: { ar: 'رفض النظام الآخر الدخول — يجب تجديد مفتاح الربط', en: 'The other system refused the key' },
+  WEBHOOK_TIMEOUT: { ar: 'لم يستجب النظام الآخر في الوقت المحدد', en: 'The other system timed out' },
+  WEBHOOK_DOWN: { ar: 'النظام الآخر متوقف', en: 'The other system is down' },
 };
-const errText = (code: string | null) => (code ? ERROR_TEXT[code] ?? { ar: 'حصلت مشكلة في الإرسال', en: code } : null);
+const errText = (code: string | null) => (code ? ERROR_TEXT[code] ?? { ar: 'تعذّر الإرسال', en: code } : null);
 function deliveries(db: DB, branchId: string | null): DeliveryView[] {
   const out: DeliveryView[] = [];
   const kdsErr = (e: string | null) => (e ? 'KDS_DOWN' : null);
@@ -215,10 +215,10 @@ function deliveries(db: DB, branchId: string | null): DeliveryView[] {
 
 // ───────── reconciliation
 const RECON_RULES = [
-  { id: 'DRAWER_CASH', title: { ar: 'كاش الأدراج', en: 'Drawer cash' }, description: { ar: 'الكاش المتوقع في كل درج مقابل اللي اتعد وقت قفل الوردية', en: 'expected vs counted per drawer' } },
-  { id: 'CARD_SETTLEMENT', title: { ar: 'الكروت مقابل تسوية البنك', en: 'Cards vs bank settlement' }, description: { ar: 'تحصيل الكارت في السيستم مقابل اللي البنك قال إنه نزل', en: 'card captures vs the bank batch' } },
+  { id: 'DRAWER_CASH', title: { ar: 'نقدية الأدراج', en: 'Drawer cash' }, description: { ar: 'النقدية المتوقعة في كل درج مقابل المعدود عند إغلاق الوردية', en: 'expected vs counted per drawer' } },
+  { id: 'CARD_SETTLEMENT', title: { ar: 'البطاقات مقابل تسوية البنك', en: 'Cards vs bank settlement' }, description: { ar: 'تحصيل البطاقات في النظام مقابل ما أكّده البنك', en: 'card captures vs the bank batch' } },
   { id: 'WALLETS', title: { ar: 'المحافظ مقابل كشف المحفظة', en: 'Wallets vs statement' }, description: { ar: 'إنستاباي وفودافون كاش مقابل كشف الحساب', en: 'wallet captures vs provider statement' } },
-  { id: 'E_RECEIPTS', title: { ar: 'الإيصالات الإلكترونية مقابل المبيعات', en: 'E-receipts vs sales' }, description: { ar: 'كل بيعة لازم يكون ليها إيصال مقبول من منصة الضرايب', en: 'each sale has an accepted e-receipt' } },
+  { id: 'E_RECEIPTS', title: { ar: 'الإيصالات الإلكترونية مقابل المبيعات', en: 'E-receipts vs sales' }, description: { ar: 'يجب أن يكون لكل عملية بيع إيصال مقبول من منصة الضرائب', en: 'each sale has an accepted e-receipt' } },
 ];
 function evaluateRule(ctx: Ctx, ruleId: string, branchId: string, from: string, to: string, runId: string): ReconResult[] {
   const db = ctx.db;
@@ -236,7 +236,7 @@ function evaluateRule(ctx: Ctx, ruleId: string, branchId: string, from: string, 
       const code = db.terminals.find((t) => t.id === s.terminalId)?.code ?? '';
       const title = { ar: `درج ${deviceName(s.terminalId)} — ${userName(db, s.userId)} (${s.businessDate})`, en: `Drawer ${code} ${s.businessDate}` };
       const entries = db.cashEntries.filter((e) => e.sessionId === s.id).map((e) => ({ kind: 'CASH', id: e.id, label: e.kind, amount: e.amount }));
-      if (!s.close) out.push(mk({ key: `DRAWER:${s.id}`, title, businessDate: s.businessDate, expected: m4(0), actual: m4(0), drilldown: entries, note: { ar: 'الوردية لسه مفتوحة — مفيش عد للدرج لسه', en: 'shift still open' }, status: 'MISSING' }));
+      if (!s.close) out.push(mk({ key: `DRAWER:${s.id}`, title, businessDate: s.businessDate, expected: m4(0), actual: m4(0), drilldown: entries, note: { ar: 'الوردية ما زالت مفتوحة — لم يُعدّ الدرج بعد', en: 'shift still open' }, status: 'MISSING' }));
       else out.push(mk({ key: `DRAWER:${s.id}`, title, businessDate: s.businessDate, expected: s.close.expectedCash, actual: s.close.countedCash, drilldown: entries, note: s.close.reason ? { ar: `ملاحظة الكاشير: ${s.close.reason}`, en: s.close.reason } : null }));
     }
   } else if (ruleId === 'CARD_SETTLEMENT' || ruleId === 'WALLETS') {
@@ -253,10 +253,10 @@ function evaluateRule(ctx: Ctx, ruleId: string, branchId: string, from: string, 
         batch = { id: nextId('sb'), branchId, businessDate: d, provider: method === 'CARD' ? 'ماكينة البنك الأهلي' : 'إنستاباي', method, amount: m4(D(expected).minus(D(missing))), count: caps.length - (D(missing).isZero() ? 0 : 1), receivedAt: ctx.nowIso };
         db.settlementBatches.push(batch);
       }
-      const label = method === 'CARD' ? 'كروت' : 'محافظ';
+      const label = method === 'CARD' ? 'بطاقات' : 'محافظ';
       const drill = [...caps.map((c) => ({ kind: 'CAPTURE', id: c.id, label: `#${db.orders.find((o) => o.id === c.orderId)?.number ?? ''} · ${c.reference ?? ''}`, amount: c.amount })), ...(batch ? [{ kind: 'SETTLEMENT', id: batch.id, label: `تسوية ${batch.provider} (${batch.count} عملية)`, amount: batch.amount }] : [])];
-      if (!batch) out.push(mk({ key: `${method}:${d}`, title: { ar: `${label} ${d}: التسوية لسه ما وصلتش`, en: `${method} ${d}: settlement not received` }, businessDate: d, expected, actual: m4(0), drilldown: drill, note: { ar: d >= today ? 'البنك بيبعت التسوية تاني يوم الصبح' : 'ملف التسوية ما وصلش', en: 'settlement arrives next morning' }, status: 'MISSING' }));
-      else out.push(mk({ key: `${method}:${d}`, title: { ar: `${label} ${d}: المتحصل مقابل ${batch.provider}`, en: `${method} ${d}` }, businessDate: d, expected, actual: batch.amount, drilldown: drill, note: D(batch.amount).lt(D(expected)) ? { ar: 'فيه عملية ظاهرة عندنا ومش ظاهرة في تسوية البنك — راجع إيصال الماكينة', en: 'a payment is missing from the settlement' } : null }));
+      if (!batch) out.push(mk({ key: `${method}:${d}`, title: { ar: `${label} ${d}: لم تصل التسوية بعد`, en: `${method} ${d}: settlement not received` }, businessDate: d, expected, actual: m4(0), drilldown: drill, note: { ar: d >= today ? 'يرسل البنك التسوية صباح اليوم التالي' : 'لم يصل ملف التسوية', en: 'settlement arrives next morning' }, status: 'MISSING' }));
+      else out.push(mk({ key: `${method}:${d}`, title: { ar: `${label} ${d}: المتحصل مقابل ${batch.provider}`, en: `${method} ${d}` }, businessDate: d, expected, actual: batch.amount, drilldown: drill, note: D(batch.amount).lt(D(expected)) ? { ar: 'عملية مسجلة لدينا وغير ظاهرة في تسوية البنك — راجع إيصال الماكينة', en: 'a payment is missing from the settlement' } : null }));
     }
   } else if (ruleId === 'E_RECEIPTS') {
     const mode = policy<string>('FiscalDocumentPolicy', { branchId }) ?? 'OFF';
@@ -265,7 +265,7 @@ function evaluateRule(ctx: Ctx, ruleId: string, branchId: string, from: string, 
       if (!sales.length) continue;
       const accepted = sales.filter((o) => db.fiscalDocuments.some((f) => f.orderId === o.id && f.state === 'ACCEPTED'));
       const missing = sales.filter((o) => !accepted.includes(o));
-      out.push(mk({ key: `ERECEIPT:${d}`, title: { ar: `إيصالات ${d}: ${accepted.length} من ${sales.length} اتقبلت`, en: `E-receipts ${d}: ${accepted.length}/${sales.length}` }, businessDate: d, expected: sumM(sales.map((o) => computeTotals(o).payable)), actual: sumM(accepted.map((o) => computeTotals(o).payable)), drilldown: missing.map((o) => ({ kind: 'ORDER', id: o.id, label: `#${o.number} · ${db.fiscalDocuments.find((f) => f.orderId === o.id)?.state ?? 'من غير إيصال'}`, amount: computeTotals(o).payable })), note: mode === 'OFF' ? { ar: 'الإيصال الإلكتروني مقفول من الإعدادات — مفيش إيصالات بتطلع', en: 'e-receipts are off' } : null, status: mode === 'OFF' ? 'MATCHED' : undefined }));
+      out.push(mk({ key: `ERECEIPT:${d}`, title: { ar: `إيصالات ${d}: قُبل ${accepted.length} من ${sales.length}`, en: `E-receipts ${d}: ${accepted.length}/${sales.length}` }, businessDate: d, expected: sumM(sales.map((o) => computeTotals(o).payable)), actual: sumM(accepted.map((o) => computeTotals(o).payable)), drilldown: missing.map((o) => ({ kind: 'ORDER', id: o.id, label: `#${o.number} · ${db.fiscalDocuments.find((f) => f.orderId === o.id)?.state ?? 'من غير إيصال'}`, amount: computeTotals(o).payable })), note: mode === 'OFF' ? { ar: 'الإيصال الإلكتروني معطّل من الإعدادات — لا تصدر إيصالات', en: 'e-receipts are off' } : null, status: mode === 'OFF' ? 'MATCHED' : undefined }));
     }
   }
   return out;
@@ -418,7 +418,7 @@ export const opsHandlers: Record<string, Handler> = {
     o.terminalId = to.terminalId;
     if (ctx.body.toServer) o.serverUserId = to.userId;
     o.version++;
-    o.history.push(hist(ctx.user!.id, 'SESSION_TRANSFER', { ar: `الشيك اتنقل من وردية ${userName(ctx.db, from?.userId)} (${fromTerm}) لوردية ${userName(ctx.db, to.userId)} (${toTerm})${ctx.body.reason ? ' — ' + String(ctx.body.reason).slice(0, 120) : ''}`, en: `handed over ${fromTerm} → ${toTerm}` }, { from: from?.id, to: to.id, grantId: g?.id }, ctx.terminal?.code));
+    o.history.push(hist(ctx.user!.id, 'SESSION_TRANSFER', { ar: `نُقل الشيك من وردية ${userName(ctx.db, from?.userId)} (${fromTerm}) إلى وردية ${userName(ctx.db, to.userId)} (${toTerm})${ctx.body.reason ? ' — ' + String(ctx.body.reason).slice(0, 120) : ''}`, en: `handed over ${fromTerm} → ${toTerm}` }, { from: from?.id, to: to.id, grantId: g?.id }, ctx.terminal?.code));
     ctx.audit(`order ${o.number} handed over ${fromTerm} → ${toTerm}`, o.id, true, g?.id);
     return { orderId: o.id, number: o.number, fromSessionId: from?.id ?? null, toSessionId: to.id, version: o.version };
   },
@@ -703,7 +703,7 @@ export function runOpsBackground(db: DB): boolean {
     const key = `dirty-${tt.tableId}-${tt.sinceMs}`;
     if ((now - tt.sinceMs) / 60000 >= tp.alertMinutes && !db.alerts.some((a) => a.ref === key)) {
       const name = db.tables.find((t) => t.id === tt.tableId)?.name ?? '';
-      db.alerts.unshift({ id: nextId('al'), at: new Date(now).toISOString(), kind: 'TABLE_DIRTY', severity: 'warning', text: { ar: `ترابيزة ${name} مستنية تنضيف من ${tp.alertMinutes} دقيقة`, en: `Table ${name} waiting for cleaning` }, ref: key, ack: false });
+      db.alerts.unshift({ id: nextId('al'), at: new Date(now).toISOString(), kind: 'TABLE_DIRTY', severity: 'warning', text: { ar: `ترابيزة ${name} تنتظر التنظيف منذ ${tp.alertMinutes} دقيقة`, en: `Table ${name} waiting for cleaning` }, ref: key, ack: false });
       changed = true;
     }
   }

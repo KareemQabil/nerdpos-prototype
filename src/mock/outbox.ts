@@ -168,7 +168,7 @@ export function runOutbox(): boolean {
       for (const h of [12, 20]) {
         const key = `eta-${h}-${doc.id}`;
         if (age >= h && !db.alerts.find((a) => a.ref === key)) {
-          db.alerts.unshift({ id: nextId('al'), at: clock.iso(), kind: 'ETA_DEADLINE', severity: h === 20 ? 'error' : 'warning', text: { ar: `إيصال ${doc.orderNumber} لسه ما اتقبلش من ${h} ساعة — آخر ميعاد 24 ساعة`, en: `Receipt ${doc.orderNumber} not accepted after ${h} h — 24 h deadline` }, ref: key, ack: false });
+          db.alerts.unshift({ id: nextId('al'), at: clock.iso(), kind: 'ETA_DEADLINE', severity: h === 20 ? 'error' : 'warning', text: { ar: `إيصال ${doc.orderNumber} لم يُقبل منذ ${h} ساعة — المهلة 24 ساعة`, en: `Receipt ${doc.orderNumber} not accepted after ${h} h — 24 h deadline` }, ref: key, ack: false });
           changed = true;
         }
       }

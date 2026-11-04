@@ -163,10 +163,10 @@ export const orderHandlers: Record<string, Handler> = {
       createdAt: ctx.nowIso, createdAtMs: ctx.now, businessDate: ctx.businessDate(branchId), createdBy: ctx.user!.id, confirmedAt: null, confirmedBy: null, completedAt: null, completedAtMs: null, completedBusinessDate: null, completedSessionId: null,
       version: 1, label: ctx.body.label, note: ctx.body.note, checkNo: visitId ? db.orders.filter((x) => x.visitId === visitId).length + 1 : 1,
       fireMode: null, rounds: [], lines: [], discounts: [], comp: null, policy: capturePolicySnapshot(branchId, channel, ctx.nowIso), service: null, confirmation: null,
-      history: [hist(ctx.user!.id, 'CREATED', { ar: `اتفتح شيك ${channel === 'DINE_IN' ? (visitId ? 'صالة على ترابيزة' : 'صالة كاونتر') : channel === 'DELIVERY' ? 'دليفري' : 'تيك أواي'}${sessionId ? ' على وردية الدرج' : ' من غير درج (شيك صالة)'}`, en: `created ${channel}${sessionId ? ' on drawer session' : ' floor check (no drawer)'}` }, null, ctx.terminal?.code)],
+      history: [hist(ctx.user!.id, 'CREATED', { ar: `فُتح شيك ${channel === 'DINE_IN' ? (visitId ? 'صالة على ترابيزة' : 'صالة كاونتر') : channel === 'DELIVERY' ? 'دليفري' : 'تيك أواي'}${sessionId ? ' على وردية الدرج' : ' بلا درج (شيك صالة)'}`, en: `created ${channel}${sessionId ? ' on drawer session' : ' floor check (no drawer)'}` }, null, ctx.terminal?.code)],
       guestCount, customerName: ctx.body.customerName, salesChannelId: sc.id,
     };
-    if (!sc.isDefault) o.history.push(hist(ctx.user!.id, 'SALES_CHANNEL', { ar: `قناة البيع: ${sc.name.ar} — الأسعار من قايمتها`, en: `sales channel: ${sc.name.en} — priced from its list` }, { salesChannelId: sc.id }, ctx.terminal?.code));
+    if (!sc.isDefault) o.history.push(hist(ctx.user!.id, 'SALES_CHANNEL', { ar: `قناة البيع: ${sc.name.ar} — الأسعار من قائمتها`, en: `sales channel: ${sc.name.en} — priced from its list` }, { salesChannelId: sc.id }, ctx.terminal?.code));
     if (ctx.body.customerId) setOrderCustomer(ctx, o, ctx.body.customerId); // crm area: customer snapshot
     db.orders.push(o);
     assignShortNo(db, o); // r3B (E08): optional short call-out number; o.number stays the immutable transaction id
@@ -183,7 +183,7 @@ export const orderHandlers: Record<string, Handler> = {
     o.lines.push(...added);
     ensureService(ctx, o);
     maybeAutoPromotion(ctx, o);
-    bump(ctx, o, 'LINES_ADDED', { ar: `اتضاف: ${added.map((l: OrderLine) => `${l.name.ar} ×${l.quantity}`).join('، ')}`, en: `added: ${added.map((l: OrderLine) => `${l.name.en} ×${l.quantity}`).join(', ')}` }, { lineIds: added.map((l: OrderLine) => l.id) });
+    bump(ctx, o, 'LINES_ADDED', { ar: `أُضيف: ${added.map((l: OrderLine) => `${l.name.ar} ×${l.quantity}`).join('، ')}`, en: `added: ${added.map((l: OrderLine) => `${l.name.en} ×${l.quantity}`).join(', ')}` }, { lineIds: added.map((l: OrderLine) => l.id) });
     return orderView(ctx.db, o);
   },
   'Order.UpdateLine': (ctx) => {
@@ -266,7 +266,7 @@ export const orderHandlers: Record<string, Handler> = {
     line!.removed = { at: ctx.nowIso, by: ctx.user!.id, approverId: g?.approverUserId ?? null, approverName: g ? userName(ctx.db, g.approverUserId) : null, byName: userName(ctx.db, ctx.user!.id), approvalGrantId: g?.id ?? null, stage, reasonCode: rc, reason: ctx.body?.reason ?? null, quantity: line!.quantity };
     recordReversal(ctx, { o, line: line!, quantity: line!.quantity, value: line!.lineTotal, stage, kind: 'LINE_REMOVE', grant: g, reasonCode: rc, reason: ctx.body?.reason, disposition: 'NOT_PREPARED' });
     ctx.audit(`line removed ${line!.name.en} ×${line!.quantity} on ${o.number} (${stage})`, line!.id, true, g?.id, { stage });
-    bump(ctx, o, 'LINE_REMOVED', { ar: `اتشال ${stage === 'S0' ? '(قبل الإرسال)' : '(بعد الشيك المبدئي — قبل الدفع)'}: ${line!.name.ar} ×${Number(line!.quantity)} — ${approvedText(ctx.db, g)}`, en: `removed (${stage}): ${line!.name.en}` }, { lineId: line!.id, stage, grantId: g?.id, approverId: g?.approverUserId });
+    bump(ctx, o, 'LINE_REMOVED', { ar: `أُزيل ${stage === 'S0' ? '(قبل الإرسال)' : '(بعد الشيك المبدئي — قبل الدفع)'}: ${line!.name.ar} ×${Number(line!.quantity)} — ${approvedText(ctx.db, g)}`, en: `removed (${stage}): ${line!.name.en}` }, { lineId: line!.id, stage, grantId: g?.id, approverId: g?.approverUserId });
     return orderView(ctx.db, o);
   },
   'Order.Fire': (ctx) => {
@@ -278,7 +278,7 @@ export const orderHandlers: Record<string, Handler> = {
       if (!r) throw new ApiError('NOTHING_TO_FIRE');
       if (o.staffMeal) o.staffMeal.sentToKitchen = true;
       o.version++;
-      o.history.push(hist(ctx.user!.id, 'FIRED', { ar: 'وجبة الموظف اتبعتت للمطبخ', en: 'staff meal sent to the kitchen' }, r, ctx.terminal?.code));
+      o.history.push(hist(ctx.user!.id, 'FIRED', { ar: 'أُرسلت وجبة الموظف للمطبخ', en: 'staff meal sent to the kitchen' }, r, ctx.terminal?.code));
       return { orderId: o.id, fireRound: r.round, lineIds: r.lineIds, firedAt: ctx.nowIso, version: o.version, order: orderView(ctx.db, o) };
     }
     if (o.status !== 'DRAFT') throw new ApiError('ORDER_NOT_EDITABLE', { status: o.status });
@@ -289,7 +289,7 @@ export const orderHandlers: Record<string, Handler> = {
     const r = fireRound(ctx, o, 'FIRE');
     if (!r) throw new ApiError('NOTHING_TO_FIRE');
     o.fireMode = o.fireMode ?? 'EXPLICIT_ROUNDS';
-    bump(ctx, o, 'FIRED', { ar: `اتبعت للمطبخ: الجولة ${r.round} (${r.lineIds.length} صنف)`, en: `fired round ${r.round} (${r.lineIds.length} lines)` }, r);
+    bump(ctx, o, 'FIRED', { ar: `أُرسل للمطبخ: الجولة ${r.round} (${r.lineIds.length} صنف)`, en: `fired round ${r.round} (${r.lineIds.length} lines)` }, r);
     return { orderId: o.id, fireRound: r.round, lineIds: r.lineIds, firedAt: ctx.nowIso, version: o.version, order: orderView(ctx.db, o) };
   },
   'Order.Confirm': (ctx) => {
@@ -310,7 +310,7 @@ export const orderHandlers: Record<string, Handler> = {
     o.status = 'CONFIRMED';
     o.confirmedAt = ctx.nowIso;
     o.confirmedBy = ctx.user!.id;
-    bump(ctx, o, 'CONFIRMED', r ? { ar: `اتأكد الشيك واتبعت الباقي للمطبخ (الجولة ${r.round})`, en: `confirmed; fired remaining as round ${r.round}` } : { ar: 'اتأكد الشيك — كل الأصناف كانت اتبعتت قبل كده، مفيش جولة جديدة', en: 'confirmed; everything was already fired, no new round' }, { payable: o.confirmation.payable });
+    bump(ctx, o, 'CONFIRMED', r ? { ar: `تأكد الشيك وأُرسل الباقي للمطبخ (الجولة ${r.round})`, en: `confirmed; fired remaining as round ${r.round}` } : { ar: 'تأكد الشيك — كل الأصناف أُرسلت مسبقًا، ولا جولة جديدة', en: 'confirmed; everything was already fired, no new round' }, { payable: o.confirmation.payable });
     return { ...orderView(ctx.db, o), confirmFireRound: r?.round ?? null, confirmMessage: r ? 'FIRED_REMAINING' : 'ALL_ALREADY_FIRED' };
   },
   'Order.Complete': (ctx) => {
@@ -332,7 +332,7 @@ export const orderHandlers: Record<string, Handler> = {
     o.completedAtMs = ctx.now;
     o.completedBusinessDate = ctx.businessDate(o.branchId);
     o.completedSessionId = lastCap?.sessionId ?? session?.id ?? null;
-    bump(ctx, o, 'COMPLETED', { ar: 'الشيك اتقفل (اتدفع بالكامل)', en: 'completed (fully paid)' });
+    bump(ctx, o, 'COMPLETED', { ar: 'أُغلق الشيك (دُفع بالكامل)', en: 'completed (fully paid)' });
     // side effects after the commit: receipt print, e-receipt, table auto-close
     const rp = policy<Record<string, string>>('ReceiptPrintPolicy', { channel: o.channel, terminalId: ctx.terminal?.id }) ?? {};
     if ((rp[o.channel] ?? 'AUTO') === 'AUTO' && o.kind !== 'STAFF_MEAL' && ctx.terminal) enqueuePrint(ctx.db, { documentType: 'RECEIPT', documentId: o.id, copyKind: 'ORIGINAL', terminalId: ctx.terminal.id, createdBy: ctx.user!.id, label: `إيصال ${o.number}` });
@@ -368,7 +368,7 @@ export const orderHandlers: Record<string, Handler> = {
     o.status = 'CANCELLED';
     o.cancelledAt = ctx.nowIso;
     o.endReason = { code: ctx.body.reasonCode, note: ctx.body.reason };
-    bump(ctx, o, 'CANCELLED', { ar: `الشيك اتلغى قبل الإرسال (${ctx.body.reasonCode})${live.length ? ` — ${live.length} صنف — ${approvedText(ctx.db, g)}` : ''}`, en: `cancelled (${ctx.body.reasonCode})` }, live.length ? { stage, grantId: g?.id, approverId: g?.approverUserId } : undefined);
+    bump(ctx, o, 'CANCELLED', { ar: `أُلغي الشيك قبل الإرسال (${ctx.body.reasonCode})${live.length ? ` — ${live.length} صنف — ${approvedText(ctx.db, g)}` : ''}`, en: `cancelled (${ctx.body.reasonCode})` }, live.length ? { stage, grantId: g?.id, approverId: g?.approverUserId } : undefined);
     afterEnd(ctx, o);
     return orderView(ctx.db, o);
   },
@@ -396,7 +396,7 @@ export const orderHandlers: Record<string, Handler> = {
     o.status = 'VOIDED';
     o.voidedAt = ctx.nowIso;
     o.endReason = { code: ctx.body.reasonCode, note: ctx.body.reason, approvalGrantId: g?.id };
-    bump(ctx, o, 'VOIDED', { ar: `الشيك اتلغى بالكامل بعد الإرسال (${ctx.body.reasonCode}) بموافقة ${ctx.db.users.find((u) => u.id === g?.approverUserId)?.displayName ?? '—'}`, en: `voided (${ctx.body.reasonCode})` });
+    bump(ctx, o, 'VOIDED', { ar: `أُلغي الشيك بالكامل بعد الإرسال (${ctx.body.reasonCode}) بموافقة ${ctx.db.users.find((u) => u.id === g?.approverUserId)?.displayName ?? '—'}`, en: `voided (${ctx.body.reasonCode})` });
     ctx.audit(`order ${o.number} voided`, o.id, true, g?.id, { stage: 'S1' });
     afterEnd(ctx, o);
     return orderView(ctx.db, o);
@@ -432,7 +432,7 @@ export const orderHandlers: Record<string, Handler> = {
       o.lines.splice(o.lines.indexOf(line!) + 1, 0, cut);
       for (const tk of ctx.db.tickets.filter((x) => x.orderId === o.id)) for (const it of tk.items) if (it.lineId === line!.id && it.status === 'ACTIVE') { it.quantity = rest; it.mods = [...(it.mods ?? []), { at: ctx.nowIso, text: `-${q6(part!)}` }]; tk.version++; }
       recordReversal(ctx, { o, line: cut, quantity: cut.quantity, value: voidValue, stage: 'S1', kind: 'LINE_VOID', grant: g, reasonCode: ctx.body.reasonCode, reason: ctx.body.reason, disposition: disp });
-      bump(ctx, o, 'LINE_VOIDED', { ar: `اتلغى جزء بعد الإرسال: ${line!.name.ar} ×${cut.quantity} من ${D(rest).plus(D(part!)).toString()} (${ctx.body.reasonCode}) — ${DISP_AR[disp]} — ${approvedText(ctx.db, g)}`, en: `partial void of fired line ${line!.name.en} ×${cut.quantity}` }, { lineId: line!.id, voidLineId: cut.id, stage: 'S1', disposition: disp, grantId: g?.id, approverId: g?.approverUserId });
+      bump(ctx, o, 'LINE_VOIDED', { ar: `أُلغي جزء بعد الإرسال: ${line!.name.ar} ×${cut.quantity} من ${D(rest).plus(D(part!)).toString()} (${ctx.body.reasonCode}) — ${DISP_AR[disp]} — ${approvedText(ctx.db, g)}`, en: `partial void of fired line ${line!.name.en} ×${cut.quantity}` }, { lineId: line!.id, voidLineId: cut.id, stage: 'S1', disposition: disp, grantId: g?.id, approverId: g?.approverUserId });
       ctx.audit(`partial line void ${line!.name.en} ×${cut.quantity} on ${o.number}`, line!.id, true, g?.id, { stage: 'S1' });
       event('OrderLineVoided', o.id, `${o.number} ${line!.name.en} ×${cut.quantity}`);
       return orderView(ctx.db, o);
@@ -442,7 +442,7 @@ export const orderHandlers: Record<string, Handler> = {
     line!.voided = { at: ctx.nowIso, by: ctx.user!.id, reasonCode: ctx.body.reasonCode, reason: ctx.body.reason, approvalGrantId: g?.id, disposition: legacyDisposition(disp), approverId: g?.approverUserId, dispositionKind: disp, stage: 'S1', terminal: ctx.terminal?.code ?? null, byName: userName(ctx.db, ctx.user!.id), approverName: g ? userName(ctx.db, g.approverUserId) : null };
     cancelTicketItems(ctx, o, [line!.id]);
     recordReversal(ctx, { o, line: line!, quantity: line!.quantity, value: line!.lineTotal, stage: 'S1', kind: 'LINE_VOID', grant: g, reasonCode: ctx.body.reasonCode, reason: ctx.body.reason, disposition: disp });
-    bump(ctx, o, 'LINE_VOIDED', { ar: `اتلغى بعد الإرسال: ${line!.name.ar} (${ctx.body.reasonCode}) — ${DISP_AR[disp]} — ${approvedText(ctx.db, g)}`, en: `voided fired line ${line!.name.en}` }, { lineId: line!.id, stage: 'S1', disposition: disp, grantId: g?.id, approverId: g?.approverUserId });
+    bump(ctx, o, 'LINE_VOIDED', { ar: `أُلغي بعد الإرسال: ${line!.name.ar} (${ctx.body.reasonCode}) — ${DISP_AR[disp]} — ${approvedText(ctx.db, g)}`, en: `voided fired line ${line!.name.en}` }, { lineId: line!.id, stage: 'S1', disposition: disp, grantId: g?.id, approverId: g?.approverUserId });
     ctx.audit(`line void ${line!.name.en} on ${o.number}`, line!.id, true, g?.id, { stage: 'S1' });
     event('OrderLineVoided', o.id, `${o.number} ${line!.name.en}`);
     return orderView(ctx.db, o);
@@ -466,8 +466,8 @@ export const orderHandlers: Record<string, Handler> = {
     src.lines = src.lines.filter((l) => !ids.includes(l.id));
     for (const l of moving) { l.movedFrom = src.id; l.version++; dst.lines.push(l); }
     ensureService(ctx, dst);
-    bump(ctx, src, 'LINES_MOVED_OUT', { ar: `اتنقل لشيك ${dst.checkNo}: ${moving.map((l) => `${l.name.ar} ×${l.quantity}`).join('، ')}`, en: `moved to check ${dst.checkNo}` }, { lineIds: ids, target: dst.id });
-    bump(ctx, dst, 'LINES_MOVED_IN', { ar: `اتنقل من شيك ${src.checkNo}: ${moving.map((l) => `${l.name.ar} ×${l.quantity}`).join('، ')} (الجولات محفوظة)`, en: `moved in from check ${src.checkNo}` }, { lineIds: ids, source: src.id });
+    bump(ctx, src, 'LINES_MOVED_OUT', { ar: `نُقل إلى شيك ${dst.checkNo}: ${moving.map((l) => `${l.name.ar} ×${l.quantity}`).join('، ')}`, en: `moved to check ${dst.checkNo}` }, { lineIds: ids, target: dst.id });
+    bump(ctx, dst, 'LINES_MOVED_IN', { ar: `نُقل من شيك ${src.checkNo}: ${moving.map((l) => `${l.name.ar} ×${l.quantity}`).join('، ')} (الجولات محفوظة)`, en: `moved in from check ${src.checkNo}` }, { lineIds: ids, source: src.id });
     return { source: orderView(ctx.db, src), target: orderView(ctx.db, dst) };
   },
   'Order.ApplyDiscount': (ctx) => {
@@ -515,7 +515,7 @@ export const orderHandlers: Record<string, Handler> = {
     const d = o.discounts.find((x) => x.id === ctx.params.discountId && x.active);
     need(d, 'ORDER_DISCOUNT_NOT_FOUND');
     d!.active = false;
-    bump(ctx, o, 'DISCOUNT_REMOVED', { ar: 'الخصم اتشال', en: 'discount removed' });
+    bump(ctx, o, 'DISCOUNT_REMOVED', { ar: 'أُزيل الخصم', en: 'discount removed' });
     return orderView(ctx.db, o);
   },
   'Order.Comp': (ctx) => {
@@ -536,7 +536,7 @@ export const orderHandlers: Record<string, Handler> = {
     if (ctx.body.label !== undefined) o.label = ctx.body.label;
     if (ctx.body.note !== undefined) o.note = ctx.body.note;
     if (ctx.body.guestCount !== undefined && o.status === 'DRAFT') o.guestCount = Number(ctx.body.guestCount);
-    bump(ctx, o, 'DETAILS', { ar: 'بيانات الشيك اتعدلت', en: 'details updated' });
+    bump(ctx, o, 'DETAILS', { ar: 'عُدّلت بيانات الشيك', en: 'details updated' });
     return orderView(ctx.db, o);
   },
   'Order.SetCustomer': (ctx) => {
@@ -573,7 +573,7 @@ export const orderHandlers: Record<string, Handler> = {
     o.salesChannelId = resolveSalesChannel(ctx.db, to, ctx.body.salesChannelId).id; // sales channels (E13)
     o.service = null;
     ensureService(ctx, o);
-    bump(ctx, o, 'CHANNEL_CHANGED', { ar: `القناة اتغيرت ${from} ← ${to}؛ الأصناف وأسعارها والجولات زي ما هي، والخدمة اتحسبت للقناة الجديدة (سؤال للخبير)`, en: `channel ${from} → ${to}` });
+    bump(ctx, o, 'CHANNEL_CHANGED', { ar: `تغيّرت القناة ${from} ← ${to}؛ الأصناف وأسعارها والجولات كما هي، واحتُسبت الخدمة للقناة الجديدة`, en: `channel ${from} → ${to}` });
     return orderView(ctx.db, o);
   },
   // Direction D3: split by seat, equally into N, or share one item (fraction). Cents by largest remainder; residual to the last share.
@@ -586,7 +586,7 @@ export const orderHandlers: Record<string, Handler> = {
     const residualFirst = policy<{ residual: string }>('SplitAllocationPolicy')?.residual === 'FIRST_SHARE';
     const mkCheck = () => {
       const c: Order = { ...structuredClone(o), id: nextId('ord'), number: formatNumber(ctx, o.branchId), lines: [], discounts: [], comp: null, rounds: [], history: [], version: 1, checkNo: ctx.db.orders.filter((x) => x.visitId === o.visitId).length + 1, createdAt: ctx.nowIso, createdAtMs: ctx.now, service: o.service };
-      c.history.push(hist(ctx.user!.id, 'CREATED', { ar: `اتعمل من تقسيم شيك ${o.checkNo}`, en: `created by split of check ${o.checkNo}` }));
+      c.history.push(hist(ctx.user!.id, 'CREATED', { ar: `أُنشئ من تقسيم شيك ${o.checkNo}`, en: `created by split of check ${o.checkNo}` }));
       // a percentage discount follows each share
       c.discounts = o.discounts.filter((d) => d.active && d.type === 'PERCENTAGE').map((d) => ({ ...d, id: nextId('disc') }));
       ctx.db.orders.push(c);
@@ -641,7 +641,7 @@ export const orderHandlers: Record<string, Handler> = {
       created.forEach((c, i) => c.discounts.push({ ...d, id: nextId('disc'), value: parts[i + 1] }));
     }
     for (const c of created) { ensureService(ctx, c); }
-    bump(ctx, o, 'SPLIT', { ar: `اتقسم (${mode}) لـ ${created.length + 1} شيكات — القروش بأكبر باقي والفرق على ${residualFirst ? 'أول' : 'آخر'} حصة`, en: `split ${mode} into ${created.length + 1}` });
+    bump(ctx, o, 'SPLIT', { ar: `قُسّم (${mode}) إلى ${created.length + 1} شيكات — القروش بأكبر باقي والفرق على ${residualFirst ? 'أول' : 'آخر'} حصة`, en: `split ${mode} into ${created.length + 1}` });
     return { source: orderView(ctx.db, o), created: created.map((c) => orderView(ctx.db, c)) };
   },
   'Order.Merge': (ctx) => {
@@ -656,9 +656,9 @@ export const orderHandlers: Record<string, Handler> = {
     moving.forEach((l) => { l.movedFrom = src.id; dst.lines.push(l); });
     src.status = 'MERGED';
     src.version++;
-    src.history.push(hist(ctx.user!.id, 'MERGED', { ar: `اتدمج في شيك ${dst.checkNo}`, en: `merged into check ${dst.checkNo}` }));
+    src.history.push(hist(ctx.user!.id, 'MERGED', { ar: `دُمج في شيك ${dst.checkNo}`, en: `merged into check ${dst.checkNo}` }));
     ensureService(ctx, dst);
-    bump(ctx, dst, 'MERGED_IN', { ar: `اتدمج فيه شيك ${src.checkNo} (${moving.length} صنف)`, en: `merged check ${src.checkNo}` });
+    bump(ctx, dst, 'MERGED_IN', { ar: `دُمج فيه شيك ${src.checkNo} (${moving.length} صنف)`, en: `merged check ${src.checkNo}` });
     return orderView(ctx.db, dst);
   },
   'Order.AssignSeat': (ctx) => {
@@ -695,7 +695,7 @@ export const orderHandlers: Record<string, Handler> = {
     l!.unitTotal = m4(ctx.body.newUnitPrice);
     l!.lineTotal = m4(D(l!.unitTotal).times(l!.quantity));
     l!.version++;
-    bump(ctx, o, 'PRICE_OVERRIDE', { ar: `سعر ${l!.name.ar} اتعدل ${old} ← ${l!.unitTotal}${g ? ' بموافقة' : ''}`, en: 'price override' });
+    bump(ctx, o, 'PRICE_OVERRIDE', { ar: `عُدّل سعر ${l!.name.ar} ${old} ← ${l!.unitTotal}${g ? ' بموافقة' : ''}`, en: 'price override' });
     return orderView(ctx.db, o);
   },
   // Direction D9 + r3A (F3-03, E12): staff meal — an identified employee, manager authorisation, a daily allowance

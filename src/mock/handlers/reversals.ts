@@ -77,13 +77,13 @@ export function recordReversal(ctx: Ctx, r: { o: Order; line?: OrderLine | null;
 
 /** "بموافقة هبة (كارت)" — the approver in words for history lines. */
 export function approvedText(db: DB, g: ApprovalGrant | null | undefined): string {
-  if (!g) return 'من غير موافقة (حسب الإعداد)';
+  if (!g) return 'بلا موافقة (حسب الإعداد)';
   const k = credKindOf(db, g);
-  const how = k === 'CARD' ? 'بالكارت' : k === 'FINGERPRINT' ? 'بالبصمة' : k === 'REMOTE' ? 'من جهازه' : 'بالرقم السري';
+  const how = k === 'CARD' ? 'بالبطاقة' : k === 'FINGERPRINT' ? 'بالبصمة' : k === 'REMOTE' ? 'من جهازه' : 'بالرقم السري';
   return `بموافقة ${userName(db, g.approverUserId)} ${how}`;
 }
-export const DISP_AR: Record<Disposition, string> = { NOT_PREPARED: 'ما اتعملش', RETURN_TO_STOCK: 'رجع المخزن', WASTE_HELD: 'هالك محفوظ للمراجعة' };
-export const STAGE_AR: Record<StageId, string> = { S0: 'قبل ما يظهر للزبون', S1: 'بعد ما ظهر للزبون (قبل الدفع)', S2: 'بعد الدفع (نفس اليوم)', S3: 'مرتجع بعد قفل اليوم' };
+export const DISP_AR: Record<Disposition, string> = { NOT_PREPARED: 'لم يُحضَّر', RETURN_TO_STOCK: 'عاد إلى المخزن', WASTE_HELD: 'هالك محفوظ للمراجعة' };
+export const STAGE_AR: Record<StageId, string> = { S0: 'قبل أن يظهر للعميل', S1: 'بعد ظهوره للعميل (قبل الدفع)', S2: 'بعد الدفع (اليوم نفسه)', S3: 'مرتجع بعد إغلاق اليوم' };
 
 /**
  * Stock effect of returning `qty` of a consumed line (refund or return after close): back to the shelf, or the
@@ -199,7 +199,7 @@ export const reversalHandlers: Record<string, Handler> = {
     r.review = { state: d, by: ctx.user!.id, at: ctx.nowIso, note: note || undefined };
     const resp = r.approverId ?? r.actorId;
     if (d === 'MISSING') {
-      ctx.db.alerts.unshift({ id: nextId('al'), at: ctx.nowIso, kind: 'VOID_ITEM_MISSING', severity: 'error', text: { ar: `صنف ملغي مش موجود وقت المراجعة: ${r.name.ar} ×${Number(r.quantity)} من شيك #${r.orderNumber} — المسؤول ${userName(ctx.db, resp)}`, en: `Voided item missing at review: ${r.name.en} on #${r.orderNumber}` }, ref: `reversal:${r.id}`, ack: false });
+      ctx.db.alerts.unshift({ id: nextId('al'), at: ctx.nowIso, kind: 'VOID_ITEM_MISSING', severity: 'error', text: { ar: `صنف ملغي غير موجود وقت المراجعة: ${r.name.ar} ×${Number(r.quantity)} من شيك #${r.orderNumber} — المسؤول ${userName(ctx.db, resp)}`, en: `Voided item missing at review: ${r.name.en} on #${r.orderNumber}` }, ref: `reversal:${r.id}`, ack: false });
       event('VoidItemMissing', r.id, `${r.orderNumber} ${r.name.en} — approver ${userName(ctx.db, resp)}`);
     }
     const o = ctx.db.orders.find((x) => x.id === r.orderId);
@@ -252,7 +252,7 @@ export const reversalHandlers: Record<string, Handler> = {
         stockForReturn(ctx, o, l, l.quantity, disp);
         recordReversal(ctx, { o, line: l, quantity: l.quantity, value: mealValue(db, [l], basis, o.createdAtMs).value, stage, kind: 'STAFF_MEAL_CANCEL', grant: g, reasonCode: ctx.body.reasonCode, reason: ctx.body.reason, disposition: disp, afterClose: true });
       }
-      o.history.push(hist(ctx.user!.id, 'STAFF_MEAL_RETURNED', { ar: `مرتجع وجبة موظف بعد قفل يوم ${o.businessDate} — اتسجل على يوم ${ctx.businessDate(o.branchId)} (${DISP_AR[disp]}) ${who}`, en: `staff meal returned after close` }, { stage }, ctx.terminal?.code));
+      o.history.push(hist(ctx.user!.id, 'STAFF_MEAL_RETURNED', { ar: `مرتجع وجبة موظف بعد إغلاق يوم ${o.businessDate} — سُجّل على يوم ${ctx.businessDate(o.branchId)} (${DISP_AR[disp]}) ${who}`, en: `staff meal returned after close` }, { stage }, ctx.terminal?.code));
       ctx.audit(`staff meal ${o.number} returned after close`, o.id, true, g?.id, { stage });
       return { order: { id: o.id, number: o.number }, stage, disposition: disp };
     }
@@ -267,7 +267,7 @@ export const reversalHandlers: Record<string, Handler> = {
     o.voidedAt = ctx.nowIso;
     o.endReason = { code: ctx.body.reasonCode, note: ctx.body.reason, approvalGrantId: g?.id };
     o.version++;
-    o.history.push(hist(ctx.user!.id, 'STAFF_MEAL_CANCELLED', { ar: `وجبة الموظف اتلغت ${stage === 'S0' ? 'قبل ما تتبعت للمطبخ' : 'بعد ما اتبعتت للمطبخ'} ${who}`, en: `staff meal cancelled (${stage})` }, { stage }, ctx.terminal?.code));
+    o.history.push(hist(ctx.user!.id, 'STAFF_MEAL_CANCELLED', { ar: `أُلغيت وجبة الموظف ${stage === 'S0' ? 'قبل إرسالها للمطبخ' : 'بعد إرسالها للمطبخ'} ${who}`, en: `staff meal cancelled (${stage})` }, { stage }, ctx.terminal?.code));
     inventoryOnOrderChange(ctx, o);
     ctx.audit(`staff meal ${o.number} cancelled (${stage})`, o.id, true, g?.id, { stage });
     return { order: { id: o.id, number: o.number, status: o.status }, stage };

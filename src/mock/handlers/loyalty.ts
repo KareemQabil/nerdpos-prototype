@@ -68,7 +68,7 @@ export function onOrderCompleted(ctx: Ctx, o: Order) {
   const q = earnQuote(ctx.db, o);
   if (!q || q.points <= 0) return;
   addLoyaltyEntry(ctx, o.customerId, 'EARN', q.points, { orderId: o.id, orderNumber: o.number, amount: q.base, reason: q.multiplier !== '1' ? `مضاعف المستوى ×${q.multiplier}` : null });
-  o.history.push(hist(ctx.user?.id ?? 'system', 'LOYALTY_EARNED', { ar: `العميل كسب ${q.points} نقطة على الطلب ده`, en: `customer earned ${q.points} points` }));
+  o.history.push(hist(ctx.user?.id ?? 'system', 'LOYALTY_EARNED', { ar: `كسب العميل ${q.points} نقطة على هذا الطلب`, en: `customer earned ${q.points} points` }));
   event('LoyaltyEarned', o.customerId, `${o.number} +${q.points}`);
 }
 
@@ -137,7 +137,7 @@ export const loyaltyHandlers: Record<string, Handler> = {
     const e: LoyaltyEntry = { id: entryId, customerId: o.customerId, kind: 'REDEEM', points: -points, balanceAfter: balanceOf(db, o.customerId) - points, orderId: o.id, orderNumber: o.number, amount: m4(value), reason: 'اتصرفت كدفع في التحصيل', at: ctx.nowIso, by: ctx.user!.id, captureId: cap.id };
     entriesOf(db).push(e);
     o.version++;
-    o.history.push(hist(ctx.user!.id, 'LOYALTY_REDEEMED', { ar: `اتدفع ${m4(value)} ج.م بالنقاط (${points} نقطة)`, en: `paid ${value} with ${points} points` }, null, ctx.terminal?.code));
+    o.history.push(hist(ctx.user!.id, 'LOYALTY_REDEEMED', { ar: `دُفع ${m4(value)} ج.م بالنقاط (${points} نقطة)`, en: `paid ${value} with ${points} points` }, null, ctx.terminal?.code));
     ctx.audit(`loyalty redeem ${points} pts = ${value} on ${o.number}`, o.id, true);
     event('LoyaltyRedeemed', o.id, `${o.number} -${points}`);
     return { status: 201, body: { entry: e, capture: cap, settlement: settlementOf(db, o), loyalty: loyaltySummary(db, o.customerId) } };

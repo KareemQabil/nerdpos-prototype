@@ -91,9 +91,9 @@ export function specOf(d: ReportDesign, today: string, deviceBranch: string | nu
 export const emptyDesign = (): ReportDesign => ({ metrics: ['item_net_sales'], rows: ['category'], columns: [], period: { preset: 'YESTERDAY' }, branches: 'DEVICE', compare: null, extras: [], topN: null, sort: null, having: [], calcs: [], format: { preset: 'none' }, view: { columns: [], chart: 'bars', expandDepth: 1 } });
 
 export const REPORT_CATEGORIES: Record<string, Loc> = {
-  sales: L('المبيعات', 'Sales'), menu: L('المنيو والأصناف', 'Menu & items'), payments: L('الفلوس والدرج', 'Money & drawer'), controls: L('الرقابة', 'Controls'),
+  sales: L('المبيعات', 'Sales'), menu: L('قائمة الطعام والأصناف', 'Menu & items'), payments: L('النقدية والدرج', 'Money & drawer'), controls: L('الرقابة', 'Controls'),
   service: L('الصالة والشيكات', 'Floor & checks'), kitchen: L('المطبخ', 'Kitchen'), inventory: L('المخزن', 'Inventory'), purchasing: L('المشتريات', 'Purchasing'),
-  fiscal: L('الضرايب', 'Tax'), channels: L('القنوات', 'Channels'), multi_branch: L('الفروع', 'Branches'), other: L('تانية', 'Other'),
+  fiscal: L('الضرائب', 'Tax'), channels: L('القنوات', 'Channels'), multi_branch: L('الفروع', 'Branches'), other: L('أخرى', 'Other'),
 };
 
 // ───────── seeds (round 4): three ready templates and four useful custom reports
@@ -103,14 +103,14 @@ function tpl(id: string, ar: string, en: string, dAr: string, dEn: string, x: Pa
     id, name: L(ar, en), description: L(dAr, dEn), builtIn: true, ownerId: null, view: { mode: 'EVERYONE' },
     paper: 'A4', orientation: 'portrait', margins: 'normal', header: { logo: true, venue: true, branch: true, params: true },
     blocks: { kpis: true, table: true, chart: false, bridge: false, notes: false, tableOnNewPage: false }, notes: '', depth: 0,
-    footer: { pageNumbers: true, confidentiality: 'سري — للاستخدام الداخلي في المطعم بس', signatures: null }, watermark: { provisional: true, sandbox: true }, lang: 'ar', updatedAt: nowIso, ...x,
+    footer: { pageNumbers: true, confidentiality: 'سري — للاستخدام الداخلي في المطعم فقط', signatures: null }, watermark: { provisional: true, sandbox: true }, lang: 'ar', updatedAt: nowIso, ...x,
   };
   return { ...base, version: 1, versions: [{ version: 1, at: nowIso, by: 'system', note: 'قالب جاهز', snapshot: base }] };
 }
 export function seedTemplates(nowIso: string): ReportTemplate[] {
   return [
-    tpl('tpl_accountant_a4', 'تقرير المحاسب اليومي A4', "Accountant's daily report A4", 'صفحة A4 طولي: البيانات كاملة، كل المستويات، رصيد منقول بين الصفحات، وتوقيعات أعده / راجعه / اعتمده.', 'A4 portrait: full detail, carried-forward subtotals, and prepared / reviewed / approved signatures.', { blocks: { kpis: true, table: true, chart: false, bridge: true, notes: true, tableOnNewPage: false }, notes: 'الأرقام من محرك التقارير المعتمد. أي فرق في الدرج متسجل في قسم «الأدراج».', footer: { pageNumbers: true, confidentiality: 'سري — للمحاسب والإدارة بس', signatures: ACC_SIGN } }, nowIso),
-    tpl('tpl_owner_weekly', 'ملخص المالك الأسبوعي', "Owner's weekly summary", 'A4 عرضي: الأرقام الكبيرة ورسم بياني والمستوى الأول من الجدول بس — يتقري في دقيقة.', 'A4 landscape: headline numbers, a chart and the first table level — readable in a minute.', { orientation: 'landscape', blocks: { kpis: true, table: true, chart: true, bridge: false, notes: false, tableOnNewPage: false }, depth: 1, footer: { pageNumbers: true, confidentiality: '', signatures: null } }, nowIso),
+    tpl('tpl_accountant_a4', 'تقرير المحاسب اليومي A4', "Accountant's daily report A4", 'صفحة A4 طولي: البيانات كاملة، كل المستويات، رصيد منقول بين الصفحات، وتوقيعات أعده / راجعه / اعتمده.', 'A4 portrait: full detail, carried-forward subtotals, and prepared / reviewed / approved signatures.', { blocks: { kpis: true, table: true, chart: false, bridge: true, notes: true, tableOnNewPage: false }, notes: 'الأرقام من محرك التقارير المعتمد. أي فرق في الدرج مسجّل في قسم «الأدراج».', footer: { pageNumbers: true, confidentiality: 'سري — للمحاسب والإدارة فقط', signatures: ACC_SIGN } }, nowIso),
+    tpl('tpl_owner_weekly', 'ملخص المالك الأسبوعي', "Owner's weekly summary", 'A4 عرضي: الأرقام الرئيسية ورسم بياني والمستوى الأول من الجدول فقط — يُقرأ في دقيقة.', 'A4 landscape: headline numbers, a chart and the first table level — readable in a minute.', { orientation: 'landscape', blocks: { kpis: true, table: true, chart: true, bridge: false, notes: false, tableOnNewPage: false }, depth: 1, footer: { pageNumbers: true, confidentiality: '', signatures: null } }, nowIso),
     tpl('tpl_receipt_xz', 'إيصال X/Z 80مم', 'X/Z receipt 80 mm', 'ورق الكاشير 80مم: الأرقام الأساسية والجدول باختصار وتوقيع الكاشير والمدير.', '80 mm cashier paper: key numbers, a compact table and cashier / manager signatures.', { paper: 'RECEIPT_80', header: { logo: true, venue: true, branch: true, params: true }, blocks: { kpis: true, table: true, chart: false, bridge: false, notes: false, tableOnNewPage: false }, depth: 1, margins: 'narrow', footer: { pageNumbers: false, confidentiality: '', signatures: [{ label: 'الكاشير', name: '', role: '' }, { label: 'المدير', name: '', role: '' }] } }, nowIso),
   ];
 }
@@ -121,13 +121,13 @@ function saved(id: string, name: string, description: string, category: string, 
 }
 export function seedSaved(nowIso: string): SavedReport[] {
   return [
-    saved('sr_branch_channel', 'المبيعات: الفرع ← القناة ← القسم ← الصنف', 'شجرة المبيعات من الفرع لحد الصنف مع الكمية ونصيب كل واحد من الإجمالي. دوس على أي سطر يفتح اللي تحته.', 'sales', 'u_owner', { mode: 'EVERYONE' },
+    saved('sr_branch_channel', 'المبيعات: الفرع ← القناة ← القسم ← الصنف', 'شجرة المبيعات من الفرع حتى الصنف مع الكمية ونصيب كل منها من الإجمالي. اضغط أي سطر لفتح ما تحته.', 'sales', 'u_owner', { mode: 'EVERYONE' },
       { metrics: ['item_net_sales', 'sold_quantity', 'gross_item_sales'], rows: ['branch', 'channel', 'category', 'product'], period: { preset: 'LAST_7' }, branches: 'ALL', extras: ['share_total'], calcs: ['price_per_unit'], format: { preset: 'highlow' }, view: { columns: [], chart: 'bars', expandDepth: 1 } }, 'tpl_accountant_a4', nowIso),
-    saved('sr_items_daypart', 'الأصناف حسب فترات اليوم', 'كل صنف اتباع بكام في الفطار والغدا والعشا وآخر الليل — أعلى 10 أصناف والباقي في سطر واحد.', 'menu', 'u_owner', { mode: 'EVERYONE' },
+    saved('sr_items_daypart', 'الأصناف حسب فترات اليوم', 'مبيعات كل صنف في الإفطار والغداء والعشاء وآخر الليل — أعلى 10 أصناف والباقي في سطر واحد.', 'menu', 'u_owner', { mode: 'EVERYONE' },
       { metrics: ['item_net_sales'], rows: ['product'], columns: ['daypart'], period: { preset: 'LAST_7' }, branches: 'DEVICE', topN: { n: 10, others: true }, format: { preset: 'highlow' }, view: { columns: [], chart: 'none', expandDepth: 1 } }, 'tpl_owner_weekly', nowIso),
-    saved('sr_week_compare', 'الأيام مقارنة بالأسبوع اللي فات', 'صافي المبيعات وعدد الأوردرات كل يوم، جنب نفس اليوم الأسبوع اللي فات، بأسهم التغيير.', 'sales', 'u_owner', { mode: 'ROLES', roles: ['role_manager', 'role_accountant'] },
+    saved('sr_week_compare', 'الأيام مقارنة بالأسبوع الماضي', 'صافي المبيعات وعدد الطلبات كل يوم، بجانب اليوم نفسه من الأسبوع الماضي، مع أسهم التغيير.', 'sales', 'u_owner', { mode: 'ROLES', roles: ['role_manager', 'role_accountant'] },
       { metrics: ['net_item_sales', 'order_count', 'avg_check'], rows: ['business_date'], period: { preset: 'LAST_7' }, branches: 'DEVICE', compare: 'last_week', format: { preset: 'arrows' }, view: { columns: [], chart: 'line', expandDepth: 1 } }, 'tpl_owner_weekly', nowIso),
-    saved('sr_controls_staff', 'الخصومات والإلغاءات حسب الموظف', 'مين عمل خصومات وإلغاءات وبكام، عشان المتابعة اليومية للمحاسب.', 'controls', 'u_accountant', { mode: 'ROLES', roles: ['role_manager', 'role_accountant'] },
+    saved('sr_controls_staff', 'الخصومات والإلغاءات حسب الموظف', 'من نفّذ الخصومات والإلغاءات وبأي قيمة، للمتابعة اليومية للمحاسب.', 'controls', 'u_accountant', { mode: 'ROLES', roles: ['role_manager', 'role_accountant'] },
       { metrics: ['discount_amount', 'discount_count', 'void_value', 'void_line_count'], rows: ['staff'], period: { preset: 'LAST_7' }, branches: 'DEVICE', format: { preset: 'topbottom', measure: 'void_value' }, view: { columns: [], chart: 'bars', expandDepth: 1 } }, 'tpl_accountant_a4', nowIso),
   ];
 }

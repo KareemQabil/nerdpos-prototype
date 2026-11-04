@@ -96,7 +96,7 @@ export function promoSummary(pr: PromotionX, productName: (id: string) => string
   const scope = (p: string[], c: string[]) => [...p.map(productName), ...c.map(categoryName)].join('، ');
   const scopeEn = (p: string[], c: string[]) => [...p.map(productNameEn), ...c.map(categoryNameEn)].join(', ');
   const benefit = r.benefitType === 'PERCENTAGE' ? `${Number(r.benefitValue)}%` : `${Number(r.benefitValue)} ج.م`;
-  const benefitEn = r.benefitType === 'PERCENTAGE' ? `${Number(r.benefitValue)}%` : `${Number(r.benefitValue)} EGP`;
+  const benefitEn = r.benefitType === 'PERCENTAGE' ? `${Number(r.benefitValue)}%` : `${Number(r.benefitValue)} ج.م`;
   if (r.mechanic === 'ITEMS') return { ar: `خصم ${benefit} على ${scope(r.productIds, r.categoryIds) || 'كل الأصناف'}`, en: `${benefitEn} off ${scopeEn(r.productIds, r.categoryIds) || 'all items'}` };
   if (r.mechanic === 'BUY_X_GET_Y') {
     const get = r.getProductIds.length || r.getCategoryIds.length ? scope(r.getProductIds, r.getCategoryIds) : scope(r.productIds, r.categoryIds) || 'أي صنف';

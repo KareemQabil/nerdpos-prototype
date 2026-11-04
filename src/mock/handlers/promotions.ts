@@ -142,7 +142,7 @@ export function autoApplyPromotions(ctx: Ctx, o: Order) {
     try {
       const d = promotionForOrder(ctx, o, p, 'system');
       o.discounts.push(d);
-      o.history.push(hist('system', 'PROMOTION', { ar: `اتطبق عرض أوتوماتيك: ${p.name.ar}`, en: `auto promotion: ${p.name.en}` }));
+      o.history.push(hist('system', 'PROMOTION', { ar: `طُبّق عرض تلقائي: ${p.name.ar}`, en: `auto promotion: ${p.name.en}` }));
     } catch { /* conditions not met (minimum, limits): skip */ }
   }
 }

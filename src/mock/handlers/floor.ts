@@ -81,7 +81,7 @@ export const floorHandlers: Record<string, Handler> = {
     const guests = Number(ctx.body.guestCount ?? 0);
     need(guests >= 1, 'VALIDATION_FAILED', { field: 'guestCount', rule: '>= 1' });
     seatOnTurn(ctx, t.id);
-    const v: TableVisit = { id: nextId('visit'), tableId: t.id, branchId: t.branchId, state: 'OPEN', guestCount: guests, serverUserId: ctx.user!.id, openedAt: ctx.nowIso, openedAtMs: ctx.now, closedAt: null, version: 1, joinedTableIds: [], history: [hist(ctx.user!.id, 'OPENED', { ar: `اتفتحت لـ ${guests} أفراد`, en: `opened for ${guests}` }, null, ctx.terminal?.code)] };
+    const v: TableVisit = { id: nextId('visit'), tableId: t.id, branchId: t.branchId, state: 'OPEN', guestCount: guests, serverUserId: ctx.user!.id, openedAt: ctx.nowIso, openedAtMs: ctx.now, closedAt: null, version: 1, joinedTableIds: [], history: [hist(ctx.user!.id, 'OPENED', { ar: `فُتحت لـ ${guests} أفراد`, en: `opened for ${guests}` }, null, ctx.terminal?.code)] };
     if (ctx.body.reservationId) {
       const r = ctx.db.reservations.find((x) => x.id === ctx.body.reservationId);
       if (r) { r.state = 'SEATED'; r.visitId = v.id; }
@@ -110,7 +110,7 @@ export const floorHandlers: Record<string, Handler> = {
     const from = ctx.db.tables.find((t) => t.id === v.tableId)!;
     v.tableId = to.id;
     v.version++;
-    v.history.push(hist(ctx.user!.id, 'TRANSFERRED', { ar: `اتنقلت من ${from.name} لـ ${to.name}`, en: `moved ${from.name} → ${to.name}` }, null, ctx.terminal?.code));
+    v.history.push(hist(ctx.user!.id, 'TRANSFERRED', { ar: `نُقلت من ${from.name} إلى ${to.name}`, en: `moved ${from.name} → ${to.name}` }, null, ctx.terminal?.code));
     for (const o of ctx.db.orders.filter((x) => x.visitId === v.id)) { o.tableId = to.id; }
     ctx.audit(`visit moved ${from.name} → ${to.name}`, v.id);
     return visitView(ctx, v);
@@ -133,7 +133,7 @@ export const floorHandlers: Record<string, Handler> = {
     need(v.joinedTableIds.includes(t.id), 'VALIDATION_FAILED', { rule: 'only a joined (non-primary) table can be released' });
     v.joinedTableIds = v.joinedTableIds.filter((x) => x !== t.id);
     v.version++;
-    v.history.push(hist(ctx.user!.id, 'RELEASED', { ar: `اتفكت ترابيزة ${t.name}`, en: `released table ${t.name}` }));
+    v.history.push(hist(ctx.user!.id, 'RELEASED', { ar: `فُصلت ترابيزة ${t.name}`, en: `released table ${t.name}` }));
     return visitView(ctx, v);
   },
   'Table.AssignWaiter': (ctx) => {
@@ -143,7 +143,7 @@ export const floorHandlers: Record<string, Handler> = {
     const before = v!.serverUserId;
     v!.serverUserId = ctx.body.userId;
     v!.version++;
-    v!.history.push(hist(ctx.user!.id, 'SERVER', { ar: `الويتر اتغير من ${userName(ctx.db, before)} لـ ${userName(ctx.db, ctx.body.userId)}`, en: 'server changed' }));
+    v!.history.push(hist(ctx.user!.id, 'SERVER', { ar: `تغيّر الويتر من ${userName(ctx.db, before)} إلى ${userName(ctx.db, ctx.body.userId)}`, en: 'server changed' }));
     return visitView(ctx, v!);
   },
   // Direction D14 (PD-held): reservations with deposit and no-show fee.

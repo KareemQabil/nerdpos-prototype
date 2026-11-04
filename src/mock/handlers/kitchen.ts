@@ -197,12 +197,12 @@ export const kitchenHandlers: Record<string, Handler> = {
 
 // ───────── KDS actions (direction, PD-held in canonical): rush, refire with a reason, move to another station
 export const REFIRE_REASONS: Record<string, { ar: string; en: string }> = {
-  BURNT: { ar: 'اتحرق / مش مستوي صح', en: 'Burnt / wrongly cooked' },
-  WRONG_ITEM: { ar: 'اتعمل غلط', en: 'Made wrong' },
+  BURNT: { ar: 'محترق / غير مطهو جيدًا', en: 'Burnt / wrongly cooked' },
+  WRONG_ITEM: { ar: 'حُضّر خطأً', en: 'Made wrong' },
   DROPPED: { ar: 'وقع', en: 'Dropped' },
-  CUSTOMER_RETURNED: { ar: 'الزبون رجّعه', en: 'Customer sent it back' },
+  CUSTOMER_RETURNED: { ar: 'أعاده العميل', en: 'Customer sent it back' },
   COLD: { ar: 'وصل بارد', en: 'Arrived cold' },
-  OTHER: { ar: 'سبب تاني', en: 'Other' },
+  OTHER: { ar: 'سبب آخر', en: 'Other' },
 };
 
 function metaOf(ctx: Ctx, ticketId: string): TicketMeta {
@@ -278,9 +278,9 @@ function kdsHandlers(): Record<string, Handler> {
       const m = metaOf(ctx, copy.id);
       Object.assign(m, { priority: 'RUSH', refireOf: t.id, refireReason: reason, refireNote: ctx.body.note ? String(ctx.body.note).slice(0, 120) : null });
       m.history.unshift({ at: ctx.nowIso, by: ctx.user!.id, text: { ar: `إعادة عمل: ${REFIRE_REASONS[reason].ar}`, en: `refire: ${REFIRE_REASONS[reason].en}` } });
-      metaOf(ctx, t.id).history.unshift({ at: ctx.nowIso, by: ctx.user!.id, text: { ar: `اتعمل تاني (${items.length} صنف)`, en: `refired (${items.length} items)` } });
+      metaOf(ctx, t.id).history.unshift({ at: ctx.nowIso, by: ctx.user!.id, text: { ar: `أُعيد تحضيره (${items.length} صنف)`, en: `refired (${items.length} items)` } });
       const o = ctx.db.orders.find((x) => x.id === t.orderId);
-      o?.history.push(hist(ctx.user!.id, 'KITCHEN_REFIRE', { ar: `المطبخ عمل تاني: ${items.map((i) => i.name.ar).join('، ')} — ${REFIRE_REASONS[reason].ar}`, en: `kitchen refire: ${REFIRE_REASONS[reason].en}` }, { ticketId: copy.id }, ctx.terminal?.code));
+      o?.history.push(hist(ctx.user!.id, 'KITCHEN_REFIRE', { ar: `أعاد المطبخ تحضير: ${items.map((i) => i.name.ar).join('، ')} — ${REFIRE_REASONS[reason].ar}`, en: `kitchen refire: ${REFIRE_REASONS[reason].en}` }, { ticketId: copy.id }, ctx.terminal?.code));
       event('KitchenRefire', t.orderId, `${t.orderNumber} r${t.round} ${reason}`);
       ctx.audit(`refire ${t.orderNumber} r${t.round}: ${reason}`, copy.id, true);
       return { status: 201, body: ticketView(ctx, copy) };
@@ -302,13 +302,13 @@ function kdsHandlers(): Record<string, Handler> {
         metaOf(ctx, same.id).history.unshift({ at: ctx.nowIso, by: ctx.user!.id, text: { ar: `انضم لها ${t.items.length} صنف من ${fromName}`, en: `merged ${t.items.length} items from ${fromName}` } });
         const m = metaOf(ctx, t.id);
         m.transferredFrom = 'MERGED';
-        m.history.unshift({ at: ctx.nowIso, by: ctx.user!.id, text: { ar: `اتنقلت لـ ${st!.name} واتضمت لتذكرتها`, en: `moved to ${st!.name} (merged)` } });
+        m.history.unshift({ at: ctx.nowIso, by: ctx.user!.id, text: { ar: `نُقلت إلى ${st!.name} وضُمّت إلى تذكرتها`, en: `moved to ${st!.name} (merged)` } });
         t.state = 'DONE'; t.doneAt = ctx.nowIso; t.version++;
         return { ...ticketView(ctx, same), merged: true };
       }
       const m = metaOf(ctx, t.id);
       m.transferredFrom = t.stationId; m.transferReason = ctx.body.reason ? String(ctx.body.reason).slice(0, 120) : null;
-      m.history.unshift({ at: ctx.nowIso, by: ctx.user!.id, text: { ar: `اتنقلت من ${fromName} لـ ${st!.name}${m.transferReason ? ' — ' + m.transferReason : ''}`, en: `moved ${fromName} → ${st!.name}` } });
+      m.history.unshift({ at: ctx.nowIso, by: ctx.user!.id, text: { ar: `نُقلت من ${fromName} إلى ${st!.name}${m.transferReason ? ' — ' + m.transferReason : ''}`, en: `moved ${fromName} → ${st!.name}` } });
       t.stationId = st!.id;
       t.version++;
       event('KitchenTicketMoved', t.orderId, `${t.orderNumber} r${t.round} → ${st!.name}`);

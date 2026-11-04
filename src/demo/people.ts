@@ -16,11 +16,11 @@ export const PERSONAS: Record<string, Persona> = {
   'demo-cashier-a': { name: 'سارة', role: 'الكاشير أ', f: true, en: 'Sara', roleEn: 'Cashier A' },
   'demo-cashier-b': { name: 'منى', role: 'الكاشير ب', f: true, en: 'Mona', roleEn: 'Cashier B' },
   'demo-chef-1': { name: 'الشيف حسن', role: 'المطبخ', en: 'Chef Hassan', roleEn: 'Kitchen' },
-  'demo-waiter-second': { name: 'علي', role: 'ويتر الفرع التاني', en: 'Ali', roleEn: 'Second-branch waiter' },
+  'demo-waiter-second': { name: 'علي', role: 'ويتر الفرع الثاني', en: 'Ali', roleEn: 'Second-branch waiter' },
   'demo-owner': { name: 'الحاج سامي', role: 'صاحب المطعم', en: 'Hajj Sami', roleEn: 'Owner' },
   'demo-accountant': { name: 'نادر', role: 'المحاسب', en: 'Nader', roleEn: 'Accountant' },
   'implementation-engineer': { name: 'كريم', role: 'مهندس التركيب', en: 'Karim', roleEn: 'Setup engineer' },
-  'nerdpos-support': { name: 'دعم NerdPOS', role: 'فريق NerdPOS (مش من المطعم)', en: 'NerdPOS support', roleEn: 'NerdPOS team (not the restaurant)' }, // r3C: vendor-only licensed modules
+  'nerdpos-support': { name: 'دعم NerdPOS', role: 'فريق NerdPOS (من خارج المطعم)', en: 'NerdPOS support', roleEn: 'NerdPOS team (not the restaurant)' }, // r3C: vendor-only licensed modules
   // users created by the "setup from zero" journey (J-A1)
   'owner-1': { name: 'عم سيد', role: 'صاحب المطعم', en: 'Uncle Sayed', roleEn: 'Owner' },
   'manager-1': { name: 'طارق', role: 'المدير', en: 'Tarek', roleEn: 'Manager' },
@@ -155,7 +155,7 @@ export function roleLabel(name: string | null | undefined): string {
   return tv(name.replace(/^Demo /, ''));
 }
 
-const BRANCH_NAMES: Record<string, string> = { 'DEMO-MAIN': 'الفرع الرئيسي', 'DEMO-SECOND': 'الفرع التاني', 'TAHRIR-1': 'فرع التحرير' };
+const BRANCH_NAMES: Record<string, string> = { 'DEMO-MAIN': 'الفرع الرئيسي', 'DEMO-SECOND': 'الفرع الثاني', 'TAHRIR-1': 'فرع التحرير' };
 const BRANCH_NAMES_EN: Record<string, string> = { 'DEMO-MAIN': 'Main branch', 'DEMO-SECOND': 'Second branch', 'TAHRIR-1': 'Tahrir branch' };
 export function branchLabel(b: { code?: string; name?: string } | null | undefined): string {
   if (!b) return '';

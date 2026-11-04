@@ -173,7 +173,7 @@ const OPTIONS: Record<string, Record<string, OptText>> = {
     ALLOW_ANY: O('بأي طريقة', 'من غير قيود.'),
   },
   'CashRoundingPolicy.mode': { OFF: O('من غير تقريب'), HALF_UP: O('تقريب لأقرب فكة') },
-  'CashRoundingPolicy.increment': { '0.25': O('ربع جنيه'), '0.50': O('نص جنيه'), '1.00': O('جنيه') },
+  'CashRoundingPolicy.increment': { '0.25': O('0.25 ج.م'), '0.50': O('0.50 ج.م'), '1.00': O('1.00 ج.م') },
   TipPolicy: { OFF: O('البقشيش مش بيتسجل على السيستم'), ON: O('البقشيش بيتسجل على السيستم', 'خانة بقشيش في الدفع، ويظهر في تقرير الوردية.') },
   'ReceiptPrintPolicy.*': { AUTO: O('يطبع لوحده'), ASK: O('يسأل الكاشير'), OFF: O('مايطبعش') },
   'ReasonCodePolicy.*': { MANAGED: O('من قايمة ثابتة'), FREE_TEXT: O('كتابة حرة') },

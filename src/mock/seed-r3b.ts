@@ -25,7 +25,7 @@ export function seedR3B(db: DB, nowMs: number) {
   r.docTemplate = {
     logoDataUrl: SAMPLE_LOGO, logoName: 'logo-sample.svg', logoWidthPct: 60, logoOnReceipt: true, logoOnReports: true,
     headerLines: ['12 شارع عباس العقاد — مدينة نصر', 'تليفون 0222700000 · واتساب 01000000000'],
-    footerLines: ['شكرًا لزيارتكم — نتمنى نشوفك تاني', 'الأسعار شاملة الضريبة حسب الإيصال'],
+    footerLines: ['شكرًا لزيارتكم — نسعد برؤيتكم مجددًا', 'الأسعار شاملة الضريبة حسب الإيصال'],
     paper: '80MM', version: 1, updatedAt: nowIso, updatedBy: 'provisioning',
   };
 }

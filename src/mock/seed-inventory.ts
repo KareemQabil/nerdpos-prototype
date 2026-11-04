@@ -191,8 +191,8 @@ export function seedInventory(db: DB, nowMs: number) {
   base.warehouses = [
     { id: WH.s, branchId: 'branch_main', name: 'المخزن الرئيسي', kind: 'STORE', active: true, salesDefault: false, version: 1, createdAt: created, history: [{ at: created, by: 'provisioning', text: 'created' }] },
     { id: WH.k, branchId: 'branch_main', name: 'المطبخ', kind: 'KITCHEN', active: true, salesDefault: true, version: 1, createdAt: created, history: [{ at: created, by: 'provisioning', text: 'created — sales warehouse of the branch' }] },
-    { id: WH.s2, branchId: 'branch_second', name: 'مخزن الفرع التاني', kind: 'STORE', active: true, salesDefault: false, version: 1, createdAt: created, history: [{ at: created, by: 'provisioning', text: 'created' }] },
-    { id: WH.k2, branchId: 'branch_second', name: 'مطبخ الفرع التاني', kind: 'KITCHEN', active: true, salesDefault: true, version: 1, createdAt: created, history: [{ at: created, by: 'provisioning', text: 'created — sales warehouse of the branch' }] },
+    { id: WH.s2, branchId: 'branch_second', name: 'مخزن الفرع الثاني', kind: 'STORE', active: true, salesDefault: false, version: 1, createdAt: created, history: [{ at: created, by: 'provisioning', text: 'created' }] },
+    { id: WH.k2, branchId: 'branch_second', name: 'مطبخ الفرع الثاني', kind: 'KITCHEN', active: true, salesDefault: true, version: 1, createdAt: created, history: [{ at: created, by: 'provisioning', text: 'created — sales warehouse of the branch' }] },
   ];
   base.suppliers = [
     { id: 'sup_ahram', name: 'مخازن الأهرام للمواد الغذائية', taxId: '512-334-871', phone: '01001234567', contactName: 'أ. مجدي عبد الحميد', paymentTerms: 'آجل 15 يوم', address: 'العبور — المنطقة الصناعية', notes: 'بقالة وزيوت وألبان وبقوليات. التوريد يوم الأحد والأربع.', active: true, version: 1, createdAt: created },

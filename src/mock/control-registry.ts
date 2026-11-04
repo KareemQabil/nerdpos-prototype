@@ -14,7 +14,7 @@ const ACTIONS: typeof APPROVAL_ACTIONS = [
 for (const a of ACTIONS) if (!APPROVAL_ACTIONS.some((x) => x.id === a.id)) APPROVAL_ACTIONS.push(a);
 // the existing "void a fired line" action now covers every removal at stage S1 (pre-bill printed or sent, unpaid)
 const lv = APPROVAL_ACTIONS.find((a) => a.id === 'LINE_VOID');
-if (lv) { lv.title = 'إلغاء صنف ظهر للزبون أو اتبعت (قبل الدفع)'; for (const c of ['Order.RemoveLine', 'Order.UpdateLine', 'Order.CancelStaffMeal']) if (!lv.commands.includes(c)) lv.commands.push(c); }
+if (lv) { lv.title = 'إلغاء صنف ظهر للعميل أو أُرسل (قبل الدفع)'; for (const c of ['Order.RemoveLine', 'Order.UpdateLine', 'Order.CancelStaffMeal']) if (!lv.commands.includes(c)) lv.commands.push(c); }
 const rf = APPROVAL_ACTIONS.find((a) => a.id === 'REFUND_APPROVE');
 if (rf) rf.title = 'مرتجع في نفس اليوم (بعد الدفع)';
 

@@ -45,7 +45,7 @@ export function availabilityOf(db: DB, productId: string, branchId: string) {
 type TaxPolicyRow = DB['taxPolicies'][number];
 const taxPart = (t: TaxPolicyRow, weight: Decimal.Value, label?: { ar: string; en: string }): LineTaxPart => ({ taxPolicyId: t.id, rate: t.rate, mode: t.calculationMode, version: t.version, name: t.name, roundingMode: t.roundingMode, roundingScale: t.roundingScale, exemption: t.exemption, weight: m4(weight), label });
 const levelName = (lv: ModifierLevel, n: { ar: string; en: string }) => lv === 'NO' ? { ar: `بدون ${n.ar}`, en: `No ${n.en}` } : lv === 'LESS' ? { ar: `${n.ar} خفيف`, en: `Light ${n.en}` } : { ar: `${n.ar} زيادة`, en: `Extra ${n.en}` };
-const placeName = (pl: HalfPlacement, n: { ar: string; en: string }) => pl === 'LEFT' ? { ar: `${n.ar} (النص الأول)`, en: `${n.en} (1st half)` } : pl === 'RIGHT' ? { ar: `${n.ar} (النص التاني)`, en: `${n.en} (2nd half)` } : n;
+const placeName = (pl: HalfPlacement, n: { ar: string; en: string }) => pl === 'LEFT' ? { ar: `${n.ar} (النص الأول)`, en: `${n.en} (1st half)` } : pl === 'RIGHT' ? { ar: `${n.ar} (النصف الثاني)`, en: `${n.en} (2nd half)` } : n;
 
 export function quoteItem(db: DB, input: QuoteInput): Quote {
   const product = db.products.find((p) => p.id === input.productId);
@@ -102,7 +102,7 @@ export function quoteItem(db: DB, input: QuoteInput): Quote {
     const modeEn = mode === 'AVERAGE' ? 'average of halves' : mode === 'SUM_OF_HALVES' ? 'sum of halves' : 'higher half';
     children.push({ kind: 'HALF', name: product.name, productId: product.id, upcharge: ZERO, allocated: m4(pa), categoryId: product.categoryId, taxPolicyId: tax.id, detail: { ar: `النص الأول · ${modeAr}`, en: `first half · ${modeEn}` } });
     const otax = (other.taxPolicyId ? db.taxPolicies.find((t) => t.id === other.taxPolicyId && t.active) : null) ?? tax;
-    children.push({ kind: 'HALF', name: other.name, productId: other.id, upcharge: ZERO, allocated: m4(pb), categoryId: other.categoryId, taxPolicyId: otax.id, detail: { ar: `النص التاني · ${modeAr}`, en: `second half · ${modeEn}` } });
+    children.push({ kind: 'HALF', name: other.name, productId: other.id, upcharge: ZERO, allocated: m4(pb), categoryId: other.categoryId, taxPolicyId: otax.id, detail: { ar: `النصف الثاني · ${modeAr}`, en: `second half · ${modeEn}` } });
     half = { mode, halves: [{ productId: product.id, name: product.name, price: m4(a) }, { productId: other.id, name: other.name, price: m4(b) }] };
     base = pa.plus(pb);
     parts.push(taxPart(tax, pa), taxPart(otax, pb));

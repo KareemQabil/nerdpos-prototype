@@ -10,7 +10,7 @@ import { t, L, getLang } from '../../i18n';
 import { cn } from '../../lib/format';
 import { Tech } from '../../app/tech';
 import bank from '../../reports/assistant/question-bank.json';
-import { EvidenceCtx, fmt, type EvidenceSpec, ReconList } from './parts';
+import { EvidenceCtx, fmt, type EvidenceSpec, ReconList, Amt } from './parts';
 import { EvidencePopup } from './Evidence';
 import { Bridge, Matrix } from './ReportView';
 
@@ -20,7 +20,7 @@ const STATUS: Record<string, { label: string; tone: any; icon: any }> = {
   REFUSED: { label: 'رفض آمن', tone: 'error', icon: ShieldX }, UNPARSED: { label: 'مش فاهم السؤال', tone: 'neutral', icon: HelpCircle },
 };
 const CHIP_ICON: Record<string, any> = { definition: BookOpen, period: Calendar, filters: Filter, asOf: Clock, provisional: AlertTriangle, source: FileSearch, not_available: Ban, refusal: ShieldX, assumption: Info, version: BookOpen };
-const SUGGEST = ['صافي المبيعات امبارح', 'أنا بعت بكام النهاردة؟', 'إيه الفرق بين مبيعات امبارح والتحصيل؟', 'مبيعات أمس مقارنة بنفس يوم الأسبوع اللي فات؟', 'أكتر 10 أصناف الأسبوع ده بالقيمة', 'عجز الدرج عند مين؟', 'الكاش كام والفيزا كام والمحافظ كام؟', 'وريني النجوم والخيول في المنيو', 'تكلفة العمالة كنسبة من المبيعات؟', 'ينفع نمسح مبيعات قبل إرسالها للضرائب؟', 'في فرق قرش بسبب الـSplit؟', 'إيه الخامات الناقصة النهاردة؟'];
+const SUGGEST = ['صافي المبيعات أمس', 'كم بعتُ اليوم؟', 'ما الفرق بين مبيعات أمس والتحصيل؟', 'مبيعات أمس مقارنة بنفس يوم الأسبوع الماضي؟', 'أعلى 10 أصناف في المبيعات هذا الأسبوع', 'عند من عجز الدرج؟', 'كم النقدي والبطاقات والمحافظ؟', 'اعرض النجوم والخيول في قائمة الطعام', 'تكلفة العمالة كنسبة من المبيعات؟', 'هل يمكن حذف مبيعات قبل إرسالها للضرائب؟', 'هل يوجد فرق قرش بسبب تقسيم الشيك؟', 'ما الخامات الناقصة اليوم؟'];
 
 function QueryResult({ r }: { r: any }) {
   const open = React.useContext(EvidenceCtx);
@@ -32,7 +32,7 @@ function QueryResult({ r }: { r: any }) {
       head={[...r.dimensions.map((d: string) => d), ...r.metrics.map((m: string) => L(r.meta.metrics.find((x: any) => x.id === m)?.label))]}
       rows={r.rows.map((row: any) => [...r.dimensions.map((d: string) => L(row.labels[d])), ...r.metrics.map((m: string) => {
         const v = row.values[m];
-        return v?.availability === 'AVAILABLE' ? <button type="button" className="num underline decoration-dotted" onClick={() => open({ metric: m, cell: row.dims, from: r.meta.from, to: r.meta.to, branchIds: r.meta.branchIds })}>{fmt(v.value, unit(m))}</button> : <span className="text-dim" title={L(v?.reason)}>{v?.availability === 'NOT_AVAILABLE' ? t('مش متاح') : '—'}</span>;
+        return v?.availability === 'AVAILABLE' ? <button type="button" className="underline decoration-dotted" onClick={() => open({ metric: m, cell: row.dims, from: r.meta.from, to: r.meta.to, branchIds: r.meta.branchIds })}><Amt v={v.value} unit={unit(m)} /></button> : <span className="text-dim" title={L(v?.reason)}>{v?.availability === 'NOT_AVAILABLE' ? t('مش متاح') : '—'}</span>;
       })])} />
   );
 }
@@ -55,9 +55,9 @@ function AnswerCard({ a, onClarify, busy }: { a: any; onClarify: (id: string, la
       {a.shape === 'bridge' && a.data?.sales && <Bridge run={{ period: { from: a.data.scope.from, to: a.data.scope.to }, branchIds: a.data.scope.branchIds }} br={a.data} />}
       {a.shape === 'matrix' && run && <Matrix run={run} mm={a.data} />}
       {a.shape === 'recon' && <ReconList checks={a.data.checks} />}
-      {a.shape === 'compare' && <Table dense head={[t('المقياس'), t('الفترة'), t('المقارنة'), t('الفرق')]} align={['start', 'end', 'end', 'end']} rows={a.data.rows.map((r: any) => [L(r.label), fmt(r.current.value), fmt(r.base.value), r.delta !== null ? `${fmt(r.delta)}${r.pct ? ` (${Number(r.pct).toFixed(1)}%)` : ''}` : '—'])} />}
-      {a.shape === 'decompose' && <div className="space-y-1">{a.data.effects.map((e: any) => <div key={e.id} className="flex items-center gap-2 text-sm rounded-md surface-1 px-2 py-1"><span className="flex-1">{L(e.label)}<span className="block text-[10px] text-dim">{L(e.note)}</span></span><span className={cn('num font-bold', Number(e.amount) < 0 && 'text-[var(--error)]')}>{fmt(e.amount)}</span></div>)}</div>}
-      {a.shape === 'evidence' && <Table dense head={[t('السجل'), t('اليوم'), t('المبلغ')]} align={['start', 'start', 'end']} rows={a.data.parts.flatMap((p: any) => p.evidence).map((e: any) => [e.label, <span className="num text-xs">{e.businessDate}</span>, <span className="num">{fmt(e.amount)}</span>])} />}
+      {a.shape === 'compare' && <Table dense head={[t('المقياس'), t('الفترة'), t('المقارنة'), t('الفرق')]} align={['start', 'end', 'end', 'end']} rows={a.data.rows.map((r: any) => [L(r.label), <Amt v={r.current.value} />, <Amt v={r.base.value} />, r.delta !== null ? <span><Amt v={r.delta} />{r.pct ? <span className="num"> ({Number(r.pct).toFixed(1)}%)</span> : ''}</span> : '—'])} />}
+      {a.shape === 'decompose' && <div className="space-y-1">{a.data.effects.map((e: any) => <div key={e.id} className="flex items-center gap-2 text-sm rounded-md surface-1 px-2 py-1"><span className="flex-1">{L(e.label)}<span className="block text-[10px] text-dim">{L(e.note)}</span></span><Amt v={e.amount} className={cn('font-bold', Number(e.amount) < 0 && 'text-[var(--error)]')} /></div>)}</div>}
+      {a.shape === 'evidence' && <Table dense head={[t('السجل'), t('اليوم'), t('المبلغ')]} align={['start', 'start', 'end']} rows={a.data.parts.flatMap((p: any) => p.evidence).map((e: any) => [e.label, <span className="num text-xs">{e.businessDate}</span>, <Amt v={e.amount} />])} />}
       {a.data?.items && Array.isArray(a.data.items) && a.shape === 'table' && !a.data.rows && <Table dense head={Object.keys(a.data.items[0] ?? {}).filter((k) => !['item', 'id'].includes(k))} rows={a.data.items.map((x: any) => Object.entries(x).filter(([k]) => !['item', 'id'].includes(k)).map(([, v]: any) => (typeof v === 'object' ? L(v) : String(v))))} />}
       {a.chips?.length > 0 && (
         <div className="flex flex-wrap gap-1.5 pt-1">

@@ -34,12 +34,12 @@ export function subCall(ctx: Ctx, opId: string, params: Record<string, string>, 
 }
 
 export const REASONS: Record<string, { ar: string; en: string }> = {
-  NO_ANSWER: { ar: 'العميل مش بيرد', en: 'Customer not answering' },
+  NO_ANSWER: { ar: 'العميل لا يرد', en: 'Customer not answering' },
   WRONG_ADDRESS: { ar: 'العنوان غلط أو ناقص', en: 'Wrong or incomplete address' },
-  CUSTOMER_NOT_HOME: { ar: 'العميل مش موجود', en: 'Customer not at home' },
+  CUSTOMER_NOT_HOME: { ar: 'العميل غير موجود', en: 'Customer not at home' },
   CUSTOMER_REFUSED: { ar: 'العميل رفض الاستلام', en: 'Customer refused' },
   VEHICLE_ISSUE: { ar: 'عطل في الموتوسيكل', en: 'Vehicle problem' },
-  OTHER: { ar: 'سبب تاني', en: 'Other' },
+  OTHER: { ar: 'سبب آخر', en: 'Other' },
 };
 
 function kitchenStatus(db: DB, d: Delivery) {
@@ -132,7 +132,7 @@ function assignDriver(ctx: Ctx, d: Delivery, drv: Driver) {
   d.driverId = drv.id;
   d.state = 'ASSIGNED';
   d.assignedAt = ctx.nowIso;
-  step(ctx, d, 'ASSIGNED', before && before !== drv.name ? { ar: `اتغيّر الطيار من ${before} لـ ${drv.name}`, en: `reassigned ${before} → ${drv.name}` } : { ar: `اتسلّم للطيار ${drv.name}`, en: `assigned to ${drv.name}` });
+  step(ctx, d, 'ASSIGNED', before && before !== drv.name ? { ar: `تغيّر الطيار من ${before} إلى ${drv.name}`, en: `reassigned ${before} → ${drv.name}` } : { ar: `سُلّم للطيار ${drv.name}`, en: `assigned to ${drv.name}` });
 }
 
 /** Capture on the drawer that settles or collects (the terminal's open session, else the order's own session). */
@@ -270,13 +270,13 @@ export const deliveryHandlers: Record<string, Handler> = {
           const c = pushCapture(ctx, o, session.id, 'CASH', amt, `${settlement.id}`, null);
           drawerEntry(ctx, session.id, 'TENDER_IN', c.amount, { ref: `${o.number} · ${drv.name}` });
           o.version++;
-          o.history.push(hist(ctx.user!.id, 'CAPTURED', { ar: `الطيار ${drv.name} سلّم ${m4(amt)} كاش في الدرج (تسوية ${settlement.id})`, en: `driver cash ${amt} settled` }, null, ctx.terminal?.code));
+          o.history.push(hist(ctx.user!.id, 'CAPTURED', { ar: `سلّم الطيار ${drv.name} ${m4(amt)} ج.م نقدًا في الدرج (تسوية ${settlement.id})`, en: `driver cash ${amt} settled` }, null, ctx.terminal?.code));
         }
         if (tryComplete(ctx, o)) completed.push(o.number);
       }
       d.cod!.settled = true;
       d.cod!.settlementId = settlement.id;
-      step(ctx, d, 'CASH_SETTLED', { ar: `فلوس الطلب اتسلمت للكاشير (${m4(d.cod!.amount)})`, en: `cash settled ${d.cod!.amount}` });
+      step(ctx, d, 'CASH_SETTLED', { ar: `سُلّمت نقدية الطلب للكاشير (${m4(d.cod!.amount)} ج.م)`, en: `cash settled ${d.cod!.amount}` });
     }
     if (D(variance).lt(0)) {
       drawerEntry(ctx, session.id, 'PAY_OUT', D(variance).abs().toString(), { reasonCode: 'DRIVER_SHORTAGE', reason: `عجز الطيار ${drv.name}`, ref: settlement.id, approvalGrantId: g?.id });
@@ -406,9 +406,9 @@ export const deliveryHandlers: Record<string, Handler> = {
           const s = collectingSessionFor(ctx, o);
           const c = pushCapture(ctx, o, s.id, 'CARD', remaining, ref, null);
           o.version++;
-          o.history.push(hist(ctx.user!.id, 'CAPTURED', { ar: `اتدفع كارت مع الطيار ${m4(remaining)} (${ref})`, en: `card on delivery ${remaining}` }, null, ctx.terminal?.code));
+          o.history.push(hist(ctx.user!.id, 'CAPTURED', { ar: `دُفع ببطاقة مع الطيار ${m4(remaining)} ج.م (${ref})`, en: `card on delivery ${remaining}` }, null, ctx.terminal?.code));
           d.collected = { method: 'CARD', amount: c.amount, reference: ref, captureId: c.id };
-          collectedText = ` — اتدفع كارت ${m4(remaining)}`;
+          collectedText = ` — دُفع ببطاقة ${m4(remaining)} ج.م`;
         } else {
           d.cod = { amount: m4(remaining), settled: false, settlementId: null };
           d.collected = { method: 'CASH', amount: m4(remaining), reference: null, captureId: null };
@@ -421,7 +421,7 @@ export const deliveryHandlers: Record<string, Handler> = {
     d.deliveredAt = ctx.nowIso;
     if (drv) drv.location = { ...zoneCenter(zonesOf(db).find((z) => z.id === d.zoneId)), at: ctx.nowIso };
     const late = ctx.now > d.promisedAtMs + rules(d.branchId).graceMinutes * 60_000;
-    step(ctx, d, 'DELIVERED', { ar: `اتسلّم للعميل${late ? ` (متأخر ${Math.floor((ctx.now - d.promisedAtMs) / 60000)} دقيقة)` : ''}${collectedText}`, en: `delivered${late ? ' (late)' : ''}` });
+    step(ctx, d, 'DELIVERED', { ar: `سُلّم للعميل${late ? ` (متأخر ${Math.floor((ctx.now - d.promisedAtMs) / 60000)} دقيقة)` : ''}${collectedText}`, en: `delivered${late ? ' (late)' : ''}` });
     event('DeliveryCompleted', d.id, `${d.number}`);
     return deliveryView(db, d, ctx.now, true);
   },
@@ -459,18 +459,18 @@ export const deliveryHandlers: Record<string, Handler> = {
       const caps = db.captures.filter((c) => c.orderId === o.id);
       if (o.status === 'DRAFT') {
         o.status = 'CANCELLED'; o.cancelledAt = ctx.nowIso; o.endReason = { code: 'DELIVERY_CANCELLED', note: reason };
-        o.version++; o.history.push(hist(ctx.user!.id, 'CANCELLED', { ar: `الطلب اتلغى مع إلغاء التوصيل: ${reason}`, en: `cancelled with delivery: ${reason}` }, null, ctx.terminal?.code));
+        o.version++; o.history.push(hist(ctx.user!.id, 'CANCELLED', { ar: `أُلغي الطلب مع إلغاء التوصيل: ${reason}`, en: `cancelled with delivery: ${reason}` }, null, ctx.terminal?.code));
         outcome = 'ORDER_CANCELLED';
       } else if (o.status === 'CONFIRMED' && !caps.length) {
         const started = db.tickets.some((t) => t.orderId === o.id && t.state !== 'NEW');
         for (const l of activeLines(o)) { l.status = 'VOIDED'; l.version++; l.voided = { at: ctx.nowIso, by: ctx.user!.id, reasonCode: 'DELIVERY_CANCELLED', reason, approvalGrantId: g?.id, disposition: started ? 'WASTE' : 'NOT_PREPARED', approverId: g?.approverUserId }; }
         for (const t of db.tickets.filter((t) => t.orderId === o.id)) { for (const it of t.items) it.status = 'CANCELLED'; t.version++; }
         o.status = 'VOIDED'; o.voidedAt = ctx.nowIso; o.endReason = { code: 'DELIVERY_CANCELLED', note: reason, approvalGrantId: g?.id };
-        o.version++; o.history.push(hist(ctx.user!.id, 'VOIDED', { ar: `الطلب اتلغى مع إلغاء التوصيل (${started ? 'الأكل اتعمل — هالك' : 'ما اتعملش'}): ${reason}${g ? ` — بموافقة ${userName(db, g.approverUserId)}` : ''}`, en: `voided with delivery: ${reason}` }, null, ctx.terminal?.code));
+        o.version++; o.history.push(hist(ctx.user!.id, 'VOIDED', { ar: `أُلغي الطلب مع إلغاء التوصيل (${started ? 'حُضّر الطعام — هالك' : 'لم يُحضَّر'}): ${reason}${g ? ` — بموافقة ${userName(db, g.approverUserId)}` : ''}`, en: `voided with delivery: ${reason}` }, null, ctx.terminal?.code));
         outcome = 'ORDER_VOIDED';
       } else if (caps.length && o.status === 'CONFIRMED') {
         outcome = 'REFUND_NEEDED';
-        o.history.push(hist(ctx.user!.id, 'DELIVERY_CANCELLED', { ar: `التوصيل اتلغى والطلب مدفوع — محتاج مرتجع: ${reason}`, en: 'delivery cancelled on a paid order — refund needed' }, null, ctx.terminal?.code));
+        o.history.push(hist(ctx.user!.id, 'DELIVERY_CANCELLED', { ar: `أُلغي التوصيل والطلب مدفوع — يلزم مرتجع: ${reason}`, en: 'delivery cancelled on a paid order — refund needed' }, null, ctx.terminal?.code));
       } else outcome = 'ORDER_KEPT';
     }
     const drv = d.driverId ? driversOf(db).find((x) => x.id === d.driverId) : null;
@@ -479,7 +479,7 @@ export const deliveryHandlers: Record<string, Handler> = {
     d.cancelledAt = ctx.nowIso;
     d.cancel = { at: ctx.nowIso, by: ctx.user!.id, reason, approvalGrantId: g?.id ?? null, orderOutcome: outcome };
     d.driverId = d.driverId ?? null;
-    step(ctx, d, 'CANCELLED', { ar: `التوصيل اتلغى: ${reason}${outcome === 'REFUND_NEEDED' ? ' — الطلب مدفوع، اعمل مرتجع' : outcome === 'ORDER_VOIDED' ? ' — الطلب اتلغى' : ''}`, en: `cancelled: ${reason} (${outcome})` });
+    step(ctx, d, 'CANCELLED', { ar: `أُلغي التوصيل: ${reason}${outcome === 'REFUND_NEEDED' ? ' — الطلب مدفوع، أنشئ مرتجعًا' : outcome === 'ORDER_VOIDED' ? ' — أُلغي الطلب' : ''}`, en: `cancelled: ${reason} (${outcome})` });
     ctx.audit(`delivery ${d.number} cancelled (${outcome}): ${reason}`, d.id, true, g?.id);
     return deliveryView(db, d, ctx.now, true);
   },

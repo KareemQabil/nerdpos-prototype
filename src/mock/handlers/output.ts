@@ -50,7 +50,7 @@ export const outputHandlers: Record<string, Handler> = {
     const o = getOrder(ctx, ctx.params.orderId);
     if (!(o.status === 'DRAFT' || o.status === 'CONFIRMED')) throw new ApiError('ORDER_NOT_EDITABLE');
     const j = enqueuePrint(ctx.db, { documentType: 'PRE_BILL', documentId: o.id, copyKind: 'ORIGINAL', terminalId: ctx.body.terminalId ?? ctx.terminal!.id, createdBy: ctx.user!.id, label: `شيك مبدئي ${o.number}` });
-    o.history.push({ at: ctx.nowIso, by: ctx.user!.id, kind: 'PRE_BILL', text: { ar: 'اتطبع شيك مبدئي (ليس فاتورة ضريبية) — الشيك ما اتغيرش', en: 'pre-bill printed' } });
+    o.history.push({ at: ctx.nowIso, by: ctx.user!.id, kind: 'PRE_BILL', text: { ar: 'طُبع شيك مبدئي (ليس فاتورة ضريبية) — الشيك لم يتغير', en: 'pre-bill printed' } });
     return { status: 201, body: j };
   },
   'Print.Document': (ctx) => {

@@ -68,6 +68,10 @@ const AR_GLOSSARY: [RegExp, string][] = [
   [/إقفال يوم /g, 'إغلاق يوم '], [/من غير إيصال/g, 'بلا إيصال'], [/من غير درج/g, 'بلا درج'],
   // Owner decision: شيك، ترابيزة، ويتر، تيك أواي، دليفري، طيار stay as they are; only non-owner colloquial words are swapped.
   arTerm('ويترية', 'ويترز'), arTerm('منيوهات', 'قوائم'), arTerm('منيو', 'قائمة'), arTerm('سيستم', 'نظام'),
+  // ux-08: ux-07 leftovers — cash/card, customer, taxes, currency (wallet brands such as «فودافون كاش» keep their name)
+  [new RegExp(`(?<!(?:فودافون|أورنج|اورنج|أورانج|اتصالات|وي)\\s)(?<![${AR_L}])([وف]?(?:بال|لل|كال|ال|ب|ل|ك)?)كاش(?![${AR_L}])`, 'g'), '$1نقدي'],
+  arTerm('كروت', 'بطاقات'), arTerm('كارت', 'بطاقة'), arTerm('زباين', 'عملاء'), arTerm('زبون', 'عميل'), arTerm('ضرايب', 'ضرائب'),
+  [/(\d[\d,.]*)\s*جنيه(?:ات|ًا)?(?![ء-ي])/g, '$1 ج.م'],
 ];
 function arLabel(v: string): string {
   if (!v || !AR_RE.test(v)) return v;

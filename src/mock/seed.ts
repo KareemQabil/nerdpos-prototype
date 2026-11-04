@@ -18,7 +18,7 @@ export const DEMO_PASSWORD = 'demo-password-1';
 
 /** Arabic display names for seeded branches and terminals (ids and codes unchanged). */
 const DISPLAY_NAME_AR: Record<string, string> = {
-  branch_main: 'الفرع الرئيسي — مدينة نصر', branch_second: 'الفرع التاني — المعادي',
+  branch_main: 'الفرع الرئيسي — مدينة نصر', branch_second: 'الفرع الثاني — المعادي',
   // ux-07: the canonical device names (same as DEVICE_NAMES in demo/people.ts)
   t_floor: 'تابلت الويتر', t_cash: 'جهاز الكاشير 1', t_kds: 'شاشة التسليم', t_admin: 'كمبيوتر المكتب', t_second_floor: 'تابلت الفرع الثاني',
 };
@@ -154,7 +154,7 @@ export function buildSeed(nowMs: number): DB {
 
   // A demo happy-hour promotion (B6) and a coded promotion.
   db.promotions.push({ id: 'promo_1', name: { ar: 'هابي أور مشروبات باردة 20%', en: 'Happy hour cold drinks 20%' }, kind: 'AUTOMATIC', code: null, benefitType: 'PERCENTAGE', benefitValue: '20', branchIds: ['branch_main'], channels: ['DINE_IN', 'TAKEAWAY'], minSubtotal: null, schedule: { days: [0, 1, 2, 3, 4, 5, 6], start: '15:00', end: '18:00' }, validFrom: null, validTo: null, active: true, version: 1 });
-  db.promotions.push({ id: 'promo_2', name: { ar: 'كود ترحيب 50 جنيه', en: 'Welcome code 50 EGP' }, kind: 'CODED', code: 'WELCOME50', benefitType: 'FIXED_AMOUNT', benefitValue: '50', branchIds: ['branch_main'], channels: ['DINE_IN', 'TAKEAWAY'], minSubtotal: m4('300'), schedule: null, validFrom: null, validTo: null, active: true, version: 1 });
+  db.promotions.push({ id: 'promo_2', name: { ar: 'كود ترحيب 50 ج.م', en: 'Welcome code 50 ج.م' }, kind: 'CODED', code: 'WELCOME50', benefitType: 'FIXED_AMOUNT', benefitValue: '50', branchIds: ['branch_main'], channels: ['DINE_IN', 'TAKEAWAY'], minSubtotal: m4('300'), schedule: null, validFrom: null, validTo: null, active: true, version: 1 });
 
   seedCrm(db, nowMs); // customers, delivery, loyalty, online orders (seed-crm.ts)
   seedOps(db, nowMs); // operations & system area: floor plans, history, reconciliation, webhooks, schedules

@@ -135,7 +135,7 @@ export const moneyHandlers: Record<string, Handler> = {
       if (remaining.lte(0)) break;
     }
     o.version++;
-    o.history.push({ at: ctx.nowIso, by: ctx.user!.id, byName: ctx.user!.displayName, terminal: ctx.terminal?.code, kind: 'CAPTURED', text: { ar: `اتدفع ${created.map((c) => `${c.method === 'CASH' ? 'كاش' : c.method === 'CARD' ? 'كارت' : c.method} ${c.amount}${c.reference ? ' (' + c.reference + ')' : ''}`).join(' + ')}${changeTotal.gt(0) ? ` — الباقي للعميل ${m4(changeTotal)}` : ''}`, en: `captured ${created.map((c) => `${c.method} ${c.amount}`).join(' + ')}` } });
+    o.history.push({ at: ctx.nowIso, by: ctx.user!.id, byName: ctx.user!.displayName, terminal: ctx.terminal?.code, kind: 'CAPTURED', text: { ar: `دُفع ${created.map((c) => `${c.method === 'CASH' ? 'نقدًا' : c.method === 'CARD' ? 'ببطاقة' : c.method} ${c.amount} ج.م${c.reference ? ' (' + c.reference + ')' : ''}`).join(' + ')}${changeTotal.gt(0) ? ` — الباقي للعميل ${m4(changeTotal)} ج.م` : ''}`, en: `captured ${created.map((c) => `${c.method} ${c.amount}`).join(' + ')}` } });
     event('PaymentCaptured', o.id, `${o.number} ${created.map((c) => `${c.method} ${c.amount}`).join(' + ')}`);
     ctx.audit(`capture ${o.number}`, o.id);
     return { status: 201, body: { captureIds: created.map((c) => c.id), captures: created, change: m4(changeTotal), settlement: settlementOf(db, o), sessionId: session.id } };
@@ -289,7 +289,7 @@ export const moneyHandlers: Record<string, Handler> = {
     const lines = (ctx.body.lines ?? []).map((l: any) => ({ lineId: l.lineId, quantity: String(l.quantity), ...(checkDisposition(l.disposition, 'lines.disposition') ? { disposition: l.disposition } : {}) }));
     const r = { id: nextId('ref'), orderId: o.id, amount, method: ctx.body.method, reasonCode: ctx.body.reasonCode, reason: ctx.body.reason, state: 'REQUESTED' as const, allocations: allocs.map((a) => ({ captureId: a.captureId, amount: m4(a.amount) })), lines, requestedBy: ctx.user!.id, requestedAt: ctx.nowIso, version: 1, stage, afterClose: stage === 'S3', originalBusinessDate: paidDateOf(db, o) };
     db.refunds.push(r);
-    o.history.push({ at: ctx.nowIso, by: ctx.user!.id, byName: ctx.user!.displayName, kind: 'REFUND_REQUESTED', text: { ar: `طلب ${stage === 'S3' ? 'مرتجع بعد قفل اليوم' : 'مرتجع'} ${amount} (${ctx.body.reasonCode})`, en: `refund requested ${amount}` }, terminal: ctx.terminal?.code });
+    o.history.push({ at: ctx.nowIso, by: ctx.user!.id, byName: ctx.user!.displayName, kind: 'REFUND_REQUESTED', text: { ar: `طلب ${stage === 'S3' ? 'مرتجع بعد إغلاق اليوم' : 'مرتجع'} ${amount} ج.م (${ctx.body.reasonCode})`, en: `refund requested ${amount}` }, terminal: ctx.terminal?.code });
     ctx.audit(`refund requested ${amount} on ${o.number} (${stage})`, r.id, true, undefined, { stage });
     return { status: 201, body: r };
   },
@@ -386,7 +386,7 @@ export const moneyHandlers: Record<string, Handler> = {
     d!.state = 'APPLIED';
     d!.appliedOrderId = o.id;
     o.version++;
-    o.history.push({ at: ctx.nowIso, by: ctx.user!.id, kind: 'DEPOSIT_APPLIED', text: { ar: `اتخصم عربون ${d!.amount} (كان التزام، بقى مبيعات دلوقتي)`, en: `deposit ${d!.amount} applied` } });
+    o.history.push({ at: ctx.nowIso, by: ctx.user!.id, kind: 'DEPOSIT_APPLIED', text: { ar: `خُصم عربون ${d!.amount} ج.م (كان التزامًا، وأصبح مبيعات الآن)`, en: `deposit ${d!.amount} applied` } });
     return { deposit: d, settlement: settlementOf(ctx.db, o) };
   },
   'Tip.Distribute': (ctx) => {

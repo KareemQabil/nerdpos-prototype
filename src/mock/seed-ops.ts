@@ -44,7 +44,7 @@ export function seedOps(db: DB, nowMs: number) {
       { id: 'd7', kind: 'PLANT', x: 30, y: 530, w: 60, h: 60 }, { id: 'd8', kind: 'WALL', x: 0, y: 300, w: 20, h: 300, label: '' },
       { id: 'd9', kind: 'DOOR', x: 420, y: 0, w: 160, h: 26, label: 'باب الصالة' },
     ]),
-    floor('floor_upper', 'branch_main', 'الدور التاني', 'Upper floor', 30, [
+    floor('floor_upper', 'branch_main', 'الطابق الثاني', 'Upper floor', 30, [
       { id: 'd10', kind: 'LABEL', x: 40, y: 30, w: 260, h: 40, label: 'ركن العائلات' },
       { id: 'd11', kind: 'DOOR', x: 860, y: 560, w: 110, h: 30, label: 'السلم' },
     ]),
@@ -53,7 +53,7 @@ export function seedOps(db: DB, nowMs: number) {
   // tables on the upper floor (new in this area; names do not clash with the provisioning set)
   for (const [i, cap] of [4, 4, 6, 10].entries()) {
     const id = `tbl_up_${i + 1}`;
-    if (!db.tables.some((t) => t.id === id)) db.tables.push({ id, branchId: 'branch_main', name: String(21 + i), area: 'الدور التاني', capacity: cap, active: true, version: 1 });
+    if (!db.tables.some((t) => t.id === id)) db.tables.push({ id, branchId: 'branch_main', name: String(21 + i), area: 'الطابق الثاني', capacity: cap, active: true, version: 1 });
   }
   const L = (tableId: string, floorId: string, x: number, y: number, shape: TableLayout['shape'], seats: number, w = 110, h = 110): TableLayout => ({ tableId, floorId, x, y, w, h, shape, rotation: 0, seats });
   db.tableLayouts = [
@@ -127,7 +127,7 @@ export function seedOps(db: DB, nowMs: number) {
   const h1 = hist.find((x) => x.branchId === 'branch_main' && x.businessDate === y1)!;
   const h2 = hist.find((x) => x.branchId === 'branch_main' && x.businessDate === y2)!;
   const results: ReconResult[] = [
-    { id: 'rr_seed_1', runId: 'run_seed_1', ruleId: 'CARD_SETTLEMENT', key: `CARD:${y2}`, title: { ar: `كروت ${y2}: المتحصل مقابل تسوية البنك`, en: `Cards ${y2}` }, businessDate: y2, expected: h2.byMethod.CARD, actual: m4(D(h2.byMethod.CARD).minus(250)), difference: m4(-250), status: 'UNEXPLAINED_DIFFERENCE', drilldown: [{ kind: 'SETTLEMENT', id: `sb_card_${y2}`, label: 'تسوية ماكينة البنك الأهلي', amount: m4(D(h2.byMethod.CARD).minus(250)) }], note: { ar: 'عملية كارت واحدة مش ظاهرة في تسوية البنك', en: 'one card payment missing in the bank batch' }, ackBy: null, ackAt: null, ackReason: null, version: 1 },
+    { id: 'rr_seed_1', runId: 'run_seed_1', ruleId: 'CARD_SETTLEMENT', key: `CARD:${y2}`, title: { ar: `بطاقات ${y2}: المتحصل مقابل تسوية البنك`, en: `Cards ${y2}` }, businessDate: y2, expected: h2.byMethod.CARD, actual: m4(D(h2.byMethod.CARD).minus(250)), difference: m4(-250), status: 'UNEXPLAINED_DIFFERENCE', drilldown: [{ kind: 'SETTLEMENT', id: `sb_card_${y2}`, label: 'تسوية ماكينة البنك الأهلي', amount: m4(D(h2.byMethod.CARD).minus(250)) }], note: { ar: 'عملية بطاقة واحدة غير ظاهرة في تسوية البنك', en: 'one card payment missing in the bank batch' }, ackBy: null, ackAt: null, ackReason: null, version: 1 },
     { id: 'rr_seed_2', runId: 'run_seed_1', ruleId: 'DRAWER_CASH', key: `DRAWER:${y1}:T1`, title: { ar: `درج الكاشير T1 — ${y1}`, en: `Drawer T1 ${y1}` }, businessDate: y1, expected: m4(D(h1.byMethod.CASH).plus(500)), actual: m4(D(h1.byMethod.CASH).plus(470)), difference: m4(-30), status: 'EXPLAINED', drilldown: [], note: null, ackBy: 'u_manager_1', ackAt: new Date(nowMs - DAY / 2).toISOString(), ackReason: 'فكة اتدّت غلط لعميل — اتكلمنا مع الكاشير', version: 2 },
     { id: 'rr_seed_3', runId: 'run_seed_1', ruleId: 'WALLETS', key: `WALLET:${y1}`, title: { ar: `محافظ ${y1}: إنستاباي`, en: `Wallets ${y1}` }, businessDate: y1, expected: h1.byMethod.DIGITAL_WALLET, actual: h1.byMethod.DIGITAL_WALLET, difference: m4(0), status: 'MATCHED', drilldown: [], note: null, ackBy: null, ackAt: null, ackReason: null, version: 1 },
   ];
