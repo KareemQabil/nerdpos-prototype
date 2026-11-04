@@ -383,7 +383,7 @@ export function query(db: DB, caller: Caller, q: QuerySpec, opts: QueryOpts = {}
   for (const m of ok) {
     const g = evalMetric(totalsCtx, m).get('') ?? evalMetric(totalsCtx, m).get('*');
     totals[m.id] = g?.value ?? zeroOrNA(m, c);
-    if (preLaunchDays.length && !hasHistory(m) && totals[m.id].availability === 'AVAILABLE') totals[m.id] = { ...totals[m.id], reason: { ar: `الأيام قبل ${c.launch} مفيهاش بيانات تفصيلية — مش داخلة في الرقم.`, en: `Days before ${c.launch} have no event-level data — excluded.` } };
+    if (preLaunchDays.length && !hasHistory(m) && totals[m.id].availability === 'AVAILABLE') totals[m.id] = { ...totals[m.id], reason: { ar: `الأيام قبل ${c.launch} بلا بيانات تفصيلية — غير داخلة في الرقم.`, en: `Days before ${c.launch} have no event-level data — excluded.` } };
     if (preLaunchDays.length === datesOf(from, to).length && !hasHistory(m)) totals[m.id] = NOT_AVAIL({ ar: `الفترة كلها قبل تشغيل السيستم (${c.launch}) — عندنا إجماليات يومية بس.`, en: `Whole period precedes launch (${c.launch}) — daily aggregates only.` });
   }
   for (const id of notAvailable.map((x) => x.metric)) totals[id] = NOT_AVAIL(notAvailable.find((x) => x.metric === id)!.reason);
@@ -411,7 +411,7 @@ export function query(db: DB, caller: Caller, q: QuerySpec, opts: QueryOpts = {}
   const days = datesOf(from, to).map((d) => ({ date: d, status: dayStatus(db, branchIds, d, caller.nowMs), source: (d < c.launch ? ((db.salesHistory ?? []).some((h) => h.businessDate === d && branchIds.includes(h.branchId)) ? 'HISTORY' : 'NONE') : 'EVENTS') as 'EVENTS' | 'HISTORY' | 'NONE' }));
   const openSessions = db.sessions.filter((s) => branchIds.includes(s.branchId) && s.state !== 'CLOSED' && inRange(s.businessDate, from, to));
   const provisionalReasons: Loc[] = [];
-  if (days.some((d) => d.status === 'OPEN')) provisionalReasons.push({ ar: 'اليوم التجاري لسه ما خلصش (بيخلص 4 الفجر).', en: 'The business day has not ended (04:00).' });
+  if (days.some((d) => d.status === 'OPEN')) provisionalReasons.push({ ar: 'لم ينتهِ اليوم التجاري بعد (ينتهي الساعة 4 فجرًا).', en: 'The business day has not ended (04:00).' });
   if (openSessions.length) provisionalReasons.push({ ar: `فيه ${openSessions.length} وردية مفتوحة.`, en: `${openSessions.length} open session(s).` });
   if (days.some((d) => d.status === 'ENDED_NOT_CLOSED')) provisionalReasons.push({ ar: 'فيه يوم خلص بس لسه ما اتقفلش (إقفال اليوم).', en: 'A day ended but is not closed yet.' });
   if (asOfMs < caller.nowMs - 60_000) provisionalReasons.push({ ar: 'التقرير لقطة قديمة (asOf) — اللي اتسجل بعدها مش ظاهر.', en: 'An older asOf snapshot — later records hidden.' });

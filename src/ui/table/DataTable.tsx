@@ -245,6 +245,8 @@ export function DataTable<T>({ columns, rows, rowKey, onRowOpen, rowClassName, r
     ...(paged ? { getPaginationRowModel: getPaginationRowModel() } : {}),
     getRowId: (x) => String(rowKey ? rowKey(x.r, x.i) : x.i),
   });
+  // a new list (search, filter) starts on its first page
+  useEffect(() => { setPagination((p) => (p.pageIndex ? { ...p, pageIndex: 0 } : p)); }, [rows.length]);
   const pageCount = paged ? Math.max(1, Math.ceil(rows.length / pagination.pageSize)) : 1;
   useEffect(() => { if (paged && pagination.pageIndex >= pageCount) setPagination((p) => ({ ...p, pageIndex: pageCount - 1 })); }, [paged, pageCount, pagination.pageIndex]);
   const shown = (paged ? table.getPaginationRowModel() : table.getCoreRowModel()).rows;
