@@ -14,6 +14,7 @@ import { t } from '../../i18n';
 import { cn } from '../../lib/format';
 import { addQty, sumQty } from '../../lib/cash';
 import { profileFor, type SaleAction } from '../../app/profiles';
+import { useProfile } from '../../app/useProfile';
 import { approvalRule } from '../../mock/policies';
 import { ActionBar, type BarAction, type PrimaryState } from '../cashier/ActionBar';
 import { CustomerPicker } from '../customers/common';
@@ -38,7 +39,7 @@ function sameLine(order: any, productId: string, seat: number | null) {
 
 export function WaiterCheck({ orderId, onBack, onSwitch }: { orderId: string; onBack: () => void; onSwitch: (id: string) => void }) {
   const { me, terminal, can, auth, id: deviceId } = useDev();
-  const profile = useMemo(() => profileFor((me?.user?.roleAssignments ?? []).map((r: any) => String(r.roleName ?? '')), terminal?.kind ?? 'FLOOR'), [me, terminal]);
+  const profile = useProfile(terminal?.kind ?? 'FLOOR');
   const bar = profile.id === 'waiter' || profile.id === 'captain' ? profile.actionBar : profileFor(['waiter'], 'FLOOR').actionBar;
   const o = useQuery<any>('Order.Get', { params: { orderId } });
   const order = o.data && o.data.id === orderId ? o.data : null;

@@ -6,7 +6,8 @@ import React, { useMemo, useRef, useState } from 'react';
 import { UserPlus, ShieldCheck, KeyRound, Pencil, Plus, Power, Lock, Trash2, Users, UserCheck, UserX, KeySquare, Search } from 'lucide-react';
 import { useCommand, useDev, useQuery, errorText } from '../../app/hooks';
 import { Avatar, Banner, Button, Card, DetailPane, EmptyState, FILL_BODY, FILL_CARD, Field, FillPage, FilterChips, Input, MasterDetail, PageHeader, Pill, Popup, SearchInput, Select, StatCard, StatGrid, StateBadge, Switch, Table, Tabs, Toolbar, toast, confirmDialog, useEnterSave } from '../../ui';
-import { t } from '../../i18n';
+import { t, L } from '../../i18n';
+import { PROFILES, profileById } from '../../app/profiles'; // ux-09: work profile per user
 import { Tech } from '../../app/tech';
 import { cn } from '../../lib/format';
 import { branchLabel, personName, roleLabel, personLabel, userLabel } from '../../demo/people';
@@ -110,14 +111,14 @@ function UsersTab({ users, roles, branches, compact, selected, onOpen }: { users
           loading={users.loading && !users.data} onRowClick={(i) => onOpen(list[i].id)} rowClassName={(i) => (list[i].id === selected ? 'row-selected' : undefined)}
           empty={<EmptyState compact icon={<Search />} title={all.length ? t('مفيش حد بالبحث ده') : t('لسه مفيش مستخدمين')} />}
           rows={list.map((u) => compact ? [
-            <div className="flex items-center gap-2.5 min-w-0" data-fb={`users:row:${u.username}`}><Avatar name={personName(u.username, u.displayName)} size="sm" /><div className="min-w-0"><div className="font-bold truncate">{userLabel(u.username, u.displayName)}</div><div className="text-[11px] text-dim truncate">{u.roleAssignments.map((r: any) => roleName(r)).join(t('، '))}</div></div></div>,
+            <div className="flex items-center gap-2.5 min-w-0" data-fb={`users:row:${u.username}`}><Avatar name={personName(u.username, u.displayName)} size="sm" /><div className="min-w-0"><div className="font-bold truncate">{userLabel(u.username, u.displayName)}</div><div className="text-[11px] text-dim truncate">{u.roleAssignments.map((r: any) => roleName(r)).join(t('، '))}{u.profileId && <span className="text-[var(--violet)]" data-fb={`users:profile:${u.username}`}> · {L(profileById(u.profileId).role)}</span>}</div></div></div>,
             <div className="flex flex-wrap gap-1">{u.active ? <Pill tone="success" dot>{t('شغال')}</Pill> : <Pill tone="neutral" dot>{t('موقوف')}</Pill>}{u.locked && <Pill tone="error"><Lock className="w-3 h-3" />{t('مقفول')}</Pill>}</div>,
           ] : [
             <div className="flex items-center gap-2.5 min-w-0">
               <Avatar name={personName(u.username, u.displayName)} size="sm" />
               <div className="min-w-0"><div className="font-bold truncate">{userLabel(u.username, u.displayName)}</div><Tech><div className="num text-[11px] text-dim" dir="ltr">{u.username}</div></Tech></div>
             </div>,
-            <div className="flex flex-wrap gap-1">{u.roleAssignments.map((r: any, i: number) => <Pill key={i} tone="primary">{roleName(r)} · {r.branchIds.map(bName).join(t('، '))}</Pill>)}</div>,
+            <div className="flex flex-wrap gap-1">{u.roleAssignments.map((r: any, i: number) => <Pill key={i} tone="primary">{roleName(r)} · {r.branchIds.map(bName).join(t('، '))}</Pill>)}{u.profileId && <Pill tone="violet" data-fb={`users:profile:${u.username}`}>{L(profileById(u.profileId).role)}</Pill>}</div>,
             <div className="flex flex-wrap gap-1">
               {u.active ? <Pill tone="success" dot>{t('شغال')}</Pill> : <Pill tone="neutral" dot>{t('موقوف')}</Pill>}
               {u.locked && <Pill tone="error"><Lock className="w-3 h-3" />{t('مقفول')}</Pill>}
@@ -224,13 +225,24 @@ function AccessDetail({ user, roles, branches, onClose }: { user: any; roles: an
   const { run, busy } = useCommand();
   const [active, setActive] = useState<boolean>(user.active);
   const [ras, setRas] = useState<RA[]>(user.roleAssignments.map((r: any) => ({ roleId: r.roleId, branchIds: [...r.branchIds] })));
-  const dirty = active !== user.active || JSON.stringify(ras) !== JSON.stringify(user.roleAssignments.map((r: any) => ({ roleId: r.roleId, branchIds: r.branchIds })));
+  // ux-09 (PROPOSED User.SetProfile): '' = «حسب الدور» (the role decides); otherwise the user's own profile
+  const [profileId, setProfileId] = useState<string>(user.profileId ?? '');
+  const permProfile = usePerm('user:manageaccess');
+  const accessDirty = active !== user.active || JSON.stringify(ras) !== JSON.stringify(user.roleAssignments.map((r: any) => ({ roleId: r.roleId, branchIds: r.branchIds })));
+  const profileDirty = profileId !== (user.profileId ?? '');
+  const dirty = accessDirty || profileDirty;
   const save = async () => {
-    await run('User.ManageAccess', { params: { userId: user.id }, body: { active, roleAssignments: ras, expectedVersion: user.version } }, { success: t('اتحدثت صلاحيات {n}', { n: personName(user.username, user.displayName) }) });
+    let version = user.version;
+    if (accessDirty) {
+      const r = await run<any>('User.ManageAccess', { params: { userId: user.id }, body: { active, roleAssignments: ras, expectedVersion: version } }, { success: t('اتحدثت صلاحيات {n}', { n: personName(user.username, user.displayName) }) });
+      if (!r) return;
+      version = r.version;
+    }
+    if (profileDirty) await run('User.SetProfile', { params: { userId: user.id }, body: { profileId: profileId || null, expectedVersion: version } }, { success: t('تم تغيير البروفايل') });
   };
   const leave = async () => { if (!dirty || (await confirmDialog(t('تجاهل التعديلات غير المحفوظة؟'), { danger: true, confirmLabel: t('تجاهل التعديلات'), cancelLabel: t('متابعة التعديل') }))) onClose(); };
   return (
-    <DetailPane fb="user-access" onClose={leave} backLabel={t('المستخدمين')} icon={<ShieldCheck />} title={t('صلاحيات {n}', { n: userLabel(user.username, user.displayName) })} badge={<StateBadge ops={['User.ManageAccess']} />}
+    <DetailPane fb="user-access" onClose={leave} backLabel={t('المستخدمين')} icon={<ShieldCheck />} title={t('صلاحيات {n}', { n: userLabel(user.username, user.displayName) })} badge={<StateBadge ops={['User.ManageAccess', 'User.SetProfile']} />}
       meta={<>{user.active ? <Pill tone="success" dot>{t('شغال')}</Pill> : <Pill tone="neutral" dot>{t('موقوف')}</Pill>}{user.locked && <Pill tone="error"><Lock className="w-3 h-3" />{t('مقفول')}</Pill>}<Tech><span className="num" dir="ltr">{user.username}</span></Tech></>}
       footer={<>{dirty && <span className="me-auto text-xs text-[var(--warning-text)]">{t('تعديلات غير محفوظة')}</span>}<Button variant="ghost" onClick={leave}>{t('إغلاق')}</Button><Button variant="primary" loading={busy} disabled={!validRA(ras) || !dirty} onClick={save} data-fb="users:access-save">{t('حفظ')}</Button></>}>
       <div className="space-y-5">
@@ -240,6 +252,10 @@ function AccessDetail({ user, roles, branches, onClose }: { user: any; roles: an
         </div>
         {!active && user.active && <Banner tone="warning">{t('الإيقاف بيخرّج الموظف من كل الأجهزة: أول حركة بعدها بترجّعه لشاشة الدخول.')}</Banner>}
         <FormGroup title={t('الدور والفروع')}><AssignmentsEditor value={ras} onChange={setRas} roles={roles} branches={branches} /></FormGroup>
+        <FormGroup title={t('البروفايل')}>
+          <Select value={profileId} onChange={(e) => setProfileId(e.target.value)} disabled={!permProfile.ok} title={permProfile.title} data-fb="users:profile" aria-label={t('البروفايل')}
+            options={[{ value: '', label: t('حسب الدور') }, ...PROFILES.map((p) => ({ value: p.id, label: `${L(p.role)} · ${L(p.group)}` }))]} />
+        </FormGroup>
         <Tech><div className="text-[11px] text-dim">LAST_OWNER_PROTECTED · v{user.version}</div></Tech>
         <UserPermOverrides user={user} />
       </div>

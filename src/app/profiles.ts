@@ -4,6 +4,8 @@
 // shown locked (needs approval) or disabled — never hidden silently behind a permission the profile did not ask for.
 // Source: ROLES_PROPOSAL.csv (owner interview 2026-11-03). The cashier profile is fully used by the sale screen.
 
+import type { WorkProfileId } from '../mock/ux-contracts';
+
 /** Every action the sale screen's action bar knows. Positions come from the profile, never from state. */
 export type SaleAction =
   | 'new' | 'held' | 'customer' | 'discount' | 'orders'
@@ -19,7 +21,8 @@ export type PrimaryAction = 'auto' | 'send' | 'pay' | 'seat' | 'ready' | 'delive
 export type QuantityMethod = 'typedPrefix' | 'repeatTap' | 'stepper' | 'swipe' | 'longPress';
 
 export interface Profile {
-  id: string;
+  /** ux-09: one of the server's work profile ids (User.SetProfile accepts exactly these) */
+  id: WorkProfileId;
   group: { ar: string; en: string };
   role: { ar: string; en: string };
   /** device screens (registry ids) this profile works in; [] = decided by permissions only */
@@ -37,6 +40,10 @@ export interface Profile {
    *  «دليفري» also needs delivery:create on the server; without it the mode is hidden. */
   saleModes?: SaleMode[];
   defaultMode?: SaleMode;
+  /** ux-09: the profile's own keys on top of the default map (sale screen / kitchen bump bar); a device can override
+   *  any key («?» overlay, swap on conflict). Effective map = defaults ← profile ← device. */
+  keys?: Partial<Record<SaleAction | 'primary', string>>;
+  kdsKeys?: Partial<Record<KdsAction, string>>;
 }
 
 /** The cashier's three peer jobs: sell تيك أواي, close a ترابيزة (الصالة), sell دليفري. */
@@ -65,7 +72,7 @@ export const PROFILES: Profile[] = [
     actionBar: { secondary: [], overflow: [], primary: 'delivered' }, quantity: NO_QTY, input: 'touch', hidden: ['everythingButHandover'] },
   { id: 'barista', group: g('الصالة والكاونتر', 'Floor & counter'), role: g('باريستا', 'Barista'), workspaces: ['counter', 'kitchen'], start: 'kitchen', saleModes: ['takeaway'],
     actionBar: { secondary: [], overflow: [], primary: 'ready' }, quantity: TOUCH_QTY, input: 'touch', hidden: ['drawer', 'reports'] },
-  { id: 'bartender', group: g('الصالة والكاونتر', 'Floor & counter'), role: g('بارتندر', 'Bartender'), workspaces: ['counter', 'kitchen'], start: 'kitchen', saleModes: ['takeaway', 'dinein'],
+  { id: 'bartender', group: g('الصالة والكاونتر', 'Floor & counter'), role: g('بارتندر', 'Bartender'), workspaces: ['counter', 'kitchen'], start: 'kitchen', saleModes: ['takeaway', 'dinein'], keys: { orders: 'F2', new: 'F7' },
     actionBar: { secondary: ['orders'], overflow: [], primary: 'ready' }, quantity: TOUCH_QTY, input: 'touch', hidden: ['reports'] },
   // ── kitchen
   { id: 'stationChef', group: g('المطبخ', 'Kitchen'), role: g('شيف محطة', 'Station chef'), workspaces: ['kitchen'], start: 'kitchen',
@@ -97,14 +104,14 @@ export const PROFILES: Profile[] = [
     actionBar: { secondary: [], overflow: [], primary: 'delivered' }, quantity: NO_QTY, input: 'touch', hidden: ['everythingButOwnOrders'] },
   { id: 'dispatcher', group: g('الدليفري', 'Delivery'), role: g('موزع الدليفري', 'Delivery dispatcher'), workspaces: ['delivery-board', 'counter', 'drivers'], start: 'delivery-board', boards: { delivery: 'board' }, saleModes: ['delivery'], defaultMode: 'delivery', /* ux-07: new deliveries from the sale screen's «دليفري» mode */
     actionBar: { secondary: [], overflow: [], primary: 'dispatch' }, quantity: NO_QTY, input: 'mixed', hidden: ['financialReports'] },
-  { id: 'callCenter', group: g('الدليفري', 'Delivery'), role: g('مركز الاتصال', 'Call center'), workspaces: ['counter', 'customers'], start: 'counter', saleModes: ['delivery'], defaultMode: 'delivery',
+  { id: 'callCenter', group: g('الدليفري', 'Delivery'), role: g('مركز الاتصال', 'Call center'), workspaces: ['counter', 'customers'], start: 'counter', saleModes: ['delivery'], defaultMode: 'delivery', keys: { customer: 'F2', new: 'F4' },
     actionBar: { secondary: ['customer'], overflow: [], primary: 'confirm' }, quantity: ALL_QTY, input: 'keyboard', hidden: ['drawer'] },
   // ── system
   { id: 'support', group: g('النظام', 'System'), role: g('فريق التركيب والدعم', 'Install & support team'), workspaces: ['import', 'settings', 'org', 'capabilities'], start: 'org',
     actionBar: { secondary: [], overflow: [], primary: 'confirm' }, quantity: NO_QTY, input: 'keyboard', hidden: ['customerPersonalData'] },
 ];
 
-export const profileById = (id: string) => PROFILES.find((p) => p.id === id) ?? PROFILES[0];
+export const profileById = (id: string): Profile => PROFILES.find((p) => p.id === id) ?? PROFILES[0];
 
 /** Default keys of the sale screen (per device they can be remapped without conflicts — see keymap.ts). */
 export const SALE_KEYS: Partial<Record<SaleAction | 'primary', string>> = {
@@ -121,13 +128,15 @@ export const KDS_KEYS: Partial<Record<KdsAction, string>> = {
 };
 
 /**
- * The profile of the signed-in person on this device. Role names come from Access.Me; the device kind breaks ties
- * (a manager on a cashier terminal works the sale screen like a cashier, with the manager's bar).
+ * The profile a role gives on this device (ux-09: the default — the owner decision «per user or from the role» is open,
+ * so the role decides and a user may carry an override, see resolveProfile). Role names come from Access.Me; the
+ * device kind breaks ties (a manager on a cashier terminal works the sale screen like a cashier, with the manager's bar).
  */
 export function profileFor(roleNames: string[], deviceKind: string | null): Profile {
   const r = roleNames.map((x) => x.toLowerCase());
   const has = (...k: string[]) => r.some((x) => k.some((y) => x.includes(y)));
   if (has('owner', 'bootstrap')) return profileById(deviceKind === 'CASH' ? 'cashier' : 'owner');
+  if (has('area manager')) return profileById('areaManager'); // ux-09: before «manager»
   if (has('manager')) return profileById(deviceKind === 'CASH' ? 'shiftManager' : deviceKind === 'KDS' ? 'kitchenManager' : 'branchManager');
   // ux-05: roles named after a profile get it (counter-only, call center, dispatch, purchasing, store)
   if (has('barista')) return profileById('barista');
@@ -136,10 +145,60 @@ export function profileFor(roleNames: string[], deviceKind: string | null): Prof
   if (has('dispatch')) return profileById('dispatcher');
   if (has('purchas')) return profileById('purchasing');
   if (has('storekeeper')) return profileById('storekeeper');
+  // ux-09: the remaining profiles (each has a demo user)
+  if (has('host')) return profileById('host');
+  if (has('captain')) return profileById('captain');
+  if (has('runner')) return profileById('runner');
+  if (has('expedit')) return profileById('expediter');
+  if (has('auditor')) return profileById('auditor');
+  if (has('support')) return profileById('support');
   if (has('cashier')) return profileById('cashier');
   if (has('waiter', 'server')) return profileById('waiter');
   if (has('chef', 'kitchen', 'cook')) return profileById('stationChef');
   if (has('driver')) return profileById('driver');
   if (has('account')) return profileById('accountant');
   return profileById(deviceKind === 'FLOOR' ? 'waiter' : deviceKind === 'KDS' ? 'stationChef' : deviceKind === 'CASH' ? 'cashier' : 'owner');
+}
+
+// ───────── ux-09: the profile drives navigation (it only narrows what permissions and the device allow)
+
+/** A workspace that stands for a family of screens: «التقارير» covers its tools (ask, designer, engine). */
+const REPORT_SCREENS = ['reports', 'report-assistant', 'report-designer', 'report-catalog'];
+const WORKSPACE_FAMILY: Record<string, string[]> = { reports: REPORT_SCREENS };
+/** The `hidden` words of a profile that name screens. Other words (expectedCash, amounts, anyWrite…) hide parts of a
+ *  screen, not a screen, and are read by the screens themselves. */
+const HIDDEN_SCREENS: Record<string, string[]> = {
+  reports: REPORT_SCREENS, financialReports: REPORT_SCREENS,
+  license: ['capabilities'], systemSettings: ['capabilities', 'health', 'sync'],
+  sale: ['counter'], sales: ['counter', 'checks'], orders: ['checks', 'counter'],
+  payment: ['refunds', 'shift'], collection: ['refunds', 'shift'], drawer: ['shift'],
+  prices: ['prices'], customerPersonalData: ['customers', 'customer', 'loyalty'],
+  dailyOperations: ['counter', 'floor', 'checks', 'kitchen', 'shift', 'reservations'],
+};
+const screensOfWorkspace = (w: string) => WORKSPACE_FAMILY[w] ?? [w];
+/** Whether the profile keeps this screen in the person's way (sidenav, screen search). Permissions and the device kind
+ *  are checked separately and stay authoritative: a profile only narrows. */
+export function profileShows(p: Profile, screenId: string): boolean {
+  if (p.hidden.some((h) => HIDDEN_SCREENS[h]?.includes(screenId))) return false;
+  return p.workspaces.length === 0 || p.workspaces.some((w) => screensOfWorkspace(w).includes(screenId));
+}
+
+/** What Access.Me / Auth.Login say about a user (roles with names, the optional profile override). */
+export interface ProfileUser { roleAssignments?: { roleName?: string | null }[]; profileId?: string | null }
+export const roleNamesOf = (u: ProfileUser | null | undefined) => (u?.roleAssignments ?? []).map((r) => String(r.roleName ?? ''));
+export const isProfileId = (id: string | null | undefined): id is string => !!id && PROFILES.some((p) => p.id === id);
+
+/**
+ * The profile of a signed-in person on a device kind. Owner decision pending (ux-09): the default is that the role
+ * decides (profileFor) and a user may carry an override (`profileId`, set on the users screen). An override that has
+ * no workspace on this device kind (e.g. a storekeeper override on the cashier terminal) falls back to the role's
+ * profile there, so nobody signs in to an empty screen. `kindHas(screenId)` tells whether the device kind has a screen.
+ */
+export function resolveProfile(u: ProfileUser | null | undefined, deviceKind: string | null, kindHas?: (screenId: string) => boolean): Profile {
+  const byRole = profileFor(roleNamesOf(u), deviceKind);
+  const id = u?.profileId;
+  if (!isProfileId(id)) return byRole;
+  const o = profileById(id);
+  if (kindHas && o.workspaces.length && !o.workspaces.some((w) => screensOfWorkspace(w).some(kindHas))) return byRole;
+  return o;
 }

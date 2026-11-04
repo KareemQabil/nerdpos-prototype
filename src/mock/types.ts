@@ -17,6 +17,7 @@ export interface User {
   pin: string; password: string; roleAssignments: RoleAssignment[];
   failedAttempts: number; lockedUntil: number | null; credentialVersion: number; mustChangeCredentials: boolean;
   /** r3A (simulated): manager card code and enrolled fingerprint id used to approve in place */ cardCode?: string | null; fingerprintId?: string | null;
+  /** ux-09 (PROPOSED): work profile override; null/absent = the profile comes from the role */ profileId?: string | null;
 }
 export interface AuthSession { id: string; userId: string; terminalId: string | null; branchId: string | null; credentialKind: 'PIN' | 'PASSWORD'; createdAt: string; expiresAt: number; revokedAt: string | null; credentialVersion: number }
 

@@ -23,7 +23,7 @@ const ACTION_TEXT: Record<string, string> = {
   setcustomer: 'يحدد العميل', updatedetails: 'يعدّل البيانات', capture: 'يحصّل', correcttender: 'يصحح طريقة الدفع', request: 'يطلب', approve: 'يعتمد', reject: 'يرفض',
   open: 'يفتح', close: 'يقفل', move: 'يدخّل أو يصرف فلوس', opennosale: 'يفتح الدرج من غير بيع', xreport: 'يطلع تقرير نص الوردية', zreport: 'يطلع تقرير القفلة',
   release: 'يفضّي', assign: 'يوزّع', transfer: 'ينقل', advanceticket: 'يحرّك الطلبات', setprice: 'يغيّر الأسعار', setavailability: 'يعلّم «خلص»',
-  updatepolicy: 'يغيّر الإعدادات', run: 'يشغّل', grant: 'يوافق', manageaccess: 'يغيّر الصلاحيات', reset: 'يعمل رقم سري جديد', setactive: 'يوقف ويشغّل',
+  updatepolicy: 'يغيّر الإعدادات', run: 'يشغّل', grant: 'يوافق', manageaccess: 'يغيّر الصلاحيات', profile: 'يغيّر البروفايل', reset: 'يعمل رقم سري جديد', setactive: 'يوقف ويشغّل',
   register: 'يسجّل', decommission: 'يشيل', issuedocument: 'يصدر إيصال', reprint: 'يعيد طباعة', retry: 'يعيد المحاولة', count: 'يجرد', start: 'يبدأ',
   submit: 'يعتمد', recordobservations: 'يسجل العد', adjust: 'يعمل تسوية', recordwaste: 'يسجل هالك', recordreturn: 'يسجل مرتجع', receive: 'يستلم',
   setsalesdefault: 'يحدد مخزن البيع', define: 'يعرّف', post: 'يسجّل', issue: 'يصدر', reverse: 'يعكس', dispatch: 'يطلّع الطيار', failattempt: 'يسجل محاولة فاشلة',

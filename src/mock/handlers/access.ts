@@ -9,6 +9,7 @@ import { APPROVAL_ACTIONS } from '../policyRegistry';
 import { isVendorPermission, VENDOR_PERMISSIONS } from '../types-channels'; // r3C
 import { permOverridesOf, overrideLive } from '../user-perms'; // r3C (P1-041)
 import { clock } from '../clock';
+import { WORK_PROFILE_IDS } from '../ux-contracts'; // ux-09
 
 /** Registered permission ids: every permission named by an operation, the approve:* permissions, and those already on roles. */
 function permissionCatalog(db: any): Set<string> {
@@ -37,6 +38,7 @@ const userView = (db: any, u: User) => ({
   id: u.id, username: u.username, displayName: u.displayName, active: u.active, version: u.version, mustChangeCredentials: u.mustChangeCredentials,
   roleAssignments: u.roleAssignments.map((ra) => ({ ...ra, roleName: db.roles.find((r: any) => r.id === ra.roleId)?.name })),
   locked: !!(u.lockedUntil && u.lockedUntil > Date.now()),
+  profileId: u.profileId ?? null, // ux-09 (PROPOSED): work profile override; null = from the role
   // r3C (P1-041): live per-user exceptions to the role
   permOverrides: (db.permOverrides ?? []).filter((o: any) => o.userId === u.id && overrideLive(o, clock.now())).map((o: any) => ({ id: o.id, permission: o.permission, effect: o.effect, expiresAt: o.expiresAtMs ? new Date(o.expiresAtMs).toISOString() : null })),
 });
@@ -151,6 +153,20 @@ export const accessHandlers: Record<string, Handler> = {
     checkVersion(u!, ctx.body.expectedVersion);
     if (ctx.body.displayName) u!.displayName = ctx.body.displayName;
     u!.version++;
+    return userView(ctx.db, u!);
+  },
+  // ux-09 (PROPOSED): the work profile override. UI only — it grants nothing, so no USER_ACCESS_CHANGE approval; audited.
+  'User.SetProfile': (ctx) => {
+    const u = ctx.db.users.find((x) => x.id === ctx.params.userId);
+    need(u, 'USER_NOT_FOUND');
+    checkVersion(u!, ctx.body.expectedVersion);
+    const next: string | null = ctx.body.profileId === undefined || ctx.body.profileId === '' ? null : ctx.body.profileId;
+    if (next !== null && !(WORK_PROFILE_IDS as readonly string[]).includes(next)) throw new ApiError('VALIDATION_FAILED', { field: 'profileId', rule: 'one of the work profiles, or null (from the role)' });
+    const before = u!.profileId ?? null;
+    if (before === next) return userView(ctx.db, u!);
+    u!.profileId = next;
+    u!.version++;
+    ctx.audit(`profile changed for ${u!.username}: ${before ?? 'ROLE'} -> ${next ?? 'ROLE'}`, u!.id);
     return userView(ctx.db, u!);
   },
   'User.ManageAccess': (ctx) => {

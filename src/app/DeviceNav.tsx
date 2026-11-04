@@ -19,11 +19,29 @@ import { cn } from '../lib/format';
 import { Tech, techMode, useTech } from './tech';
 import { personName, personRole, roleLabel } from '../demo/people';
 import { capabilityHiding, pendingApprovalCount } from '../screens/ops/capabilities-ui';
+import { profileShows, type Profile } from './profiles';
+import { useProfile, profileOfUser } from './useProfile';
 
-export function visibleScreens(kind: Kind, can: (p: string) => boolean, branchId: string | null = null) {
+const permits = (s: ScreenDef, can: (p: string) => boolean) => (s.perm ? can(s.perm) : s.anyPerm ? s.anyPerm.some(can) : true);
+/** The screens in the person's way on this device: device kind ∩ permissions ∩ capabilities, narrowed by the work
+ *  profile (ux-09: its workspaces and hidden areas). Permissions stay authoritative — a profile never adds a screen. */
+export function visibleScreens(kind: Kind, can: (p: string) => boolean, branchId: string | null = null, profile?: Profile | null) {
   const tech = techMode.get(); // ux-07: demo / engineering pages only with technical details on
-  return SCREENS.filter((s) => !s.hidden && (!s.demoOnly || tech) && s.kinds.includes(kind) && (s.perm ? can(s.perm) : s.anyPerm ? s.anyPerm.some(can) : true) && !capabilityHiding(s, branchId));
+  return SCREENS.filter((s) => !s.hidden && (!s.demoOnly || tech) && s.kinds.includes(kind) && permits(s, can) && !capabilityHiding(s, branchId) && (!profile || profileShows(profile, s.id)));
 }
+
+/** ux-09: the first screen after sign-in — the profile's start screen when the device and the permissions allow it,
+ *  else the first screen the profile keeps on this device, else the first screen the device and permissions allow. */
+export function startScreenFor(user: any, kind: Kind, can: (p: string) => boolean, branchId: string | null): string {
+  const profile = profileOfUser(user, kind);
+  const start = SCREENS.find((s) => s.id === profile.start);
+  if (start && start.kinds.includes(kind) && permits(start, can) && !capabilityHiding(start, branchId)) return start.id;
+  return (visibleScreens(kind, can, branchId, profile)[0] ?? visibleScreens(kind, can, branchId)[0])?.id ?? (kind === 'KDS' ? 'kitchen' : kind === 'FLOOR' ? 'floor' : kind === 'CASH' ? 'counter' : 'home');
+}
+/** ux-09 owner rule «the cashier never needs the sidenav»: a profile that works from one screen (sale, floor, kitchen,
+ *  delivery board) gets the compact rail by default; a person can still widen it. */
+const ONE_SCREEN_START = new Set(['counter', 'floor', 'kitchen', 'delivery-board']);
+export const prefersRail = (p: Profile) => p.workspaces.length > 0 && ONE_SCREEN_START.has(p.start);
 
 const GROUP_ICON: Record<ScreenGroup, React.ComponentType<{ className?: string }>> = {
   home: LayoutDashboard, service: ConciergeBell, money: Wallet, delivery: Bike, customers: Contact, inventory: Boxes,
@@ -52,8 +70,9 @@ export function useNavSections(): NavSection[] {
   const { kind, can, me, id } = useDev();
   const lang = useLang();
   useTech(); // re-list when technical details are switched (demo-only pages)
+  const profile = useProfile();
   const branchId = me?.branchId ?? devices.auth(id).branchId ?? null;
-  const items = visibleScreens(kind as Kind, can, branchId);
+  const items = visibleScreens(kind as Kind, can, branchId, profile);
   const roles: string[] = (me?.user?.roleAssignments ?? []).map((r: any) => String(r.roleName ?? ''));
   const order = ORDER[personaOf(kind as Kind, roles)];
   return useMemo(() => {
@@ -98,7 +117,8 @@ export function Sidebar({ paneWidth, compact }: { paneWidth: number; compact?: b
   const sections = useNavSections();
   const branchId = me?.branchId ?? devices.auth(id).branchId ?? null;
   const badges = useBadges(branchId);
-  const autoWide = paneWidth >= 1180 && !compact;
+  const profile = useProfile();
+  const autoWide = paneWidth >= 1180 && !compact && !prefersRail(profile);
   const wide = p.mode === 'wide' ? paneWidth >= 760 : p.mode === 'rail' ? false : autoWide;
   const [palette, setPalette] = useState<false | true | 'follow'>(false);
   const followed = useFollowList(me?.user?.id);

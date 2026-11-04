@@ -6923,4 +6923,9 @@ export const en: Record<string, string> = {
   "عجز": "Short",
   "الرصيد الافتتاحي (ج.م)": "Opening float (ج.م)",
   "إلغاء صنف ظهر للعميل أو أُرسل (قبل الدفع)": "Void an item the customer saw or that was sent (before payment)",
+  // ux-09: work profiles
+  "البروفايل": "Profile",
+  "حسب الدور": "From the role",
+  "تم تغيير البروفايل": "Profile changed",
+  "يغيّر البروفايل": "Change the profile",
 };

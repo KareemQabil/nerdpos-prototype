@@ -21,7 +21,8 @@ import { capabilityHiding } from '../screens/ops/capabilities-ui'; // operations
 import { OfflineBar } from '../screens/ops/OfflineBar';
 import { ControlApprovalDialog } from '../screens/control/ApprovalDialog'; // r3A
 import { ruleSentence, contextFieldLabel, contextValueText } from '../demo/policyText';
-import { Sidebar, visibleScreens, markPane } from './DeviceNav';
+import { Sidebar, visibleScreens, markPane, startScreenFor } from './DeviceNav';
+import { useProfile } from './useProfile';
 export { visibleScreens } from './DeviceNav';
 
 const KIND_ICON: Record<string, React.ComponentType<{ className?: string }>> = { CASH: ShoppingCart, FLOOR: Armchair, KDS: ChefHat, ADMIN: Briefcase, BO: Building2 };
@@ -131,13 +132,15 @@ function Header() {
   const KIcon = KIND_ICON[terminal?.kind ?? 'BO'] ?? Monitor;
   const dn = String(me?.user?.displayName ?? '');
   const roleText = personRole(me?.user?.username, dn) || me?.user?.roleAssignments?.map((r: any) => roleLabel(r.roleName)).join(t('، '));
+  const profile = useProfile();
+  const profileText = L(profile.role);
   const opener = session.data ? (() => { const u = store.db.users.find((x) => x.id === session.data.userId); return personName(u?.username, u?.displayName); })() : null;
   return (
     <header className="@container/hdr h-14 shrink-0 flex items-center gap-3 px-4 border-b line device-header">
       <div className="flex items-center gap-2.5 min-w-0 flex-1">
         <span className="w-9 h-9 rounded-xl bg-[var(--surface-2)] border border-[var(--glass-border)] flex items-center justify-center shrink-0 text-[var(--primary)]" title={deviceName(id, terminal?.kind, terminal?.name)}><KIcon className="w-[18px] h-[18px]" /></span>
         <div className="leading-tight min-w-0">
-          <div className="text-sm font-bold truncate">{personName(me?.user?.username, me?.user?.displayName)}<span className="text-dim font-normal">{roleText ? ` · ${roleText}` : ''}</span><Tech><span className="num text-[10px] text-dim font-normal ms-1">{me?.user?.username}</span></Tech></div>
+          <div className="text-sm font-bold truncate">{personName(me?.user?.username, me?.user?.displayName)}<span className="text-dim font-normal">{roleText ? ` · ${roleText}` : ''}</span>{profileText !== roleText && <span className="ms-1.5 px-1.5 h-[18px] leading-[18px] inline-block rounded-full border border-[var(--glass-border)] bg-[var(--surface-1)] text-[10px] font-semibold text-soft align-middle" data-fb="hdr-profile" data-profile={profile.id} title={t('البروفايل')}>{profileText}</span>}<Tech><span className="num text-[10px] text-dim font-normal ms-1">{me?.user?.username}</span></Tech></div>
           <div className="text-[11px] text-dim truncate">{deviceName(id, terminal?.kind, terminal?.name)} · {branchLabel(branch) || t('من غير فرع')}<Tech> · <span className="num">{lbl.code}</span></Tech></div>
         </div>
       </div>
@@ -156,7 +159,7 @@ function Header() {
 
 // ───────── A1 login and PIN
 // Plain wording for demo users: "اختار اسمك", device and branch names, personas; usernames/codes only in <Tech>.
-const FITS: Record<string, string[]> = { CASH: ['cashier', 'manager'], FLOOR: ['waiter'], KDS: ['chef'], ADMIN: ['manager', 'owner'], BO: ['owner', 'bootstrap', 'manager'] };
+const FITS: Record<string, string[]> = { CASH: ['cashier', 'manager', 'dispatch', 'call center', 'driver'], FLOOR: ['waiter', 'host', 'captain'], KDS: ['chef', 'runner', 'barista', 'bartender', 'expedit'], ADMIN: ['manager', 'owner', 'storekeeper'], BO: ['owner', 'bootstrap', 'manager', 'accountant', 'auditor', 'purchas', 'support'] };
 const fitsDevice = (kind: string, roles: string[]) => roles.some((r) => (FITS[kind] ?? []).some((k) => r.toLowerCase().includes(k)));
 function LoginScreen() {
   const { id, auth, terminal } = useDev();
@@ -179,7 +182,10 @@ function LoginScreen() {
     try {
       const a = { ...auth, branchId: terminal ? terminal.branchId : boBranch || null };
       const r = await call(a, 'Auth.Login', { body: { method: 'PIN', userId, secret } });
-      devices.update(id, { token: r.data.token, userName: r.data.user.displayName, branchId: r.data.branchId ?? a.branchId });
+      // ux-09: the first screen after sign-in is the work profile's start screen (when this device and the permissions allow it)
+      const perms: string[] = r.data.effectivePermissions ?? [];
+      const screen = startScreenFor(r.data.user, kind as Kind, (p) => hasPermission(perms, p), r.data.branchId ?? a.branchId ?? null);
+      devices.update(id, { token: r.data.token, userName: r.data.user.displayName, branchId: r.data.branchId ?? a.branchId, screen, params: {} });
       toast('success', t('أهلًا يا {name}', { name: personName(r.data.user.username, r.data.user.displayName).replace(/^ال/, '') }), `Auth.Login 200 · ${lbl.code}`, lbl.short);
     } catch (e) {
       const f = e as ApiFailure;

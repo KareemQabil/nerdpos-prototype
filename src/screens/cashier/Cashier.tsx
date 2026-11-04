@@ -18,7 +18,8 @@ import { cn } from '../../lib/format';
 import { addQty, cmpQty, sumQty } from '../../lib/cash';
 import { clock } from '../../mock/clock';
 import { minutesSince } from '../order/tableStage';
-import { profileFor, type SaleAction, type SaleMode } from '../../app/profiles';
+import { type SaleAction, type SaleMode } from '../../app/profiles';
+import { useProfile } from '../../app/useProfile';
 import { call } from '../../api/client';
 import { DeliveryStartPopup, DeliveryDraftBar, DeliveryQueue, CashierDeliveryBoard, deliveryDrafts } from './DeliveryMode';
 import { useHotkeys, useKeymap, type KeyAction } from '../../app/keymap';
@@ -66,8 +67,8 @@ type Undo = { id: number; text: string; lock?: boolean; run: () => Promise<any>;
 
 export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { sessionId: string; staffMealOnOpen?: boolean; businessDate?: string | null }) {
   const { id: deviceId, terminal, nav, params, can, me, auth } = useDev();
-  const profile = useMemo(() => profileFor((me?.user?.roleAssignments ?? []).map((r: any) => String(r.roleName ?? '')), terminal?.kind ?? null), [me, terminal]);
-  const keys = useKeymap(deviceId);
+  const profile = useProfile(); // ux-09: role or the user's override
+  const keys = useKeymap(deviceId, 'sale', profile.keys);
   const showKeys = profile.input !== 'touch';
   const orderId: string | null = params.orderId ?? null;
   const o = useQuery<any>(orderId ? 'Order.Get' : null, { params: { orderId } });
@@ -362,7 +363,7 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
     viewTables: () => { if (!allowed.includes('collect')) return; if (mode !== 'collect') switchMode('collect'); setView('tables'); },
     viewChecks: () => { if (!allowed.includes('collect')) return; if (mode !== 'collect') switchMode('collect'); setView('checks'); setTimeout(focusCollect, 60); },
     viewClosed: () => { if (!allowed.includes('collect')) return; if (mode !== 'collect') switchMode('collect'); setView('closed'); },
-  });
+  }, 'sale', profile.keys);
 
   const actionLabels: Partial<Record<KeyAction, string>> = { primary: t('الزر الرئيسي'), shortcuts: t('الاختصارات'), new: t('شيك جديد'), held: t('الطلبات المعلقة'), customer: t('العميل'), discount: t('الخصم'), orders: t('الشيكات'), more: t('المزيد'), mode: t('الوضع التالي'), modeTakeaway: t('وضع تيك أواي'), modeDineIn: t('وضع الصالة'), modeDelivery: t('وضع دليفري'), search: t('البحث'), viewTables: t('الصالة: الترابيزات'), viewChecks: t('الصالة: الشيكات'), viewClosed: t('الصالة: المغلقة اليوم') };
 
@@ -486,7 +487,7 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
       )}
       {startOpen === 'new' && <DeliveryStartPopup customerId={startCustomerId} onClose={() => setStartOpen(null)} onStarted={(id) => { setStartOpen(null); latest.current = null; curId.current = id; go({ orderId: id, mode: 'delivery' }); setTimeout(focusSearch, 120); }} />}
       {startOpen === 'edit' && order && <DeliveryStartPopup onClose={() => setStartOpen(null)} onStarted={() => setStartOpen(null)} edit={{ orderId: order.id, draft: deliveryDrafts.get(order.id) ?? { customerId: order.customerId ?? order.customer?.id ?? '', customerName: order.customer?.name ?? '', phone: order.customer?.phone ?? '', address: null, zoneId: null, payMode: 'CASH_ON_DELIVERY' } }} />}
-      {keysOpen && <ShortcutsOverlay deviceId={deviceId} labels={actionLabels} profileName={L(profile.role)} onClose={() => setKeysOpen(false)} />}
+      {keysOpen && <ShortcutsOverlay deviceId={deviceId} labels={actionLabels} profileName={L(profile.role)} profileKeys={profile.keys} onClose={() => setKeysOpen(false)} />}
       {custOpen && order && <CustomerPicker open onClose={() => setCustOpen(false)} onPick={async (c) => { const r = await run('Order.SetCustomer', { params: { orderId: order.id }, body: { expectedVersion: (latest.current?.id === order.id ? latest.current : order).version, customerId: c.id } }, { success: t('أُضيف العميل إلى الشيك') }); if (r) setCustOpen(false); }} />}
       {staffMeal && <StaffMealDialog onClose={() => setStaffMeal(false)} />}
       <SoldOutPopup open={soldOutOpen} onClose={() => setSoldOutOpen(false)} />

@@ -43,3 +43,21 @@ export function applyUx05Extensions(ops: OperationDef[]) {
     if (op.id === 'PurchaseOrder.Issue') { op.errors = [...new Set([...(op.errors ?? []), 'APPROVAL_REQUIRED', 'APPROVAL_GRANT_INVALID', 'SELF_APPROVAL_DENIED'])]; op.approval = { mode: 'WHEN_PENDING_APPROVAL', action: 'PURCHASE_ORDER_APPROVE' }; }
   }
 }
+
+// ux-09 (profiles drive navigation): a user's work profile. Owner decision pending — the default: the profile comes
+// from the role, and a user may carry an override (null = «حسب الدور»). The profile is UI only (which screens are in
+// the person's way, where they start, the action bar and keys); it never grants a permission, so changing it is not an
+// access change (no USER_ACCESS_CHANGE approval) — it is audited like the other user edits.
+/** The work profiles a user can be given (same ids as src/app/profiles.ts; the app's Profile.id is typed by this list). */
+export const WORK_PROFILE_IDS = [
+  'cashier', 'waiter', 'captain', 'host', 'runner', 'barista', 'bartender',
+  'stationChef', 'expediter', 'kitchenManager',
+  'shiftManager', 'branchManager', 'areaManager', 'owner',
+  'accountant', 'auditor', 'storekeeper', 'purchasing',
+  'driver', 'dispatcher', 'callCenter',
+  'support',
+] as const;
+export type WorkProfileId = (typeof WORK_PROFILE_IDS)[number];
+export const UX09_PROPOSED_OPERATIONS: OperationDef[] = [
+  { id: 'User.SetProfile', module: 'access', kind: 'CMD', method: 'POST', path: '/users/{userId}/profile', permission: 'user:manageaccess', input: { userId: { type: 'Ref<access.User>', required: true }, profileId: { type: 'Code', required: false }, expectedVersion: { type: 'Version', required: true } }, output: 'UserView', errors: ['USER_NOT_FOUND', 'CONCURRENCY_CONFLICT', 'VALIDATION_FAILED'], approval: null, backend_state: 'PROPOSED', note: 'ux-09: work profile override of one user (profileId one of WORK_PROFILE_IDS, or null = from the role); UI only, grants nothing; audited with the old and new value; UserView carries profileId' },
+];

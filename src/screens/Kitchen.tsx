@@ -17,7 +17,8 @@ import { t, L } from '../i18n';
 import { cn, qty, time } from '../lib/format';
 import { Tech } from '../app/tech';
 import { stationName } from '../demo/humanLog';
-import { profileFor, profileById } from '../app/profiles';
+import { profileById } from '../app/profiles';
+import { useProfile } from '../app/useProfile';
 import { useHotkeys, useKeymap, keyLabel, type KeyAction } from '../app/keymap';
 import { cue, useSound } from '../app/sound';
 import { ShortcutsOverlay } from './cashier/ShortcutsOverlay';
@@ -40,8 +41,7 @@ export default function Kitchen() {
   const dispatch: boolean = !!screen.canHandOff;
   const startPolicy: 'HIDDEN' | 'OPTIONAL' | 'REQUIRED' = screen.start ?? 'HIDDEN';
   const itemBump = screen.itemBump !== false;
-  const roles = (me?.user?.roleAssignments ?? []).map((r: any) => String(r.roleName ?? ''));
-  const base = profileFor(roles, 'KDS');
+  const base = useProfile('KDS'); // ux-09: role or the user's override, read as a kitchen screen
   const profile = base.id === 'stationChef' && dispatch && screen.isKds ? profileById('expediter') : base;
   const active = (stations.data?.items ?? []).filter((s: any) => s.active);
   const mine = screen.stationIds?.length ? active.filter((s: any) => screen.stationIds.includes(s.id)) : active;
@@ -64,7 +64,7 @@ export default function Kitchen() {
   const showStation = mine.length > 1 && station === 'ALL';
   const timing = board.data?.timing;
   const reasons = board.data?.refireReasons ?? {};
-  const keys = useKeymap(deviceId, 'kds');
+  const keys = useKeymap(deviceId, 'kds', profile.kdsKeys);
   const snd = useSound(deviceId);
 
   // ── selection (bump bar) over the visible list
@@ -131,7 +131,7 @@ export default function Kitchen() {
     kdsCall: () => selected && v === 'orders' && (selected as OrderGroup).ready && call(selected),
     kdsView: () => dispatch && setView((x) => (x === 'orders' ? 'tickets' : 'orders')),
     kdsHelp: () => setHelp(true), shortcuts: () => setHelp(true),
-  }, 'kds');
+  }, 'kds', profile.kdsKeys);
   // fixed keys: ←/→ move visually (reading direction aware), 1–9 pick a ticket
   const fixedRef = useRef({ move, list, setSel });
   fixedRef.current = { move, list, setSel };
@@ -236,7 +236,7 @@ export default function Kitchen() {
         </div>
       )}
       {recall && <RecallPopup onClose={() => setRecall(false)} stations={active} reasons={reasons} dispatch={dispatch} />}
-      {help && <ShortcutsOverlay deviceId={deviceId} scope="kds" labels={labels} profileName={L(profile.role)} onClose={() => setHelp(false)} title={t('اختصارات شاشة المطبخ')} fb="kds-keys"
+      {help && <ShortcutsOverlay deviceId={deviceId} scope="kds" labels={labels} profileName={L(profile.role)} profileKeys={profile.kdsKeys} onClose={() => setHelp(false)} title={t('اختصارات شاشة المطبخ')} fb="kds-keys"
         fixed={[['← →', t('التنقل بين التذاكر')], ['1–9', t('اختيار تذكرة برقمها')], ['?', t('عرض الاختصارات')], ['Esc', t('إغلاق النافذة')]]} />}
       {dlg?.k === 'refire' && <RefireDialog tk={dlg.tk} reasons={reasons} stations={active} onClose={() => setDlg(null)} />}
       {dlg?.k === 'move' && <MoveDialog tk={dlg.tk} stations={active} onClose={() => setDlg(null)} />}
