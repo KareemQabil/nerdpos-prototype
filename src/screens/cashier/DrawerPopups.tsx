@@ -6,7 +6,7 @@
 // and approval rules as before: Session.Open, Cash.Move, Drawer.OpenNoSale, Session.XReport, Session.Close
 // (SESSION_VARIANCE approval), Tip.Distribute. The expected cash is never shown before the count is confirmed.
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { ArrowDownToLine, ArrowUpFromLine, Inbox, FileText, Lock, HandCoins, Printer, AlertTriangle, ArrowRightLeft, DoorOpen, Minus, Plus, Clock, Wallet, ShieldCheck, Landmark } from 'lucide-react';
+import { ArrowDownToLine, ArrowUpFromLine, Inbox, FileText, Lock, HandCoins, Printer, AlertTriangle, ArrowRightLeft, DoorOpen, Minus, Plus, Clock, Wallet, ShieldCheck, Landmark, RotateCcw, Repeat } from 'lucide-react';
 import { useDev, useQuery, useCommand } from '../../app/hooks';
 import { Popup, Button, Money, Numpad, applyNumpadKey, useNumpadKeys, Kbd, Pill, Input, Skeleton, SegmentedControl, StateBadge, DateTime, EmptyState, type NumpadKey } from '../../ui';
 import { t, L, tv } from '../../i18n';
@@ -15,27 +15,25 @@ import { useReasons } from '../order/CheckPanel';
 import { TransferSessionDialog } from '../ops/TransferSessionDialog';
 import { personName, personText } from '../../demo/people';
 import { store } from '../../mock/store';
-import { approvalRule } from '../../mock/policies';
+import { approvalRule, policy, policyFields, reasonMinLength } from '../../mock/policies';
+import { handoverRules, recountMode } from '../../mock/drawer-count'; // ux-10b: the handover mode, the recount rule (the server enforces both)
+import { HandoverAcceptPopup, HandoverCancelPopup } from './HandoverPopups';
 import { Tech } from '../../app/tech';
 import { useProfile } from '../../app/useProfile';
 import { useHotkeys, useKeymap, keyLabel, type KeyAction } from '../../app/keymap';
 import { drawerBus, type DrawerJob } from '../../app/drawerBus';
+import { plainAmount, sign, changePreview } from '../../lib/cash';
+import { useBlindCount, CountBoard, enterOr } from './CountBoard';
 import { DENOMS, fromPiasters, OUT_KINDS, kindLabel, ReportView, VarianceText, ZPopup } from './ShiftReport';
 
 type MoveKind = 'PAY_IN' | 'PAY_OUT' | 'SAFE_DROP';
 type Job = Exclude<DrawerJob, 'cashIn' | 'cashOut'> | 'move' | 'z';
+/** ux-10b: the handover being accepted / cancelled, kept while the session changes under it (the result stays on screen). */
+type Hand = { sid: string; handover: any };
 
 /** A count confirmed by the cashier stays confirmed on this device until the shift closes (no recount after the
  *  approval popup has shown the variance). Memory only, per session. */
 const confirmed = new Map<string, { counted: string; note: string }>();
-
-/** Enter on a focused action button presses it; otherwise (a choice tile, a numpad key, nothing) runs `fallback`, the
- *  popup's main action — useNumpadKeys owns Enter inside these popups. */
-const enterOr = (scope: React.RefObject<HTMLElement>, fallback: () => void) => () => {
-  const a = document.activeElement as HTMLElement | null;
-  const action = !!a && a.tagName === 'BUTTON' && !!scope.current?.contains(a) && a.getAttribute('role') !== 'radio' && !a.hasAttribute('data-key');
-  if (action) a!.click(); else fallback();
-};
 
 /** Whether this person works the drawer on this device (profile + device). Permissions stay with the server. */
 export function useDrawerOn() {
@@ -48,7 +46,7 @@ export function useDrawerOn() {
  * Lives on the sale screen (with or without an open shift) and owns the drawer popups: takes requests from drawerBus
  * and runs the drawer keys of the profile's map. A closing count stays on screen after the shift is closed.
  */
-export function DrawerHost({ session }: { session: any | null }) {
+export function DrawerHost({ session, pending = null }: { session: any | null; pending?: any | null }) {
   const { id: deviceId } = useDev();
   const profile = useProfile();
   const on = useDrawerOn();
@@ -57,24 +55,31 @@ export function DrawerHost({ session }: { session: any | null }) {
   const [countSid, setCountSid] = useState<string | null>(null);
   const [zSid, setZSid] = useState<string | null>(null);
   const [fromHub, setFromHub] = useState(false); // a job picked in the shift popup returns there; a key returns to the sale
+  const [hand, setHand] = useState<Hand | null>(null);
   const waiting = useSyncExternalStore(drawerBus.subscribe, () => drawerBus.peek(deviceId));
   const open = (j: DrawerJob, viaHub = false) => {
     if (!on) return;
     setFromHub(viaHub);
+    // ux-10b: a drawer waiting for its handover: only accepting it or cancelling it
+    if (pending) { if ((j === 'handoverAccept' || j === 'handoverCancel') && pending.handover) { setHand({ sid: pending.id, handover: pending.handover }); setJob(j); } return; }
+    if (j === 'handoverAccept' || j === 'handoverCancel') return;
     if (!session) { setJob('open'); return; }
+    if (j === 'handover' && handoverRules(session.branchId ?? null).mode === 'FULL_CLOSE') return;
     if (j === 'open' || j === 'hub') return setJob('hub');
     if (j === 'cashIn' || j === 'cashOut') { setKind(j === 'cashIn' ? 'PAY_IN' : 'PAY_OUT'); return setJob('move'); }
     if (j === 'count') setCountSid(session.id);
     setJob(j);
   };
-  useEffect(() => { if (waiting) { const j = drawerBus.take(deviceId); if (j) open(j); } }, [waiting, session?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-  useHotkeys(deviceId, on && !job, {
-    drawer: () => open('hub'), cashIn: () => open('cashIn'), cashOut: () => open('cashOut'), noSale: () => open('noSale'), xReport: () => open('x'), closeShift: () => open('count'),
+  useEffect(() => { if (waiting) { const j = drawerBus.take(deviceId); if (j) open(j); } }, [waiting, session?.id, pending?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useHotkeys(deviceId, on && !job && !pending, {
+    drawer: () => open('hub'), cashIn: () => open('cashIn'), cashOut: () => open('cashOut'), noSale: () => open('noSale'), xReport: () => open('x'), closeShift: () => open('count'), handover: () => open('handover'),
   }, 'sale', profile.keys);
   const back = () => setJob(session && fromHub ? 'hub' : null);
   const close = () => setJob(null);
   if (!job) return null;
-  if (job === 'open') return session ? null : <OpenShiftPopup onClose={close} onOpened={close} />;
+  if (job === 'handoverAccept' && hand) return <HandoverAcceptPopup sid={hand.sid} handover={hand.handover} onClose={() => { setHand(null); close(); }} />;
+  if (job === 'handoverCancel' && hand) return <HandoverCancelPopup sid={hand.sid} handover={hand.handover} onClose={() => { setHand(null); close(); }} />;
+  if (job === 'open') return session || pending ? null : <OpenShiftPopup onClose={close} onOpened={close} />;
   if (job === 'z' && zSid) return <ZPopup sid={zSid} onClose={close} />;
   if (job === 'count' && countSid) return <CountPopup sid={countSid} onClose={() => (session ? back() : close())} onZ={(id) => { setZSid(id); setJob('z'); }} />;
   if (!session) return null;
@@ -83,6 +88,7 @@ export function DrawerHost({ session }: { session: any | null }) {
   if (job === 'noSale') return <NoSalePopup sid={session.id} onClose={back} />;
   if (job === 'x') return <XPopup sid={session.id} onClose={back} />;
   if (job === 'tips') return <TipsPopup sid={session.id} onClose={back} />;
+  if (job === 'handover') return <HandoverStartPopup sid={session.id} onClose={back} />;
   return null;
 }
 
@@ -135,17 +141,23 @@ const Footer = ({ children }: { children: React.ReactNode }) => <div className="
 function OpenShiftPopup({ onClose, onOpened }: { onClose: () => void; onOpened: () => void }) {
   const { terminal } = useDev();
   const { run, busy } = useCommand();
-  const [float, setFloat] = useState('');
+  // ux-10b OpeningFloatPolicy: the standard float is filled in; another amount needs a manager (APPROVAL) or is refused (LOCKED)
+  const fp = policyFields<{ standardFloat: string; change: string }>('OpeningFloatPolicy', { branchId: terminal?.branchId });
+  const std = plainAmount(String(fp.standardFloat ?? '0')) || '0.00';
+  const locked = fp.change === 'LOCKED';
+  const [float, setFloat] = useState(std);
   const panel = useRef<HTMLDivElement>(null);
-  const key = (k: NumpadKey) => setFloat((cur) => applyNumpadKey(cur, k));
+  const differs = !!float && sign(changePreview(float, std)) !== 0; // display only (Decimal); the server decides
+  const key = (k: NumpadKey) => { if (!locked) setFloat((cur) => applyNumpadKey(cur, k)); };
   const submit = async () => { if (!float || busy) return; if (await run('Session.Open', { body: { terminalId: terminal!.id, openingFloat: float } }, { success: t('فُتحت الوردية') })) onOpened(); };
   useNumpadKeys(true, key, { onEnter: enterOr(panel, submit), scope: panel });
   return (
     <Popup open onClose={onClose} size="sm" fb="open-shift-popup" title={<span className="flex items-center gap-2"><DoorOpen className="w-5 h-5 text-[var(--primary)]" />{t('فتح وردية')}</span>} badge={<StateBadge ops={['Session.Open']} />}>
       <div ref={panel} className="space-y-2">
         <div className="text-sm font-bold text-soft">{t('الرصيد الافتتاحي')}</div>
-        <AmountEntry value={float} onKey={key} fb="opening-float" quick={['300.00', '500.00', '1000.00']} onQuick={setFloat} />
-        <Footer><Button variant="ghost" onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" size="lg" loading={busy} disabled={!float} onClick={submit} data-fb="open-shift"><DoorOpen className="w-5 h-5" />{t('فتح الوردية')}<Kbd className="!bg-black/10 !border-black/10 !text-current">Enter</Kbd></Button></Footer>
+        {locked ? <div className="rounded-2xl border px-4 h-[68px] flex items-center justify-between border-[var(--glass-border)] bg-[var(--surface-1)]" data-fb="opening-float" data-value={float}><Lock className="w-4 h-4 text-soft" aria-label={t('ثابت')} /><Money v={float} className="text-[34px] leading-none" /></div>
+          : <AmountEntry value={float} onKey={key} fb="opening-float" quick={[std]} onQuick={setFloat} />}
+        <Footer><Button variant="ghost" onClick={onClose}>{t('إلغاء')}</Button><Button variant="primary" size="lg" loading={busy} disabled={!float} onClick={submit} data-fb="open-shift">{differs && fp.change === 'APPROVAL' ? <Lock className="w-4 h-4" /> : <DoorOpen className="w-5 h-5" />}{t('فتح الوردية')}<Kbd className="!bg-black/10 !border-black/10 !text-current">Enter</Kbd></Button></Footer>
       </div>
     </Popup>
   );
@@ -161,12 +173,14 @@ function HubPopup({ sid, onClose, onPick }: { sid: string; onClose: () => void; 
   const s = useQuery<any>('Session.Get', { params: { sessionId: sid } });
   const ses = s.data;
   const lockOf = (action: string) => approvalRule(action, { branchId: auth.branchId }).mode !== 'NEVER';
+  const handover = handoverRules(auth.branchId ?? null).mode !== 'FULL_CLOSE'; // ux-10b
   const tiles: { j: DrawerJob; a?: KeyAction; icon: React.ReactNode; label: string; lock?: boolean; proposed?: boolean; tone?: 'warning' }[] = [
     { j: 'cashIn', a: 'cashIn', icon: <ArrowDownToLine />, label: t('إدخال نقدية'), lock: lockOf('CASH_MOVE') },
     { j: 'cashOut', a: 'cashOut', icon: <ArrowUpFromLine />, label: t('صرف نقدية'), lock: lockOf('CASH_MOVE') },
     { j: 'noSale', a: 'noSale', icon: <Inbox />, label: t('فتح الدرج من غير بيع'), lock: lockOf('DRAWER_NO_SALE') },
     { j: 'x', a: 'xReport', icon: <FileText />, label: t('تقرير X') },
     { j: 'tips', icon: <HandCoins />, label: t('توزيع البقشيش'), proposed: true },
+    ...(handover ? [{ j: 'handover' as DrawerJob, a: 'handover' as KeyAction, icon: <Repeat />, label: t('تسليم الوردية'), proposed: true }] : []),
     { j: 'count', a: 'closeShift', icon: <Lock />, label: t('عدّ الدرج وإغلاق الوردية'), tone: 'warning' },
   ];
   return (
@@ -287,50 +301,46 @@ function XPopup({ sid, onClose }: { sid: string; onClose: () => void }) {
   );
 }
 
-// ───────── blind count by denomination → Session.Close
+// ───────── blind count → Session.Close (a confirmed count is locked; BlindRecountPolicy may allow an approved recount)
 
 function CountPopup({ sid, onClose, onZ }: { sid: string; onClose: () => void; onZ: (sid: string) => void }) {
-  const { can } = useDev();
+  const { can, auth } = useDev();
   const profile = useProfile();
   const showExpected = !profile.hidden.includes('expectedCash');
   const { run, busy } = useCommand();
   const s = useQuery<any>('Session.Get', { params: { sessionId: sid } });
-  const [mode, setMode] = useState<'denoms' | 'total'>('denoms');
-  const [counts, setCounts] = useState<Record<number, string>>({});
-  const [sel, setSel] = useState(0);
-  const [typed, setTyped] = useState('');
+  // BlindClosePolicy off: the expected cash may be read while counting (the server sends it only then)
+  const blind = policy<boolean>('BlindClosePolicy', { branchId: auth.branchId }) !== false;
+  const x = useQuery<any>(!blind && showExpected ? 'Session.XReport' : null, { params: { sessionId: sid } });
+  const recount = recountMode(auth.branchId ?? null) === 'WITH_APPROVAL';
+  const minReason = reasonMinLength({ branchId: auth.branchId });
   const [note, setNote] = useState('');
   const [lockedAt, setLockedAt] = useState(confirmed.get(sid) ?? null);
+  const [recounting, setRecounting] = useState(false);
+  const [rcReason, setRcReason] = useState('');
   const [result, setResult] = useState<any>(null);
   const panel = useRef<HTMLDivElement>(null);
-  const totalP = useMemo(() => DENOMS.reduce((a, d) => a + d.p * Number(counts[d.p] || 0), 0), [counts]); // integer piasters
-  const counted = lockedAt?.counted ?? (mode === 'total' ? typed : totalP ? fromPiasters(totalP) : '');
-  const editable = !lockedAt && !result;
-  const setCount = (p: number, v: string) => setCounts((c) => ({ ...c, [p]: v.replace(/\D/g, '').slice(0, 4).replace(/^0+(?=\d)/, '') }));
-  const key = (k: NumpadKey) => {
-    if (mode === 'total') return setTyped((cur) => applyNumpadKey(cur, k));
-    const d = DENOMS[sel];
-    setCounts((c) => ({ ...c, [d.p]: applyNumpadKey(c[d.p] ?? '', k, { decimals: 0, maxDigits: 4 }) }));
-  };
-  const closeShift = async (c: { counted: string; note: string }) => {
+  // the server keeps the confirmed count: after a reload the count is still locked
+  const server = s.data?.confirmedCount ?? null;
+  useEffect(() => { if (server && !lockedAt && !result) setLockedAt({ counted: server.counted, note: '' }); }, [server?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const editable = (!lockedAt || recounting) && !result;
+  const bc = useBlindCount(editable, () => (recounting ? doRecount() : confirm()), panel);
+  const counted = recounting ? bc.counted : lockedAt?.counted ?? bc.counted;
+  const closeShift = async (c: { counted: string; note: string }, version?: number) => {
     const ses = s.data;
     if (!ses || busy) return;
-    const r = await run<any>('Session.Close', { params: { sessionId: sid }, body: { expectedVersion: ses.version, countedCash: c.counted, reason: c.note || undefined } }, { success: t('الوردية اتقفلت') });
+    const r = await run<any>('Session.Close', { params: { sessionId: sid }, body: { expectedVersion: version ?? ses.version, countedCash: c.counted, reason: c.note || undefined } }, { success: t('الوردية اتقفلت') });
     if (r) { confirmed.delete(sid); setResult(r); }
   };
   const confirm = () => { if (!counted || !editable) return; const c = { counted, note: note.trim() }; confirmed.set(sid, c); setLockedAt(c); closeShift(c); };
-  useNumpadKeys(editable, key, { onEnter: enterOr(panel, () => (mode === 'denoms' ? setSel((i) => Math.min(DENOMS.length - 1, i + 1)) : confirm())), scope: panel, decimals: mode === 'total' });
-  useEffect(() => {
-    if (!editable || mode !== 'denoms') return;
-    const h = (e: KeyboardEvent) => {
-      const el = e.target as HTMLElement | null;
-      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) return;
-      if (e.key === 'ArrowDown') { e.preventDefault(); setSel((i) => Math.min(DENOMS.length - 1, i + 1)); }
-      if (e.key === 'ArrowUp') { e.preventDefault(); setSel((i) => Math.max(0, i - 1)); }
-    };
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, [editable, mode]);
+  const doRecount = async () => {
+    if (!bc.counted || rcReason.trim().length < minReason || busy || !s.data) return;
+    const r = await run<any>('Session.Recount', { params: { sessionId: sid }, body: { countedCash: bc.counted, reason: rcReason.trim(), expectedVersion: s.data.version } }, { success: t('سُجّلت إعادة العد') });
+    if (!r) return;
+    const c = { counted: r.count.counted, note: note.trim() };
+    confirmed.set(sid, c); setLockedAt(c); setRecounting(false); setRcReason('');
+    closeShift(c, r.session.version);
+  };
   const grant = result?.session?.close?.approvalGrantId ? store.db.grants.find((g) => g.id === result.session.close.approvalGrantId) : null;
   const approver = grant ? store.db.users.find((u) => u.id === grant.approverUserId) : null;
 
@@ -341,6 +351,7 @@ function CountPopup({ sid, onClose, onZ }: { sid: string; onClose: () => void; o
         <div className="space-y-1.5 text-sm">
           <div className="flex justify-between"><span className="text-soft">{t('المعدود')}</span><Money v={result.countedCash} /></div>
           {showExpected && <div className="flex justify-between"><span className="text-soft">{t('المتوقع')}</span><Money v={result.expectedCash} fb="count-expected" /></div>}
+          {(result.session?.close?.recounts ?? 0) > 0 && <div className="flex justify-between"><span className="text-soft">{t('إعادة العد')}</span><span className="num font-semibold">{result.session.close.recounts}</span></div>}
           {approver && <div className="flex justify-between"><span className="text-soft">{t('بموافقة مدير')}</span><span className="font-semibold">{personName(approver.username, approver.displayName)}</span></div>}
         </div>
         <Footer>{can('session:zreport') && <Button onClick={() => onZ(sid)} data-fb="count-z"><FileText className="w-4 h-4" />{t('تقرير Z')}</Button>}<Button variant="primary" size="lg" onClick={onClose} data-fb="count-done">{t('تم')}</Button></Footer>
@@ -348,45 +359,54 @@ function CountPopup({ sid, onClose, onZ }: { sid: string; onClose: () => void; o
     </Popup>
   );
   return (
-    <Popup open onClose={onClose} size="xl" fb="count-popup" title={<span className="flex items-center gap-2"><Lock className="w-5 h-5 text-[var(--primary)]" />{t('عدّ الدرج وإغلاق الوردية')}</span>} badge={<StateBadge ops={['Session.Close', 'Approval.Grant']} />}>
-      <div ref={panel} className="grid lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] gap-5">
-        <div className={cn(!editable && 'opacity-50 pointer-events-none')}>
-          <SegmentedControl value={mode} onChange={setMode} className="mb-2" options={[{ id: 'denoms', label: t('بالفئات'), fb: 'count-mode:denoms' }, { id: 'total', label: t('المبلغ الإجمالي'), fb: 'count-mode:total' }]} />
-          {(
-            <div className={cn('space-y-1', mode === 'total' && 'opacity-40 pointer-events-none')} data-fb="denoms">
-              {DENOMS.map((d, i) => {
-                const n = counts[d.p] ?? '';
-                return (
-                  <div key={d.p} onClick={() => setSel(i)} className={cn('flex items-center gap-2 rounded-xl border px-2 h-11 cursor-pointer', sel === i && mode === 'denoms' ? 'border-[var(--primary)] bg-[var(--primary-container)]' : n ? 'border-[color-mix(in_srgb,var(--primary)_30%,transparent)] surface-1' : 'surface-1 border-transparent')} data-fb={`denom:${d.label}`} data-selected={sel === i || undefined}>
-                    <span className="w-14 flex justify-center shrink-0"><span className={cn('h-8 flex items-center justify-center font-extrabold num text-sm', d.coin ? 'min-w-8 px-1 rounded-full bg-[color-mix(in_srgb,var(--warning)_18%,transparent)] text-[var(--warning-text)]' : 'w-14 rounded-md bg-[color-mix(in_srgb,var(--success)_15%,transparent)] text-[var(--success)]')}>{d.label}</span></span>
-                    <span className="text-xs text-dim w-16 shrink-0">{d.coin ? t('عملة') : t('ورقة')}</span>
-                    <button type="button" onClick={() => setCount(d.p, String(Math.max(0, Number(n || 0) - 1)))} disabled={!n} className="w-9 h-9 rounded-lg surface-2 flex items-center justify-center disabled:opacity-30" aria-label={t('أقل')} data-fb={`denom-minus:${d.label}`}><Minus className="w-4 h-4" /></button>
-                    <input value={n} onChange={(e) => setCount(d.p, e.target.value)} onFocus={() => setSel(i)} inputMode="numeric" placeholder="0" className="num w-14 h-9 text-center rounded-lg glass-input !p-0 font-bold" style={{ fontSize: 17 }} aria-label={t('عدد {d}', { d: d.label })} data-fb={`denom-input:${d.label}`} />
-                    <button type="button" onClick={() => setCount(d.p, String(Number(n || 0) + 1))} className="w-9 h-9 rounded-lg surface-2 flex items-center justify-center" aria-label={t('أكتر')} data-fb={`denom-plus:${d.label}`}><Plus className="w-4 h-4" /></button>
-                    <span className="flex-1 text-end text-sm">{n && n !== '0' ? <Money v={fromPiasters(d.p * Number(n))} /> : ''}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-        <div className="space-y-3 min-w-0">
-          <div className="rounded-2xl p-3 text-center border border-[color-mix(in_srgb,var(--primary)_30%,transparent)] bg-[var(--primary-container)]" data-fb="count-total" data-value={counted}>
-            <div className="text-sm text-soft font-bold">{t('إجمالي اللي اتعد')}</div>
-            <div style={{ fontSize: 34, lineHeight: 1.15 }}><Money v={counted || '0'} className="font-extrabold text-[var(--primary)]" /></div>
-          </div>
-          {editable ? <>
-            <Numpad onKey={key} mode={mode === 'total' ? 'amount' : 'integer'} size="md" fb="count-numpad" />
-            <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('ملاحظة')} maxLength={200} data-fb="count-note" className="!h-11" />
-          </> : (
+    <Popup open onClose={onClose} size="xl" fb="count-popup" title={<span className="flex items-center gap-2"><Lock className="w-5 h-5 text-[var(--primary)]" />{t('عدّ الدرج وإغلاق الوردية')}</span>} badge={<StateBadge ops={recount ? ['Session.Close', 'Session.Recount', 'Approval.Grant'] : ['Session.Close', 'Approval.Grant']} />}>
+      <div ref={panel}>
+        <CountBoard bc={bc} editable={editable} shown={counted}>
+          {!blind && showExpected && x.data?.expectedCash !== undefined && <div className="flex justify-between text-sm rounded-xl surface-1 border line px-3 py-2" data-fb="count-expected-open"><span className="text-soft">{t('المتوقع')}</span><Money v={x.data.expectedCash} /></div>}
+          {editable && !recounting && <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('ملاحظة')} maxLength={200} data-fb="count-note" className="!h-11" />}
+          {recounting && <Input value={rcReason} onChange={(e) => setRcReason(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); doRecount(); } }} placeholder={t('سبب إعادة العد')} maxLength={200} data-fb="recount-reason" className="!h-11" />}
+          {!editable && (
             <div className="rounded-xl border p-3 space-y-2 border-[color-mix(in_srgb,var(--warning)_40%,transparent)] bg-[color-mix(in_srgb,var(--warning)_8%,transparent)]" data-fb="count-locked">
               <div className="text-sm font-bold flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-[var(--warning)]" />{t('العد مؤكد — بانتظار موافقة المدير')}</div>
               <Button variant="warning" size="lg" className="w-full" loading={busy} onClick={() => lockedAt && closeShift(lockedAt)} data-fb="count-retry">{t('طلب الموافقة')}</Button>
+              {recount && <Button variant="outline" className="w-full" onClick={() => { bc.reset(); setRecounting(true); }} data-fb="count-recount"><RotateCcw className="w-4 h-4" />{t('إعادة العد')}<Lock className="w-3.5 h-3.5 text-[var(--warning-text)]" /></Button>}
             </div>
           )}
           <OpenOrders sid={sid} />
-          {editable && <Footer><Button variant="ghost" onClick={onClose}>{t('رجوع')}</Button><Button variant="warning" size="lg" loading={busy} disabled={!counted} onClick={confirm} data-fb="count-confirm"><Lock className="w-4 h-4" />{t('تأكيد العد')}</Button></Footer>}
-        </div>
+          {editable && !recounting && <Footer><Button variant="ghost" onClick={onClose}>{t('رجوع')}</Button><Button variant="warning" size="lg" loading={busy} disabled={!counted} onClick={confirm} data-fb="count-confirm"><Lock className="w-4 h-4" />{t('تأكيد العد')}</Button></Footer>}
+          {recounting && <Footer><Button variant="ghost" onClick={() => setRecounting(false)}>{t('رجوع')}</Button><Button variant="warning" size="lg" loading={busy} disabled={!bc.counted || rcReason.trim().length < minReason} onClick={doRecount} data-fb="recount-confirm"><Lock className="w-4 h-4" />{t('تأكيد إعادة العد')}</Button></Footer>}
+        </CountBoard>
+      </div>
+    </Popup>
+  );
+}
+
+// ───────── shift handover: the outgoing cashier's blind count → Session.HandoverStart (the drawer then waits)
+
+function HandoverStartPopup({ sid, onClose }: { sid: string; onClose: () => void }) {
+  const { auth } = useDev();
+  const { run, busy } = useCommand();
+  const s = useQuery<any>('Session.Get', { params: { sessionId: sid } });
+  const rules = handoverRules(auth.branchId ?? null);
+  const [note, setNote] = useState('');
+  const panel = useRef<HTMLDivElement>(null);
+  const server = s.data?.confirmedCount ?? null; // a confirmed count still stands: the handover takes the same amount
+  const bc = useBlindCount(!server, () => submit(), panel);
+  const counted = server?.counted ?? bc.counted;
+  const submit = async () => {
+    if (!counted || busy || !s.data) return;
+    if (await run('Session.HandoverStart', { params: { sessionId: sid }, body: { countedCash: counted, note: note.trim() || undefined, expectedVersion: s.data.version } }, { success: t('الدرج بانتظار استلام الكاشير التالي') })) onClose();
+  };
+  return (
+    <Popup open onClose={onClose} size="xl" fb="handover-popup" title={<span className="flex items-center gap-2"><Repeat className="w-5 h-5 text-[var(--primary)]" />{t('تسليم الوردية')}</span>} badge={<StateBadge ops={['Session.HandoverStart']} />}>
+      <div ref={panel}>
+        <CountBoard bc={bc} editable={!server} shown={counted}>
+          <div className="text-xs text-soft flex items-center gap-1.5" data-fb="handover-mode" data-mode={rules.mode}><Repeat className="w-3.5 h-3.5" />{rules.mode === 'DIRECT_SWAP' ? t('يستلم الكاشير التالي بعدّك') : t('يعدّ الكاشير التالي الدرج بعدك')}</div>
+          {!server && <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('ملاحظة')} maxLength={200} data-fb="handover-note" className="!h-11" />}
+          {server && <div className="rounded-xl border p-2.5 text-sm font-bold flex items-center gap-1.5 border-[color-mix(in_srgb,var(--warning)_40%,transparent)] bg-[color-mix(in_srgb,var(--warning)_8%,transparent)]" data-fb="handover-count-locked"><ShieldCheck className="w-4 h-4 text-[var(--warning)]" />{t('العد مؤكد ومقفل')}</div>}
+          <OpenOrders sid={sid} />
+          <Footer><Button variant="ghost" onClick={onClose}>{t('رجوع')}</Button><Button variant="warning" size="lg" loading={busy} disabled={!counted} onClick={submit} data-fb="handover-confirm"><Lock className="w-4 h-4" />{t('تأكيد العد وتسليم الوردية')}</Button></Footer>
+        </CountBoard>
       </div>
     </Popup>
   );

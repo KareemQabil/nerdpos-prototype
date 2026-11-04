@@ -370,7 +370,7 @@ export function CashierScreen({ sessionId, staffMealOnOpen, businessDate }: { se
   }, 'sale', profile.keys);
 
   const actionLabels: Partial<Record<KeyAction, string>> = { primary: t('الزر الرئيسي'), shortcuts: t('الاختصارات'), new: t('شيك جديد'), held: t('الطلبات المعلقة'), customer: t('العميل'), discount: t('الخصم'), orders: t('الشيكات'), more: t('المزيد'), mode: t('الوضع التالي'), modeTakeaway: t('وضع تيك أواي'), modeDineIn: t('وضع الصالة'), modeDelivery: t('وضع دليفري'), search: t('البحث'), viewTables: t('الصالة: الترابيزات'), viewChecks: t('الصالة: الشيكات'), viewClosed: t('الصالة: المغلقة اليوم'),
-    ...(drawerOn ? { drawer: t('الوردية والدرج'), cashIn: t('إدخال نقدية'), cashOut: t('صرف نقدية'), noSale: t('فتح الدرج من غير بيع'), xReport: t('تقرير X'), closeShift: t('عدّ الدرج وإغلاق الوردية') } : {}) };
+    ...(drawerOn ? { drawer: t('الوردية والدرج'), cashIn: t('إدخال نقدية'), cashOut: t('صرف نقدية'), noSale: t('فتح الدرج من غير بيع'), xReport: t('تقرير X'), closeShift: t('عدّ الدرج وإغلاق الوردية'), handover: t('تسليم الوردية') } : {}) };
 
   const activeDeliveries: any[] = (deliveriesQ.data?.items ?? []).filter((d: any) => d.state !== 'DELIVERED' && d.state !== 'CANCELLED');
   const modeOpts = ([

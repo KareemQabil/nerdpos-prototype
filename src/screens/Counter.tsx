@@ -8,16 +8,21 @@ import { useDev, useQuery } from '../app/hooks';
 import { Skeleton } from '../ui';
 import { CashierScreen, NoDrawer } from './cashier/Cashier';
 import { DrawerHost, NoShiftCta } from './cashier/DrawerPopups';
+import { HandoverWaiting } from './cashier/HandoverPopups'; // ux-10b
 
 export default function Counter() {
   const { terminal, params } = useDev();
   const session = useQuery<any>(terminal?.drawer ? 'Session.Current' : null, { query: { terminalId: terminal?.id } });
   if (!terminal?.drawer) return <div data-screen="C2"><NoDrawer /></div>;
   // a refused re-read keeps the last data in useQuery: «no open session» after a close means no shift
-  const open = session.error?.code === 'SESSION_NOT_FOUND' ? null : session.data ?? null;
+  const live = session.error?.code === 'SESSION_NOT_FOUND' ? null : session.data ?? null;
+  // ux-10b: a drawer waiting for its handover locks the sale; the waiting panel takes the sale screen's place
+  const pending = live?.state === 'HANDOVER_PENDING' ? live : null;
+  const open = live?.state === 'OPEN' ? live : null;
   const body = session.loading && !session.data ? <Skeleton className="h-64 rounded-2xl" />
+    : pending ? <HandoverWaiting session={pending} />
     : !open ? <div data-screen="C2" data-fb="no-shift" className="h-full flex items-center justify-center"><NoShiftCta /></div>
     : <CashierScreen sessionId={open.id} businessDate={open.businessDate ?? null} staffMealOnOpen={params.staffMeal === '1'} />;
   // the host keeps its place in the tree whatever the body is, so a closing count stays on screen after the close
-  return <>{body}<DrawerHost session={open} /></>;
+  return <>{body}<DrawerHost session={open} pending={pending} /></>;
 }

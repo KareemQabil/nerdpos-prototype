@@ -1,7 +1,7 @@
 // ux-10: the drawer's jobs open as popups over the sale screen. Anything on the device (the header's shift chip, the
 // sale screen's «المزيد», a key, the no-shift call to action) asks for a job here; the sale screen's DrawerHost takes it.
 // Per device and in memory only (a popup is never restored after a reload).
-export type DrawerJob = 'hub' | 'open' | 'cashIn' | 'cashOut' | 'noSale' | 'x' | 'count' | 'tips';
+export type DrawerJob = 'hub' | 'open' | 'cashIn' | 'cashOut' | 'noSale' | 'x' | 'count' | 'tips' | 'handover' | 'handoverAccept' | 'handoverCancel'; // ux-10b: the shift handover
 
 let pending: Record<string, DrawerJob | undefined> = {};
 const ls = new Set<() => void>();

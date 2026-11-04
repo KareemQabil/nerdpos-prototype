@@ -154,7 +154,9 @@ function Header() {
       </div>
       <div className="flex items-center gap-1.5 min-w-0 shrink overflow-x-auto scrollbar-hide">
         {offline && <Chip tone="error" icon={<WifiOff />} fb="hdr-offline" title={t('الجهاز ده مفصول عن النت (محاكاة). الحركات بتتحفظ على الجهاز وتتبعت لما النت يرجع.')} onClick={() => sim.setOffline(id, false)}>{t('مفيش نت')}</Chip>}
-        {terminal?.drawer && (session.data
+        {terminal?.drawer && (session.data?.state === 'HANDOVER_PENDING'
+          ? <Chip tone="warning" icon={<Wallet />} title={t('بانتظار استلام الكاشير التالي')} onClick={() => nav('counter')} fb="hdr-shift">{t('بانتظار استلام الدرج')}</Chip>
+          : session.data
           ? <Chip tone="success" icon={<Wallet />} title={t('الوردية المفتوحة على الجهاز ده')} onClick={onShift} fb="hdr-shift"><span className="@max-[34rem]/hdr:hidden">{t('الوردية مفتوحة')} · </span>{opener}</Chip>
           : <Chip tone="warning" icon={<Wallet />} title={t('اضغط عشان تفتح وردية')} onClick={onShift} fb="hdr-shift">{t('مفيش وردية — افتح وردية')}</Chip>)}
         {terminal && !terminal.drawer && <Chip className="@max-[44rem]/hdr:hidden" title={t('الجهاز ده مالوش درج فلوس — التحصيل بيتم على جهاز الكاشير')}>{t('من غير درج')}</Chip>}

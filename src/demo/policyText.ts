@@ -81,6 +81,12 @@ const PLAIN: Record<string, Plain> = {
   SupervisorOverridePolicy: { title: 'المدير يوافق في مكانه بدل ما يدخل بحسابه', explain: 'لو الحركة مش من صلاحية الموظف (إلغاء، مرتجع، ضيافة، صرف من الدرج، وجبة موظف…) يكملها من جهازه لما مدير عنده الصلاحية يوافق بالرقم السري أو الكارت أو البصمة أو من موبايله. السجل بيقول مين عمل ومين وافق.', reacts: 'زراير الإلغاء والمرتجع بتظهر للكاشير وبتطلب موافقة مدير على نفس الجهاز.', question: 'الكاشير يكمّل الإلغاء والمرتجع بموافقة المدير في مكانه، ولا المدير لازم يعملها بنفسه؟' },
   ApprovalCredentialPolicy: { title: 'المدير يثبت شخصيته إزاي', explain: 'الطرق اللي المدير يوافق بيها على جهاز الكاشير: الرقم السري، تمرير كارت المدير، البصمة (لو فيه جهاز بصمة زي Digital Persona)، أو طلب يوصل على جهازه.', reacts: 'شاشة موافقة المدير.' },
   StaffMealAllowancePolicy: { title: 'حد وجبة الموظف في اليوم', explain: 'كل موظف ليه حد في اليوم لوجباته، بسعر البيع أو بالتكلفة حسب تشغيل المكان. الوجبة اللي تعدّي الباقي بتترفض قبل ما تتسجل، والوجبة دايمًا محتاجة موافقة مدير.', reacts: 'شاشة وجبة الموظف: الباقي لكل موظف والرفض لو عدّى.', question: 'حد وجبة الموظف في اليوم كام، ومحسوب بسعر البيع ولا بالتكلفة؟' },
+  // ux-10b — shift handover and the remaining defaults
+  ShiftHandoverPolicy: { title: 'تسليم الوردية', explain: 'كيف يستلم الكاشير التالي الدرج: إغلاق كامل ثم فتح جديد، أو عدّ أعمى من الكاشيرين على الجهاز نفسه، أو استلام بعدّ الكاشير السابق. الفرق على الكاشير المُسلِّم.', reacts: 'زر «تسليم الوردية» في نافذة الوردية والدرج، وشاشة انتظار الاستلام.', question: 'هل يعدّ الكاشير المستلم الدرج بنفسه عند تسليم الوردية؟' },
+  OpeningFloatPolicy: { title: 'الرصيد الافتتاحي', explain: 'المبلغ المعتاد في الدرج عند فتح الوردية، وهل يفتح الكاشير بمبلغ آخر.', reacts: 'نافذة «فتح وردية»: المبلغ المعتاد مكتوب مسبقًا.', question: 'كم الرصيد الافتتاحي المعتاد؟' },
+  BlindRecountPolicy: { title: 'إعادة العد الأعمى', explain: 'بعد تأكيد عدّ الدرج يُقفل المبلغ. يمكن السماح بإعادة العد بموافقة المدير مع سبب، ويُحفظ العدّان.', reacts: 'زر «إعادة العد» بعد تأكيد العد.' },
+  RefundCancelPolicy: { title: 'سحب طلب المرتجع', explain: 'من يسحب طلب مرتجع لم يُعتمد بعد.', reacts: 'زر «إلغاء الطلب» في المرتجعات.' },
+  ReasonTextPolicy: { title: 'طول السبب المكتوب', explain: 'أقل عدد حروف للسبب في إلغاء الحجز ورد العربون وتسوية عجز الطيار وإيقافه وسحب طلب المرتجع وتسليم الوردية وإعادة العد.' },
   SplitLimitPolicy: { title: 'عدد الشيكات مايزيدش عن عدد الأفراد', explain: 'على الترابيزة، الشيك الجديد أو التقسيم مايخليش عدد الشيكات أكتر من عدد الأفراد القاعدين (3 أفراد = 3 شيكات بالكتير).', reacts: 'زرار «شيك جديد» والتقسيم على الترابيزة.' },
 };
 
@@ -191,6 +197,11 @@ const OPTIONS: Record<string, Record<string, OptText>> = {
   'StackedTaxPolicy.order': { BEFORE_VAT: O('قبل القيمة المضافة (تدخل فيها)'), AFTER_VAT: O('بعد القيمة المضافة') },
   'WalletProvidersPolicy.providers': { INSTAPAY: O('إنستاباي'), VODAFONE_CASH: O('فودافون كاش'), ORANGE_CASH: O('أورنج كاش'), ETISALAT_CASH: O('اتصالات كاش') },
   'ApprovalCredentialPolicy.methods': { PIN: O('الرقم السري'), CARD: O('تمرير كارت المدير'), FINGERPRINT: O('البصمة'), REMOTE: O('طلب على جهاز المدير') },
+  'ShiftHandoverPolicy.mode': { FULL_CLOSE: O('إغلاق كامل ثم فتح جديد', 'يغلق الكاشير ورديته بالعد وتقرير Z، ويفتح التالي وردية جديدة برصيد افتتاحي.'), DUAL_COUNT: O('عدّ مزدوج أعمى', 'يعدّ الكاشير المُسلِّم، ثم يعدّ المستلم بنفسه على الجهاز نفسه.'), DIRECT_SWAP: O('استلام بعدّ الكاشير السابق', 'يستلم الكاشير التالي بلا عدّ، ويُحسب الفرق على المتوقع.') },
+  'OpeningFloatPolicy.change': { APPROVAL: O('بموافقة المدير', 'أي مبلغ غير المعتاد يحتاج موافقة المدير.'), LOCKED: O('ثابت', 'لا يُفتح الدرج إلا بالمبلغ المعتاد.'), FREE: O('حر', 'يكتب الكاشير المبلغ بلا موافقة.') },
+  'BlindRecountPolicy.mode': { NOT_ALLOWED: O('غير مسموحة', 'العد المؤكد لا يتغير.'), WITH_APPROVAL: O('بموافقة المدير', 'إعادة عد واحدة مع سبب، ويُحفظ العدّان.') },
+  'RefundCancelPolicy.cancelBy': { REQUESTER_OR_DECIDER: O('صاحب الطلب أو صاحب صلاحية الرفض'), REQUESTER_ONLY: O('صاحب الطلب فقط'), DECIDER_ONLY: O('صاحب صلاحية الرفض فقط') },
+  'DriverPayPolicy.payoutDrawer': { OWN_DRAWER: O('الكاشير صاحب الوردية من درجه', 'يصرف الكاشير الذي يحمل الوردية المفتوحة على الجهاز، من درجه.'), TERMINAL_DRAWER: O('أي صاحب صلاحية من درج الجهاز', 'أي صاحب صلاحية صرف المستحقات يصرف من درج الجهاز المفتوح.') },
   'DriverPayPolicy.mode': { PER_TRIP: O('مبلغ لكل مشوار مُسلَّم'), FIXED_SHIFT: O('مبلغ ثابت لكل وردية'), PERCENT_OF_FEE: O('نسبة من رسوم التوصيل') }, // ux-11
   'ReservationPolicy.cancelDepositMode': { REFUND_WITH_APPROVAL: O('يُرد بموافقة المدير'), FORFEIT_IF_LATE: O('يُصادر عند الإلغاء المتأخر، ويُرد قبله بموافقة المدير'), ALWAYS_FORFEIT: O('يُصادر دائمًا') }, // ux-12
   'DeliveryPolicy.cashLimitMode': { APPROVAL: O('بموافقة المدير'), BLOCK: O('ممنوع'), WARN: O('تنبيه فقط') }, // ux-11
@@ -243,6 +254,9 @@ const FIELD_LABEL: Record<string, string> = {
   'SecondLanguagePolicy.receipt': 'على إيصال الزبون', 'SecondLanguagePolicy.kitchen': 'على تذكرة المطبخ', 'SecondLanguagePolicy.menu': 'في أزرار المنيو',
   'TableTurnPolicy.markDirty': 'تتعلم «محتاجة تنضيف» بعد القعدة', 'TableTurnPolicy.blockSeating': 'ممنوع حد يقعد عليها قبل التنضيف', 'TableTurnPolicy.alertMinutes': 'ينبّه لو فضلت مش نضيفة بعد',
   'OfflineModePolicy.maxQueued': 'أقصى عمليات مستنية على الجهاز', 'OfflineModePolicy.cashOnly': 'التحصيل من غير نت كاش بس',
+  'ShiftHandoverPolicy.mode': 'طريقة التسليم', 'ShiftHandoverPolicy.countMismatchTolerance': 'الفرق المسموح بين العدّين', 'ShiftHandoverPolicy.mismatchRecounts': 'مرات إعادة العد عند عدم التطابق',
+  'OpeningFloatPolicy.standardFloat': 'الرصيد المعتاد', 'OpeningFloatPolicy.change': 'تغيير الرصيد عند الفتح', 'BlindRecountPolicy.mode': 'إعادة العد بعد التأكيد',
+  'RefundCancelPolicy.cancelBy': 'من يسحب الطلب', 'ReasonTextPolicy.minLength': 'أقل عدد حروف', 'DriverPayPolicy.payoutDrawer': 'من يصرف ومن أي درج',
   'ApprovalCredentialPolicy.methods': 'الطرق المسموحة', 'StaffMealAllowancePolicy.enabled': 'فيه حد في اليوم', 'StaffMealAllowancePolicy.basis': 'بيتحسب', 'StaffMealAllowancePolicy.dailyLimit': 'الحد لكل موظف في اليوم',
 };
 const REASON_KIND: Record<string, string> = {
@@ -256,7 +270,7 @@ const UNITS: Record<string, Unit> = {
   'OrderNumberPolicy.width': 'digit', 'RoundingPolicy.scale': 'digit', 'SkuGenerationPolicy.width': 'digit',
   'SessionDurationPolicy.maxHours': 'hour', 'SessionDurationPolicy.warningHours': 'hour', 'ApprovalTtlPolicy.seconds': 'sec',
   'KitchenTimingPolicy.targetMinutes': 'min', 'KitchenTimingPolicy.alertMinutes': 'min', 'LoginLockoutPolicy.maxFailedAttempts': 'try', 'LoginLockoutPolicy.lockMinutes': 'min',
-  'TableTurnPolicy.alertMinutes': 'min',
+  'TableTurnPolicy.alertMinutes': 'min', 'ReasonTextPolicy.minLength': 'char', 'ShiftHandoverPolicy.mismatchRecounts': 'none',
   'AuthSessionPolicy.maxHours': 'hour', 'AuthSessionPolicy.pinSessionMaxHours': 'hour', 'CredentialPolicy.passwordMinLength': 'char', 'CredentialPolicy.pinLength': 'digit',
 };
 export function fieldLabel(policyId: string, f: { key: string; label: string }): string {
@@ -396,6 +410,8 @@ const CONTEXT_FIELD: Record<string, [string, Unit]> = {
   warehouseId: ['المخزن', 'none'], quantityDelta: ['الكمية (زيادة أو نقص)', 'none'], reasonCode: ['السبب', 'none'], absVarianceValue: ['قيمة الفروقات', 'egp'], lineCount: ['عدد الأصناف', 'none'], value: ['القيمة بالتكلفة', 'egp'], // inventory area
   exposure: ['النقد الذي سيحمله الطيار', 'egp'], limit: ['حد النقد', 'egp'], owedBefore: ['العجز قبل التسوية', 'egp'], mode: ['طريقة التسوية', 'none'], gross: ['المستحقات', 'egp'], deductions: ['خصم العجز', 'egp'], net: ['الصافي من الدرج', 'egp'], // ux-11 riders
   remaining: ['المتبقي من العربون', 'egp'], // ux-12 deposit refund
+  outgoingCount: ['عدّ الكاشير المُسلِّم', 'egp'], incomingCount: ['عدّ الكاشير المستلم', 'egp'], absDifference: ['الفرق بين العدّين', 'egp'], varianceOverThreshold: ['فرق الدرج فوق حد «فرق في عد الدرج»', 'none'], countMismatch: ['العدّان غير متطابقين', 'none'], needsApproval: ['فرق فوق الحد أو عدم تطابق العدّين', 'none'], handoverId: ['التسليم', 'none'], // ux-10b
+  firstCount: ['العد الأول', 'egp'], recount: ['إعادة العد', 'egp'], sessionId: ['الوردية', 'none'], standardFloat: ['الرصيد المعتاد', 'egp'], openingFloat: ['الرصيد المكتوب', 'egp'], terminalId: ['الجهاز', 'none'], // ux-10b
   foodFired: ['الأكل كان اتبعت للمطبخ', 'none'], variance: ['الفرق', 'egp'], quantity: ['الكمية', 'none'], percent: ['النسبة', 'pct'],
   orderId: ['الشيك', 'none'], fromSessionId: ['من وردية', 'none'], toSessionId: ['لوردية', 'none'], date: ['اليوم', 'none'], deliveryId: ['العملية', 'none'], consumerId: ['رايحة لـ', 'none'],
   attempts: ['عدد المحاولات', 'none'], warnings: ['عدد التحذيرات', 'none'], deadLetter: ['العملية وقفت بعد محاولات كتير', 'none'],

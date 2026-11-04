@@ -6,7 +6,8 @@
 // Staff meals found here are cancelled / returned through their own stages (F3-01).
 import React, { useEffect, useState } from 'react';
 import { RotateCcw, Check, X, Receipt, Search, Wallet, Coffee, ShieldCheck, Lock, Undo2 } from 'lucide-react';
-import { useDev, useQuery, useCommand } from '../app/hooks';
+import { useDev, useQuery, useCommand, useReasonMin } from '../app/hooks';
+import { policyFields } from '../mock/policies'; // ux-10b: RefundCancelPolicy
 import { PageHeader, Card, Input, Button, Field, Select, Money, Table, Pill, Textarea, Tabs, SearchInput, EmptyState, Skeleton, FilterChips, Toolbar, Banner, confirmDialog, DateTime, Popup, StateBadge } from '../ui';
 import { Tech } from '../app/tech';
 import { t, L } from '../i18n';
@@ -137,11 +138,13 @@ function StaffMealReturn({ order }: { order: any }) {
 
 function Cases({ q }: { q: any }) {
   const { run } = useCommand();
-  const { terminal, me, can } = useDev();
+  const { terminal, me, can, auth } = useDev();
   const [f, setF] = useState<'ALL' | 'REQUESTED' | 'PAID' | 'S3'>('ALL');
   const [cancel, setCancel] = useState<any>(null);
   // ux-10: the requester withdraws a pending request (a refund:reject holder may too); the server decides
-  const canCancel = (r: any) => r.requestedBy === me?.user?.id || can('refund:reject');
+  // ux-10b: RefundCancelPolicy decides who (the server enforces it)
+  const cancelBy = policyFields<{ cancelBy: string }>('RefundCancelPolicy', { branchId: auth.branchId }).cancelBy;
+  const canCancel = (r: any) => (cancelBy === 'REQUESTER_ONLY' ? r.requestedBy === me?.user?.id : cancelBy === 'DECIDER_ONLY' ? can('refund:reject') : r.requestedBy === me?.user?.id || can('refund:reject'));
   const approve = (r: any) => run('Refund.Approve', { params: { refundCaseId: r.id }, body: { expectedVersion: r.version, payoutMethod: r.method } }, { success: t('المرتجع اتصرف') });
   const reject = async (r: any) => { if (await confirmDialog(t('ترفض طلب المرتجع ده؟ الزبون مش هياخد فلوس.'), { danger: true, confirmLabel: t('أيوه، ارفض') })) run('Refund.Reject', { params: { refundCaseId: r.id }, body: { expectedVersion: r.version, decisionReason: 'rejected' } }, { success: t('الطلب اترفض') }); };
   const all: any[] = (q.data?.items ?? []).slice().reverse();
@@ -167,10 +170,11 @@ function Cases({ q }: { q: any }) {
 function CancelRefundPopup({ r, onClose }: { r: any; onClose: () => void }) {
   const { run, busy } = useCommand();
   const [reason, setReason] = useState('');
-  const submit = async () => { if (!reason.trim() || busy) return; if (await run('Refund.Cancel', { params: { refundCaseId: r.id }, body: { expectedVersion: r.version, reason: reason.trim() } }, { success: t('أُلغي طلب المرتجع') })) onClose(); };
+  const minReason = useReasonMin(); // ux-10b: ReasonTextPolicy
+  const submit = async () => { if (reason.trim().length < minReason || busy) return; if (await run('Refund.Cancel', { params: { refundCaseId: r.id }, body: { expectedVersion: r.version, reason: reason.trim() } }, { success: t('أُلغي طلب المرتجع') })) onClose(); };
   return (
     <Popup open onClose={onClose} size="sm" fb="refund-cancel-popup" title={<span className="flex items-center gap-2"><Undo2 className="w-5 h-5 text-[var(--primary)]" />{t('إلغاء طلب المرتجع')} <span className="num">#{r.orderNumber}</span></span>} badge={<StateBadge ops={['Refund.Cancel']} />}
-      footer={<><Button variant="ghost" onClick={onClose}>{t('رجوع')}</Button><Button variant="danger" loading={busy} disabled={!reason.trim()} onClick={submit} data-fb="refund-cancel-confirm">{t('تأكيد الإلغاء')}</Button></>}>
+      footer={<><Button variant="ghost" onClick={onClose}>{t('رجوع')}</Button><Button variant="danger" loading={busy} disabled={reason.trim().length < minReason} onClick={submit} data-fb="refund-cancel-confirm">{t('تأكيد الإلغاء')}</Button></>}>
       <div className="space-y-3 text-sm">
         <div className="flex items-center justify-between rounded-xl surface-1 border line px-3 py-2"><span className="text-soft">{r.reason}</span><Money v={r.amount} /></div>
         <Field label={t('سبب الإلغاء')}><Textarea autoFocus value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} data-fb="refund-cancel-reason" className="min-h-[72px]" /></Field>

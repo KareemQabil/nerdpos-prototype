@@ -9,7 +9,7 @@ import { errorsAr, errorsEn } from '../i18n/errors';
 import { sim } from '../mock/sim';
 import { clock } from '../mock/clock';
 import { OFFLINE_ALLOWLIST, capabilityOn } from '../mock/ops-registry';
-import { policy } from '../mock/policies';
+import { policy, reasonMinLength } from '../mock/policies';
 
 export interface DevCtx { id: string; auth: DeviceAuth; me: any | null; nav: (screen: string, params?: Record<string, any>) => void; screen: string; params: Record<string, any>; can: (p: string) => boolean; kind: string; terminal: any | null }
 export const DeviceContext = createContext<DevCtx | null>(null);
@@ -31,6 +31,12 @@ let manual = 0;
 export function refreshAll() { manual++; throttled = store.version() + manual * 1e6; vl.forEach((f) => f()); }
 export function useStoreVersion() {
   return useSyncExternalStore((cb) => { vl.add(cb); return () => vl.delete(cb); }, () => throttled);
+}
+
+/** ux-10b: the least number of characters a written reason needs here (ReasonTextPolicy; the server enforces it). */
+export function useReasonMin(): number {
+  const { auth, terminal } = useDev();
+  return reasonMinLength({ branchId: auth.branchId ?? terminal?.branchId ?? null });
 }
 
 export function errorText(e: unknown): string {

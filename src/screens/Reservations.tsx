@@ -4,7 +4,7 @@
 // (out of the drawer with a manager's approval) and seat popups. Centered popups only — no side drawers.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarPlus, UserCheck, UserX, PiggyBank, CalendarClock, Users, Pencil, Ban, Undo2, Clock, Search, UserPlus, UserRound, List, GanttChart, AlertTriangle, CheckCircle2, Armchair, StickyNote, History, Minus, Plus, Phone, MoreHorizontal, ExternalLink, X } from 'lucide-react';
-import { useDev, useQuery, useCommand } from '../app/hooks';
+import { useDev, useQuery, useCommand, useReasonMin } from '../app/hooks';
 import { PageHeader, Button, Field, Input, Select, Money, Table, Pill, Tabs, Popup, Popover, Kbd, FilterChips, SegmentedControl, EmptyState, DateTime, Numpad, Spinner, toast, useNow, applyNumpadKey, useNumpadKeys, type NumpadKey } from '../ui';
 import { sign, plainAmount, changePreview } from '../lib/cash';
 import { Tech } from '../app/tech';
@@ -613,10 +613,11 @@ function EditPopup({ r, all, tables, rules, onClose }: { r: any; all: any[]; tab
 function CancelPopup({ r, rules, onClose, onRefund }: { r: any; rules: Rules; onClose: () => void; onRefund: () => void }) {
   const { run, busy } = useCommand();
   const { can, terminal } = useDev();
+  const minReason = useReasonMin(); // ux-10b: ReasonTextPolicy
   const [reason, setReason] = useState('');
   const [seen, setSeen] = useState<number>(r.version);
   const p = r.cancelPreview ?? { outcome: 'NONE', late: false, amount: '0', cutoffAt: r.at };
-  const ok = reason.trim().length >= 3;
+  const ok = reason.trim().length >= minReason;
   const confirm = async () => {
     if (!ok || busy) return;
     const out = await run<any>('Reservation.Cancel', { params: { reservationId: r.id }, body: { reason: reason.trim(), expectedVersion: seen } }, { success: out0(p.outcome) });
@@ -648,6 +649,7 @@ function CancelPopup({ r, rules, onClose, onRefund }: { r: any; rules: Rules; on
 const out0 = (o: string) => (o === 'FORFEITED' ? t('أُلغي الحجز وصودر العربون') : o === 'REFUNDABLE' ? t('أُلغي الحجز والعربون قابل للرد') : t('أُلغي الحجز'));
 
 function RefundPopup({ d, who, onClose }: { d: any; who?: string; onClose: () => void }) {
+  const minReason = useReasonMin(); // ux-10b: ReasonTextPolicy
   const { run, busy } = useCommand();
   const { terminal } = useDev();
   const [amount, setAmount] = useState(plainAmount(d?.remaining));
@@ -659,7 +661,7 @@ function RefundPopup({ d, who, onClose }: { d: any; who?: string; onClose: () =>
   useNumpadKeys(!done, key, { scope: panel });
   if (!d) return null;
   const over = amount !== '' && sign(changePreview(amount, d.remaining)) > 0;
-  const ok = amount !== '' && sign(amount) > 0 && !over && reason.trim().length >= 3 && !!terminal?.drawer;
+  const ok = amount !== '' && sign(amount) > 0 && !over && reason.trim().length >= minReason && !!terminal?.drawer;
   const confirm = async () => {
     if (!ok || busy) return;
     const out = await run<any>('Deposit.Refund', { params: { depositId: d.id }, body: { amount, reason: reason.trim(), expectedVersion: seen ?? d.version } }, { success: t('رُدّ العربون من الدرج') });

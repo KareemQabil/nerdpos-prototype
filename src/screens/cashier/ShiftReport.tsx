@@ -46,6 +46,18 @@ export function ReportView({ r, z }: { r: any; z?: boolean }) {
         <div className="flex justify-between"><span>{t('الكاش المفروض في الدرج')}</span>{r.expectedCash !== undefined ? <Money v={r.expectedCash} fb="report-expected" /> : <Pill tone="neutral">{t('مخفي لحد ما تعد (عد أعمى)')}</Pill>}</div>
         {z && <><div className="flex justify-between"><span>{t('اللي اتعد فعلًا')}</span><Money v={r.countedCash} /></div><div className="flex justify-between items-center border-t line pt-1.5"><span className="font-bold flex items-center gap-1"><Scale className="w-4 h-4" />{t('الفرق')}</span><VarianceText v={r.variance} /></div></>}
       </div>
+      {r.handoverIn && <div className="rounded-xl surface-1 border line p-3 text-xs flex items-center justify-between gap-2" data-fb="report-handover-in"><span className="font-bold text-soft">{t('بدأت بتسليم من {n}', { n: personName(null, personText(r.handoverIn.fromCashier)) })} <span className="num text-dim">{r.handoverIn.number}</span></span><Money v={r.handoverIn.openingFromCount} /></div>}
+      {r.handoverOut && (
+        <div className="rounded-xl surface-1 border line p-3" data-fb="report-handover-out">
+          <div className="text-xs font-bold text-soft mb-1.5">{t('سُلّمت إلى {n}', { n: personName(null, personText(r.handoverOut.toCashier)) })} <span className="num text-dim">{r.handoverOut.number}</span></div>
+          <div className="space-y-1">
+            <div className="flex justify-between"><span>{t('عدّ الكاشير المُسلِّم')}</span><Money v={r.handoverOut.outgoingCount} /></div>
+            {r.handoverOut.incomingCount && <div className="flex justify-between"><span>{t('عدّ الكاشير المستلم')}</span><Money v={r.handoverOut.incomingCount} /></div>}
+            {r.handoverOut.approver && <div className="flex justify-between"><span>{t('بموافقة مدير')}</span><span>{personName(null, personText(r.handoverOut.approver))}</span></div>}
+            {r.handoverOut.reason && <div className="flex justify-between gap-2"><span>{t('السبب')}</span><span className="text-soft truncate">{r.handoverOut.reason}</span></div>}
+          </div>
+        </div>
+      )}
       <div className="rounded-xl surface-1 border line p-3"><div className="text-xs font-bold text-soft mb-1.5">{t('شيكات لسه مفتوحة (مش بتمنع القفل)')}</div>{r.outstandingChecks.length === 0 ? <div className="text-dim text-xs">{t('مفيش')}</div> : r.outstandingChecks.map((o: any) => <div key={o.orderId} className="flex justify-between text-xs"><span><span className="num">#{o.number}</span> {o.table ? `· ${t('ترابيزة')} ${o.table}` : ''}</span><Money v={o.payable} /></div>)}</div>
       <div className="text-[11px] text-dim">{z ? t('تقرير Z') : t('تقرير X')} · <DateTime v={r.snapshotAt} /></div>
     </div>

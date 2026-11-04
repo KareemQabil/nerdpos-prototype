@@ -14,7 +14,9 @@ export type SaleAction =
   | 'guests' | 'label' | 'undo' | 'viewTables' | 'viewChecks' | 'viewClosed'
   | 'modeTakeaway' | 'modeDineIn' | 'modeDelivery'
   // ux-10: the drawer's jobs, as popups over the sale screen («drawer» opens the shift popup)
-  | 'cashIn' | 'cashOut' | 'noSale' | 'xReport' | 'closeShift';
+  | 'cashIn' | 'cashOut' | 'noSale' | 'xReport' | 'closeShift'
+  // ux-10b: the shift handover (a popup over the sale screen)
+  | 'handover';
 
 /** What the big primary button does; 'auto' follows the check state (send → pay → finish paying). */
 export type PrimaryAction = 'auto' | 'send' | 'pay' | 'seat' | 'ready' | 'delivered' | 'dispatch' | 'confirm';
@@ -123,6 +125,7 @@ export const SALE_KEYS: Partial<Record<SaleAction | 'primary', string>> = {
   modeTakeaway: 'Insert', modeDineIn: 'Home', modeDelivery: 'Delete', // ux-05: the three peer modes (F9 still cycles)
   // ux-10: the drawer's jobs on Shift + a function key (the plain function keys are all taken)
   drawer: 'Shift+F1', cashIn: 'Shift+F2', cashOut: 'Shift+F3', noSale: 'Shift+F4', xReport: 'Shift+F6', closeShift: 'Shift+F7',
+  handover: 'Shift+F8', // ux-10b
 };
 
 /** Kitchen screen actions a bump bar (or a keyboard) drives. ←/→ move between tickets and 1–9 pick one (fixed). */

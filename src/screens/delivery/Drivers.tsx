@@ -5,7 +5,7 @@
 // Deactivated riders are listed under «المتوقفون» with «إعادة تفعيل».
 import React, { useRef, useState } from 'react';
 import { Bike, UserPlus, Banknote, Pencil, Power, PowerOff, Wallet, Scale, RotateCcw, Phone, AlertTriangle, Clock3, Save, CheckCircle2 } from 'lucide-react';
-import { useDev, useQuery, useCommand } from '../../app/hooks';
+import { useDev, useQuery, useCommand, useReasonMin } from '../../app/hooks';
 import { Tech } from '../../app/tech';
 import { Button, Card, DateTime, DetailPane, EmptyState, FILL_BODY, FILL_CARD, Field, FillPage, FilterChips, Input, MasterDetail, Money, Numpad, PageHeader, Pill, Popup, Select, Spinner, StatCard, StatGrid, StateBadge, Table, Tabs, Textarea, applyNumpadKey, useEnterSave, useNumpadKeys, type NumpadKey } from '../../ui';
 import { t } from '../../i18n';
@@ -228,6 +228,7 @@ function AmountPad({ value, onChange, full, fullLabel, fb, onEnter }: { value: s
 /** ux-11 owner decision 2: an old shortage — collect it in cash (into this drawer), move it to the next payout, or
  *  waive it. Every way needs a manager (DRIVER_OWED_SETTLE, the approval popup); moving and waiving need a reason. */
 function OwedPopup({ d, onClose }: { d: any; onClose: () => void }) {
+  const minReason = useReasonMin(); // ux-10b: ReasonTextPolicy
   const { run, busy } = useCommand();
   const { terminal } = useDev();
   const [mode, setMode] = useState<'COLLECT_CASH' | 'DEDUCT_PAYOUT' | 'WAIVE'>(terminal?.drawer ? 'COLLECT_CASH' : 'DEDUCT_PAYOUT');
@@ -238,7 +239,7 @@ function OwedPopup({ d, onClose }: { d: any; onClose: () => void }) {
   const max = mode === 'DEDUCT_PAYOUT' ? minAmount(owed, available) : owed;
   const over = amount !== '' && sign(changePreview(amount, max)) > 0;
   const needReason = mode !== 'COLLECT_CASH';
-  const ok = amount !== '' && sign(amount) > 0 && !over && (!needReason || reason.trim().length >= 3) && !(mode === 'COLLECT_CASH' && !terminal?.drawer);
+  const ok = amount !== '' && sign(amount) > 0 && !over && (!needReason || reason.trim().length >= minReason) && !(mode === 'COLLECT_CASH' && !terminal?.drawer);
   const save = async () => {
     if (!ok || busy) return;
     const r = await run('Driver.SettleOwed', { params: { driverId: d.id }, body: { mode, amount, reason: reason.trim() || undefined, expectedVersion: d.version } }, { success: mode === 'COLLECT_CASH' ? t('دخل المبلغ الدرج ونقص العجز') : mode === 'DEDUCT_PAYOUT' ? t('حُوّل المبلغ للخصم من المستحقات') : t('أُعفي الطيار من المبلغ') });
@@ -307,8 +308,9 @@ const Row = ({ label, v }: { label: React.ReactNode; v: React.ReactNode }) => <d
 const STOP_REASONS = ['ترك العمل', 'إجازة طويلة', 'إيقاف مؤقت بقرار الإدارة'];
 function DeactivatePopup({ d, onClose }: { d: any; onClose: () => void }) {
   const { run, busy } = useCommand();
+  const minReason = useReasonMin(); // ux-10b: ReasonTextPolicy
   const [reason, setReason] = useState('');
-  const ok = reason.trim().length >= 3;
+  const ok = reason.trim().length >= minReason;
   const save = async () => { if (!ok || busy) return; const r = await run('Driver.Upsert', { params: { driverId: d.id }, body: { expectedVersion: d.version, active: false, reason: reason.trim() } }, { success: t('أُوقف {n}', { n: d.name }) }); if (r) onClose(); };
   const onKey = useEnterSave(save, ok && !busy);
   return (
