@@ -20,6 +20,9 @@
 //   Popup                smart centered popup (replaces side sheets for actions), Popover (anchored, 1–2 fields)
 //   Numpad               the one keypad: quantity, payment, PIN, drawer counting (./Numpad)
 //   MasterDetail, DetailPane, FillPage, useEnterSave, useScrollLock   page layouts without side drawers (./layout)
+//   DataTable + cols<Row>()  ux-16 the one table: typed columns (money, qty, number, status, date/day/time, text,
+//                        actions) on TanStack Table, sort, density (DensityToggle), totals, pages (./table); Table is
+//                        the older API on the same system
 import React, { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Loader2, AlertTriangle, CheckCircle2, Info, XCircle, Search, Check, Inbox } from 'lucide-react';
@@ -30,6 +33,7 @@ import { badgeOfOps, opsById } from '../mock/contracts';
 import { useTech } from '../app/tech';
 import { deviceName } from '../demo/people';
 import { useScrollLock } from './layout';
+import { LegacyTable } from './table/DataTable';
 
 // ───────── buttons
 type BtnVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success' | 'warning' | 'outline' | 'subtle';
@@ -649,41 +653,14 @@ export function Timeline({ items, className, empty }: { items: { id?: string | n
 }
 
 /**
- * One table. `fill`: the table fills its flex parent and is the region's only scroller (sticky head, horizontal scroll
- * inside). Without fill/maxHeight the table flows with the page; while it fits the width it is not a scroll box, so its
- * head sticks to the page scroller (ux-06: no nested scrollers, sticky heads, horizontal overflow only in tables).
+ * One table (older API, kept): `head` / `rows` of rendered cells / `align`, on the one table system (./table, ux-16).
+ * `fill`: the table fills its flex parent and is the region's only scroller (sticky head, horizontal scroll inside).
+ * Without fill/maxHeight the table flows with the page; while it fits the width it is not a scroll box, so its head
+ * sticks to the page scroller (ux-06: no nested scrollers, sticky heads, horizontal overflow only in tables).
+ * New screens use <DataTable columns={cols<Row>()…}> (typed money / quantity / status / date / text / actions columns).
  */
-export function Table({ head, rows, empty, className, align, loading, onRowClick, maxHeight, dense, rowKey, rowClassName, fill }: { head: React.ReactNode[]; rows: React.ReactNode[][]; empty?: React.ReactNode; className?: string; align?: ('start' | 'end' | 'center' | undefined)[]; loading?: boolean; onRowClick?: (i: number) => void; maxHeight?: number | string; dense?: boolean; rowKey?: (i: number) => React.Key; rowClassName?: (i: number) => string | undefined; fill?: boolean }) {
-  const al = (j: number) => (align?.[j] === 'end' ? 'text-end' : align?.[j] === 'center' ? 'text-center' : 'text-start');
-  const py = dense ? 'py-1.5' : 'py-2.5';
-  const wrap = useRef<HTMLDivElement>(null);
-  const tbl = useRef<HTMLTableElement>(null);
-  const [flow, setFlow] = useState(false);
-  useLayoutEffect(() => {
-    const w = wrap.current, tb = tbl.current;
-    if (maxHeight || fill || !w || !tb) { setFlow(false); return; }
-    const check = () => setFlow(tb.offsetWidth <= w.clientWidth + 1);
-    check();
-    const ro = new ResizeObserver(check);
-    ro.observe(w); ro.observe(tb);
-    return () => ro.disconnect();
-  }, [maxHeight, fill]);
-  return (
-    <div ref={wrap} className={cn('rounded-xl border line table-wrap', flow ? 'overflow-visible' : 'overflow-auto', fill && 'flex-1 min-h-0', className)} style={maxHeight ? { maxHeight } : undefined} data-table-fill={fill || undefined}>
-      <table ref={tbl} className="w-full text-sm border-separate border-spacing-0">
-        <thead><tr>{head.map((h, i) => <th key={i} className={cn('table-head sticky top-0 z-[1] font-bold text-[11px] text-soft px-3 py-2.5 whitespace-nowrap border-b line', al(i))}>{h}</th>)}</tr></thead>
-        <tbody>
-          {loading && rows.length === 0 && Array.from({ length: 4 }, (_, i) => <tr key={`sk${i}`}>{head.map((_, j) => <td key={j} className={cn('px-3 border-b line', py)}><Skeleton className={cn('h-4', j === 0 ? 'w-3/4' : 'w-1/2', align?.[j] === 'end' && 'ms-auto')} /></td>)}</tr>)}
-          {!loading && rows.length === 0 && <tr><td colSpan={head.length} className="px-3 py-8 text-center text-dim">{empty ?? t('مفيش بيانات')}</td></tr>}
-          {rows.map((r, i) => (
-            <tr key={rowKey ? rowKey(i) : i} onClick={onRowClick ? () => onRowClick(i) : undefined} className={cn('table-row transition-colors', onRowClick && 'cursor-pointer', rowClassName?.(i))}>
-              {r.map((c, j) => <td key={j} className={cn('px-3 align-middle border-b line', py, al(j))}>{c}</td>)}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+export function Table(props: { head: React.ReactNode[]; rows: React.ReactNode[][]; empty?: React.ReactNode; className?: string; align?: ('start' | 'end' | 'center' | undefined)[]; loading?: boolean; onRowClick?: (i: number) => void; maxHeight?: number | string; dense?: boolean; rowKey?: (i: number) => React.Key; rowClassName?: (i: number) => string | undefined; fill?: boolean }) {
+  return <LegacyTable {...props} />;
 }
 
 // ───────── confirm
@@ -713,3 +690,5 @@ export function ConfirmHost() {
 export { Numpad, applyNumpadKey, useNumpadKeys } from './Numpad';
 export { MasterDetail, DetailPane, FillPage, FILL_CARD, FILL_BODY, useEnterSave, useScrollLock, useDetailMode, useListCompact, SPLIT_MIN, DetailModeProvider } from './layout';
 export type { NumpadKey, NumpadMode } from './Numpad';
+export { DataTable, cols, DensityToggle, TruncText, DayText, useDensity } from './table/DataTable';
+export type { Column, DataTableProps, StatusValue } from './table/DataTable';

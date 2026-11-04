@@ -7862,4 +7862,13 @@ export const en: Record<string, string> = {
   "سجل العرض يحفظ كل تعديل بسببه، والشيكات السابقة تبقى بنسختها": "The promotion's history keeps every change with its reason; earlier checks keep their version",
   "قائمة الطعام والعروض": "Menu and promotions",
   "صنف بمقاسين وسعر مجدول، إيقافه بدل حذفه بعد بيعه، هابي أور يظهر للكاشير بمبلغه من الخادم، رمز عرض بلا تكرار، عرض للأعضاء مرة لكل عميل، وإزالة العرض وتعديله بسبب.": "An item with two sizes and a scheduled price, retired instead of deleted once sold, a happy hour shown to the cashier with the server's amount, a code applied once, a members promotion once per customer, and removing and editing a promotion with a reason.",
+  // ux-16 the one table
+  "كثافة الجدول": "Table density",
+  "لا توجد بيانات": "No data",
+  "ترتيب تصاعدي": "sorted ascending",
+  "ترتيب تنازلي": "sorted descending",
+  "بلا ترتيب": "not sorted",
+  "{a}–{b} من {n}": "{a}–{b} of {n}",
+  "الصفحة السابقة": "Previous page",
+  "الصفحة التالية": "Next page",
 };
