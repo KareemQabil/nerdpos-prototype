@@ -5,10 +5,10 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, ClipboardCheck, Send, CheckCheck, XCircle, Eye, EyeOff, Save } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
-import { Banner, Button, Card, DetailPane, FILL_BODY, FILL_CARD, Field, FillPage, Input, MasterDetail, Modal, Money, PageHeader, Spinner, StateBadge, Switch, Table, Textarea, EmptyState, Toolbar } from '../../ui';
+import { Banner, Button, Card, DetailPane, FILL_BODY, FILL_CARD, Field, FillPage, Input, MasterDetail, Modal, Money, PageHeader, Spinner, StateBadge, Switch, Table, Textarea, EmptyState, Toolbar, DataTable, cols, DensityToggle, DateTime } from '../../ui';
 import { t, L, tv } from '../../i18n';
 import { cn, dateTime, money } from '../../lib/format';
-import { BranchScope, COUNT_STATE, Qty, StatePill, WarehouseSelect, fmtQty, unitLabel, unitOptions, useBranchScope, useItemsCatalog, useList, useWarehouses, Inp, Sel } from './common';
+import { BranchScope, COUNT_STATE, Qty, StatePill, stateOf, WarehouseSelect, fmtQty, unitLabel, unitOptions, useBranchScope, useItemsCatalog, useList, useWarehouses, Inp, Sel } from './common';
 import { personText } from '../../demo/people';
 
 const OPS = ['StockCount.Start', 'StockCount.RecordObservations', 'StockCount.Submit', 'Stock.Count', 'StockCount.Cancel', 'StockCount.Find', 'StockCount.Get'];
@@ -22,21 +22,24 @@ export default function Counts() {
   const setOpen = (id: string | null) => nav('inv-counts', id ? { open: id } : {});
   const [starting, setStarting] = useState(!!params?.start);
   useEffect(() => { if (params?.start) setStarting(true); }, [params?.start]);
+  const CC = cols<any>();
   const page = (
     <FillPage>
       <PageHeader className="!mb-0" icon={<ClipboardCheck />} title={t('الجرد')} badge={<StateBadge ops={OPS} />}
         actions={<><BranchScope scope={scope} /><Button data-fb="counts:new" variant="primary" onClick={() => setStarting(true)}><Plus className="w-4 h-4" />{t('جرد جديد')}</Button></>} />
       <Card padding="sm" className={FILL_CARD} bodyClassName={FILL_BODY}>
-        <Toolbar><Sel className="w-52" value={state} onChange={(e) => setState(e.target.value)} options={[{ value: '', label: t('كل الحالات') }, ...Object.entries(COUNT_STATE).map(([k, v]) => ({ value: k, label: t(v.ar) }))]} /></Toolbar>
-        <Table fill loading={list.loading && !list.raw} onRowClick={(i) => setOpen(list.items[i].id)} empty={<EmptyState compact icon={<ClipboardCheck />} title={t('لا يوجد جرد.')} action={!state ? <Button variant="primary" onClick={() => setStarting(true)}><Plus className="w-4 h-4" />{t('جرد جديد')}</Button> : undefined} />} head={[t('رقم الجرد'), t('المخزن'), t('بدأ'), t('الحالة'), t('اتعد'), t('الفروقات'), '']} align={['start', 'start', 'start', 'start', 'end', 'end', 'end']} rows={list.items.map((c) => [
-          <span className="num font-bold" data-fb={`counts:open:${c.id}`}>{c.number}</span>,
-          <span>{tv(c.warehouse.name)} <span className="text-xs text-dim">{tv(c.warehouse.branchName)}</span></span>,
-          <span className="text-xs">{dateTime(c.startedAt)} · {personText(c.startedByName)}</span>,
-          <StatePill map={COUNT_STATE} state={c.state} />,
-          <span className="num text-xs">{c.countedCount} / {c.lineCount}</span>,
-          c.state === 'POSTED' ? <Money v={c.varianceValue} tone={Number(c.varianceValue) < 0 ? 'error' : 'success'} className="text-sm" /> : c.previewVarianceValue !== null && c.state !== 'CANCELLED' ? <span className="text-xs text-dim">{t('متوقع')} <Money v={c.previewVarianceValue} className="text-xs" /></span> : '—',
-          <Button size="sm" onClick={(e) => { e.stopPropagation(); setOpen(c.id); }}>{c.state === 'DRAFT' ? t('متابعة العد') : c.state === 'SUBMITTED' ? t('مراجعة واعتماد') : t('عرض')}</Button>,
-        ])} />
+        <Toolbar><Sel className="w-52" value={state} onChange={(e) => setState(e.target.value)} options={[{ value: '', label: t('كل الحالات') }, ...Object.entries(COUNT_STATE).map(([k, v]) => ({ value: k, label: t(v.ar) }))]} /><Toolbar.Spacer /><DensityToggle /></Toolbar>
+        <DataTable fill rows={list.items} rowKey={(c: any) => c.id} loading={list.loading && !list.raw} onRowOpen={(c) => setOpen(c.id)} label={t('الجرد')}
+          empty={<EmptyState compact icon={<ClipboardCheck />} title={t('لا يوجد جرد.')} action={!state ? <Button variant="primary" onClick={() => setStarting(true)}><Plus className="w-4 h-4" />{t('جرد جديد')}</Button> : undefined} />}
+          columns={[
+            CC.text('number', t('رقم الجرد'), (c) => c.number, { cell: (c) => <span className="num font-bold" data-fb={`counts:open:${c.id}`}>{c.number}</span> }),
+            CC.text('warehouse', t('المخزن'), (c) => tv(c.warehouse.name), { maxChars: 20, sub: (c) => tv(c.warehouse.branchName) }),
+            CC.date('started', t('بدأ'), (c) => c.startedAt, { cell: (c) => <div><DateTime v={c.startedAt} className="text-xs" /><div className="text-[11px] text-dim">{personText(c.startedByName)}</div></div> }),
+            CC.status('state', t('الحالة'), (c) => stateOf(COUNT_STATE, c.state)),
+            CC.number('counted', t('اتعد'), (c) => c.countedCount, { cell: (c) => <span className="num text-xs">{c.countedCount} / {c.lineCount}</span> }),
+            CC.money('variance', t('الفروقات'), (c) => (c.state === 'POSTED' ? c.varianceValue : c.previewVarianceValue !== null && c.state !== 'CANCELLED' ? c.previewVarianceValue : null), { cell: (c) => c.state === 'POSTED' ? <Money v={c.varianceValue} tone={String(c.varianceValue).startsWith('-') ? 'error' : 'success'} /> : c.previewVarianceValue !== null && c.state !== 'CANCELLED' ? <span className="text-xs text-dim">{t('متوقع')} <Money v={c.previewVarianceValue} className="font-normal" /></span> : <span className="text-dim">—</span> }),
+            CC.actions('act', (c) => <Button size="sm" onClick={() => setOpen(c.id)}>{c.state === 'DRAFT' ? t('متابعة العد') : c.state === 'SUBMITTED' ? t('مراجعة واعتماد') : t('عرض')}</Button>),
+          ]} />
       </Card>
       {starting && <StartDialog onClose={() => setStarting(false)} onStarted={(id) => { setStarting(false); setOpen(id); }} />}
     </FillPage>

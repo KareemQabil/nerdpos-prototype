@@ -3,9 +3,10 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, SlidersHorizontal, Undo2 } from 'lucide-react';
 import { useCommand, useQuery } from '../../app/hooks';
-import { Banner, Button, Empty, Field, Input, Modal, Money, Pill, Section, Select, Spinner, StateBadge, Table, Tabs, EmptyState } from '../../ui';
+import { Banner, Button, Empty, Field, Input, Modal, Money, Pill, Section, Select, Spinner, StateBadge, Table, DataTable, cols, DateTime, Tabs, EmptyState } from '../../ui';
+import { D } from '../../mock/money';
 import { t, L, tv } from '../../i18n';
-import { dateTime } from '../../lib/format';
+import { dateTime, money } from '../../lib/format';
 import { BranchScope, ItemPicker, MovementTable, Qty, WASTE_REASONS, WASTE_REASON_TEXT, WarehouseSelect, reasonText, useBranchScope, useItemsCatalog, useList, useWarehouses } from './common';
 import { WasteDialog } from './WasteDialog';
 import { AdjustDialog } from './ItemDetail';
@@ -34,8 +35,10 @@ function WasteTab({ branchId }: { branchId?: string }) {
   const [wh, setWh] = useState('');
   const [open, setOpen] = useState(false);
   const q = useList<any>('Waste.Find', { branchId, reason: reason || undefined, warehouseId: wh || undefined });
-  const byReason = new Map<string, number>();
-  for (const w of q.items) byReason.set(w.reason, (byReason.get(w.reason) ?? 0) + Number(w.value));
+  // ux-16: per-reason sums as Decimal (was floating point)
+  const byReason = new Map<string, ReturnType<typeof D>>();
+  for (const w of q.items) byReason.set(w.reason, (byReason.get(w.reason) ?? D(0)).plus(D(w.value)));
+  const WC = cols<any>();
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2 items-end">
@@ -45,17 +48,18 @@ function WasteTab({ branchId }: { branchId?: string }) {
         <div className="text-sm">{t('الإجمالي')}: <Money v={q.raw?.totalValue} tone="error" /></div>
         <Button variant="warning" data-fb="waste-list:new" onClick={() => setOpen(true)}><Trash2 className="w-4 h-4" />{t('تسجيل هالك')}</Button>
       </div>
-      {byReason.size > 0 && <div className="flex flex-wrap gap-1.5">{[...byReason].sort((a, b) => b[1] - a[1]).map(([r, v]) => <Pill key={r} tone="warning">{reasonText(r)} · <span className="num">{v.toFixed(2)}</span></Pill>)}</div>}
-      <Table loading={q.loading && !q.raw} empty={<EmptyState compact icon={<Trash2 />} title={t('مفيش هالك متسجل')} />} head={[t('إمتى'), t('الصنف'), t('الكمية'), t('السبب'), t('المخزن'), t('القيمة'), t('مين'), t('وافق')]} rows={q.items.map((w) => [
-          <span className="text-xs">{dateTime(w.at)} <span className="num text-dim">{w.number}</span></span>,
-          <div><div className="font-bold">{L(w.name)} {w.itemKind === 'PRODUCT' && <Pill tone="info">{t('طبق')}</Pill>}</div>{w.lines?.length > 0 && <div className="text-[11px] text-dim">{w.lines.map((x: any) => `${L(x.name)} ${x.quantity}`).join(t('، '))}</div>}{tv(w.note) && <div className="text-[11px] text-dim">{tv(w.note)}</div>}</div>,
-          w.itemKind === 'PRODUCT' ? <span className="num">{w.quantity} {t('طبق')}</span> : <Qty v={w.quantity} unit={w.unit} />,
-          <Pill tone="warning">{reasonText(w.reason)}</Pill>,
-          <span className="text-xs">{tv(w.warehouse.name)}</span>,
-          <Money v={w.value} tone="error" className="text-xs" />,
-          <span className="text-xs">{personText(w.userName)}</span>,
-          <span className="text-xs text-dim">{personText(w.approverName) ?? '—'}</span>,
-        ])} />
+      {byReason.size > 0 && <div className="flex flex-wrap gap-1.5">{[...byReason].sort((a, b) => b[1].comparedTo(a[1])).map(([r, v]) => <Pill key={r} tone="warning">{reasonText(r)} · <span className="num">{money(v.toFixed(4), false)}</span></Pill>)}</div>}
+      <DataTable rows={q.items} rowKey={(w: any) => w.id ?? w.number} loading={q.loading && !q.raw} label={t('الهالك')} defaultSort={{ id: 'at', dir: 'desc' }} empty={<EmptyState compact icon={<Trash2 />} title={t('مفيش هالك متسجل')} />}
+        columns={[
+          WC.date('at', t('إمتى'), (w) => w.at, { cell: (w) => <div><DateTime v={w.at} className="text-xs" /><div className="num text-[11px] text-dim">{w.number}</div></div> }),
+          WC.text('item', t('الصنف'), (w) => L(w.name), { cell: (w) => <div><div className="font-bold">{L(w.name)} {w.itemKind === 'PRODUCT' && <Pill tone="info">{t('طبق')}</Pill>}</div>{w.lines?.length > 0 && <div className="text-[11px] text-dim">{w.lines.map((x: any) => `${L(x.name)} ${x.quantity}`).join(t('، '))}</div>}{tv(w.note) && <div className="text-[11px] text-dim">{tv(w.note)}</div>}</div> }),
+          WC.qty('qty', t('الكمية'), (w) => w.quantity, { cell: (w) => (w.itemKind === 'PRODUCT' ? <span className="num">{w.quantity} {t('طبق')}</span> : <Qty v={w.quantity} unit={w.unit} />) }),
+          WC.status('reason', t('السبب'), (w) => ({ label: reasonText(w.reason), tone: 'warning' })),
+          WC.text('warehouse', t('المخزن'), (w) => tv(w.warehouse.name), { maxChars: 16 }),
+          WC.money('value', t('القيمة'), (w) => w.value, { tone: () => 'error' }),
+          WC.text('who', t('مين'), (w) => personText(w.userName), { maxChars: 16 }),
+          WC.text('approver', t('وافق'), (w) => personText(w.approverName) ?? null, { maxChars: 16, className: 'text-dim' }),
+        ]} />
       <WasteDialog open={open} onClose={() => setOpen(false)} />
     </div>
   );
@@ -98,16 +102,23 @@ function ReturnsTab({ branchId }: { branchId?: string }) {
   const q = useList<any>('Waste.Find', { branchId });
   const [open, setOpen] = useState(false);
   const list: any[] = q.raw?.customerReturns ?? [];
+  const RC = cols<any>();
   return (
     <div className="space-y-3">
       <div className="flex justify-between items-center flex-wrap gap-2">
         <Banner tone="info">{t('لما زبون يرجّع صنف: لو ينفع يرجع المخزن (كانز، مياه مقفولة) اختار "يرجع المخزن". الأكل اللي اتعمل بيتسجل "يترمي" — مفيش حركة مخزن لأنه اتسحب وقت البيع.')}</Banner>
         <Button variant="primary" data-fb="returns:new" onClick={() => setOpen(true)}><Undo2 className="w-4 h-4" />{t('تسجيل مرتجع')}</Button>
       </div>
-      <Table empty={t('مفيش مرتجعات')} head={[t('إمتى'), t('الشيك'), t('الصنف'), t('الكمية'), t('مصيره'), t('القيمة'), t('مين')]} rows={list.map((r) => [
-        <span className="text-xs">{dateTime(r.at)}</span>, <span className="num">{r.orderNumber}</span>, <span className="font-bold">{L(r.name)}</span>, <span className="num">{r.quantity}</span>,
-        r.disposition === 'RESTOCK' ? <Pill tone="success">{t('رجع المخزن')}</Pill> : <Pill tone="warning">{t('اترمى')}</Pill>, <Money v={r.value} className="text-xs" />, <span className="text-xs">{personText(r.userName)}</span>,
-      ])} />
+      <DataTable rows={list} rowKey={(r: any, i) => r.id ?? i} empty={t('مفيش مرتجعات')} label={t('مرتجعات العملاء')} defaultSort={{ id: 'at', dir: 'desc' }}
+        columns={[
+          RC.date('at', t('إمتى'), (r) => r.at),
+          RC.number('order', t('الشيك'), (r) => r.orderNumber, { align: 'start' }),
+          RC.text('item', t('الصنف'), (r) => L(r.name), { maxChars: 28, className: 'font-bold' }),
+          RC.qty('qty', t('الكمية'), (r) => r.quantity),
+          RC.status('disp', t('مصيره'), (r) => (r.disposition === 'RESTOCK' ? { label: t('رجع المخزن'), tone: 'success' } : { label: t('اترمى'), tone: 'warning' })),
+          RC.money('value', t('القيمة'), (r) => r.value),
+          RC.text('who', t('مين'), (r) => personText(r.userName), { maxChars: 16 }),
+        ]} />
       {open && <ReturnDialog onClose={() => setOpen(false)} />}
     </div>
   );

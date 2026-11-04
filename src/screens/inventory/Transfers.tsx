@@ -4,10 +4,10 @@ import React, { useEffect, useState } from 'react';
 import { Plus, ArrowLeftRight, Truck, PackageCheck, XCircle, Trash2, ArrowLeft } from 'lucide-react';
 import { useCommand, useDev, useQuery } from '../../app/hooks';
 import { Tech } from '../../app/tech';
-import { Banner, Button, Empty, Field, Input, KV, Modal, Money, Section, Select, Spinner, StateBadge, Table, Textarea, EmptyState } from '../../ui';
+import { Banner, Button, Empty, Field, Input, KV, Modal, Money, Section, Select, Spinner, StateBadge, Table, Textarea, EmptyState, DataTable, cols, DateTime } from '../../ui';
 import { t, L, tv } from '../../i18n';
 import { dateTime } from '../../lib/format';
-import { BranchScope, ItemPicker, Qty, StatePill, TRANSFER_STATE, WarehouseSelect, fmtQty, unitOptions, useBranchScope, useList, useWarehouses, Inp, Sel } from './common';
+import { BranchScope, ItemPicker, Qty, StatePill, TRANSFER_STATE, stateOf, WarehouseSelect, fmtQty, unitOptions, useBranchScope, useList, useWarehouses, Inp, Sel } from './common';
 import { personText } from '../../demo/people';
 
 const OPS = ['Transfer.Create', 'Stock.Transfer', 'Transfer.Receive', 'Transfer.Cancel', 'Transfer.Find', 'Transfer.Get'];
@@ -20,21 +20,23 @@ export default function Transfers() {
   const [open, setOpen] = useState<string | null>(null);
   const [creating, setCreating] = useState(!!params?.create);
   useEffect(() => { if (params?.create) setCreating(true); }, [params?.create]);
+  const TC = cols<any>();
   return (
     <div>
       <Section title={t('التحويلات')} badge={<StateBadge ops={OPS} />} sub={t('نقل بضاعة من مخزن لمخزن: من المخزن الرئيسي للمطبخ، أو لفرع تاني. البضاعة بتطلع من المخزن أول ما تتبعت، وبتدخل لما تتستلم.')}
         actions={<><BranchScope scope={scope} /><Button data-fb="transfers:new" variant="primary" onClick={() => setCreating(true)}><Plus className="w-4 h-4" />{t('تحويل جديد')}</Button></>} />
       <div className="flex gap-2 mb-3"><Sel className="w-52" value={state} onChange={(e) => setState(e.target.value)} options={[{ value: '', label: t('كل الحالات') }, ...Object.entries(TRANSFER_STATE).map(([k, v]) => ({ value: k, label: t(v.ar) }))]} /></div>
-      <Table loading={list.loading && !list.raw} empty={<EmptyState compact icon={<ArrowLeftRight />} title={t('مفيش تحويلات')} />} head={[t('الرقم'), t('من'), t('إلى'), t('الحالة'), t('الأصناف'), t('القيمة'), t('آخر تحديث'), '']} rows={list.items.map((tr) => [
-          <button className="num font-bold hover:text-[var(--primary)]" data-fb={`transfers:open:${tr.id}`} onClick={() => setOpen(tr.id)}>{tr.number}</button>,
-          <span>{tv(tr.from.name)} <span className="text-[11px] text-dim">{tv(tr.from.branchName)}</span></span>,
-          <span>{tv(tr.to.name)} <span className="text-[11px] text-dim">{tv(tr.to.branchName)}</span></span>,
-          <StatePill map={TRANSFER_STATE} state={tr.state} />,
-          <span className="text-xs">{tr.lines.map((l: any) => L(l.item?.name)).slice(0, 3).join(t('، '))}{tr.lines.length > 3 ? ` +${tr.lines.length - 3}` : ''}</span>,
-          <Money v={tr.value} className="text-xs" />,
-          <span className="text-xs text-dim">{dateTime(tr.receivedAt ?? tr.dispatchedAt ?? tr.cancelledAt ?? tr.createdAt)}</span>,
-          <Button size="sm" onClick={() => setOpen(tr.id)}>{tr.state === 'DRAFT' ? t('ابعت') : tr.state === 'DISPATCHED' ? t('استلم') : t('اعرض')}</Button>,
-        ])} />
+      <DataTable rows={list.items} rowKey={(tr: any) => tr.id} loading={list.loading && !list.raw} onRowOpen={(tr) => setOpen(tr.id)} label={t('التحويلات')} empty={<EmptyState compact icon={<ArrowLeftRight />} title={t('مفيش تحويلات')} />}
+        columns={[
+          TC.text('number', t('الرقم'), (tr) => tr.number, { cell: (tr) => <span className="num font-bold" data-fb={`transfers:open:${tr.id}`}>{tr.number}</span> }),
+          TC.text('from', t('من'), (tr) => tv(tr.from.name), { maxChars: 20, sub: (tr) => tv(tr.from.branchName) }),
+          TC.text('to', t('إلى'), (tr) => tv(tr.to.name), { maxChars: 20, sub: (tr) => tv(tr.to.branchName) }),
+          TC.status('state', t('الحالة'), (tr) => stateOf(TRANSFER_STATE, tr.state)),
+          TC.text('lines', t('الأصناف'), (tr) => `${tr.lines.map((l: any) => L(l.item?.name)).slice(0, 3).join(t('، '))}${tr.lines.length > 3 ? ` +${tr.lines.length - 3}` : ''}`, { maxChars: 32 }),
+          TC.money('value', t('القيمة'), (tr) => tr.value),
+          TC.date('at', t('آخر تحديث'), (tr) => tr.receivedAt ?? tr.dispatchedAt ?? tr.cancelledAt ?? tr.createdAt),
+          TC.actions('act', (tr) => <Button size="sm" onClick={() => setOpen(tr.id)}>{tr.state === 'DRAFT' ? t('ابعت') : tr.state === 'DISPATCHED' ? t('استلم') : t('اعرض')}</Button>),
+        ]} />
       {creating && <CreateTransfer onClose={() => setCreating(false)} onCreated={(id) => { setCreating(false); setOpen(id); }} />}
       <TransferView id={open} onClose={() => setOpen(null)} />
     </div>

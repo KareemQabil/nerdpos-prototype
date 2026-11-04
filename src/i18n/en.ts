@@ -7871,4 +7871,9 @@ export const en: Record<string, string> = {
   "{a}–{b} من {n}": "{a}–{b} of {n}",
   "الصفحة السابقة": "Previous page",
   "الصفحة التالية": "Next page",
+  "أصناف الشيك": "Check items",
+  "طلبات المرتجع": "Refund requests",
+  "المشاكل": "Issues",
+  "مرتجعات العملاء": "Customer returns",
+  "النتيجة": "Result",
 };
